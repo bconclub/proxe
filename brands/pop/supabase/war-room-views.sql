@@ -26,7 +26,11 @@ SELECT
   action_intent,
   loop_status,
   created_at,
-  updated_at
+  updated_at,
+  -- 026: intensity ladder + engagement (appended — CREATE OR REPLACE VIEW
+  -- requires existing column order preserved)
+  intensity,
+  engagement_type
 FROM all_leads
 WHERE brand = 'pop';
 

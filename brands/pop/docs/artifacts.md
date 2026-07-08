@@ -11,6 +11,25 @@ The dashboard's brand header (top-left) opens the **artifact switcher**
 
 ---
 
+## The intensity ladder (the spine of spines)
+
+~3 crore people, ~2 crore voters. Every person climbs one ladder, and every
+artifact gauges flow on it — `all_leads.intensity` (migration 026):
+
+| Tier | Key | Means |
+|---|---|---|
+| 0 | contact | row exists, nothing placeable |
+| 1 | voter | placeable: seat/booth known, a non-default lean, or vote intent |
+| 2 | supporter | `lean='supporter'`, or leaning + will act |
+| 3 | volunteer | raised their hand (`action_intent`/`engagement_type='volunteer'`, stage Converted) |
+| 4 | cadre | active `d2d_workers` row linked by lead_id |
+
+Enforced by a DB trigger on every write path (ratchet: climbs, never silently
+falls; `opposed` caps derived tier at 1). Shared display vocabulary:
+`core/src/lib/pop/intensity.ts`. War Room renders the funnel; the Leader API
+exposes per-seat tier counts; registering a cadre worker auto-promotes the
+person.
+
 ## Shared identity model (the spine)
 
 Every artifact speaks the same vocabulary — columns on `all_leads`
@@ -51,6 +70,13 @@ knock), private `d2d-photos` bucket.
 - **Writes:** nothing — read-only by design, isolated route tree
 - **Realtime:** Supabase `postgres_changes` on `all_leads` + `d2d_visits`
 - **Files:** `core/src/app/war-room/*`, `core/src/app/api/war-room/data/route.ts`
+
+### Live API contracts (this build)
+
+- **Leader API** (`x-api-key: LEADER_API_KEY`): `GET /api/leader/pulse|issues|mood|volunteers|performance`, `POST /api/leader/recommendations` → War Room Directives tab (realtime). MLA performance = derived composite (resolution 50% + mood shift 25% + volunteer growth 25%).
+- **Listen intake** (`x-api-key: INBOUND_API_KEY`): `POST /api/agent/listen/log` (10 sources) → `listen_signals`; digest at `GET /api/dashboard/listen` + War Room Listen panel.
+- **Cadre registry**: `GET/POST /api/dashboard/d2d/workers` (register = person-merge + badge code + tier-4 promotion); `POST /api/agent/d2d/verify` (QR badge check). `d2d/log` accepts `survey` jsonb, `worker_code`, and `outcome='revisit'` → agent_tasks reminder.
+- **War Room ops**: `GET/POST /api/dashboard/settings/daily-targets`, `GET/POST /api/war-room/summary` (AI brief), `GET/POST /api/dashboard/events` (campaign_events CRUD), `GET/POST /api/dashboard/recommendations` (ack/actioned).
 
 ## 2. Pulse Punjab — leader-facing · **WIP (separate build)**
 

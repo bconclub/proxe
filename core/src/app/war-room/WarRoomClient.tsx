@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CONSTITUENCIES, DISTRICTS, TOTAL_SEATS } from '@/lib/war-room/constituencies';
+import { INTENSITY_TIERS } from '@/lib/pop/intensity';
 import PunjabMap, { type ColorMode } from './PunjabMap';
 import { LeanDonut, SentimentGauge, TrendLines, GlowDonut, GlowSpark, GlowArea } from './WarCharts';
 import {
@@ -50,6 +51,22 @@ export interface WarRoomData {
     topWorkers: { name: string; visits: number; met: number }[];
     series: number[]; // knocks/day aligned to series.days
   } | null;
+  // Intensity ladder (026): contact→voter→supporter→volunteer→cadre.
+  intensity: { tiers: number[]; conversion: number[] } | null;
+  volunteers: {
+    total: number;
+    byConstituency: { constituency: string; count: number }[];
+    recent: { name: string | null; constituency: string | null; intensity: number; created_at: string }[];
+  } | null;
+  events: { id: string; title: string; topic: string | null; constituency: string | null; venue: string | null; event_date: string | null; status: string; rsvps: { interested: number; confirmed: number; attended: number } }[] | null;
+  targets: { targets: Record<string, number> | null; actuals: { voices: number; volunteers: number; knocks: number; events: number } } | null;
+  recommendations: { id: string; created_at: string; title: string; body: string | null; source: string; constituency: string | null; status: string; created_by: string | null }[] | null;
+  listen: {
+    totals: { signals7d: number; crisis: number; opposition: number; positive: number };
+    trending: { category: string; count: number; prev: number; trend: number }[];
+    crisisAlerts: { content: string; source: string; constituency: string | null; created_at: string }[];
+    bySource: { source: string; count: number }[];
+  } | null;
 }
 interface Filters { constituency: string; district: string; channel: string; language: string; days: string; }
 const EMPTY: Filters = { constituency: '', district: '', channel: '', language: '', days: 'all' };
@@ -78,6 +95,34 @@ export default function WarRoomClient() {
   const [pulse, setPulse] = useState<string | null>(null);
   const mobile = useIsMobile();
   const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
+  // AI summary strip
+  const [summary, setSummary] = useState<{ summary: string | null; generatedAt: string | null }>({ summary: null, generatedAt: null });
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  // Live Feed panel tab: citizen feed vs leader directives
+  const [feedTab, setFeedTab] = useState<'feed' | 'directives'>('feed');
+  // Daily targets inline editor
+  const [editTargets, setEditTargets] = useState(false);
+  const [targetDraft, setTargetDraft] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch('/api/war-room/summary', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((j) => j && setSummary(j)).catch(() => {});
+  }, []);
+  const generateSummary = async () => {
+    setSummaryBusy(true);
+    try { const r = await fetch('/api/war-room/summary', { method: 'POST' }); if (r.ok) setSummary(await r.json()); } catch {}
+    setSummaryBusy(false);
+  };
+  const saveTargets = async () => {
+    const body: Record<string, number> = {};
+    Object.entries(targetDraft).forEach(([k, v]) => { const n = Number(v); if (Number.isFinite(n) && n >= 0) body[k] = n; });
+    try { await fetch('/api/dashboard/settings/daily-targets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); } catch {}
+    setEditTargets(false);
+    fetchData();
+  };
+  const ackReco = async (id: string, status: 'acked' | 'actioned') => {
+    try { await fetch('/api/dashboard/recommendations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); } catch {}
+    fetchData();
+  };
 
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams(); Object.entries(filters).forEach(([k, v]) => v && v !== 'all' && qs.set(k, v));
@@ -92,6 +137,11 @@ export default function WarRoomClient() {
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'd2d_visits' }, (p: any) => {
       // A knock from the field tool — pulse the seat and refresh D2D coverage.
       const seat = p.new?.constituency; if (seat) { setPulse(seat); setTimeout(() => setPulse(null), 2500); } fetchData();
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaign_recommendations' }, () => {
+      // Leader pushed a directive — refresh so it lands in the Directives tab.
+      fetchData();
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'listen_signals' }, () => {
+      fetchData();
     }).subscribe();
     return () => { sb.removeChannel(ch); };
   }, [fetchData]);
@@ -126,6 +176,19 @@ export default function WarRoomClient() {
             <Kpi label="Active Seats" value={d?.kpis.activeConstituencies ?? 0} sub={`of ${TOTAL_SEATS}`} trend="+5" up accent={BLUE} spark={d?.series.total} />
             <Kpi label="Loop Health" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${d?.kpis.resolved ?? 0} / ${d?.kpis.raised ?? 0} resolved`} trend="+3pp" up accent={GREEN} spark={d?.series.resolved} />
             <Kpi label="Sentiment Shift" value={`${(d?.sentiment.shiftPp ?? 0) >= 0 ? '+' : ''}${d?.sentiment.shiftPp ?? 0}pp`} sub="vs 7d ago" trend={d?.sentiment.label || '—'} up={(d?.sentiment.shiftPp ?? 0) >= 0} accent={PURPLE} spark={d?.series.total} />
+          </div>
+
+          {/* AI SUMMARY STRIP — command-center readout, cached + on-demand */}
+          <div style={{ ...card, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 12px' }}>
+            <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', color: PURPLE, border: `1px solid ${LINE}`, borderRadius: 6, padding: '3px 7px', background: 'rgba(167,139,250,0.10)' }}>AI BRIEF</span>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.5 }}>
+              {summary.summary
+                ? <>{summary.summary} <span style={{ color: MUT, fontSize: 10, whiteSpace: 'nowrap' }}>· {summary.generatedAt ? ago(summary.generatedAt) + ' ago' : ''}</span></>
+                : <span style={{ color: MUT }}>No brief yet — generate a command-center summary of the last 7 days.</span>}
+            </div>
+            <button onClick={generateSummary} disabled={summaryBusy} style={{ flexShrink: 0, background: summaryBusy ? TRACK : 'rgba(167,139,250,0.16)', color: summaryBusy ? MUT : TXT, border: `1px solid ${LINE}`, borderRadius: 8, padding: '5px 11px', fontSize: 11, fontWeight: 600, cursor: summaryBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
+              {summaryBusy ? 'Analysing…' : summary.summary ? 'Regenerate' : 'Generate'}
+            </button>
           </div>
 
           {/* MAIN GRID: map | center | feed (stacks on mobile) */}
@@ -200,48 +263,144 @@ export default function WarRoomClient() {
               </Panel>
             </div>
 
-            {/* LIVE FEED */}
-            <Panel title="Live Feed" sub="Listening now" noPad h={mobile ? 320 : undefined}>
+            {/* LIVE FEED + DIRECTIVES */}
+            <Panel title={feedTab === 'feed' ? 'Live Feed' : 'Directives'} sub={feedTab === 'feed' ? 'Listening now' : 'From the leader app'} noPad h={mobile ? 320 : undefined} right={
+              <div style={{ display: 'flex', gap: 5 }}>
+                <Chip on={feedTab === 'feed'} onClick={() => setFeedTab('feed')}>Feed</Chip>
+                <Chip on={feedTab === 'directives'} onClick={() => setFeedTab('directives')}>
+                  {`Directives${(d?.recommendations || []).filter((r) => r.status === 'new').length ? ` (${(d?.recommendations || []).filter((r) => r.status === 'new').length})` : ''}`}
+                </Chip>
+              </div>
+            }>
               <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                {(d?.liveFeed || []).length === 0 ? <Empty /> : d!.liveFeed.map((f) => {
-                  const Icon = CAT_ICON[f.category || 'other'] || MdMoreHoriz;
-                  return (
-                    <div key={f.id} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${LINE}`, animation: 'wr-in 0.4s ease' }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: 'grid', placeItems: 'center', background: `${CAT_C[f.category || 'other']}22` }}><Icon size={14} color={CAT_C[f.category || 'other']} /></div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b style={{ fontSize: 12 }}>{f.constituency || 'Punjab'}</b><span style={{ fontSize: 10, color: MUT }}>{ago(f.created_at)}</span></div>
-                        <div style={{ fontSize: 10, color: MUT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mask(f.name, f.constituency)} · <span style={{ color: SAFFRON, textTransform: 'uppercase', fontSize: 9, fontWeight: 700 }}>{(f.category || 'other').replace('_', ' ')}</span></div>
+                {feedTab === 'feed' ? (
+                  (d?.liveFeed || []).length === 0 ? <Empty /> : d!.liveFeed.map((f) => {
+                    const Icon = CAT_ICON[f.category || 'other'] || MdMoreHoriz;
+                    return (
+                      <div key={f.id} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderBottom: `1px solid ${LINE}`, animation: 'wr-in 0.4s ease' }}>
+                        <div style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: 'grid', placeItems: 'center', background: `${CAT_C[f.category || 'other']}22` }}><Icon size={14} color={CAT_C[f.category || 'other']} /></div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><b style={{ fontSize: 12 }}>{f.constituency || 'Punjab'}</b><span style={{ fontSize: 10, color: MUT }}>{ago(f.created_at)}</span></div>
+                          <div style={{ fontSize: 10, color: MUT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mask(f.name, f.constituency)} · <span style={{ color: SAFFRON, textTransform: 'uppercase', fontSize: 9, fontWeight: 700 }}>{(f.category || 'other').replace('_', ' ')}</span></div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  (d?.recommendations || []).length === 0 ? <Empty text="No directives yet — the leader app pushes here" /> : d!.recommendations!.map((r) => (
+                    <div key={r.id} style={{ padding: '8px 12px', borderBottom: `1px solid ${LINE}` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'flex-start' }}>
+                        <b style={{ fontSize: 12, lineHeight: 1.3 }}>{r.title}</b>
+                        <span style={{ fontSize: 10, color: MUT, whiteSpace: 'nowrap' }}>{ago(r.created_at)}</span>
+                      </div>
+                      {r.body && <div style={{ fontSize: 11, color: MUT, marginTop: 2 }}>{r.body}</div>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: r.source === 'ai' ? PURPLE : SAFFRON }}>{r.source}</span>
+                        {r.constituency && <span style={{ fontSize: 9, color: MUT }}>· {r.constituency}</span>}
+                        <span style={{ flex: 1 }} />
+                        {r.status === 'new' ? (
+                          <>
+                            <Chip on={false} onClick={() => ackReco(r.id, 'acked')}>Ack</Chip>
+                            <Chip on={false} onClick={() => ackReco(r.id, 'actioned')}>Done</Chip>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: r.status === 'actioned' ? GREEN : BLUE }}>{r.status}</span>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
+                  ))
+                )}
               </div>
             </Panel>
           </div>
 
-          {/* BOTTOM ROW (stacks on mobile) */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.85fr) minmax(0,0.95fr) minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
-            <Panel title="Channel Mix" sub="By volume" h={mobile ? 190 : undefined}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 120, height: 120, flexShrink: 0 }}><GlowDonut segments={(d?.channelMix || []).map((c, i) => ({ name: c.magnet.replace('_', ' '), value: c.count, top: CHAN_GRAD[i % 5][0], bot: CHAN_GRAD[i % 5][1] }))} /></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {(d?.channelMix || []).map((c, i) => <span key={c.magnet} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: [GREEN, BLUE, SAFFRON, AMBER, PURPLE][i % 5] }} /><span style={{ textTransform: 'capitalize', color: MUT, width: 70 }}>{c.magnet.replace('_', ' ')}</span><b>{c.share}%</b></span>)}
-                </div>
-              </div>
-            </Panel>
-            <Panel title="Mobilization Readiness" sub="Who will act" h={mobile ? 230 : undefined}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gridTemplateRows: '1fr 1fr', gap: 8, flex: 1, minHeight: 0 }}>
-                {(['vote', 'volunteer', 'rally', 'share'] as const).map((k) => {
-                  const c = k === 'vote' ? GREEN : k === 'volunteer' ? BLUE : k === 'rally' ? SAFFRON : PURPLE;
+          {/* BOTTOM ROW A — THE INTENSITY ENGINE (voter → supporter → volunteer → cadre) */}
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
+            <Panel title="Intensity Ladder" sub="Voter → Supporter → Volunteer → Cadre" h={mobile ? 250 : undefined}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 5, justifyContent: 'center' }}>
+                {INTENSITY_TIERS.map((t) => {
+                  const n = d?.intensity?.tiers?.[t.tier] ?? 0;
+                  const max = Math.max(...(d?.intensity?.tiers || [1]), 1);
+                  const conv = t.tier >= 2 ? d?.intensity?.conversion?.[t.tier - 2] : undefined;
                   return (
-                    <div key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1.1 }}>{d?.mobilization[k] || 0}</div>
-                      <div style={{ fontSize: 10, color: MUT, textTransform: 'capitalize' }}>{k === 'vote' ? 'Voters' : k === 'volunteer' ? 'Volunteers' : k === 'rally' ? 'Rallies' : 'Shares'}</div>
-                      <div style={{ flex: 1, minHeight: 16, marginTop: 2 }}><GlowSpark data={d?.series.mobilization[k] || []} color={c} /></div>
+                    <div key={t.key} style={{ display: 'grid', gridTemplateColumns: '74px 1fr 64px', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: MUT }}>{t.label}</span>
+                      <div style={{ height: 12, background: TRACK, borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.max(2, (n / max) * 100)}%`, height: '100%', background: t.color, borderRadius: 4 }} />
+                      </div>
+                      <span style={{ fontSize: 11, textAlign: 'right' }}><b>{n}</b>{conv !== undefined && <span style={{ color: MUT, fontSize: 9 }}> ·{conv}%↑</span>}</span>
                     </div>
                   );
                 })}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 10, color: MUT, flexWrap: 'wrap' }}>
+                  {(['vote', 'volunteer', 'rally', 'share'] as const).map((k) => (
+                    <span key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 8px' }}>
+                      {k === 'vote' ? 'Will vote' : k === 'volunteer' ? 'Will work' : k === 'rally' ? 'Will rally' : 'Will share'} <b style={{ color: TXT }}>{d?.mobilization[k] || 0}</b>
+                    </span>
+                  ))}
+                </div>
               </div>
+            </Panel>
+            <Panel title="Daily Targets" sub="Today vs target" h={mobile ? 230 : undefined} right={
+              <Chip on={editTargets} onClick={() => { setEditTargets(!editTargets); setTargetDraft(Object.fromEntries(Object.entries(d?.targets?.targets || {}).map(([k, v]) => [k, String(v)]))); }}>{editTargets ? 'Close' : 'Set'}</Chip>
+            }>
+              {editTargets ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(['voices', 'volunteers', 'knocks', 'events'] as const).map((k) => (
+                    <label key={k} style={{ display: 'grid', gridTemplateColumns: '78px 1fr', alignItems: 'center', gap: 8, fontSize: 11, color: MUT, textTransform: 'capitalize' }}>
+                      {k}
+                      <input type="number" min={0} value={targetDraft[k] ?? ''} onChange={(e) => setTargetDraft({ ...targetDraft, [k]: e.target.value })}
+                        style={{ background: TRACK, color: TXT, border: `1px solid ${LINE}`, borderRadius: 7, padding: '5px 8px', fontSize: 12, width: '100%' }} />
+                    </label>
+                  ))}
+                  <button onClick={saveTargets} style={{ marginTop: 2, background: SAFFRON, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 0', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>Save targets</button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gridTemplateRows: '1fr 1fr', gap: 8, flex: 1, minHeight: 0 }}>
+                  {(['voices', 'volunteers', 'knocks', 'events'] as const).map((k) => {
+                    const target = d?.targets?.targets?.[k];
+                    const actual = d?.targets?.actuals?.[k] ?? 0;
+                    const pct = target ? Math.min(100, Math.round((100 * actual) / target)) : null;
+                    const c = pct === null ? MUT : pct >= 100 ? GREEN : pct >= 50 ? AMBER : SAFFRON;
+                    return (
+                      <div key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: 17, fontWeight: 800, lineHeight: 1.1, color: c }}>{actual}<span style={{ fontSize: 10, color: MUT, fontWeight: 500 }}>{target ? ` / ${target}` : ''}</span></div>
+                        <div style={{ fontSize: 10, color: MUT, textTransform: 'capitalize' }}>{k}</div>
+                        <div style={{ height: 5, background: 'rgba(0,0,0,0.15)', borderRadius: 3, marginTop: 5, overflow: 'hidden' }}>
+                          {pct !== null && <div style={{ width: `${pct}%`, height: '100%', background: c, borderRadius: 3 }} />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Panel>
+            <Panel title="Volunteer Pulse" sub="Tier 3+ energy" h={mobile ? 230 : undefined}>
+              {d?.volunteers && d.volunteers.total > 0 ? (
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: AMBER, lineHeight: 1 }}>{d.volunteers.total} <span style={{ fontSize: 10, color: MUT, fontWeight: 500 }}>volunteers+</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {d.volunteers.byConstituency.map((v) => {
+                      const max = Math.max(...d.volunteers!.byConstituency.map((x) => x.count), 1);
+                      return (
+                        <div key={v.constituency} style={{ display: 'grid', gridTemplateColumns: '92px 1fr 22px', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                          <span style={{ color: MUT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.constituency}</span>
+                          <div style={{ height: 7, background: TRACK, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(v.count / max) * 100}%`, height: '100%', background: AMBER, borderRadius: 3 }} /></div>
+                          <b style={{ textAlign: 'right' }}>{v.count}</b>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: `1px solid ${LINE}`, paddingTop: 5 }}>
+                    {d.volunteers.recent.map((v, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: MUT, padding: '2px 0' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mask(v.name, v.constituency)} · {v.constituency || 'Punjab'}</span>
+                        <span style={{ whiteSpace: 'nowrap' }}>{ago(v.created_at)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : <Empty text="No volunteers yet — MyVoice and D2D feed this" />}
             </Panel>
             <Panel title="D2D Coverage" sub="Field knocks" h={mobile ? 230 : undefined}>
               {d?.d2d ? (
@@ -264,6 +423,36 @@ export default function WarRoomClient() {
                 </div>
               ) : <Empty text="No knocks logged yet — D2D field tool feeds this" />}
             </Panel>
+          </div>
+
+          {/* BOTTOM ROW B — INTELLIGENCE (channels, events, issues, listening) */}
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.85fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.05fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
+            <Panel title="Channel Mix" sub="By volume" h={mobile ? 190 : undefined}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 120, height: 120, flexShrink: 0 }}><GlowDonut segments={(d?.channelMix || []).map((c, i) => ({ name: c.magnet.replace('_', ' '), value: c.count, top: CHAN_GRAD[i % 5][0], bot: CHAN_GRAD[i % 5][1] }))} /></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {(d?.channelMix || []).map((c, i) => <span key={c.magnet} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: [GREEN, BLUE, SAFFRON, AMBER, PURPLE][i % 5] }} /><span style={{ textTransform: 'capitalize', color: MUT, width: 70 }}>{c.magnet.replace('_', ' ')}</span><b>{c.share}%</b></span>)}
+                </div>
+              </div>
+            </Panel>
+            <Panel title="Event Monitor" sub="Upcoming + RSVPs" h={mobile ? 220 : undefined}>
+              {(d?.events || []).length > 0 ? (
+                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {d!.events!.map((e) => (
+                    <div key={e.id} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 9px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
+                        <b style={{ fontSize: 11.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</b>
+                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: e.status === 'live' ? GREEN : BLUE, flexShrink: 0 }}>{e.status}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: MUT, marginTop: 1 }}>
+                        {e.constituency || 'Punjab'}{e.event_date ? ` · ${new Date(e.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}` : ''}
+                        {' · '}<span style={{ color: GREEN }}>{e.rsvps.confirmed}✓</span> <span>{e.rsvps.interested} interested</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : <Empty text="No events planned — create from Events API" />}
+            </Panel>
             <Panel title="Issue Trend (Top 5)" sub="14 days" h={mobile ? 240 : undefined}>
               <div style={{ flex: 1, minHeight: 120 }}>
                 <GlowArea
@@ -274,6 +463,39 @@ export default function WarRoomClient() {
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 4 }}>
                 {(d?.series.categories || []).map((c) => <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 3, textTransform: 'capitalize' }}><span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_C[c] }} />{c.replace('_', ' ')}</span>)}
               </div>
+            </Panel>
+            <Panel title="Listen" sub="External signals · 7d" h={mobile ? 230 : undefined}>
+              {d?.listen ? (
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+                    <St l="Signals" v={d.listen.totals.signals7d} />
+                    <St l="Crisis" v={<span style={{ color: d.listen.totals.crisis ? '#FF5D73' : undefined }}>{d.listen.totals.crisis}</span>} />
+                    <St l="Oppn" v={d.listen.totals.opposition} />
+                    <St l="Positive" v={<span style={{ color: GREEN }}>{d.listen.totals.positive}</span>} />
+                  </div>
+                  {d.listen.crisisAlerts.length > 0 && (
+                    <div style={{ background: 'rgba(255,93,115,0.10)', border: '1px solid rgba(255,93,115,0.35)', borderRadius: 8, padding: '5px 8px', fontSize: 10 }}>
+                      <b style={{ color: '#FF5D73' }}>⚠ {d.listen.crisisAlerts[0].content}</b>
+                      <div style={{ color: MUT, marginTop: 1 }}>{d.listen.crisisAlerts[0].source.replace('_', ' ')}{d.listen.crisisAlerts[0].constituency ? ` · ${d.listen.crisisAlerts[0].constituency}` : ''} · {ago(d.listen.crisisAlerts[0].created_at)}</div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {d.listen.trending.map((t) => {
+                      const max = Math.max(...d.listen!.trending.map((x) => x.count), 1);
+                      return (
+                        <div key={t.category} style={{ display: 'grid', gridTemplateColumns: '78px 1fr 40px', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                          <span style={{ color: MUT, textTransform: 'capitalize' }}>{t.category.replace('_', ' ')}</span>
+                          <div style={{ height: 7, background: TRACK, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(t.count / max) * 100}%`, height: '100%', background: CAT_C[t.category] || PURPLE, borderRadius: 3 }} /></div>
+                          <span style={{ textAlign: 'right' }}><b>{t.count}</b> <span style={{ color: t.trend >= 0 ? GREEN : SAFFRON, fontSize: 9 }}>{t.trend >= 0 ? '+' : ''}{t.trend}</span></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 'auto', fontSize: 9, color: MUT }}>
+                    {d.listen.bySource.slice(0, 4).map((s) => <span key={s.source} style={{ background: TRACK, borderRadius: 10, padding: '1px 7px', textTransform: 'capitalize' }}>{s.source.replace('_', ' ')} {s.count}</span>)}
+                  </div>
+                </div>
+              ) : <Empty text="No signals yet — Listen bridges feed this" />}
             </Panel>
             <Panel title="Constituency Snapshot" sub="Top 5 by volume & salience" h={mobile ? 260 : undefined}>
               <div style={{ overflowY: 'auto' }}>

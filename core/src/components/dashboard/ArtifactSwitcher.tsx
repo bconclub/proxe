@@ -172,6 +172,27 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
           </button>
         )
       })}
+      <button
+        role="menuitem"
+        onClick={() => { onClose(); router.push('/dashboard/artifacts') }}
+        className="artifact-switcher-footer w-full text-left rounded-md"
+        style={{
+          marginTop: '4px',
+          padding: '7px 8px',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'var(--text-secondary)',
+          background: 'transparent',
+          border: 'none',
+          borderTop: '1px solid var(--border-primary)',
+          borderRadius: 0,
+          cursor: 'pointer',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+      >
+        View all artifacts →
+      </button>
     </div>
   )
 }

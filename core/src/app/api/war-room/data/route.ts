@@ -233,7 +233,143 @@ export async function GET(req: NextRequest) {
       d2d = null;
     }
 
-    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d });
+    // ── INTENSITY LADDER (026) — the campaign's central funnel ──
+    // contact → voter → supporter → volunteer → cadre, from the same filtered
+    // rows (view carries intensity since 026). Null-degrading like d2d.
+    let intensity: any = null;
+    try {
+      const tiers = [0, 0, 0, 0, 0];
+      R.forEach((r) => { const t = typeof r.intensity === 'number' ? r.intensity : 0; if (t >= 0 && t <= 4) tiers[t]++; });
+      // Cadre lives in d2d_workers (a registered worker may predate any voice
+      // capture, so count the registry too and take the max for tier 4).
+      try {
+        const { count } = await sb.from('d2d_workers').select('id', { count: 'exact', head: true }).eq('status', 'active');
+        if (typeof count === 'number') tiers[4] = Math.max(tiers[4], count);
+      } catch {}
+      // Conversion between adjacent tiers: of everyone AT OR ABOVE tier n, how
+      // many made it to at-or-above n+1.
+      const atOrAbove = (n: number) => tiers.slice(n).reduce((s, x) => s + x, 0);
+      const conversion = [1, 2, 3].map((n) => {
+        const base = atOrAbove(n); const next = atOrAbove(n + 1);
+        return base ? Math.round((100 * next) / base) : 0;
+      });
+      intensity = { tiers, conversion };
+    } catch (e) { console.error('[war-room/data] intensity failed:', (e as Error).message); }
+
+    // ── VOLUNTEER PULSE — tier-3+ people: where they are + who just joined ──
+    let volunteers: any = null;
+    try {
+      const vols = R.filter((r) => (r.intensity ?? 0) >= 3);
+      const bySeatV = new Map<string, number>();
+      vols.forEach((v) => { if (v.constituency) bySeatV.set(v.constituency, (bySeatV.get(v.constituency) || 0) + 1); });
+      volunteers = {
+        total: vols.length,
+        byConstituency: Array.from(bySeatV.entries()).map(([constituency, count]) => ({ constituency, count })).sort((a, b) => b.count - a.count).slice(0, 5),
+        recent: vols.slice(0, 6).map((v) => ({ name: v.name, constituency: v.constituency, intensity: v.intensity, created_at: v.created_at })),
+      };
+    } catch (e) { console.error('[war-room/data] volunteers failed:', (e as Error).message); }
+
+    // ── EVENT MONITOR — campaign_events + RSVP counts (first consumer of 023) ──
+    let events: any = null;
+    try {
+      const { data: evs, error: evErr } = await sb
+        .from('campaign_events')
+        .select('id, title, topic, constituency, district, venue, event_date, status')
+        .in('status', ['planned', 'live'])
+        .order('event_date', { ascending: true })
+        .limit(5);
+      if (evErr) throw evErr;
+      if (evs && evs.length) {
+        const ids = evs.map((e) => e.id);
+        const { data: rsvps } = await sb.from('event_rsvps').select('event_id, status').in('event_id', ids);
+        const agg = new Map<string, Record<string, number>>();
+        (rsvps || []).forEach((r) => {
+          const a = agg.get(r.event_id) || {};
+          a[r.status] = (a[r.status] || 0) + 1;
+          agg.set(r.event_id, a);
+        });
+        events = evs.map((e) => {
+          const a = agg.get(e.id) || {};
+          return { ...e, rsvps: { interested: a.interested || 0, confirmed: a.confirmed || 0, attended: a.attended || 0 } };
+        });
+      } else events = [];
+    } catch (e) { console.error('[war-room/data] events failed:', (e as Error).message); }
+
+    // ── DAILY TARGETS — dashboard_settings 'daily_targets' vs today's actuals ──
+    let targets: any = null;
+    try {
+      const { data: trow } = await sb.from('dashboard_settings').select('value').eq('key', 'daily_targets').maybeSingle();
+      const t = trow?.value || null;
+      // Actuals: voices = captures today (already computed); volunteers = tier-3+
+      // rows whose latest activity is today (v1 approximation — the ladder has no
+      // per-tier timestamps yet); knocks = today's d2d visits; events = RSVPs
+      // confirmed today.
+      const volunteersToday = R.filter((r) => (r.intensity ?? 0) >= 3 && new Date(r.updated_at || r.created_at).getTime() >= todayStart).length;
+      let rsvpsToday = 0;
+      try {
+        const { count } = await sb.from('event_rsvps').select('id', { count: 'exact', head: true })
+          .eq('status', 'confirmed').gte('created_at', new Date(todayStart).toISOString());
+        rsvpsToday = count || 0;
+      } catch {}
+      targets = {
+        targets: t, // { voices, volunteers, knocks, events } or null when unset
+        actuals: { voices: kpis.today, volunteers: volunteersToday, knocks: d2d?.totals?.today || 0, events: rsvpsToday },
+      };
+    } catch (e) { console.error('[war-room/data] targets failed:', (e as Error).message); }
+
+    // ── DIRECTIVES — recommendations pushed from the leader app / AI (027) ──
+    let recommendations: any = null;
+    try {
+      const { data: recos, error: rErr } = await sb
+        .from('campaign_recommendations')
+        .select('id, created_at, title, body, source, constituency, status, created_by')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (rErr) throw rErr;
+      recommendations = recos || [];
+    } catch (e) { console.error('[war-room/data] recommendations failed:', (e as Error).message); }
+
+    // ── LISTEN digest — external signals (027): trending, crisis, sources ──
+    let listen: any = null;
+    try {
+      const since14 = new Date(now - 14 * 86400000).toISOString();
+      const { data: sigs, error: sErr } = await sb
+        .from('listen_signals')
+        .select('source, issue_category, sentiment, severity, is_crisis, is_opposition, is_positive, content, constituency, created_at')
+        .gte('created_at', since14)
+        .order('created_at', { ascending: false })
+        .limit(2000);
+      if (sErr) throw sErr;
+      const S = sigs || [];
+      if (S.length) {
+        const last7 = S.filter((s) => new Date(s.created_at).getTime() >= d7);
+        const prev7 = S.filter((s) => { const t = new Date(s.created_at).getTime(); return t >= d14 && t < d7; });
+        const catCount = (arr: any[]) => {
+          const m: Record<string, number> = {};
+          arr.forEach((s) => { if (s.issue_category) m[s.issue_category] = (m[s.issue_category] || 0) + 1; });
+          return m;
+        };
+        const cur = catCount(last7); const prev = catCount(prev7);
+        const trending = Object.entries(cur)
+          .map(([category, count]) => ({ category, count, prev: prev[category] || 0, trend: count - (prev[category] || 0) }))
+          .sort((a, b) => b.count - a.count).slice(0, 3);
+        const srcCount: Record<string, number> = {};
+        last7.forEach((s) => { srcCount[s.source] = (srcCount[s.source] || 0) + 1; });
+        listen = {
+          totals: {
+            signals7d: last7.length,
+            crisis: last7.filter((s) => s.is_crisis).length,
+            opposition: last7.filter((s) => s.is_opposition).length,
+            positive: last7.filter((s) => s.is_positive).length,
+          },
+          trending,
+          crisisAlerts: S.filter((s) => s.is_crisis).slice(0, 5).map((s) => ({ content: s.content.slice(0, 140), source: s.source, constituency: s.constituency, created_at: s.created_at })),
+          bySource: Object.entries(srcCount).map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count),
+        };
+      }
+    } catch (e) { console.error('[war-room/data] listen failed:', (e as Error).message); }
+
+    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d, intensity, volunteers, events, targets, recommendations, listen });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });

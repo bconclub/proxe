@@ -4,6 +4,11 @@
 // that define `artifacts` get an artifact switcher dropdown on the sidebar
 // brand header; brands without it keep the plain header.
 export type ArtifactStatus = 'live' | 'wip' | 'coming_soon';
+export type ArtifactFeatureStatus = 'live' | 'wip' | 'planned';
+export interface ArtifactFeature {
+  name: string;
+  status: ArtifactFeatureStatus;
+}
 export interface ArtifactDef {
   id: string;
   name: string;
@@ -12,6 +17,7 @@ export interface ArtifactDef {
   href?: string;             // internal route ('/war-room') or full URL; omit = not navigable yet
   external?: boolean;        // true → open in new tab
   icon?: string;             // string key mapped to an icon inside the switcher component (config stays serializable)
+  features?: ArtifactFeature[]; // full feature checklist — rendered on /dashboard/artifacts
 }
 
 export interface BrandConfig {

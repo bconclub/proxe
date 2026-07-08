@@ -45,7 +45,21 @@ export async function POST(req: NextRequest) {
       outcome = 'met', notes,
       grievance_category, grievance_text,
       lean, language,
+      survey, survey_version, // household survey answers (026: jsonb on the visit)
+      worker_code,            // QR badge code — resolves worker identity from the registry
     } = body || {};
+
+    // Badge code → registry identity (field app sends the code it verified).
+    let resolvedWorkerName = worker_name || null;
+    let resolvedWorkerPhone = worker_phone || null;
+    if (worker_code) {
+      const { data: w } = await supabase.from('d2d_workers')
+        .select('name, phone')
+        .eq('verification_code', String(worker_code).trim().toUpperCase())
+        .eq('status', 'active')
+        .maybeSingle();
+      if (w) { resolvedWorkerName = w.name; resolvedWorkerPhone = w.phone; }
+    }
 
     // 1. Photo → private bucket (path stored, never a public URL).
     let storedPhotoPath: string | null = photo_url || null;
@@ -104,8 +118,8 @@ export async function POST(req: NextRequest) {
     const { data: visit, error: insErr } = await supabase
       .from('d2d_visits')
       .insert({
-        worker_name: worker_name || null,
-        worker_phone: worker_phone || null,
+        worker_name: resolvedWorkerName,
+        worker_phone: resolvedWorkerPhone,
         lead_id: leadId,
         constituency: constituency || null,
         district: district || null,
@@ -116,12 +130,34 @@ export async function POST(req: NextRequest) {
         longitude: typeof longitude === 'number' ? longitude : null,
         outcome,
         notes: notes || null,
+        survey: survey && typeof survey === 'object' ? survey : null,
+        survey_version: survey_version || null,
         brand: BRAND_ID,
       })
       .select('id')
       .single();
     if (insErr) {
       return NextResponse.json({ error: `visit insert failed: ${insErr.message}` }, { status: 500 });
+    }
+
+    // 4. Revisit → follow-up reminder on the task board (+2 days, existing
+    //    agent_tasks machinery; the follow-up cron / Tasks page surfaces it).
+    if (outcome === 'revisit') {
+      try {
+        await supabase.from('agent_tasks').insert({
+          task_type: 'd2d_revisit',
+          task_description: `D2D revisit: ${address_note || constituency || 'address on visit'}${resolvedWorkerName ? ` (worker: ${resolvedWorkerName})` : ''}`,
+          lead_id: leadId,
+          lead_phone: personPhone,
+          lead_name: person?.name || null,
+          status: 'pending',
+          scheduled_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+          metadata: { source: 'd2d_log', visit_id: visit.id, constituency: constituency || null, booth: booth || null },
+          created_at: new Date().toISOString(),
+        });
+      } catch (e: any) {
+        console.error('[d2d] revisit task insert failed:', e?.message);
+      }
     }
 
     return NextResponse.json({ ok: true, visitId: visit.id, leadId });
