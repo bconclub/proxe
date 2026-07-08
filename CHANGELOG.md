@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): WhatsApp scout leads now classified as scout (land in Gigs, not Leads)
+
+- A WhatsApp lead saying "interested in becoming a Lokazen Scout" was sitting in the Leads tab. Two gaps: (1) `detectLokazenAudience` required `scout` + a narrow set of context words that "becoming / interested / application / help" weren't in, so it returned null; (2) the WhatsApp/meta route never ran audience detection or stamped `user_type` at all (only the web route did) — it only recovered a stored type and otherwise persisted the generic AI-intent userType.
+- Broadened scout detection to any self-referential scout mention (become/becoming/be a/want/interested/apply/application/help/… + "scout", plus "location scout", "scout application"). Still requires the word "scout" so a brand/owner mentioning "your scouts" in passing is safe.
+- The meta route now classifies the incoming message (`detectLokazenAudience`) and persists `user_type`/`lead_type`. SCOUT wins even over a stale stored owner/brand ("the moment scout is mentioned, they're a scout lead"); owner/brand stay sticky. The resolved audience is also passed to the engine so the reply is locked to the right flow. The Leads/Gigs split (`unified_context.lokazen.user_type ∈ [scout,connector]`) then routes them to Gigs automatically.
+- Forward-looking: existing mis-filed leads reclassify on their next inbound message; a bulk backfill of already-stored leads needs DB access (flagged).
+
 ## 2026-07-08 · fix(worker): bounce guard — stop messaging a lead whose last WhatsApp message failed to deliver
 
 - Reference worker only (`brands/windchasers/worker/task-worker.js`); the lokazen worker is a fork-parity copy running off-repo on a host and must be redeployed to pick this up.

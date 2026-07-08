@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { process as processMessage } from '@/lib/agent-core/engine';
 import { AgentInput } from '@/lib/agent-core/types';
+import { detectLokazenAudience } from '@/lib/agent-core/lokazenAudience';
 import { extractProfileFromConversation, mergeProfile } from '@/lib/agent-core/conversationIntelligence';
 import {
   getServiceClient,
@@ -808,6 +809,20 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
+    // WhatsApp never freshly CLASSIFIED the incoming message — it only recovered
+    // a stored type — so a new scout ("interested in becoming a Lokazen Scout")
+    // never got stamped and sat in the Leads tab. Classify from this message and
+    // let SCOUT win even over a stale stored owner/brand: the product rule is
+    // "the moment scout is mentioned, they're a scout lead." Owner/brand stay
+    // sticky (only fill in when nothing is stored yet).
+    let resolvedLokazenAudience = knownLokazenAudience;
+    if (brand === 'lokazen') {
+      const detectedAudience = detectLokazenAudience(messageText, conversationHistory, []);
+      resolvedLokazenAudience = detectedAudience === 'scout'
+        ? 'scout'
+        : (knownLokazenAudience || detectedAudience);
+    }
+
     // 7. Build AgentInput and generate AI response
     const agentInput: AgentInput = {
       channel: 'whatsapp',
@@ -821,7 +836,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       conversationHistory,
       summary: existingSummary,
       usedButtons: [],
-      lokazenAudience: knownLokazenAudience,
+      lokazenAudience: resolvedLokazenAudience,
     };
 
     // FINAL DEDUP CHECK — race protection.
@@ -927,6 +942,15 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     };
     const intentUpdate: Record<string, string> = {};
     if (result.intent?.userType) intentUpdate.user_type = result.intent.userType;
+    // Lokazen: persist the resolved audience as user_type/lead_type so the lead
+    // lands in the right tab (scout/connector → Gigs, owner/brand → Leads). This
+    // is what was missing — the WhatsApp scout was never stamped, so a clear
+    // "become a Scout" lead sat in Leads. Lokazen audience wins over the generic
+    // intent userType above for this brand.
+    if (brand === 'lokazen' && resolvedLokazenAudience) {
+      intentUpdate.user_type = resolvedLokazenAudience;
+      intentUpdate.lead_type = resolvedLokazenAudience === 'owner' ? 'property_owner' : resolvedLokazenAudience;
+    }
     if (result.intent?.courseInterest) {
       const raw = String(result.intent.courseInterest).toLowerCase();
       intentUpdate.course_interest = courseMap[raw] || result.intent.courseInterest;

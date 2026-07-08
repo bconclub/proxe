@@ -103,11 +103,22 @@ export function detectLokazenAudience(
     /(spot|photograph|click a photo of).{0,20}(shop|property|space|to[\s-]?let)/.test(answerLower);
   const scoutIntent =
     answerLower.includes('become a scout') ||
+    answerLower.includes('becoming a scout') ||
+    answerLower.includes('be a scout') ||
     answerLower.includes('join as a scout') ||
     answerLower.includes('as a scout') ||
+    answerLower.includes('location scout') ||
     answerLower.includes('scout account') ||
     answerLower.includes('scout app') ||
-    (hasScoutWord && /(account|app|kyc|payout|join|register|sign\s?up|spot|verif|earn)/.test(answerLower)) ||
+    answerLower.includes('scout application') ||
+    // Any self-referential scout mention: "interested in becoming a Lokazen
+    // Scout", "want to be a scout", "help with my scout application", "how do I
+    // scout". Still requires the word "scout" so a brand/owner asking about "your
+    // scouts" in passing stays safe, but the intent-word list is wide because
+    // the product rule is: the moment someone says they want to scout, they ARE
+    // a scout lead. Broadened per user directive (was missing "becoming",
+    // "interested", "application", "help").
+    (hasScoutWord && /(become|becoming|be a|want|interest|join|apply|application|register|sign\s?up|onboard|help|start|account|app|kyc|payout|spot|verif|earn|how (do|can|to))/.test(answerLower)) ||
     scoutPhrase ||
     buttons.some((b) => b.includes('scout'));
 
