@@ -11,7 +11,7 @@ import {
   MdCheckCircle,
   MdInfoOutline
 } from 'react-icons/md'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, getBrandConfig } from '@/configs'
 
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
@@ -66,8 +66,10 @@ export default function WebAgentSettingsClient() {
 
     setIsResettingChat(true)
     try {
-      // ChatWidget stores the session id at this key for windchasers.
-      window.localStorage.removeItem('windchasers.chat.sessionId')
+      // ChatWidget stores the session id at `${brand}.chat.sessionId` — clear
+      // THIS brand's key, not a hardcoded windchasers one (else Reset Chat did
+      // nothing for pop/lokazen/bcon).
+      window.localStorage.removeItem(`${getCurrentBrandId()}.chat.sessionId`)
 
       if (iframeRef.current) {
         iframeRef.current.src = `/widget/bubble?reset=${Date.now()}`
@@ -440,10 +442,14 @@ export default function WebAgentSettingsClient() {
                   }}
                 >
                   {(() => {
+                    // Brand-aware preview address bar. Env wins; else the brand's
+                    // own website (pop=goproxe.com, lokazen=lokazen.in, …) — never
+                    // a hardcoded windchasers.in leaking into every brand.
                     const raw =
                       process.env.NEXT_PUBLIC_SITE_URL ||
                       process.env.NEXT_PUBLIC_APP_URL ||
-                      'https://windchasers.in'
+                      getBrandConfig().website ||
+                      'https://your-site.com'
                     try {
                       return new URL(raw).hostname.replace(/^www\./, '')
                     } catch {

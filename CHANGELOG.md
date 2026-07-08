@@ -1,3 +1,10 @@
+## 2026-07-08 15:15 IST · fix(pop): kill hardcoded windchasers.in in web-agent preview
+
+- Web Agent settings widget-preview address bar showed "windchasers.in" for every brand (hardcoded fallback). Now uses the brand's own website (pop=goproxe.com) via getBrandConfig().website, neutral placeholder if none.
+- Reset Chat cleared a hardcoded `windchasers.chat.sessionId` key → did nothing for pop/lokazen/bcon. Now clears `${brand}.chat.sessionId`.
+- User-facing: POP web-agent preview no longer shows a Windchasers scene.
+- `(pending-sha)`
+
 ## 2026-07-08 14:55 IST · fix(pop): harden model override + Brain quick-link on Calls
 
 - Harden the Vapi model override: build a minimal { provider, model, messages } from the assistant's real config instead of spreading the whole object (a null `temperature` could itself be rejected). Fallback openai/gpt-4o-mini keeps provider present.
