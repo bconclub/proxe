@@ -44,8 +44,27 @@ interface CallRow {
   summary: string | null
   endedReason: string | null
   sentiment: string | null
+  engine: 'vapi' | 'elevenlabs' | 'sarvam'
   turnCount: number
   createdAt: string
+}
+
+// Which engine placed the call — a small V1/V2/V3 badge on each row so it's
+// obvious at a glance what stack was used (Vapi vs ElevenLabs vs our Sarvam
+// pipeline). Colours match the eval bench.
+const ENGINE_BADGE: Record<'vapi' | 'elevenlabs' | 'sarvam', { label: string; tone: string; title: string }> = {
+  vapi: { label: 'V1', tone: '#14b8a6', title: 'V1 · Vapi (Azure · GPT · 11Labs voice)' },
+  elevenlabs: { label: 'V2', tone: '#f59e0b', title: 'V2 · ElevenLabs end-to-end' },
+  sarvam: { label: 'V3', tone: '#8b5cf6', title: 'V3 · Sarvam STT · Groq LLM · 11Labs voice' },
+}
+function EngineTag({ engine }: { engine: 'vapi' | 'elevenlabs' | 'sarvam' }) {
+  const m = ENGINE_BADGE[engine] || ENGINE_BADGE.vapi
+  return (
+    <span title={m.title} style={{
+      fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, padding: '1px 6px', borderRadius: 999, flexShrink: 0,
+      color: m.tone, background: `${m.tone}1f`, border: `1px solid ${m.tone}55`,
+    }}>{m.label}</span>
+  )
 }
 
 interface CallTurn {
@@ -307,6 +326,7 @@ export default function CallsTable() {
                           <ScoreRing score={c.leadScore} size={32} />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
+                              <EngineTag engine={c.engine} />
                               <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{c.leadName || 'Unknown caller'}</p>
                               {SHOW_WEBSITE_BADGE && !c.phone && !c.leadName && (
                                 <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>

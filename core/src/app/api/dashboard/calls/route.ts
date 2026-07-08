@@ -132,6 +132,15 @@ export async function GET(request: NextRequest) {
       // (summary row present), reflect "completed" + the real duration.
       const ended = !!(extra?.endedReason || extra?.summary)
       const status = (ended && r.call_status !== 'completed') ? 'completed' : (r.call_status || null)
+      // Which engine placed the call. V2/V3 stamp an `engine:<name>` marker into
+      // call_summary at dial time (test-call route); V1 (Vapi) has no marker.
+      // That marker is also why we must NOT surface call_summary as summary text.
+      const marker = String(r.call_summary || '').toLowerCase()
+      const engine: 'vapi' | 'elevenlabs' | 'sarvam' =
+        marker.includes('engine:sarvam') ? 'sarvam'
+        : marker.includes('engine:elevenlabs') ? 'elevenlabs'
+        : 'vapi'
+      const realSummary = r.call_summary && !r.call_summary.startsWith('engine:') ? r.call_summary : null
       return {
         id: r.external_session_id || r.id,
         sessionId: r.id,
@@ -145,9 +154,10 @@ export async function GET(request: NextRequest) {
         status,
         durationSeconds: r.call_duration_seconds || extra?.durationSeconds || 0,
         recordingUrl: r.recording_url || extra?.recordingUrl || null,
-        summary: r.call_summary || extra?.summary || null,
+        summary: realSummary || extra?.summary || null,
         endedReason: extra?.endedReason || null,
         sentiment: r.sentiment || null,
+        engine,
         turnCount: extra?.turnCount ?? 0,
         createdAt: r.created_at,
       }

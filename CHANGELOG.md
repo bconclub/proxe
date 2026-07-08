@@ -1,3 +1,8 @@
+## 2026-07-08 15:55 IST · feat(pop): V1/V2/V3 engine badge on every Calls row
+
+- Each call in the Calls list now shows a V1/V2/V3 badge next to the contact — derived from the engine:<name> marker on the session (Vapi / ElevenLabs / Sarvam). See at a glance what placed each call.
+- Also stops the raw "engine:sarvam" marker from leaking in as summary text.
+- `(pending-sha)`
 ## 2026-07-08 15:40 IST · fix(pop): V3 voice eval — real TTS, endpoint, + Vobiz leg
 
 - Root bug: pipeline bucketed TTS TTFB as STT because "ElevenLabsTTSService" contains the substring "stt" and the check ran stt-first. Now checks "tts" first — VOICE shows the real number, STT shows Sarvam.
