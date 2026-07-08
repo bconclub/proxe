@@ -111,7 +111,7 @@ function computeCall(c: any) {
     id: c.id,
     source: isWeb ? 'web' : 'phone',
     engine: 'vapi' as 'vapi' | 'elevenlabs' | 'sarvam', // Vapi-API calls are the Vapi pipeline
-    language: normLang(c.analysis?.structuredData?.language), // from post-call extraction
+    language: normLang(c.metadata?.language || c.analysis?.structuredData?.language), // dialed lang, else post-call extraction
     callerName: null as string | null,        // filled from voice_sessions -> all_leads
     callee: c.customer?.number || (isWeb ? 'Web test' : 'unknown'),
     createdAt: c.createdAt || null,
@@ -301,7 +301,7 @@ async function fetchSarvamCalls(): Promise<any[]> {
         id: r.callId,
         source: 'phone',
         engine: 'sarvam',
-        language: null, // no post-call extraction on the pipeline yet
+        language: normLang(r.language), // dialed starting language (from the pipeline)
         callerName: null,
         callee: r.to || 'unknown',
         createdAt: r.startedAt || null,

@@ -21,6 +21,7 @@ export interface V3TurnRecord {
 export interface V3CallRecord {
   callId: string;
   to: string | null;
+  language?: string | null; // dialed starting language (pa/hi/en)
   startedAt: string;
   endedAt: string;
   durationSec: number;

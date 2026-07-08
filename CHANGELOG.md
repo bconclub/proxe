@@ -1,3 +1,8 @@
+## 2026-07-08 17:35 IST · feat(pop): per-language latency comparison in the eval
+
+- The eval now records the DIALED language (V1 via Vapi call metadata, V3 via pipeline telemetry) instead of relying on flaky post-call extraction.
+- New "By language" comparison block on the voice bench: Hindi vs English vs Punjabi latency (STT/LLM/Voice/Endpoint/Vobiz/Turn avg + calls + cost) side by side, over the current engine filter. Always shows all three regardless of the language filter.
+- `(pending-sha)` + VPS pipeline redeploy
 ## 2026-07-08 17:05 IST · fix(pop): Indian-accent voice everywhere + V2 speaks the selected language
 
 - V2 Hindi didn't work because the ElevenLabs agent was hardcoded to Punjabi and blocked per-call overrides. Enabled language/first_message/prompt overrides on the agent and wired V2 to the same one-core-place prompt in the selected language.

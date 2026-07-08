@@ -195,6 +195,52 @@ function V3Row() {
   )
 }
 
+// Aggregate a set of calls into one latency/cost split (engine- or language-
+// agnostic). Latency only from calls that have real per-turn data.
+function aggregateSplit(list: Call[]): EngineSplit | null {
+  if (!list.length) return null
+  const num = (arr: Array<number | null | undefined>) => {
+    const xs = arr.filter((x): x is number => typeof x === 'number')
+    return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
+  }
+  const wp = list.filter((c) => c.perf && c.perf.turnAvg)
+  const cost = list.reduce((a, c) => a + (c.cost || 0), 0)
+  const mins = list.reduce((a, c) => a + (c.durationSec || 0), 0) / 60
+  return {
+    calls: list.length,
+    cost: Number(cost.toFixed(3)),
+    costPerMin: mins > 0 ? Number((cost / mins).toFixed(3)) : null,
+    turnAvg: wp.length ? num(wp.map((c) => c.perf!.turnAvg)) : null,
+    transcriber: wp.length ? num(wp.map((c) => c.perf!.stages.transcriber)) : null,
+    model: wp.length ? num(wp.map((c) => c.perf!.stages.model)) : null,
+    voice: wp.length ? num(wp.map((c) => c.perf!.stages.voice)) : null,
+    endpointing: wp.length ? num(wp.map((c) => c.perf!.stages.endpointing)) : null,
+    transport: wp.length ? num(wp.map((c) => c.perf!.stages.transport)) : null,
+    groqCalls: list.filter((c) => c.connector.model?.startsWith('groq')).length,
+  }
+}
+
+// One language's latency split — same columns as SplitRow, labelled by language.
+function LangSplitRow({ lang, split, netLabel }: { lang: string; split: EngineSplit; netLabel: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, padding: '3px 10px', borderRadius: 999, flexShrink: 0, minWidth: 62, textAlign: 'center', color: 'var(--text-primary)', background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)' }}>
+        {LANG_LABEL[lang] || lang}
+      </span>
+      <StageChip label="STT" value={split.transcriber} where="outside" />
+      <StageChip label="LLM" value={split.model} where="outside" />
+      <StageChip label="Voice" value={split.voice} where="outside" />
+      <StageChip label="Endpoint" value={split.endpointing} where="inside" />
+      <StageChip label={netLabel} value={split.transport} where="network" />
+      <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 82 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
+        <div style={{ fontSize: 19, fontWeight: 800, color: latColor(split.turnAvg), fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{M(split.turnAvg)}</div>
+      </div>
+      <span style={{ fontSize: 10.5, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums' }}>{split.calls} call{split.calls === 1 ? '' : 's'} · ${split.cost.toFixed(2)}</span>
+    </div>
+  )
+}
+
 const GRID = '132px 1fr 56px 48px 46px 78px 78px 66px 26px'
 
 export default function CallsView() {
@@ -272,6 +318,18 @@ export default function CallsView() {
     }
     const phones = visible.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
     const vapi = splitFor('vapi'), elevenlabs = splitFor('elevenlabs'), sarvam = splitFor('sarvam')
+
+    // Per-language comparison — Hindi vs English vs Punjabi latency, over the
+    // current engine filter (all engines when eng==='all'), ignoring the language
+    // filter so all three always show side by side. Last-N applied per language.
+    const engBase = calls.filter((c) => (showWeb || c.source === 'phone') && (eng === 'all' || c.engine === eng))
+    const langRows = langsPresent
+      .map((l) => {
+        const list = engBase.filter((c) => c.language === l)
+        const capped = limit === 'all' ? list : list.slice(0, limit)
+        return { lang: l, split: aggregateSplit(capped) }
+      })
+      .filter((r): r is { lang: string; split: EngineSplit } => !!r.split)
     // headline insight: fastest engine among those with latency data, with the
     // margin over the runner-up.
     let insight: { text: string; tone: string } | null = null
@@ -292,7 +350,7 @@ export default function CallsView() {
       sparkTurns: phones.map((c) => c.turns || 0),
       sparkMins: phones.map((c) => c.durationSec || 0),
       sparkCost: phones.map((c) => c.cost || 0),
-      vapi, elevenlabs, sarvam, insight,
+      vapi, elevenlabs, sarvam, insight, langRows,
     }
   }, [visible, calls])
 
@@ -388,6 +446,18 @@ export default function CallsView() {
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
           )}
         </div>
+
+        {/* per-language comparison — Hindi vs English vs Punjabi latency */}
+        {view.langRows.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start', marginTop: 4, paddingTop: 10, borderTop: '1px dashed var(--border-primary)' }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              By language{eng !== 'all' ? ` · ${ENG_TABS.find((t) => t.id === eng)!.label}` : ''}
+            </span>
+            {view.langRows.map((r) => (
+              <LangSplitRow key={r.lang} lang={r.lang} split={r.split} netLabel={eng === 'sarvam' ? 'Vobiz' : 'Network'} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── scrollable list ── */}

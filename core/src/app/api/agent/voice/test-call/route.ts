@@ -199,6 +199,9 @@ async function vapiTestCall(body: any) {
           },
         },
         customer: { number: e164 },
+        // Record the DIALED language so the eval can compare pa/hi/en latency
+        // (authoritative — beats post-call extraction which is often empty).
+        ...(voiceLang ? { metadata: { language: voiceLang } } : {}),
       }),
     });
 
