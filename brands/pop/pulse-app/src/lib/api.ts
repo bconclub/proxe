@@ -296,6 +296,31 @@ export const api = {
     // No PROXe device route yet — no-op until push is wired.
     return { ok: true };
   },
+
+  /**
+   * Leader pushes a directive to the war-room team (the "Act on this" action).
+   * Lands in the War Room's Directives tab in realtime as a leader
+   * recommendation. Used from grievances ("act on this problem") and from the
+   * workforce panel ("mobilise these people here").
+   */
+  async pushToTeam(payload: { no: number; title: string; body?: string }): Promise<{ ok: boolean }> {
+    if (USE_LOCAL) return { ok: true };
+    const seat = byNo[payload.no];
+    try {
+      await request('/api/leader/recommendations', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: payload.title,
+          body: payload.body || null,
+          constituency: seat?.name || null,
+          created_by: 'Leader app',
+        }),
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  },
 };
 
 export type Api = typeof api;

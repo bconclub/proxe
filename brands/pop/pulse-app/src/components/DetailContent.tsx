@@ -10,18 +10,9 @@ import DistrictIntel from './DistrictIntel';
 import GrievanceList from './GrievanceList';
 import { byNo, framework } from '../data';
 import { winnerOf } from '../lib/geo';
-import { party as PARTY, colors, radius, space } from '../theme';
+import { party as PARTY, colors, radius, space, phase } from '../theme';
 import type { Pulse } from '../lib/pulse';
 import { api } from '../lib/api';
-import { sendLocal } from '../lib/notifications';
-
-const FEATURE_ICON: Record<string, any> = {
-  volunteer: 'users',
-  stay_updated: 'bell',
-  share_voice: 'mic',
-  join_events: 'calendar',
-  location: 'map-pin',
-};
 
 export default function DetailContent({
   no,
@@ -53,10 +44,20 @@ export default function DetailContent({
     );
   }
 
-  async function notify() {
-    if (no == null) return;
-    await api.subscribe({ no, channel: 'push' });
-    await sendLocal(`${c!.name} · you're subscribed`, 'Constituency updates will reach you here. Demo alert.');
+  // Leader mobilisation: push a "move these people here" directive to the team.
+  const [mob, setMob] = React.useState<Record<string, 'sending' | 'done'>>({});
+  const activeWorkforce = (p.volunteers || 0) + (p.cadre ?? 0);
+  const workforce = [
+    { key: 'vol', label: 'Volunteers', value: p.volunteers || 0, icon: 'users', color: phase.P3 },
+    { key: 'sup', label: 'Supporters', value: p.supporters ?? 0, icon: 'heart', color: phase.P2 },
+    { key: 'cad', label: 'Cadre', value: p.cadre ?? 0, icon: 'award', color: phase.P1 },
+  ];
+
+  async function pushWorkforce(key: string, title: string, body: string) {
+    if (no == null || mob[key]) return;
+    setMob((s) => ({ ...s, [key]: 'sending' }));
+    const res = await api.pushToTeam({ no, title, body });
+    setMob((s) => { const n = { ...s }; if (res.ok) n[key] = 'done'; else delete n[key]; return n; });
   }
 
   return (
@@ -103,21 +104,47 @@ export default function DetailContent({
       <AgeBars age={p.age} />
 
       <Divider />
-      <GrievanceList no={c.no} district={c.district} />
+      <GrievanceList no={c.no} district={c.district} seatName={c.name} />
 
       <Divider />
       <Txt size={11} weight="bold" dim style={styles.section}>
-        VOTER TOUCHPOINTS
+        WORKFORCE YOU CAN MOVE
       </Txt>
-      <View style={styles.chips}>
-        {framework.engagement.features.map((f: any) => (
-          <View key={f.id} style={styles.chip}>
-            <Feather name={FEATURE_ICON[f.id] || 'circle'} size={14} color={colors.accent} />
-            <Txt size={12} weight="medium">
-              {f.label}
-            </Txt>
-          </View>
-        ))}
+      <Txt size={10.5} faint style={{ marginTop: -6, marginBottom: 10 }}>
+        {activeWorkforce.toLocaleString()} boots on the ground here. Tap a group to push a mobilise directive to your team.
+      </Txt>
+      <View style={styles.wfGrid}>
+        {workforce.map((wf) => {
+          const st = mob[wf.key];
+          return (
+            <Pressable
+              key={wf.key}
+              disabled={!!st}
+              onPress={() =>
+                pushWorkforce(
+                  wf.key,
+                  `Mobilise ${wf.label} in ${c.name}`,
+                  `${wf.value.toLocaleString()} ${wf.label.toLowerCase()} available in ${c.name}. Leader is asking the team to activate them here.`,
+                )
+              }
+              style={({ pressed }) => [styles.wfCard, { borderLeftColor: wf.color }, pressed && { opacity: 0.7 }]}
+            >
+              <View style={styles.wfTop}>
+                <Feather name={wf.icon as any} size={14} color={wf.color} />
+                <Feather name={st === 'done' ? 'check-circle' : 'send'} size={12} color={st === 'done' ? '#2FD08A' : colors.faint} />
+              </View>
+              <Txt size={20} weight="bold">
+                {wf.value.toLocaleString()}
+              </Txt>
+              <Txt size={10} faint style={{ letterSpacing: 0.3, marginTop: 1 }}>
+                {wf.label.toUpperCase()}
+              </Txt>
+              <Txt size={9} weight="bold" color={st === 'done' ? '#2FD08A' : colors.accent} style={{ marginTop: 4 }}>
+                {st === 'done' ? 'SENT TO TEAM' : st === 'sending' ? 'SENDING…' : 'PUSH →'}
+              </Txt>
+            </Pressable>
+          );
+        })}
       </View>
 
       <Txt size={11} weight="bold" dim style={styles.section}>
@@ -138,10 +165,20 @@ export default function DetailContent({
         ))}
       </View>
 
-      <Pressable style={styles.cta} onPress={notify}>
-        <Feather name="bell" size={16} color={colors.bg} />
+      <Pressable
+        style={[styles.cta, mob.all === 'done' && { backgroundColor: '#2FD08A' }]}
+        disabled={mob.all === 'sending'}
+        onPress={() =>
+          pushWorkforce(
+            'all',
+            `Mobilise the ground in ${c.name}`,
+            `Workforce ready in ${c.name}: ${(p.volunteers || 0).toLocaleString()} volunteers, ${(p.supporters ?? 0).toLocaleString()} supporters, ${(p.cadre ?? 0).toLocaleString()} cadre (${activeWorkforce.toLocaleString()} boots on the ground). Leader requests activation.`,
+          )
+        }
+      >
+        <Feather name={mob.all === 'done' ? 'check' : 'send'} size={16} color={colors.bg} />
         <Txt size={14.5} weight="bold" color={colors.bg}>
-          Subscribe to updates
+          {mob.all === 'done' ? 'Pushed to team' : mob.all === 'sending' ? 'Pushing…' : 'Push to team'}
         </Txt>
       </Pressable>
     </ScrollView>
@@ -176,18 +213,18 @@ const styles = StyleSheet.create({
   },
   partyDot: { width: 10, height: 10, borderRadius: 5 },
   section: { letterSpacing: 0.6, marginBottom: 10, marginTop: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
+  wfGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  wfCard: {
+    width: '31.5%',
+    flexGrow: 1,
     backgroundColor: colors.surface2,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    borderLeftWidth: 3,
+    padding: 10,
   },
+  wfTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   flow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 6 },
   node: {
     backgroundColor: colors.surface2,
