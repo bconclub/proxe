@@ -1809,6 +1809,99 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ==========================================================================
+    // POP CAMPAIGN HOME — the three home cards reworked for the campaign so the
+    // dashboard is one intuitive glance (War Room stays the deep dive):
+    //   events        → party events + who's already volunteered / supporting
+    //   attentionSeats→ CONSTITUENCIES that need attention now (the whole voice,
+    //                   not individual people)
+    //   sources       → where conversations came from (entry-channel mix)
+    // POP-gated + own try/catch; spread only for pop so other brands are untouched.
+    // ==========================================================================
+    let campaignHome: any = undefined
+    if (BRAND_ID === 'pop') {
+      try {
+        const [{ data: popLeads }, { data: evRows }] = await Promise.all([
+          supabase.from('all_leads')
+            .select('constituency, district, grievance_category, loop_status, salience, lean, magnet, intensity, created_at')
+            .eq('brand', 'pop').limit(10000),
+          supabase.from('campaign_events')
+            .select('id, title, topic, constituency, district, venue, event_date, status')
+            .in('status', ['planned', 'live'])
+            .order('event_date', { ascending: true }).limit(6),
+        ])
+        const L: any[] = popLeads || []
+        const EV: any[] = evRows || []
+        const leanScore = (v: string) => (v === 'supporter' ? 1 : v === 'leaning' ? 0.5 : v === 'opposed' ? -1 : 0)
+
+        // Per-constituency rollup: mood, loop health, unresolved grievances, and
+        // the mobilizable base (supporters = tier≥2, volunteers = tier≥3).
+        const seats = new Map<string, any>()
+        L.forEach((r) => {
+          if (!r.constituency) return
+          const s = seats.get(r.constituency) || { constituency: r.constituency, district: r.district || null, total: 0, grievances: 0, unresolved: 0, salSum: 0, leanSum: 0, leanN: 0, supporters: 0, volunteers: 0, cats: {} as Record<string, number> }
+          s.total++
+          if (r.grievance_category) {
+            s.grievances++; s.salSum += r.salience || 1
+            s.cats[r.grievance_category] = (s.cats[r.grievance_category] || 0) + 1
+            if (r.loop_status !== 'resolved') s.unresolved++
+          }
+          if (r.lean) { s.leanN++; s.leanSum += leanScore(r.lean) }
+          if ((r.intensity ?? 0) >= 2) s.supporters++
+          if ((r.intensity ?? 0) >= 3) s.volunteers++
+          if (!s.district && r.district) s.district = r.district
+          seats.set(r.constituency, s)
+        })
+        const seatArr = Array.from(seats.values()).map((s) => {
+          const topCategory = Object.entries(s.cats).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] || null
+          const loopHealthPct = s.grievances ? Math.round((100 * (s.grievances - s.unresolved)) / s.grievances) : 100
+          const avgSal = s.grievances ? s.salSum / s.grievances : 0
+          const mood = s.leanN ? s.leanSum / s.leanN : 0
+          // Attention = unresolved grievances, weighted up by salience and by a
+          // negative mood in the seat.
+          const attention = s.unresolved * (1 + avgSal / 3) * (mood < 0 ? 1.5 : 1)
+          return { constituency: s.constituency, district: s.district, total: s.total, grievances: s.grievances, unresolved: s.unresolved, loopHealthPct, topCategory, mood: Math.round(mood * 100) / 100, supporters: s.supporters, volunteers: s.volunteers, attention }
+        })
+        const attentionSeats = seatArr.filter((s) => s.unresolved > 0).sort((a, b) => b.attention - a.attention).slice(0, 6)
+
+        // Events + their mobilizable base (from the seat rollup) + RSVP counts.
+        const seatBy = new Map(seatArr.map((s) => [s.constituency, s]))
+        const rsvpBy = new Map<string, { going: number; interested: number }>()
+        if (EV.length) {
+          const { data: rsvps } = await supabase.from('event_rsvps').select('event_id, status').in('event_id', EV.map((e) => e.id))
+          ;(rsvps || []).forEach((r: any) => {
+            const a = rsvpBy.get(r.event_id) || { going: 0, interested: 0 }
+            if (r.status === 'confirmed' || r.status === 'attended') a.going++
+            else if (r.status === 'interested' || r.status === 'invited') a.interested++
+            rsvpBy.set(r.event_id, a)
+          })
+        }
+        const events = EV.map((e) => {
+          const seat = e.constituency ? seatBy.get(e.constituency) : null
+          const rs = rsvpBy.get(e.id) || { going: 0, interested: 0 }
+          return {
+            id: e.id, title: e.title, topic: e.topic, constituency: e.constituency, district: e.district, venue: e.venue, event_date: e.event_date, status: e.status,
+            going: rs.going, interested: rs.interested,
+            seatVolunteers: seat?.volunteers || 0, seatSupporters: seat?.supporters || 0,
+          }
+        })
+
+        // Where conversations came from — entry-channel (magnet) mix, last 7 days.
+        const win = L.filter((r) => r.created_at && new Date(r.created_at) >= sevenDaysAgo)
+        const magCount: Record<string, number> = {}
+        win.forEach((r) => { const m = r.magnet || 'other'; magCount[m] = (magCount[m] || 0) + 1 })
+        const magTotal = win.length || 1
+        const sources = {
+          total7d: win.length,
+          byMagnet: Object.entries(magCount).map(([magnet, count]) => ({ magnet, count, share: Math.round((100 * count) / magTotal) })).sort((a, b) => b.count - a.count),
+        }
+
+        campaignHome = { events, attentionSeats, sources }
+      } catch (e) {
+        console.error('[founder-metrics] campaignHome failed:', (e as Error).message)
+      }
+    }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1863,6 +1956,8 @@ export async function GET(request: NextRequest) {
       leadsRecovered: { count: leadsRecoveredCount },
       // POP-only cohort funnel — key omitted entirely for other brands.
       ...(funnel ? { funnel } : {}),
+      // POP-only campaign home cards (events / attention seats / sources).
+      ...(campaignHome ? { campaignHome } : {}),
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',

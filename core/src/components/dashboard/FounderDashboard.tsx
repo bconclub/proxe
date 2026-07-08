@@ -106,6 +106,21 @@ interface FounderMetrics {
     avgResponseTime: Array<{ value: number }>
   }
   trendSeries?: { conversations: Record<TimeFilter, Array<{ value: number }>> }
+  // POP-only: the three home cards reworked for the campaign (see route).
+  campaignHome?: {
+    events: Array<{
+      id: string; title: string; topic?: string | null
+      constituency?: string | null; district?: string | null; venue?: string | null
+      event_date?: string | null; status: string
+      going: number; interested: number; seatVolunteers: number; seatSupporters: number
+    }>
+    attentionSeats: Array<{
+      constituency: string; district?: string | null; total: number
+      grievances: number; unresolved: number; loopHealthPct: number
+      topCategory?: string | null; mood: number; supporters: number; volunteers: number; attention: number
+    }>
+    sources: { total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }> }
+  }
 }
 
 // "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
@@ -154,6 +169,21 @@ const fmtComma = (n: number | string): string => (typeof n === 'number' ? n.toLo
 const fmt = (n: number | string): number | string => (isPop ? fmtComma(n) : n)
 // Compact K abbreviation for the tight Engine Overview nodes (10.5K, 2.9K, 760).
 const abbrevK = (n: number): string => (n < 1000 ? String(n) : `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`)
+
+// POP entry-channel (magnet) labels + colors for the "where it came from" strip.
+const MAGNET_META: Record<string, { label: string; color: string }> = {
+  whatsapp: { label: 'WhatsApp', color: '#22c55e' },
+  voice: { label: 'Voice', color: '#3b82f6' },
+  pulse_app: { label: 'Pulse App', color: '#a78bfa' },
+  qr: { label: 'QR', color: '#f06c18' },
+  missed_call: { label: 'Missed call', color: '#f59e0b' },
+  d2d: { label: 'Door-to-door', color: '#fb7185' },
+  event: { label: 'Event', color: '#2ec4b6' },
+  landing: { label: 'Landing', color: '#6ea5d4' },
+  web: { label: 'Web', color: '#38bdf8' },
+  other: { label: 'Other', color: '#7a8aa0' },
+}
+const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
 
 // Deterministic gentle daily climb from `start`→`end` with a small wave — for
 // the mock trend/sparkline series (no Math.random so renders are stable).
@@ -848,7 +878,53 @@ export default function FounderDashboard() {
             </button>
           </div>
           <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
-            {metrics.upcomingBookings.length > 0 ? (
+            {isPop && metrics.campaignHome ? (
+              metrics.campaignHome.events.length > 0 ? (
+                metrics.campaignHome.events.map((ev) => {
+                  const t = ev.event_date ? countdownTint(ev.event_date) : { bg: 'var(--bg-tertiary)', color: 'var(--text-muted)' }
+                  return (
+                    <button
+                      key={ev.id} type="button" onClick={() => router.push('/dashboard/bookings')}
+                      className="w-full text-left p-2.5 rounded-lg transition-all border block"
+                      style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
+                          <p className="text-[10.5px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                            {[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}
+                            {ev.event_date ? ` · ${formatBookingWhen(ev.event_date)}` : ''}
+                          </p>
+                        </div>
+                        {ev.event_date && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
+                            {formatCountdown(ev.event_date)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Mobilization — the "how many volunteered / supporting" glance. */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.14)', color: '#22c55e' }}>
+                          {ev.going} going
+                        </span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.14)', color: '#f59e0b' }}>
+                          {ev.interested} interested
+                        </span>
+                        {(ev.seatVolunteers > 0 || ev.seatSupporters > 0) && (
+                          <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                            seat base: <b style={{ color: 'var(--text-secondary)' }}>{ev.seatVolunteers}</b> volunteers · <b style={{ color: 'var(--text-secondary)' }}>{ev.seatSupporters}</b> supporters
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet — create one from Events, and RSVPs will show here.</p>
+              )
+            ) : metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.map((booking) => (
                 <button
                   key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
@@ -926,14 +1002,54 @@ export default function FounderDashboard() {
         <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Priority Lead Queue')}</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{brandLabel('Leads that need your attention now')}</p>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : brandLabel('Leads that need your attention now')}</p>
             </div>
-            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
-              View {brandLabel('Lead') === 'Person' ? 'People' : 'Leads'} <MdArrowForward size={13} />
+            <button onClick={() => router.push(isPop && metrics.campaignHome ? '/war-room' : '/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              {isPop && metrics.campaignHome ? 'War Room' : `View ${brandLabel('Lead') === 'Person' ? 'People' : 'Leads'}`} <MdArrowForward size={13} />
             </button>
           </div>
-          {metrics.leadsNeedingAttention.length > 0 ? (
+          {isPop && metrics.campaignHome ? (
+            metrics.campaignHome.attentionSeats.length > 0 ? (
+              <div className="overflow-auto flex-1 min-h-0 divide-y" style={{ borderColor: 'var(--border-primary)' }}>
+                {metrics.campaignHome.attentionSeats.map((s) => {
+                  const health = s.loopHealthPct >= 70 ? '#22c55e' : s.loopHealthPct >= 40 ? '#f59e0b' : '#ef4444'
+                  const moodColor = s.mood > 0.1 ? '#22c55e' : s.mood < -0.1 ? '#ef4444' : 'var(--text-muted)'
+                  const moodLabel = s.mood > 0.1 ? 'positive' : s.mood < -0.1 ? 'negative' : 'neutral'
+                  return (
+                    <button key={s.constituency} type="button" onClick={() => router.push('/war-room')}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors block"
+                      style={{ borderColor: 'var(--border-primary)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                    >
+                      {/* Unresolved count — the headline attention number */}
+                      <div className="shrink-0 flex flex-col items-center justify-center rounded-lg" style={{ width: 44, height: 44, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                        <span className="text-[15px] font-bold leading-none" style={{ color: '#ef4444' }}>{s.unresolved}</span>
+                        <span className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>open</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.constituency}</p>
+                          {s.topCategory && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0 capitalize" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}>
+                              {s.topCategory.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                          {s.district ? `${s.district} · ` : ''}loop <b style={{ color: health }}>{s.loopHealthPct}%</b> · mood <b style={{ color: moodColor }}>{moodLabel}</b> · {s.supporters} supporters
+                        </p>
+                      </div>
+                      <MdArrowForward size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No seats need attention — grievance loops are healthy.</div>
+            )
+          ) : metrics.leadsNeedingAttention.length > 0 ? (
             <div className="overflow-auto flex-1 min-h-0">
               <table className="min-w-full text-left">
                 <thead>
@@ -1026,6 +1142,26 @@ export default function FounderDashboard() {
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
             </div>
           </div>
+          {/* POP — WHERE IT CAME FROM: entry-channel mix, last 7 days. Turns the
+              trend from "how many" into "how many + from where" at a glance. */}
+          {isPop && metrics.campaignHome && metrics.campaignHome.sources.byMagnet.length > 0 && (
+            <div className="mt-2.5 shrink-0">
+              <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Where it came from · 7d</div>
+              <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+                {metrics.campaignHome.sources.byMagnet.map((s) => (
+                  <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                {metrics.campaignHome.sources.byMagnet.slice(0, 5).map((s) => (
+                  <span key={s.magnet} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: magnetMeta(s.magnet).color, display: 'inline-block' }} />
+                    {magnetMeta(s.magnet).label} <b style={{ color: 'var(--text-primary)' }}>{s.share}%</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
