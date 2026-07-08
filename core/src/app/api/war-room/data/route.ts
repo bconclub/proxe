@@ -12,7 +12,10 @@ const LEAN_SCORE: Record<string, number> = { supporter: 1, leaning: 0.4, undecid
 // PostgREST caps a single response at ~1000 rows regardless of .limit(); page
 // through with .range() so the War Room aggregates the FULL dataset at campaign
 // volume (tens of thousands of rows) instead of silently the first 1000.
-async function fetchAllRows(build: () => any, cap = 60000): Promise<any[]> {
+// Bounded scan: OFFSET pagination is O(N²), so an unbounded pull at campaign
+// volume (27k+) hangs the route for minutes. The War Room aggregates the most
+// recent `cap` rows; the exact ladder + total come from indexed counts below.
+async function fetchAllRows(build: () => any, cap = 8000): Promise<any[]> {
   const PAGE = 1000;
   const out: any[] = [];
   for (let from = 0; from < cap; from += PAGE) {
@@ -58,6 +61,23 @@ export async function GET(req: NextRequest) {
     };
     const R = await fetchAllRows(buildBase);
 
+    // Exact total + ladder via indexed counts (the capped R scan would undercount
+    // at campaign volume). The common unfiltered War Room view is exact; a
+    // filtered view falls back to the recent-rows sample.
+    const noFilter = !f.constituency && !f.district && !f.channel && !f.language && f.days === 'all';
+    let baseTotal = R.length;
+    let tierCounts: number[] | null = null;
+    if (noFilter) {
+      try {
+        const [tot, t0, t1, t2, t3, t4] = await Promise.all([
+          sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }),
+          ...[0, 1, 2, 3, 4].map((t) => sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).eq('intensity', t)),
+        ]);
+        if (typeof tot.count === 'number') baseTotal = tot.count;
+        tierCounts = [t0, t1, t2, t3, t4].map((r) => (typeof r.count === 'number' ? r.count : 0));
+      } catch (e) { console.error('[war-room/data] count fallback:', (e as Error).message); }
+    }
+
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
     const now = Date.now();
     const d7 = now - 7 * 86400000;
@@ -68,7 +88,7 @@ export async function GET(req: NextRequest) {
     const raised = R.length;
     const resolved = R.filter((r) => r.loop_status === 'resolved').length;
     const kpis = {
-      total: R.length,
+      total: baseTotal,
       today: R.filter((r) => new Date(r.created_at).getTime() >= todayStart).length,
       activeConstituencies: seatsActive.size,
       raised,
@@ -257,7 +277,8 @@ export async function GET(req: NextRequest) {
     let intensity: any = null;
     try {
       const tiers = [0, 0, 0, 0, 0];
-      R.forEach((r) => { const t = typeof r.intensity === 'number' ? r.intensity : 0; if (t >= 0 && t <= 4) tiers[t]++; });
+      if (tierCounts) { for (let t = 0; t < 5; t++) tiers[t] = tierCounts[t]; }
+      else R.forEach((r) => { const t = typeof r.intensity === 'number' ? r.intensity : 0; if (t >= 0 && t <= 4) tiers[t]++; });
       // Cadre lives in d2d_workers (a registered worker may predate any voice
       // capture, so count the registry too and take the max for tier 4).
       try {
