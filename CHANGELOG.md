@@ -1,3 +1,9 @@
+## 2026-07-09 00:40 IST · feat(pop): Campaign Events to reference design + home 50-50 with scroll free Activity Sources
+
+- User-facing: Campaign Events page rebuilt to the reference: KPI strip (Confirmed / Leadership Proposed / AI Suggested / Awaiting Sign-off with deltas), clickable legend filters, month grid with 4 typed pills (solid saffron / blue outline / dashed purple / dashed orange), day count badges, day selection, and the Event Intelligence rail: selected day breakdown per type, AI Rationale with confidence, Quick Actions (Approve actually confirms, Reject removes), overlap detection, Upcoming Approvals with priority chips.
+- Home bottom row exactly 50-50; Activity Sources is one card with NO internal scroll: donut + insights left, per source rows right, share bar below.
+- (pending-sha)
+
 ## 2026-07-08 23:59 IST · feat(pop): home redefined (ladder engine, wide events, wide activity) + War Room decluttered + slim scrollbars
 
 - User-facing: home Outreach Engine is now the intensity ladder for POP: Voters → Supporters → Volunteers → Cadre → Grievances Logged (real counts from all_leads.intensity), in a narrower card; Upcoming Events takes the wide slot so the rich reference cards breathe. Bottom row flipped: Priority Constituencies narrower (it is a compact list), Activity Sources wider.

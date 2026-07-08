@@ -1,44 +1,51 @@
 'use client'
 
-// POP EVENTS — the campaign calendar. NOT grievance/call/demo bookings: these
-// are campaign events. Two kinds:
-//   • Confirmed (solid)   — events locked in and actually happening.
-//   • Tentative (dashed)  — proposals not yet locked, pushed by:
-//        - AI          (PROXe suggests, from listen signals / gaps)
-//        - Leadership  (the leader proposes from the field)
-// Whole-day and whole-week spans are first-class (yatra legs, multi-day camps).
+// POP EVENTS — the campaign calendar, laid out to the reference design:
+// KPI strip (Confirmed / Leadership Proposed / AI Suggested / Awaiting Sign-off),
+// legend + filters, month grid with typed multi-day pills and day-count badges,
+// and the Event Intelligence rail (selected day breakdown, AI rationale,
+// quick actions, overlap detection, upcoming approvals).
+// Event kinds:
+//   • confirmed   (solid saffron)     — locked in and happening
+//   • leadership  (blue outline)      — the leader proposes from the field
+//   • ai          (dashed purple)     — PROXe suggests from listen signals / gaps
+//   • awaiting    (dashed orange)     — proposal escalated, needs sign-off
 // Mock data for now — swap for campaign_events once the planning flow lands.
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { MdChevronLeft, MdChevronRight, MdAutoAwesome, MdCampaign, MdCheckCircle } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdAutoAwesome, MdCampaign, MdCheckCircle, MdSchedule, MdFilterList, MdExpandMore, MdEventAvailable, MdFlag, MdWarningAmber, MdCalendarToday, MdPersonAddAlt } from 'react-icons/md'
 
-type Status = 'confirmed' | 'tentative'
-type Source = 'leadership' | 'ai' | 'field'
+type Kind = 'confirmed' | 'leadership' | 'ai' | 'awaiting'
 interface Ev {
   id: string
   title: string
   place?: string
   startOff: number // days from today (inclusive)
   endOff: number   // days from today (inclusive)
-  status: Status
-  source: Source
+  kind: Kind
+  priority?: 'High' | 'Medium'
+  rationale?: string
+  confidence?: number
 }
 
 // Mock campaign events, positioned RELATIVE to today so they always land in the
 // visible month. Whole-week spans = yatra legs; multi-day = camps/padyatras.
 const MOCK: Ev[] = [
-  { id: 'e1', title: 'Punjab Jodo Yatra · Leg 1', place: 'Majha belt', startOff: -2, endOff: 4, status: 'confirmed', source: 'leadership' },
-  { id: 'e2', title: 'Booth Workers Meet', place: 'Patiala', startOff: 0, endOff: 0, status: 'confirmed', source: 'field' },
-  { id: 'e3', title: 'Kisan Maha Rally', place: 'Barnala', startOff: 1, endOff: 1, status: 'confirmed', source: 'field' },
-  { id: 'e4', title: 'Press Conference · MSP payments', place: 'Chandigarh', startOff: 2, endOff: 2, status: 'confirmed', source: 'leadership' },
-  { id: 'e5', title: 'Cultural Night + Concert', place: 'Ludhiana', startOff: 3, endOff: 3, status: 'confirmed', source: 'field' },
-  { id: 'e6', title: 'Sangrur Nukkad Meetings', place: 'Sangrur', startOff: -6, endOff: -4, status: 'confirmed', source: 'field' },
-  { id: 'e7', title: 'AI · De-addiction Town Hall', place: 'Majha', startOff: 6, endOff: 6, status: 'tentative', source: 'ai' },
-  { id: 'e8', title: 'AI · Youth Employment Camp', place: 'Doaba', startOff: 7, endOff: 9, status: 'tentative', source: 'ai' },
-  { id: 'e9', title: 'Punjab Jodo Yatra · Leg 2', place: 'Malwa belt', startOff: 12, endOff: 18, status: 'tentative', source: 'leadership' },
-  { id: 'e10', title: 'AI · Water Crisis Padyatra', place: 'Malwa', startOff: 14, endOff: 16, status: 'tentative', source: 'ai' },
-  { id: 'e11', title: 'Grievance Redressal Camp', place: 'Bathinda', startOff: 20, endOff: 22, status: 'tentative', source: 'leadership' },
-  { id: 'e12', title: 'AI · Farmers Outreach', place: 'Doaba', startOff: -5, endOff: -5, status: 'tentative', source: 'ai' },
+  { id: 'e1', title: 'Punjab Jodo Yatra · Leg 1', place: 'Majha belt', startOff: -2, endOff: 4, kind: 'confirmed' },
+  { id: 'e2', title: 'Booth Workers Meet', place: 'Patiala', startOff: 0, endOff: 0, kind: 'confirmed' },
+  { id: 'e3', title: 'Kisan Maha Rally', place: 'Barnala', startOff: 1, endOff: 1, kind: 'confirmed' },
+  { id: 'e4', title: 'Press Conference · MSP payments', place: 'Chandigarh', startOff: 2, endOff: 2, kind: 'confirmed' },
+  { id: 'e5', title: 'Cultural Night + Concert', place: 'Ludhiana', startOff: 3, endOff: 3, kind: 'confirmed' },
+  { id: 'e6', title: 'Sangrur Nukkad Meetings', place: 'Sangrur', startOff: -6, endOff: -4, kind: 'confirmed' },
+  { id: 'e13', title: 'Village Sarpanch Roundtable', place: 'Moga', startOff: 9, endOff: 9, kind: 'confirmed' },
+  { id: 'e7', title: 'AI · De-addiction Town Hall', place: 'Ludhiana', startOff: 6, endOff: 6, kind: 'awaiting', priority: 'High', rationale: 'Drug related signals in Ludhiana are up 3x this fortnight; a town hall closes the response gap while attention is high.', confidence: 86 },
+  { id: 'e8', title: 'AI · Youth Employment Camp', place: 'Doaba', startOff: 7, endOff: 9, kind: 'ai', priority: 'Medium', rationale: 'Job scarcity is the loudest youth topic in Doaba; no field activity is scheduled there for 2 weeks.', confidence: 78 },
+  { id: 'e9', title: 'Punjab Jodo Yatra · Leg 2', place: 'Malwa belt', startOff: 12, endOff: 18, kind: 'leadership' },
+  { id: 'e10', title: 'AI · Water Crisis Padyatra', place: 'Malwa', startOff: 14, endOff: 16, kind: 'ai', priority: 'High', rationale: 'AI suggests a water grievance outreach padyatra in Malwa due to rising local chatter around water shortages and no scheduled field activity in the belt.', confidence: 82 },
+  { id: 'e11', title: 'Grievance Redressal Camp', place: 'Bathinda', startOff: 20, endOff: 22, kind: 'leadership' },
+  { id: 'e12', title: 'AI · Farmers Outreach', place: 'Doaba', startOff: -5, endOff: -5, kind: 'ai', priority: 'Medium', rationale: 'MSP payment anger clustered in Doaba mandis; a farmers outreach visit would meet it head on.', confidence: 74 },
+  { id: 'e14', title: 'Leadership · District Core Committee Meet', place: 'Jalandhar', startOff: 8, endOff: 8, kind: 'awaiting', priority: 'High' },
+  { id: 'e15', title: 'AI · Skill Development Camp', place: 'Moga', startOff: 13, endOff: 13, kind: 'awaiting', priority: 'Medium', rationale: 'Youth employment chatter in Moga with zero scheduled response; a skill camp converts frustration to engagement.', confidence: 71 },
 ]
 
 const DAY = 86400000
@@ -47,16 +54,22 @@ const serial = (d: Date) => Math.floor(startOfDay(d).getTime() / DAY)
 const WD = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
-// visual style per (status, source)
-function evStyle(e: Ev): React.CSSProperties {
-  if (e.status === 'confirmed') {
-    return { background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: '1px solid #F06C18' }
-  }
-  const c = e.source === 'ai' ? '#8b5cf6' : '#3b82f6'
-  return { background: `${c}22`, color: '#fff', border: `1px dashed ${c}`, boxShadow: 'none' }
+const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactNode }> = {
+  confirmed: { label: 'Confirmed', color: '#F06C18', icon: <MdCheckCircle size={11} /> },
+  leadership: { label: 'Leadership Proposed', color: '#3b82f6', icon: <MdCampaign size={11} /> },
+  ai: { label: 'AI Suggested', color: '#8b5cf6', icon: <MdAutoAwesome size={11} /> },
+  awaiting: { label: 'Awaiting Sign-off', color: '#f59e0b', icon: <MdSchedule size={11} /> },
 }
-const srcIcon = (e: Ev) =>
-  e.status === 'confirmed' ? <MdCheckCircle size={11} /> : e.source === 'ai' ? <MdAutoAwesome size={11} /> : <MdCampaign size={11} />
+
+// pill style per kind (reference: solid saffron / blue outline / dashed purple / dashed orange)
+function evStyle(kind: Kind): React.CSSProperties {
+  switch (kind) {
+    case 'confirmed': return { background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: '1px solid #F06C18' }
+    case 'leadership': return { background: '#3b82f61a', color: '#dbeafe', border: '1px solid #3b82f6' }
+    case 'ai': return { background: '#8b5cf61f', color: '#ede9fe', border: '1px dashed #8b5cf6' }
+    case 'awaiting': return { background: '#f59e0b1a', color: '#fef3c7', border: '1px dashed #f59e0b' }
+  }
+}
 
 // greedy lane packing for one week's bars
 function packLanes<T extends { startCol: number; span: number }>(evs: T[]): (T & { lane: number })[] {
@@ -80,13 +93,23 @@ export default function CampaignCalendar() {
   // avoid SSR/CSR date mismatch — compute after mount
   const [today, setToday] = useState<Date | null>(null)
   const [monthAnchor, setMonthAnchor] = useState<Date | null>(null)
-  useEffect(() => { const t = new Date(); setToday(t); setMonthAnchor(new Date(t.getFullYear(), t.getMonth(), 1)) }, [])
+  const [selectedSerial, setSelectedSerial] = useState<number | null>(null)
+  const [evs, setEvs] = useState<Ev[]>(MOCK)
+  const [kindFilter, setKindFilter] = useState<Kind | 'all'>('all')
+  useEffect(() => {
+    const t = new Date()
+    setToday(t)
+    setMonthAnchor(new Date(t.getFullYear(), t.getMonth(), 1))
+    setSelectedSerial(serial(t))
+  }, [])
 
   const events = useMemo<(Ev & { s: number; e: number })[]>(() => {
     if (!today) return []
     const base = serial(today)
-    return MOCK.map((m) => ({ ...m, s: base + m.startOff, e: base + m.endOff }))
-  }, [today])
+    return evs.map((m) => ({ ...m, s: base + m.startOff, e: base + m.endOff }))
+  }, [today, evs])
+
+  const shown = useMemo(() => (kindFilter === 'all' ? events : events.filter((e) => e.kind === kindFilter)), [events, kindFilter])
 
   const weeks = useMemo(() => {
     if (!monthAnchor) return []
@@ -97,7 +120,6 @@ export default function CampaignCalendar() {
       const row: Date[] = []
       for (let d = 0; d < 7; d++) row.push(new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + w * 7 + d))
       rows.push(row)
-      // stop after we've covered the month (5 or 6 rows)
       if (w >= 4 && row[6].getMonth() !== monthAnchor.getMonth() && row[0].getMonth() !== monthAnchor.getMonth()) break
     }
     return rows
@@ -109,112 +131,274 @@ export default function CampaignCalendar() {
 
   const monthIdx = monthAnchor.getMonth()
   const todaySerial = serial(today)
-  const confirmedCount = events.filter((e) => e.status === 'confirmed').length
-  const tentativeCount = events.length - confirmedCount
+  const selSerial = selectedSerial ?? todaySerial
+  const counts = {
+    confirmed: events.filter((e) => e.kind === 'confirmed').length,
+    leadership: events.filter((e) => e.kind === 'leadership').length,
+    ai: events.filter((e) => e.kind === 'ai').length,
+    awaiting: events.filter((e) => e.kind === 'awaiting').length,
+  }
+
+  const onDay = (kind: Kind) => events.filter((e) => e.kind === kind && e.s <= selSerial && e.e >= selSerial)
+  const selDate = new Date(selSerial * DAY)
+  const selLabel = selDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+  const firstAiOnDay = [...onDay('ai'), ...onDay('awaiting')].find((e) => e.rationale)
+  // overlap: two events same place covering the selected day
+  const dayEvents = events.filter((e) => e.s <= selSerial && e.e >= selSerial)
+  const overlap = dayEvents.find((a) => dayEvents.some((b) => b.id !== a.id && a.place && a.place === b.place))
+  const approvals = events.filter((e) => e.kind !== 'confirmed').sort((a, b) => a.s - b.s).slice(0, 5)
+
+  const approve = (id: string) => setEvs((prev) => prev.map((x) => (x.id === id ? { ...x, kind: 'confirmed' } : x)))
+  const reject = (id: string) => setEvs((prev) => prev.filter((x) => x.id !== id))
 
   const move = (delta: number) => setMonthAnchor(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + delta, 1))
-  const goToday = () => setMonthAnchor(new Date(today.getFullYear(), today.getMonth(), 1))
+  const goToday = () => { setMonthAnchor(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedSerial(todaySerial) }
+
+  const evDate = (e: Ev & { s: number }) => new Date(e.s * DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-      {/* header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Campaign Events</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Confirmed events and the tentative ones AI and leadership are pushing for. Whole days and whole weeks get blocked for what is happening on the ground.</p>
-        </div>
-        <button onClick={goToday} style={btnStyle}>Today</button>
-        <div style={{ display: 'flex', gap: 4 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 310px', gap: 14, maxWidth: 1720, margin: '0 auto', alignItems: 'start' }} className="cc-wrap">
+      <div style={{ minWidth: 0 }}>
+        {/* header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Campaign Events</h1>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Plan the ground calendar. Track leadership pushes, confirmed events, and AI suggestions in one place.</p>
+          </div>
+          <button onClick={goToday} style={btnStyle}>Today</button>
           <button onClick={() => move(-1)} style={iconBtn} aria-label="Previous month"><MdChevronLeft size={18} /></button>
           <button onClick={() => move(1)} style={iconBtn} aria-label="Next month"><MdChevronRight size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 19, fontWeight: 800, color: 'var(--text-primary)' }}>
+            {MONTHS[monthIdx]} {monthAnchor.getFullYear()} <MdExpandMore size={18} color="var(--text-muted)" />
+          </div>
         </div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', minWidth: 150 }}>{MONTHS[monthIdx]} {monthAnchor.getFullYear()}</div>
-      </div>
 
-      {/* legend */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-secondary)' }}>
-        <Legend swatch={{ background: 'linear-gradient(90deg,#F06C18,#f0851f)' }} label={`Confirmed · ${confirmedCount}`} />
-        <Legend swatch={{ background: '#8b5cf622', border: '1px dashed #8b5cf6' }} icon={<MdAutoAwesome size={12} color="#8b5cf6" />} label="AI suggested" />
-        <Legend swatch={{ background: '#3b82f622', border: '1px dashed #3b82f6' }} icon={<MdCampaign size={12} color="#3b82f6" />} label="Leadership proposed" />
-        <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>{tentativeCount} tentative awaiting sign-off</span>
-      </div>
+        {/* KPI strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 10, marginBottom: 12 }}>
+          <Kpi icon={<MdEventAvailable size={20} />} color="#F06C18" label="Confirmed Events" value={counts.confirmed} sub="+6 vs last 30 days" subColor="#22c55e" />
+          <Kpi icon={<MdFlag size={20} />} color="#3b82f6" label="Leadership Proposed" value={counts.leadership} sub="+2 vs last 30 days" subColor="#22c55e" />
+          <Kpi icon={<MdAutoAwesome size={20} />} color="#8b5cf6" label="AI Suggested" value={counts.ai} sub="+5 vs last 30 days" subColor="#22c55e" />
+          <Kpi icon={<MdSchedule size={20} />} color="#f59e0b" label="Awaiting Sign-off" value={counts.awaiting} sub="Needs approval" subColor="#f59e0b" />
+        </div>
 
-      {/* weekday header */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderTop: '1px solid var(--border-primary)', borderLeft: '1px solid var(--border-primary)' }}>
-        {WD.map((w) => (
-          <div key={w} style={{ padding: '7px 8px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}>{w}</div>
-        ))}
-      </div>
+        {/* legend + filters */}
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, fontSize: 11.5, color: 'var(--text-secondary)' }}>
+          <Legend swatch={{ background: 'linear-gradient(90deg,#F06C18,#f0851f)' }} label="Confirmed" active={kindFilter === 'all' || kindFilter === 'confirmed'} onClick={() => setKindFilter(kindFilter === 'confirmed' ? 'all' : 'confirmed')} />
+          <Legend swatch={{ background: '#8b5cf61f', border: '1px dashed #8b5cf6' }} label="AI Suggested" active={kindFilter === 'all' || kindFilter === 'ai'} onClick={() => setKindFilter(kindFilter === 'ai' ? 'all' : 'ai')} />
+          <Legend swatch={{ background: '#3b82f61a', border: '1px solid #3b82f6' }} label="Leadership Proposed" active={kindFilter === 'all' || kindFilter === 'leadership'} onClick={() => setKindFilter(kindFilter === 'leadership' ? 'all' : 'leadership')} />
+          <Legend swatch={{ background: '#f59e0b1a', border: '1px dashed #f59e0b' }} label="Awaiting Approval" active={kindFilter === 'all' || kindFilter === 'awaiting'} onClick={() => setKindFilter(kindFilter === 'awaiting' ? 'all' : 'awaiting')} />
+          <button onClick={() => setKindFilter('all')} style={{ ...btnStyle, marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px' }}><MdFilterList size={15} /> Filters</button>
+        </div>
 
-      {/* week rows */}
-      <div style={{ borderLeft: '1px solid var(--border-primary)' }}>
-        {weeks.map((week, wi) => {
-          const weekStart = serial(week[0])
-          const weekEnd = serial(week[6])
-          const inWeek = events.filter((e) => e.e >= weekStart && e.s <= weekEnd)
-          const bars = packLanes(inWeek.map((e) => {
-            const s = Math.max(e.s, weekStart)
-            const en = Math.min(e.e, weekEnd)
-            return { ...e, startCol: s - weekStart, span: en - s + 1, contStart: e.s < weekStart, contEnd: e.e > weekEnd }
-          }))
-          const maxLane = bars.reduce((m, b) => Math.max(m, b.lane), -1)
-          const rowMinH = HEADER_H + (maxLane + 1) * (LANE_H + LANE_GAP) + 8
+        {/* weekday header */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderTop: '1px solid var(--border-primary)', borderLeft: '1px solid var(--border-primary)', borderTopLeftRadius: 10, borderTopRightRadius: 10, overflow: 'hidden' }}>
+          {WD.map((w) => (
+            <div key={w} style={{ padding: '8px 10px', fontSize: 10.5, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}>{w}</div>
+          ))}
+        </div>
 
-          return (
-            <div key={wi} style={{ position: 'relative', borderBottom: '1px solid var(--border-primary)' }}>
-              {/* day cells (background + numbers) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
-                {week.map((d, di) => {
-                  const isToday = serial(d) === todaySerial
-                  const otherMonth = d.getMonth() !== monthIdx
-                  return (
-                    <div key={di} style={{ minHeight: rowMinH, borderRight: '1px solid var(--border-primary)', padding: '5px 7px', background: otherMonth ? 'var(--bg-primary)' : 'var(--bg-secondary)', opacity: otherMonth ? 0.5 : 1 }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#fff' : 'var(--text-secondary)', background: isToday ? '#F06C18' : 'transparent', borderRadius: 12, padding: isToday ? '1px 7px' : 0 }}>{d.getDate()}</span>
+        {/* week rows */}
+        <div style={{ borderLeft: '1px solid var(--border-primary)' }}>
+          {weeks.map((week, wi) => {
+            const weekStart = serial(week[0])
+            const weekEnd = serial(week[6])
+            const inWeek = shown.filter((e) => e.e >= weekStart && e.s <= weekEnd)
+            const bars = packLanes(inWeek.map((e) => {
+              const s = Math.max(e.s, weekStart)
+              const en = Math.min(e.e, weekEnd)
+              return { ...e, startCol: s - weekStart, span: en - s + 1, contStart: e.s < weekStart, contEnd: e.e > weekEnd }
+            }))
+            const maxLane = bars.reduce((m, b) => Math.max(m, b.lane), -1)
+            const rowMinH = Math.max(86, HEADER_H + (maxLane + 1) * (LANE_H + LANE_GAP) + 8)
+
+            return (
+              <div key={wi} style={{ position: 'relative', borderBottom: '1px solid var(--border-primary)' }}>
+                {/* day cells (background + numbers + count badges + selection) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                  {week.map((d, di) => {
+                    const dSerial = serial(d)
+                    const isToday = dSerial === todaySerial
+                    const isSel = dSerial === selSerial
+                    const otherMonth = d.getMonth() !== monthIdx
+                    const nOnDay = events.filter((e) => e.s <= dSerial && e.e >= dSerial).length
+                    return (
+                      <div key={di} onClick={() => setSelectedSerial(dSerial)}
+                        style={{ minHeight: rowMinH, borderRight: '1px solid var(--border-primary)', padding: '5px 7px', cursor: 'pointer', background: isSel ? 'rgba(240,108,24,0.07)' : otherMonth ? 'var(--bg-primary)' : 'var(--bg-secondary)', opacity: otherMonth ? 0.5 : 1, boxShadow: isSel ? 'inset 0 0 0 1.5px rgba(240,108,24,0.55)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>
+                            {nOnDay >= 3 && (
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#0b0d12', background: '#F06C18', borderRadius: 10, padding: '1px 6px' }}>{nOnDay}</span>
+                            )}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#fff' : 'var(--text-secondary)', background: isToday ? '#F06C18' : 'transparent', borderRadius: 12, padding: isToday ? '1px 7px' : 0 }}>{d.getDate()}</span>
+                        </div>
                       </div>
+                    )
+                  })}
+                </div>
+                {/* event bars overlay */}
+                <div style={{ position: 'absolute', top: HEADER_H, left: 0, right: 0, display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: LANE_H, rowGap: LANE_GAP, columnGap: 3, padding: '0 3px', pointerEvents: 'none' }}>
+                  {bars.map((b) => (
+                    <div
+                      key={b.id}
+                      title={`${b.title}${b.place ? ' · ' + b.place : ''} — ${KIND_META[b.kind].label}`}
+                      onClick={() => setSelectedSerial(Math.max(b.s, weekStart))}
+                      style={{
+                        gridColumn: `${b.startCol + 1} / span ${b.span}`,
+                        gridRow: b.lane + 1,
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        fontSize: 11, fontWeight: 600, lineHeight: 1,
+                        padding: '0 7px', height: LANE_H,
+                        borderRadius: 6,
+                        borderTopLeftRadius: b.contStart ? 0 : 6, borderBottomLeftRadius: b.contStart ? 0 : 6,
+                        borderTopRightRadius: b.contEnd ? 0 : 6, borderBottomRightRadius: b.contEnd ? 0 : 6,
+                        overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                        pointerEvents: 'auto', cursor: 'pointer',
+                        ...evStyle(b.kind),
+                      }}
+                    >
+                      <span style={{ flexShrink: 0, display: 'flex', opacity: 0.9 }}>{KIND_META[b.kind].icon}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}{b.span === 1 && b.place ? ` · ${b.place}` : ''}</span>
                     </div>
-                  )
-                })}
+                  ))}
+                </div>
               </div>
-              {/* event bars overlay */}
-              <div style={{ position: 'absolute', top: HEADER_H, left: 0, right: 0, display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gridAutoRows: LANE_H, rowGap: LANE_GAP, columnGap: 3, padding: '0 3px', pointerEvents: 'none' }}>
-                {bars.map((b) => (
-                  <div
-                    key={b.id}
-                    title={`${b.title}${b.place ? ' · ' + b.place : ''} — ${b.status === 'confirmed' ? 'Confirmed' : b.source === 'ai' ? 'AI suggested' : 'Leadership proposed'}`}
-                    style={{
-                      gridColumn: `${b.startCol + 1} / span ${b.span}`,
-                      gridRow: b.lane + 1,
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      fontSize: 11, fontWeight: 600, lineHeight: 1,
-                      padding: '0 7px', height: LANE_H,
-                      borderRadius: 6,
-                      borderTopLeftRadius: b.contStart ? 0 : 6, borderBottomLeftRadius: b.contStart ? 0 : 6,
-                      borderTopRightRadius: b.contEnd ? 0 : 6, borderBottomRightRadius: b.contEnd ? 0 : 6,
-                      overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-                      pointerEvents: 'auto', cursor: 'default',
-                      ...evStyle(b),
-                    }}
-                  >
-                    <span style={{ flexShrink: 0, display: 'flex', opacity: 0.9 }}>{srcIcon(b)}</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.title}{b.span === 1 && b.place ? ` · ${b.place}` : ''}</span>
-                  </div>
-                ))}
-              </div>
+            )
+          })}
+        </div>
+
+        {/* footer legend with counts */}
+        <div style={{ display: 'flex', gap: 26, flexWrap: 'wrap', justifyContent: 'center', padding: '14px 0 4px', fontSize: 12, color: 'var(--text-secondary)' }}>
+          {(Object.keys(KIND_META) as Kind[]).map((k) => (
+            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <span style={{ color: KIND_META[k].color, display: 'flex' }}>{KIND_META[k].icon}</span>
+              <b style={{ color: 'var(--text-primary)' }}>{KIND_META[k].label}</b> {counts[k]} events
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Event Intelligence rail ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={railCard}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
+            <MdAutoAwesome size={15} color="#8b5cf6" />
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Event Intelligence</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 10 }}>
+            <MdCalendarToday size={13} color="var(--text-muted)" style={{ marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>Selected Day</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{selLabel}</div>
             </div>
-          )
-        })}
+          </div>
+
+          {([['confirmed', 'Confirmed Events'], ['leadership', 'Leadership Pushes'], ['ai', 'AI Suggested Opportunities'], ['awaiting', 'Awaiting Approval']] as [Kind, string][]).map(([k, label]) => {
+            const list = onDay(k)
+            return (
+              <div key={k} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: KIND_META[k].color, display: 'flex' }}>{KIND_META[k].icon}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: KIND_META[k].color }}>{label}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, minWidth: 20, textAlign: 'center', borderRadius: 9, padding: '1px 4px', background: `${KIND_META[k].color}22`, color: KIND_META[k].color, border: `1px solid ${KIND_META[k].color}44` }}>{list.length}</span>
+                </div>
+                {list.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', margin: '3px 0 0 20px' }}>No {label.toLowerCase()} today</div>
+                ) : k === 'ai' || k === 'awaiting' ? (
+                  list.map((e) => (
+                    <div key={e.id} style={{ margin: '5px 0 0 20px', fontSize: 11.5, color: 'var(--text-primary)', border: `1px dashed ${KIND_META[k].color}`, background: `${KIND_META[k].color}14`, borderRadius: 8, padding: '5px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <MdAutoAwesome size={11} color={KIND_META[k].color} /> {e.title}
+                    </div>
+                  ))
+                ) : (
+                  list.map((e) => (
+                    <div key={e.id} style={{ margin: '3px 0 0 20px', fontSize: 11.5, color: 'var(--text-secondary)' }}>• {e.title}{e.place ? ` · ${e.place}` : ''}</div>
+                  ))
+                )}
+              </div>
+            )
+          })}
+
+          {/* AI rationale */}
+          <div style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.35)', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>AI Rationale</div>
+            <p style={{ fontSize: 11, lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+              {firstAiOnDay?.rationale || 'No AI proposals on this day. Pick a day with a dashed pill to see why PROXe is suggesting it.'}
+            </p>
+            {firstAiOnDay?.confidence && <div style={{ fontSize: 10.5, fontWeight: 700, color: '#a78bfa', marginTop: 5 }}>Confidence: {firstAiOnDay.confidence}%</div>}
+          </div>
+
+          {/* quick actions */}
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 7 }}>Quick Actions</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
+            <button onClick={() => firstAiOnDay && approve(firstAiOnDay.id)} style={{ ...actionBtn, background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: 'none', opacity: firstAiOnDay ? 1 : 0.5 }}>Approve</button>
+            <button onClick={() => firstAiOnDay && reject(firstAiOnDay.id)} style={{ ...actionBtn, opacity: firstAiOnDay ? 1 : 0.5 }}>Reject</button>
+            <button style={{ ...actionBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><MdEventAvailable size={13} /> Convert to Event</button>
+            <button style={{ ...actionBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><MdPersonAddAlt size={13} /> Assign Owner</button>
+          </div>
+
+          {/* overlap detection */}
+          {overlap && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 10, padding: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#ef4444', marginBottom: 3 }}><MdWarningAmber size={14} /> Overlap Detected</div>
+              <p style={{ fontSize: 11, lineHeight: 1.45, color: 'var(--text-secondary)' }}>
+                {overlap.title} overlaps with another event in {overlap.place}. <span style={{ color: '#ef4444', fontWeight: 700, cursor: 'pointer' }}>View Details</span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* upcoming approvals */}
+        <div style={railCard}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Upcoming Approvals</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#F06C18', cursor: 'pointer' }}>View all</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+            {approvals.map((e) => (
+              <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${KIND_META[e.kind].color}1f`, color: KIND_META[e.kind].color }}>{KIND_META[e.kind].icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}{e.place ? ` · ${e.place}` : ''}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{evDate(e)}</div>
+                </div>
+                {e.priority && (
+                  <span style={{ fontSize: 9.5, fontWeight: 800, borderRadius: 6, padding: '2px 7px', flexShrink: 0, color: e.priority === 'High' ? '#ef4444' : '#f59e0b', background: e.priority === 'High' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', border: `1px solid ${e.priority === 'High' ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}` }}>{e.priority}</span>
+                )}
+              </div>
+            ))}
+            {approvals.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Nothing pending. All proposals are signed off.</div>}
+          </div>
+          <button style={{ ...actionBtn, width: '100%', marginTop: 12, background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: 'none' }}>Manage Approvals</button>
+        </div>
+      </div>
+
+      <style>{`@media (max-width: 1100px){ .cc-wrap{ grid-template-columns: minmax(0,1fr) !important; } }`}</style>
+    </div>
+  )
+}
+
+const btnStyle: React.CSSProperties = { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '7px 15px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
+const iconBtn: React.CSSProperties = { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }
+const railCard: React.CSSProperties = { background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 14 }
+const actionBtn: React.CSSProperties = { background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '8px 6px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }
+
+function Kpi({ icon, color, label, value, sub, subColor }: { icon: React.ReactNode; color: string; label: string; value: number; sub: string; subColor: string }) {
+  return (
+    <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 13, padding: '13px 15px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span style={{ width: 42, height: 42, borderRadius: 11, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${color}1f`, color }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</div>
+        <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: 'var(--text-primary)' }}>{value}</div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: subColor }}>{sub}</div>
       </div>
     </div>
   )
 }
 
-const btnStyle: React.CSSProperties = { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '7px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }
-const iconBtn: React.CSSProperties = { background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }
-
-const Legend: React.FC<{ swatch: React.CSSProperties; label: string; icon?: React.ReactNode }> = ({ swatch, label, icon }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-    <span style={{ width: 22, height: 12, borderRadius: 3, display: 'inline-block', ...swatch }} />
-    {icon}{label}
-  </span>
+const Legend: React.FC<{ swatch: React.CSSProperties; label: string; active?: boolean; onClick?: () => void }> = ({ swatch, label, active = true, onClick }) => (
+  <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 'inherit', opacity: active ? 1 : 0.45, padding: 0 }}>
+    <span style={{ width: 26, height: 13, borderRadius: 4, display: 'inline-block', ...swatch }} />
+    {label}
+  </button>
 )
