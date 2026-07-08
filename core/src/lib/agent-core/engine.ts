@@ -192,7 +192,11 @@ User's message: ${input.message}`
   // A payment/transaction complaint (any audience) is support, not sales — never
   // wire booking tools for it, so the model can't pivot the person into a call.
   const lokazenBookingAction = !isScout && !supportEscalation && brandId === 'lokazen' && isLokazenBookingAction(input);
-  const needsBookingTools = !isScout && !supportEscalation && (input.channel === 'whatsapp' || lokazenBookingAction) &&
+  // POP is citizen grievance outreach — there is nothing to book. Same cutoff
+  // pattern as scouts: never wire the tools, so a booking flow can't even start
+  // if a citizen's message happens to trip isBookingIntent().
+  const isVoterBrand = brandId === 'pop';
+  const needsBookingTools = !isScout && !isVoterBrand && !supportEscalation && (input.channel === 'whatsapp' || lokazenBookingAction) &&
     (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
