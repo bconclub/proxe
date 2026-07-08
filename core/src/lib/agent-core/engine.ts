@@ -104,7 +104,7 @@ User's message: ${input.message}`
   }
 
   const promptOverride = await getPromptOverride(input.channel);
-  const { systemPrompt, userPrompt } = buildPrompt({
+  let { systemPrompt, userPrompt } = buildPrompt({
     channel: input.channel,
     userName: input.userProfile.name,
     userEmail: input.userProfile.email,
@@ -120,6 +120,10 @@ User's message: ${input.message}`
     promptOverride,
     formData,
   });
+  // Lock the model to the resolved Lokazen audience so it can't drift into the
+  // wrong flow (e.g. answering a scout's "money debited" with brand/CRE copy,
+  // or offering a scout a call). No-op for non-lokazen brands / unknown audience.
+  systemPrompt += lokazenAudienceDirective(input, brandId);
 
   // 5. Detect human handoff requests before AI generation
   const wantsHuman = detectHumanHandoffRequest(input.message);
@@ -131,8 +135,14 @@ User's message: ${input.message}`
   // only escalation path is a support request.
   const scoutSupportIssue =
     input.lokazenAudience === 'scout' &&
-    /\b(can'?t|cannot|can not|unable|not able|couldn'?t|won'?t|isn'?t|doesn'?t|didn'?t|no|not)\b[^.?!]*\b(upload|uploaded|uploading|photo|picture|image|pic|location|gps|submit|submitted|kyc|verif|verified|login|log ?in|sign ?in|app|payout|paid|payment|money|reward)\b|\b(kyc|payout|payment|verification)\b[^.?!]*\b(stuck|pending|fail|failed|error|not|missing|issue|problem|delay)\b|\b(problem|issue|trouble|error|not working|doesn'?t work|stuck|help me)\b/i
-      .test(input.message || '');
+    (/\b(can'?t|cannot|can not|unable|not able|couldn'?t|won'?t|isn'?t|doesn'?t|didn'?t|no|not)\b[^.?!]*\b(upload|uploaded|uploading|photo|picture|image|pic|location|gps|submit|submitted|kyc|verif|verified|login|log ?in|sign ?in|app|payout|paid|payment|money|reward)\b|\b(kyc|payout|payment|verification)\b[^.?!]*\b(stuck|pending|fail|failed|error|not|missing|issue|problem|delay)\b|\b(problem|issue|trouble|error|not working|doesn'?t work|stuck|help me)\b/i
+      .test(input.message || '') ||
+    // Money / payment complaints — scouts get PAID, so any "debited / deducted /
+    // charged / refund / not credited / amount cut / kindly check my payment"
+    // line is a support issue even without a negation word. Scout-scoped, so a
+    // brand/owner asking about fees is never caught here.
+    /\b(debited|deducted|charged|refunded?|not credited|credited|chargeback)\b|\b(money|amount|paisa|rupees?|rs\.?|₹|payment|payout|balance)\b[^.?!]*\b(debited|deducted|cut|gone|missing|stuck|check|not received|didn'?t (get|receive)|haven'?t (got|received)|pending|deducted)\b|\b(didn'?t|not|haven'?t|never)\b[^.?!]*\b(get|got|receive|received|credited|paid)\b[^.?!]*\b(money|amount|payment|payout|refund)\b/i
+      .test(input.message || ''));
 
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
@@ -162,8 +172,14 @@ User's message: ${input.message}`
     .reverse()
     .find((m) => m.role === 'assistant');
   const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-  const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
-  const needsBookingTools = (input.channel === 'whatsapp' || lokazenBookingAction) &&
+  // Scouts can NEVER book a call — so we never even WIRE the booking tools for
+  // them. Previously the tools were offered and the handler hard-refused with
+  // scoutBookingBlock(), which the model surfaced as a dumb "Sorry, I cannot
+  // book a call" AFTER walking the user down the booking path. Cutting the
+  // tools off here means the flow never starts.
+  const isScout = input.lokazenAudience === 'scout';
+  const lokazenBookingAction = !isScout && brandId === 'lokazen' && isLokazenBookingAction(input);
+  const needsBookingTools = !isScout && (input.channel === 'whatsapp' || lokazenBookingAction) &&
     (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
@@ -338,8 +354,12 @@ export async function* processStream(
       .reverse()
       .find((m) => m.role === 'assistant');
     const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-    const lokazenBookingAction = brandId === 'lokazen' && isLokazenBookingAction(input);
-    const hasBookingIntent = isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction;
+    // Scouts never book — keep booking intent (and thus the booking tools) off
+    // entirely for them, same as the WhatsApp path above.
+    const isScout = input.lokazenAudience === 'scout';
+    const lokazenBookingAction = !isScout && brandId === 'lokazen' && isLokazenBookingAction(input);
+    const hasBookingIntent = !isScout &&
+      (isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
     // 2. Parallelize DB calls: KB search always runs (audience-scoped for
     //    Lokazen — see resolveKbScope); booking check only when needed
@@ -384,7 +404,7 @@ User's message: ${input.message}`
     }
 
     const promptOverride = await getPromptOverride(input.channel);
-    const { systemPrompt, userPrompt } = buildPrompt({
+    let { systemPrompt, userPrompt } = buildPrompt({
       channel: input.channel,
       userName: input.userProfile.name,
       userEmail: input.userProfile.email,
@@ -400,6 +420,8 @@ User's message: ${input.message}`
       promptOverride,
       formData,
     });
+    // Lock the model to the resolved audience (see the WhatsApp path above).
+    systemPrompt += lokazenAudienceDirective(input, brandId);
 
     // 4. Generate response — true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
@@ -539,6 +561,37 @@ function suppressKnownContactReask(response: string, input: AgentInput, brandId:
   return 'What would you like to do next?\n[BTN: Submit Property][BTN: Talk to Team]';
 }
 
+/**
+ * A hard, per-turn audience lock appended to the Lokazen system prompt. The
+ * base prompt carries brand/owner/scout GUIDANCE, but nothing tells the model
+ * which flow THIS conversation is in — so it would infer (and drift), e.g.
+ * answering a scout's "money debited" with brand/CRE copy, or offering a scout
+ * a call. This states the resolved audience outright. No-op for non-lokazen
+ * brands or when the audience is unknown (null) — then the base guidance +
+ * "ask one question if unsure" rule still applies.
+ */
+function lokazenAudienceDirective(input: AgentInput, brandId: string): string {
+  if (brandId !== 'lokazen' || !input.lokazenAudience) return '';
+
+  if (input.lokazenAudience === 'scout') {
+    return `\n\n=================================================================================
+CURRENT CONVERSATION AUDIENCE: SCOUT (LOCKED — overrides any inferred flow)
+=================================================================================
+This person is a Lokazen SCOUT (a gig worker who spots empty "To Let" shops and gets PAID after verification). Apply the SCOUT rules ONLY — never the Brand or Owner flow.
+- NEVER offer, suggest, or attempt a call, consultation, demo, or site visit. There is nothing to book for a scout. Never ask "what day/time works for a call" or say "I'll connect you with the team for a call".
+- NEVER answer with brand / commercial-real-estate / space-finding / pricing content. That is a different audience.
+- If they report ANY problem — money debited / deducted / charged, payment or payout not received, refund, amount cut, "kindly check", KYC stuck, verification, app not working, login, upload / photo / location — treat it as SCOUT SUPPORT: acknowledge briefly, confirm their phone number, and say plainly: "I've raised a support request with the Lokazen team with your number and details, and they'll help you shortly." Do NOT invent troubleshooting steps and do NOT claim the issue is fixed.`;
+  }
+
+  const label = input.lokazenAudience === 'brand'
+    ? 'BRAND (looking for commercial space)'
+    : 'PROPERTY OWNER (listing a space)';
+  return `\n\n=================================================================================
+CURRENT CONVERSATION AUDIENCE: ${label} (LOCKED)
+=================================================================================
+Apply the ${input.lokazenAudience.toUpperCase()} flow for this conversation. Do not switch this person into the Scout flow.`;
+}
+
 function isLokazenBookingAction(input: AgentInput): boolean {
   const current = (input.message || '').toLowerCase();
   const buttons = (input.usedButtons || []).map((b) => String(b).toLowerCase());
@@ -556,6 +609,10 @@ function isLokazenBookingAction(input: AgentInput): boolean {
 
 function advanceLokazenBookingAfterEmail(response: string, input: AgentInput, brandId: string): string {
   if (brandId !== 'lokazen') return response;
+  // Scouts never book — never rewrite a scout's reply into "what day/time works
+  // for a call". Their "team will reach out" line is the support-request
+  // confirmation, not a booking punt.
+  if (input.lokazenAudience === 'scout') return response;
 
   const userMessage = input.message || '';
   const emailProvided = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userMessage.trim());
