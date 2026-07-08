@@ -24,5 +24,16 @@ export function getCurrentBrandId(): string {
 
 export const BRAND_ID = brandConfig.brand;
 
+/**
+ * Brand-aware dashboard vocabulary. Pass the default English string; if the
+ * active brand's config.labels remaps it, the brand's term comes back —
+ * otherwise the default is returned unchanged. Lets a non-business brand
+ * (pop = voters) rename "Leads"/"High Intent"/"Booked Calls" etc. without
+ * forking components or touching other brands.
+ */
+export function brandLabel(defaultLabel: string): string {
+  return brandConfig.labels?.[defaultLabel] ?? defaultLabel;
+}
+
 export { brandConfig };
 export type { BrandConfig };

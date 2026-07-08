@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
 import LogCallDecisionHub from './LogCallDecisionHub'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, brandLabel } from '@/configs'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
@@ -2321,7 +2321,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <section className="lead-journey-stats-section flex-1 flex flex-col h-full gap-4">
               {/* Customer Journey - TOP */}
               <section className="lead-journey-section">
-                <h3 className="lead-journey-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Customer Journey</h3>
+                <h3 className="lead-journey-title text-xs font-semibold text-[var(--text-secondary)] mb-2">{brandLabel('Customer Journey')}</h3>
                 <div className="lead-journey-row flex items-center gap-1.5">
                   {activeChannels.length > 0 ? (
                     <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
@@ -2724,7 +2724,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         role="menuitem"
                         aria-label={`Change stage to ${stage}`}
                       >
-                        {stage}
+                        {brandLabel(stage)}
                       </button>
                     </li>
                   ))}

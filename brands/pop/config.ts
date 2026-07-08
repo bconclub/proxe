@@ -25,6 +25,43 @@ export const popConfig: BrandConfig = {
     followUpSequence: true,
     warRoom: true,
   },
+  // Voter-native dashboard vocabulary. POP's audience is citizens/voters, not
+  // sales leads — the dashboard shell's business-CRM words are remapped here
+  // (key = default English string used in core components, via brandLabel()).
+  labels: {
+    // Overview KPIs
+    'High Intent Leads': 'Strong Supporters',
+    'flagged high-intent by PROXe': 'flagged strong support by PROXe',
+    'Booked Calls / Events': 'Grievances Logged',
+    'Follow-up Health': 'Loop Health',
+    // Engine funnel
+    'Engine Overview': 'Outreach Engine',
+    'Total Leads': 'People Reached',
+    'Engaged': 'Responded',
+    'Warm': 'Supportive',
+    'Booked': 'Grievance Logged',
+    'Your follow-up engine is performing well': 'Your grievance loop is performing well',
+    // Priority queue
+    'Priority Lead Queue': 'Priority Follow-ups',
+    'Leads that need your attention now': 'People who need your attention now',
+    'Lead': 'Person',
+    'High Intent': 'High Salience',
+    'Comparing': 'Undecided',
+    'Push to book a call': 'Call back — hear them out',
+    'Share pricing + offers': 'Send grievance status update',
+    'Share program details': 'Share campaign update',
+    'Onboard / next steps': 'Invite to volunteer',
+    // Misc shell
+    'Founder': 'Team',
+    'Customer Journey': 'Voter Journey',
+    // Stage names (display-only — the stored lead_stage values are unchanged)
+    'Qualified': 'Supporter',
+    'Booking Made': 'Call Scheduled',
+    'Converted': 'Volunteer',
+    'Closed Lost': 'Opposed',
+    'Not Qualified': 'Not Reachable',
+    'Cold': 'Inactive',
+  },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
     path: '@/api/prompts/pop-prompt',

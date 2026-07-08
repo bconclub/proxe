@@ -13,7 +13,7 @@ import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
 import DashboardBrain from './DashboardBrain'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
-import { getBrandConfig } from '@/configs'
+import { getBrandConfig, brandLabel } from '@/configs'
 import type { Lead } from '@/types'
 import {
   Sparkline,
@@ -431,8 +431,8 @@ export default function FounderDashboard() {
 
   // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
   const intentFor = (score: number): { label: string; color: string; bg: string } => {
-    if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
-    if (score >= 50) return { label: 'Comparing', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    if (score >= hotLeadThreshold) return { label: brandLabel('High Intent'), color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (score >= 50) return { label: brandLabel('Comparing'), color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
     return { label: 'Needs follow-up', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
@@ -441,10 +441,10 @@ export default function FounderDashboard() {
   const nextStepFor = (stage: string): string => {
     const s = (stage || '').toLowerCase()
     if (s.includes('booking')) return 'Confirm the slot'
-    if (s.includes('high')) return 'Push to book a call'
-    if (s.includes('qualified')) return 'Share pricing + offers'
-    if (s.includes('engaged')) return 'Share program details'
-    if (s.includes('converted')) return 'Onboard / next steps'
+    if (s.includes('high')) return brandLabel('Push to book a call')
+    if (s.includes('qualified')) return brandLabel('Share pricing + offers')
+    if (s.includes('engaged')) return brandLabel('Share program details')
+    if (s.includes('converted')) return brandLabel('Onboard / next steps')
     if (s.includes('lost') || s.includes('cold')) return 'Re-engage'
     return 'First outreach'
   }
@@ -530,8 +530,8 @@ export default function FounderDashboard() {
     : range === '30D'
       ? metrics.totalConversations.trend30D
       : metrics.totalConversations.trend7D
-  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
-  const firstName = displayName.split(' ')[0] || 'Founder'
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : brandLabel('Founder'))
+  const firstName = displayName.split(' ')[0] || brandLabel('Founder')
   const profileInitials = getInitials(displayName)
   // Time-of-day greeting in IST (shifts morning/afternoon/evening/night).
   const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
@@ -722,10 +722,10 @@ export default function FounderDashboard() {
         ) : (
           <KpiCard
             icon={<MdLocalFireDepartment size={15} />} iconColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
-            label="High Intent Leads"
+            label={brandLabel('High Intent Leads')}
             value={fmt(metrics.hotLeads?.count ?? 0)}
             sparkData={metrics.trends?.hotLeads?.data} sparkColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
-            sub="flagged high-intent by PROXe"
+            sub={brandLabel('flagged high-intent by PROXe')}
             onClick={() => router.push('/dashboard/leads?filter=hot')}
           />
         )}
@@ -733,7 +733,7 @@ export default function FounderDashboard() {
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthLevel === 'good' ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{brandLabel('Follow-up Health')}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <div>
@@ -758,7 +758,7 @@ export default function FounderDashboard() {
         ) : (
           <KpiCard
             icon={<MdEvent size={15} />} iconColor="#a855f7"
-            label="Booked Calls / Events"
+            label={brandLabel('Booked Calls / Events')}
             value={fmt(bookedVal)}
             delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
             sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
@@ -793,7 +793,7 @@ export default function FounderDashboard() {
         {/* Engine Overview funnel */}
         <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-2 shrink-0">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
             <div className="flex items-center gap-0.5 shrink-0">
               {(hasNewHomeLook ? (['Today', '7D', '14D', 'All'] as const) : (['All', '7D', '14D'] as const)).map((p) => (
                 <button
@@ -808,16 +808,16 @@ export default function FounderDashboard() {
           </div>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label={brandLabel('Total Leads')} sub={engTopSub} />
             {isGigsView ? (
               <EngineNode icon={<MdAssignment size={28} />} color="#22c55e" count={engK(gigStages.kycStarted)} label="KYC Started" sub={engPct(gigStages.kycStarted)} />
             ) : (
-              <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
+              <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label={brandLabel('Engaged')} sub={engPct(engEngaged)} />
             )}
             {isGigsView ? (
               <EngineNode icon={<MdVerified size={28} />} color="#f59e0b" count={engK(gigStages.kycDone)} label="KYC Done" sub={engPct(gigStages.kycDone)} />
             ) : (
-              <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
+              <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label={brandLabel('Warm')} sub={engPct(engWarm)} />
             )}
             {isGigsView ? (
               <EngineNode icon={<MdAccountBalanceWallet size={28} />} color="#a855f7" count={engK(gigStages.live)} label="Live" sub="UPI added" />
@@ -828,14 +828,14 @@ export default function FounderDashboard() {
               icon={isGigsView ? <MdCheckCircle size={28} /> : <MdCalendarToday size={28} />}
               color="#10b981"
               count={engK(isGigsView ? gigStages.active : engBooked)}
-              label={isGigsView ? 'Active' : 'Booked'}
+              label={isGigsView ? 'Active' : brandLabel('Booked')}
               sub={isGigsView ? 'Submitting properties' : (hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week')}
               last
             />
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
-            {healthLevel === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+            {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention — check the Follow-up Due column.`}
           </div>
         </section>
 
@@ -926,11 +926,11 @@ export default function FounderDashboard() {
         <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Leads that need your attention now</p>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Priority Lead Queue')}</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{brandLabel('Leads that need your attention now')}</p>
             </div>
             <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
-              View Leads <MdArrowForward size={13} />
+              View {brandLabel('Lead') === 'Person' ? 'People' : 'Leads'} <MdArrowForward size={13} />
             </button>
           </div>
           {metrics.leadsNeedingAttention.length > 0 ? (
@@ -938,7 +938,7 @@ export default function FounderDashboard() {
               <table className="min-w-full text-left">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                    <th className="px-4 py-2 font-medium">Lead</th>
+                    <th className="px-4 py-2 font-medium">{brandLabel('Lead')}</th>
                     <th className="px-3 py-2 font-medium">Intent</th>
                     <th className="px-3 py-2 font-medium hidden md:table-cell">Recommended Next Step</th>
                     <th className="px-3 py-2 font-medium hidden lg:table-cell">Due</th>

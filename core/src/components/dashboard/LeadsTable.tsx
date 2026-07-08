@@ -9,7 +9,7 @@ import LeadDetailsModal from './LeadDetailsModal'
 import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
-import { getCurrentBrandId, brandConfig } from '@/configs'
+import { getCurrentBrandId, brandConfig, brandLabel } from '@/configs'
 import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
@@ -910,8 +910,10 @@ export default function LeadsTable({
                 const calculatedScore = calculatedScores[lead.id]
                 const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
-                const displayStage = stage || 'New'
-                const stageColor = getStageColor(displayStage)
+                // brandLabel: voter brands (pop) rename sales stages for display
+                // only — filtering/storage still use the raw lead_stage value.
+                const displayStage = brandLabel(stage || 'New')
+                const stageColor = getStageColor(stage || 'New')
                 // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
                 // first — never the last_touchpoint, since that gets overwritten
                 // by any later interaction (e.g. a logged call flips to 'voice').

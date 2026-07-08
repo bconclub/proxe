@@ -26,6 +26,13 @@ export interface BrandConfig {
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)
     scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
   };
+  // Dashboard vocabulary overrides. The dashboard shell was written in
+  // business-CRM English (Leads, High Intent, Booked Calls, Priority Lead
+  // Queue…) — a brand whose audience isn't "sales leads" (e.g. pop = voters/
+  // citizens) remaps just the words here. Key = the default English string
+  // (or a dotted key where noted at the call site), value = the brand's term.
+  // Missing keys fall back to the default, so other brands are untouched.
+  labels?: Record<string, string>;
   apiUrl?: string;
   supabase?: {
     url?: string;
