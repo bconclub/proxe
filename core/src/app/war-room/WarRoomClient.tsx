@@ -14,7 +14,7 @@ import {
 // colors use the app theme tokens so the war room follows light/dark like the dashboard.
 const SAFFRON = '#F06C18', GREEN = '#22C55E', BLUE = '#3B82F6', AMBER = '#F59E0B', PURPLE = '#A78BFA';
 const BG = 'var(--bg-primary)', CARD = 'var(--bg-secondary)', LINE = 'var(--border-primary)', TXT = 'var(--text-primary)', MUT = 'var(--text-secondary)', TRACK = 'var(--bg-tertiary)';
-const CHANNELS = ['whatsapp', 'voice', 'pulse_app', 'qr', 'missed_call'];
+const CHANNELS = ['whatsapp', 'voice', 'pulse_app', 'qr', 'missed_call', 'd2d', 'event', 'landing'];
 const LEAN_KEYS = ['supporter', 'leaning', 'undecided', 'opposed'];
 const LEAN_C: Record<string, string> = { supporter: GREEN, leaning: '#86EFAC', undecided: AMBER, opposed: SAFFRON };
 const CAT_ICON: Record<string, any> = { water: MdWaterDrop, power: MdBolt, jobs: MdWork, roads: MdAddRoad, health: MdLocalHospital, education: MdSchool, farm_debt: MdAgriculture, drugs: MdWarning, other: MdMoreHoriz };
@@ -43,6 +43,13 @@ export interface WarRoomData {
   liveFeed: { id: string; name: string | null; constituency: string | null; category: string | null; created_at: string }[];
   series: { days: string[]; total: number[]; resolved: number[]; categories: string[]; byCategory: Record<string, number[]>; seats: string[]; bySeat: Record<string, number[]>; mobilization: Record<string, number[]> };
   sentiment: { net: number; shiftPp: number; label: string };
+  // D2D field coverage (d2d_visits) — null when no knocks / query degraded.
+  d2d: {
+    totals: { visits: number; met: number; not_home: number; refused: number; revisit: number; today: number; workers: number };
+    byConstituency: { constituency: string; visits: number; met: number; metRate: number }[];
+    topWorkers: { name: string; visits: number; met: number }[];
+    series: number[]; // knocks/day aligned to series.days
+  } | null;
 }
 interface Filters { constituency: string; district: string; channel: string; language: string; days: string; }
 const EMPTY: Filters = { constituency: '', district: '', channel: '', language: '', days: 'all' };
@@ -82,6 +89,9 @@ export default function WarRoomClient() {
     const sb = sbRef.current;
     const ch = sb.channel('wr').on('postgres_changes', { event: '*', schema: 'public', table: 'all_leads' }, (p: any) => {
       const seat = p.new?.constituency || p.old?.constituency; if (seat) { setPulse(seat); setTimeout(() => setPulse(null), 2500); } fetchData();
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'd2d_visits' }, (p: any) => {
+      // A knock from the field tool — pulse the seat and refresh D2D coverage.
+      const seat = p.new?.constituency; if (seat) { setPulse(seat); setTimeout(() => setPulse(null), 2500); } fetchData();
     }).subscribe();
     return () => { sb.removeChannel(ch); };
   }, [fetchData]);
@@ -90,15 +100,11 @@ export default function WarRoomClient() {
   const SEAT_C = [SAFFRON, BLUE, GREEN, AMBER, PURPLE, '#2EC4B6'];
 
   return (
-    <div style={{ height: mobile ? 'auto' : '100vh', minHeight: '100vh', overflow: mobile ? 'visible' : 'hidden', color: TXT, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, background: `radial-gradient(900px 480px at 12% -6%, rgba(240,108,24,0.12), transparent 60%), radial-gradient(820px 460px at 88% 0%, rgba(34,197,94,0.12), transparent 58%), radial-gradient(820px 520px at 50% 112%, rgba(59,130,246,0.10), transparent 60%), ${BG}` }}>
+    <div style={{ height: '100%', minHeight: 0, overflow: 'hidden', color: TXT, display: 'flex', flexDirection: 'column', fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, background: `radial-gradient(900px 480px at 12% -6%, rgba(240,108,24,0.12), transparent 60%), radial-gradient(820px 460px at 88% 0%, rgba(34,197,94,0.12), transparent 58%), radial-gradient(820px 520px at 50% 112%, rgba(59,130,246,0.10), transparent 60%), ${BG}` }}>
       {/* MAIN */}
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* HEADER */}
         <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 8 : 12, padding: mobile ? '10px 12px' : '12px 18px', flexWrap: 'wrap', borderBottom: `1px solid ${LINE}` }}>
-          <a href="/dashboard" title="Back to dashboard" style={{ display: 'inline-flex', textDecoration: 'none' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/pop-icon.png" alt="Pulse of Punjab" style={{ width: mobile ? 26 : 30, height: mobile ? 26 : 30, borderRadius: 7 }} />
-          </a>
           <div>
             <div style={{ fontSize: mobile ? 16 : 19, fontWeight: 800, letterSpacing: '-0.02em' }}>Pulse of Punjab <span style={{ color: MUT, fontWeight: 500, fontSize: mobile ? 13 : 15 }}>War Room</span></div>
             <div style={{ fontSize: 11, color: MUT, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: GREEN, animation: 'wr-pulse 2s infinite' }} />Real-time political intelligence across Punjab</div>
@@ -109,13 +115,10 @@ export default function WarRoomClient() {
           <Sel v={filters.channel} on={(v) => setFilters({ ...filters, channel: v })} opts={['', ...CHANNELS]} fmt={(o) => o ? o.replace('_', ' ') : 'All Channels'} />
           <Sel v={filters.language} on={(v) => setFilters({ ...filters, language: v })} opts={['', 'pa', 'hi', 'en']} fmt={(o) => o ? o.toUpperCase() : 'All Languages'} />
           <Sel v={filters.days} on={(v) => setFilters({ ...filters, days: v })} opts={['all', '1', '7', '30']} fmt={(o) => o === 'all' ? 'All Time' : o === '1' ? 'Today' : `${o}d`} />
-          <a href="/dashboard" title="Exit the War Room — back to dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: CARD, color: TXT, border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 12px', fontSize: 11, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-            <span aria-hidden style={{ fontSize: 13, lineHeight: 1 }}>✕</span> Exit
-          </a>
         </div>
 
         {/* SCROLL BODY (single-VH scroll on desktop; page scroll on mobile) */}
-        <div style={{ flex: 1, minHeight: 0, overflowY: mobile ? 'visible' : 'auto', padding: mobile ? '10px 12px 18px' : '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: mobile ? '10px 12px 18px' : '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* KPI ROW */}
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: mobile ? 8 : 12 }}>
             <Kpi label="Voices Captured" value={d?.kpis.total ?? 0} sub="Total constituents" trend="+14%" up accent={SAFFRON} spark={d?.series.total} />
@@ -217,7 +220,7 @@ export default function WarRoomClient() {
           </div>
 
           {/* BOTTOM ROW (stacks on mobile) */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.85fr) minmax(0,0.95fr) minmax(0,0.95fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
             <Panel title="Channel Mix" sub="By volume" h={mobile ? 190 : undefined}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 120, height: 120, flexShrink: 0 }}><GlowDonut segments={(d?.channelMix || []).map((c, i) => ({ name: c.magnet.replace('_', ' '), value: c.count, top: CHAN_GRAD[i % 5][0], bot: CHAN_GRAD[i % 5][1] }))} /></div>
@@ -239,6 +242,27 @@ export default function WarRoomClient() {
                   );
                 })}
               </div>
+            </Panel>
+            <Panel title="D2D Coverage" sub="Field knocks" h={mobile ? 230 : undefined}>
+              {d?.d2d ? (
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+                    <St l="Knocks" v={d.d2d.totals.visits} />
+                    <St l="Met" v={`${d.d2d.totals.visits ? Math.round((100 * d.d2d.totals.met) / d.d2d.totals.visits) : 0}%`} />
+                    <St l="Workers" v={d.d2d.totals.workers} />
+                    <St l="Today" v={d.d2d.totals.today} />
+                  </div>
+                  <div style={{ height: 30, opacity: 0.9 }}><GlowSpark data={d.d2d.series} color={BLUE} /></div>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {d.d2d.topWorkers.map((w) => (
+                      <div key={w.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
+                        <span style={{ color: MUT, whiteSpace: 'nowrap' }}><b style={{ color: TXT }}>{w.visits}</b> · {w.met} met</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : <Empty text="No knocks logged yet — D2D field tool feeds this" />}
             </Panel>
             <Panel title="Issue Trend (Top 5)" sub="14 days" h={mobile ? 240 : undefined}>
               <div style={{ flex: 1, minHeight: 120 }}>
@@ -348,6 +372,21 @@ export default function WarRoomClient() {
                       ))}
                     </div>
                   </div>
+
+                  {/* d2d coverage for this seat */}
+                  {(() => {
+                    const dd = d?.d2d?.byConstituency.find((x) => x.constituency === selected);
+                    return dd ? (
+                      <div>
+                        <div style={{ fontSize: 10, color: MUT, marginBottom: 6, letterSpacing: '0.04em' }}>D2D COVERAGE</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 10px' }}>
+                          <span><b style={{ color: BLUE }}>{dd.visits}</b> <span style={{ color: MUT }}>knocks</span></span>
+                          <span><b style={{ color: GREEN }}>{dd.met}</b> <span style={{ color: MUT }}>met</span></span>
+                          <span style={{ marginLeft: 'auto', color: MUT }}>{dd.metRate}% met rate</span>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
 
                   {/* channels */}
                   {sd.channels.length > 0 && (

@@ -53,8 +53,10 @@ Karyakartas go door to door: talk, log the person, photograph the place.
 - A "met" visit with contact details creates/merges a Person
   (phone = merge key) with `first_touchpoint='d2d'`, `magnet='d2d'`,
   `engagement_type='outreach'`.
-- Intake: `POST /api/agent/d2d/log` (INBOUND_API_KEY-protected) — built for the
-  field app / a Google-Form-to-webhook bridge until the field app exists.
+- Intake: `POST /api/agent/d2d/log` (INBOUND_API_KEY-protected) — **BUILT** —
+  for the field app / a Google-Form-to-webhook bridge until the field app
+  exists. Also accepts `lean` (always-overwrite: latest canvass wins) and
+  fill-if-null `district`/`booth`/`language` enrichment.
 
 ### Privacy call-out (explicit decision needed)
 The ask was: under People, see **how many** came via D2D — with their details/
@@ -76,8 +78,12 @@ roles?) is a follow-up decision — flagged, not silently decided.
 
 - People table: engagement-type visible; D2D arrivals identifiable via source;
   count of D2D people visible with a filter.
-- War Room later: D2D coverage layer on the constituency map (knocks per booth)
-  — natural extension, not in base.
+- War Room: **BUILT** — "D2D Coverage" panel (knocks, met-rate, workers, trend,
+  top workers), per-seat D2D line in the drawer, realtime pulse on new knocks
+  (`/api/war-room/data` returns a `d2d` block from `d2d_visits`).
+- Artifact map: see `brands/pop/docs/artifacts.md` — the master architecture
+  for all POP surfaces (War Room, Pulse Punjab leader app, D2D, Lead Now,
+  Listener) on the shared person model.
 
 ## Out of scope for base structure (next phases)
 - Field-worker app / mobile capture UI for D2D.

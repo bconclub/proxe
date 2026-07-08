@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       latitude, longitude,
       outcome = 'met', notes,
       grievance_category, grievance_text,
+      lean, language,
     } = body || {};
 
     // 1. Photo → private bucket (path stored, never a public URL).
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
         // engagement/grievance from a prior interaction.
         const { data: cur } = await supabase
           .from('all_leads')
-          .select('first_touchpoint, engagement_type, grievance_text, constituency')
+          .select('first_touchpoint, engagement_type, grievance_text, constituency, district, booth, language')
           .eq('id', leadId).maybeSingle();
         const cols: Record<string, any> = { magnet: 'd2d' };
         if (!cur?.first_touchpoint || cur.first_touchpoint === 'web') cols.first_touchpoint = 'd2d';
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest) {
           if (!cur?.grievance_text) cols.engagement_type = 'outreach';
         }
         if (constituency && !cur?.constituency) cols.constituency = constituency;
+        // Location/profile enrichment — fill-if-null (a prior channel's data wins).
+        if (district && !cur?.district) cols.district = district;
+        if (booth && !cur?.booth) cols.booth = booth;
+        if (language && !cur?.language && ['pa', 'hi', 'en'].includes(language)) cols.language = language;
+        // Lean — always overwrite: the doorstep read is the freshest signal
+        // ("latest canvass wins").
+        if (lean && ['supporter', 'leaning', 'undecided', 'opposed'].includes(lean)) cols.lean = lean;
         if (grievance_category) cols.grievance_category = grievance_category;
         if (grievance_text && !cur?.grievance_text) {
           cols.grievance_text = grievance_text;

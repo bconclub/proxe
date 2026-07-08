@@ -174,7 +174,66 @@ export async function GET(req: NextRequest) {
     const prev7 = R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= d14 && t < d7; });
     const sentiment = { net: Math.round(net * 100) / 100, shiftPp: Math.round((avg(last7) - avg(prev7)) * 100), label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral' };
 
-    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment });
+    // ── D2D coverage (d2d_visits — the field tool's knocks) ──
+    // Separate table, separate try/catch: a d2d failure must never take the
+    // War Room down, so this degrades to d2d: null. Worker phone stays server-side.
+    let d2d: any = null;
+    try {
+      let dq = sb.from('d2d_visits').select('constituency, district, worker_name, outcome, created_at');
+      if (f.constituency) dq = dq.eq('constituency', f.constituency);
+      if (f.district) dq = dq.eq('district', f.district);
+      if (f.days !== 'all') {
+        const d = parseInt(f.days, 10);
+        const since = f.days === '1'
+          ? new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+          : new Date(Date.now() - d * 86400000).toISOString();
+        dq = dq.gte('created_at', since);
+      }
+      const { data: visits, error: dErr } = await dq.order('created_at', { ascending: false }).limit(5000);
+      if (dErr) throw dErr;
+      const V = visits || [];
+      if (V.length) {
+        const totals = { visits: V.length, met: 0, not_home: 0, refused: 0, revisit: 0, today: 0, workers: 0 };
+        const workerAgg = new Map<string, { visits: number; met: number }>();
+        const seatAgg = new Map<string, { visits: number; met: number }>();
+        const d2dSeries = new Array(DAYS).fill(0);
+        V.forEach((v) => {
+          const o = v.outcome as keyof typeof totals;
+          if (o && totals[o] !== undefined) (totals as any)[o]++;
+          const t = new Date(v.created_at).getTime();
+          if (t >= todayStart) totals.today++;
+          if (v.worker_name) {
+            const w = workerAgg.get(v.worker_name) || { visits: 0, met: 0 };
+            w.visits++; if (v.outcome === 'met') w.met++;
+            workerAgg.set(v.worker_name, w);
+          }
+          if (v.constituency) {
+            const s = seatAgg.get(v.constituency) || { visits: 0, met: 0 };
+            s.visits++; if (v.outcome === 'met') s.met++;
+            seatAgg.set(v.constituency, s);
+          }
+          const i = dayIdx[new Date(v.created_at).toISOString().slice(0, 10)];
+          if (i !== undefined) d2dSeries[i]++;
+        });
+        totals.workers = workerAgg.size;
+        d2d = {
+          totals,
+          byConstituency: Array.from(seatAgg.entries())
+            .map(([constituency, s]) => ({ constituency, visits: s.visits, met: s.met, metRate: s.visits ? Math.round((100 * s.met) / s.visits) : 0 }))
+            .sort((a, b) => b.visits - a.visits),
+          topWorkers: Array.from(workerAgg.entries())
+            .map(([name, w]) => ({ name, visits: w.visits, met: w.met }))
+            .sort((a, b) => b.visits - a.visits)
+            .slice(0, 5),
+          series: d2dSeries, // knocks/day, aligned to series.days
+        };
+      }
+    } catch (e) {
+      console.error('[war-room/data] d2d aggregation failed:', (e as Error).message);
+      d2d = null;
+    }
+
+    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });

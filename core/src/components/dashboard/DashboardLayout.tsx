@@ -8,6 +8,7 @@ import PageTransitionLoader from '@/components/PageTransitionLoader'
 import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
 import { getBrandConfig } from '@/configs'
+import ArtifactSwitcher from '@/components/dashboard/ArtifactSwitcher'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
@@ -20,6 +21,7 @@ import {
   MdMenuBook,
   MdChevronLeft,
   MdChevronRight,
+  MdUnfoldMore,
   MdClose,
   MdMenu,
   MdLightMode,
@@ -84,7 +86,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands — only the resolved values differ per brand.
-  const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors } = getBrandConfig()
+  const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors, artifacts: brandArtifacts } = getBrandConfig()
+  // Brands with `artifacts` in config (pop) get the artifact switcher dropdown
+  // on the brand header instead of a plain title / hardcoded war-room link.
+  const hasArtifacts = Boolean(brandArtifacts && brandArtifacts.length > 0)
+  const [artifactSwitcherOpen, setArtifactSwitcherOpen] = useState(false)
+  // The artifact matching the current route (its name shows in the selector box,
+  // and it's highlighted as "current" in the dropdown). External artifacts never
+  // match a route.
+  const activeArtifact = brandArtifacts?.find(
+    (a) => a.href && !a.external && (pathname === a.href || pathname.startsWith(`${a.href}/`))
+  )
   const brandLogo = brandChat?.avatar?.source || '' // never fall back to another brand's asset
   // Transparent mark for the full-screen auth loader (jpg avatars render as a
   // square box). Falls back to the avatar when a brand has no dedicated mark.
@@ -430,21 +442,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             the nav icons below, so it never shifts between collapsed/expanded.
             Only the brand name reveals beside it. Slimmer, lighter header. */}
         <div
-          className="dashboard-layout-sidebar-header flex items-center flex-shrink-0"
+          className="dashboard-layout-sidebar-header relative flex items-center flex-shrink-0"
           style={{ padding: '6px 8px', minHeight: '44px' }}
         >
           <div
             className="dashboard-layout-sidebar-logo-box flex items-center justify-center flex-shrink-0"
-            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || brandId === 'pop') ? 'pointer' : 'default' }}
+            style={{ width: '40px', minWidth: '40px', height: '28px', cursor: (!showExpanded || hasArtifacts || brandId === 'pop') ? 'pointer' : 'default' }}
             onClick={() => {
               if (!showExpanded && !isMobile) {
                 setIsCollapsed(false)
                 localStorage.setItem('sidebar-collapsed', 'false')
+              } else if (showExpanded && hasArtifacts) {
+                setArtifactSwitcherOpen((v) => !v)
               } else if (showExpanded && brandId === 'pop') {
                 router.push('/war-room')
               }
             }}
-            title={!showExpanded ? 'Click to expand sidebar' : brandId === 'pop' ? 'Enter the War Room' : undefined}
+            title={!showExpanded ? 'Click to expand sidebar' : hasArtifacts ? 'Switch artifact' : brandId === 'pop' ? 'Enter the War Room' : undefined}
           >
             {brandLogo && (
               <img
@@ -457,7 +471,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {showExpanded && (
             <>
-              {brandId === 'pop' ? (
+              {hasArtifacts ? (
+                <button
+                  type="button"
+                  title="Switch artifact"
+                  onClick={() => setArtifactSwitcherOpen((v) => !v)}
+                  className="dashboard-layout-sidebar-logo dashboard-layout-artifact-trigger flex-1 min-w-0 flex items-center text-left"
+                  style={{
+                    gap: '6px',
+                    padding: '4px 6px 4px 8px',
+                    borderRadius: '8px',
+                    border: `1px solid ${artifactSwitcherOpen ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                    background: artifactSwitcherOpen ? 'var(--bg-hover)' : 'transparent',
+                    cursor: 'pointer',
+                    transition: 'background 120ms, border-color 120ms',
+                  }}
+                  onMouseEnter={(e) => { if (!artifactSwitcherOpen) e.currentTarget.style.background = 'var(--bg-hover)' }}
+                  onMouseLeave={(e) => { if (!artifactSwitcherOpen) e.currentTarget.style.background = 'transparent' }}
+                  aria-haspopup="menu"
+                  aria-expanded={artifactSwitcherOpen}
+                >
+                  <span
+                    className="min-w-0 truncate"
+                    style={{ flex: 1, fontSize: '12.5px', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.02em', color: 'var(--accent-primary)' }}
+                  >
+                    {activeArtifact?.name || brandName}
+                  </span>
+                  <MdUnfoldMore size={15} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                </button>
+              ) : brandId === 'pop' ? (
                 <a
                   href="/war-room"
                   title="Enter the War Room"
@@ -500,6 +542,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </>
           )}
+          {hasArtifacts && (
+            <ArtifactSwitcher
+              artifacts={brandArtifacts!}
+              activeId={activeArtifact?.id}
+              open={artifactSwitcherOpen && showExpanded}
+              onClose={() => setArtifactSwitcherOpen(false)}
+            />
+          )}
         </div>
 
         {/* Navigation */}
@@ -517,7 +567,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               // direct: no sales Pipeline, no Flow builder, no Humans page.
               // War Room is reachable from the collapsed sidebar / brand logo, so
               // it's kept out of the main menu list too.
-              if (brandId === 'pop' && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans', '/war-room'].includes(item.href)) return null
+              if (brandId === 'pop' && item.href && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans', '/war-room'].includes(item.href)) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
@@ -935,7 +985,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Home (/dashboard) + inbox render in a NON-scrolling full-height main
             so the home page fits exactly one viewport (founder: "one VH completely").
             FounderDashboard handles its own padding + internal scroll. */}
-        {pathname === '/dashboard/inbox' || pathname === '/dashboard' ? (
+        {pathname === '/dashboard/inbox' || pathname === '/dashboard' || pathname === '/war-room' ? (
           <main className="dashboard-layout-main-content-wrapper flex-1 min-h-0" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
             {children}
           </main>

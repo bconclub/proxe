@@ -1,3 +1,19 @@
+// Artifacts — brand-level surfaces built ON TOP of the PROXe engine (e.g. POP's
+// War Room, leader app, D2D field tool). All artifacts share the same person
+// variables in all_leads; each is a different lens/tool over that data. Brands
+// that define `artifacts` get an artifact switcher dropdown on the sidebar
+// brand header; brands without it keep the plain header.
+export type ArtifactStatus = 'live' | 'wip' | 'coming_soon';
+export interface ArtifactDef {
+  id: string;
+  name: string;
+  description?: string;      // one-liner shown under the name in the switcher
+  status: ArtifactStatus;    // live = clickable, wip = clickable if href, coming_soon = disabled
+  href?: string;             // internal route ('/war-room') or full URL; omit = not navigable yet
+  external?: boolean;        // true → open in new tab
+  icon?: string;             // string key mapped to an icon inside the switcher component (config stays serializable)
+}
+
 export interface BrandConfig {
   name: string;
   brand: string;
@@ -33,6 +49,9 @@ export interface BrandConfig {
   // (or a dotted key where noted at the call site), value = the brand's term.
   // Missing keys fall back to the default, so other brands are untouched.
   labels?: Record<string, string>;
+  // Artifact surfaces built on the engine (see ArtifactDef above). Presence of
+  // this array turns the sidebar brand header into an artifact switcher.
+  artifacts?: ArtifactDef[];
   apiUrl?: string;
   supabase?: {
     url?: string;

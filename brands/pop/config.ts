@@ -25,6 +25,50 @@ export const popConfig: BrandConfig = {
     followUpSequence: true,
     warRoom: true,
   },
+  // POP artifacts — the surfaces built on top of the engine. Clicking the
+  // sidebar brand header opens the artifact switcher listing these. All of
+  // them read/write the SAME person variables in all_leads (phone = merge
+  // key); see brands/pop/docs/artifacts.md for the full architecture.
+  artifacts: [
+    {
+      id: 'war-room',
+      name: 'War Room',
+      description: 'Campaign command — voices, seats, grievance loop',
+      status: 'live',
+      href: '/war-room',
+      icon: 'map',
+    },
+    {
+      id: 'pulse-app',
+      name: 'Pulse Punjab',
+      description: 'Leader-facing 117-seat mobilization app',
+      status: 'wip',
+      href: 'https://pulse-punjab.vercel.app',
+      external: true,
+      icon: 'pulse',
+    },
+    {
+      id: 'd2d',
+      name: 'D2D Field Tool',
+      description: 'Volunteer door-to-door logging (data flows into War Room)',
+      status: 'wip',
+      icon: 'door',
+    },
+    {
+      id: 'lead-now',
+      name: 'Lead Now',
+      description: 'Citizen app — QR, call, volunteer, share your voice',
+      status: 'coming_soon',
+      icon: 'megaphone',
+    },
+    {
+      id: 'listener',
+      name: 'Listener',
+      description: 'Live state overview — issues, sentiment, media scan',
+      status: 'coming_soon',
+      icon: 'radar',
+    },
+  ],
   // Voter-native dashboard vocabulary. POP's audience is citizens/voters, not
   // sales leads — the dashboard shell's business-CRM words are remapped here
   // (key = default English string used in core components, via brandLabel()).
