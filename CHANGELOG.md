@@ -1,3 +1,11 @@
+## 2026-07-08 23:59 IST · feat(pop): home redefined (ladder engine, wide events, wide activity) + War Room decluttered + slim scrollbars
+
+- User-facing: home Outreach Engine is now the intensity ladder for POP: Voters → Supporters → Volunteers → Cadre → Grievances Logged (real counts from all_leads.intensity), in a narrower card; Upcoming Events takes the wide slot so the rich reference cards breathe. Bottom row flipped: Priority Constituencies narrower (it is a compact list), Activity Sources wider.
+- War Room decluttered: Daily Targets, Event Monitor and the Listen panel removed (Listen has its own artifact page; events live on the Events calendar). Rows rebalanced to 3 panels each, no overlap, even spacing. Top Issues by Salience drops the meaningless "Other" bucket.
+- Slim scrollbars everywhere: 6px rounded translucent thumb, no track, no arrow buttons (Windows Chromium was drawing the classic chunky bar).
+- Campaign event titles de-hyphened in DB (Nukkad Sabha · Water & Farm Debt).
+- `(92aa0664)`
+
 ## 2026-07-08 22:50 IST · feat(pop): Listen analytics row to reference + dashboard card fix + map click polish + variety
 
 - FIX: dashboard home broke (Engine/Events squeezed to nothing) because Activity Sources rendered full width inside the fixed height home grid. It is now a compact card back in the Conversations Trend slot; Priority Constituencies back to its normal width. All rows visible again.

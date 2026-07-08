@@ -92,13 +92,35 @@ body:not(.dark) {
   }
 }
 
-/* Native, theme-aware scrollbars.
-   `color-scheme` (set on :root / .dark above) lets the browser draw its OWN
-   native scrollbar, tinted to light/dark automatically — no custom-drawn bar.
-   `scrollbar-width: thin` keeps it slim + modern in Chromium/Firefox. We do NOT
-   use a `::-webkit-scrollbar` override: that forced the chunky, non-native bar. */
+/* Slim, unobtrusive scrollbars everywhere. Windows Chromium draws the classic
+   chunky arrow-button bar even with `scrollbar-width: thin`, so we style the
+   webkit scrollbar explicitly: 6px, rounded translucent thumb, no track, no
+   buttons. Firefox keeps `scrollbar-width: thin` + subtle colors. */
 * {
   scrollbar-width: thin;
+  scrollbar-color: rgba(130, 140, 160, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(130, 140, 160, 0.32);
+  border-radius: 9px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(130, 140, 160, 0.55);
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Channel icons - adapt to theme */

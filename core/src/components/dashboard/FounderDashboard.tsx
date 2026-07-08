@@ -129,6 +129,7 @@ interface FounderMetrics {
     }
     dailyActivity?: Array<{ date: string; count: number }>
     weekHour?: number[][]
+    ladder?: { voters: number; supporters: number; volunteers: number; cadre: number; grievances: number }
   }
 }
 
@@ -893,10 +894,12 @@ export default function FounderDashboard() {
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
-        {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
+            Volunteers → Cadre → Grievances), narrower so Events breathes. */}
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-5' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
+            {!(isPop && metrics.campaignHome?.ladder) && (
             <div className="flex items-center gap-0.5 shrink-0">
               {(hasNewHomeLook ? (['Today', '7D', '14D', 'All'] as const) : (['All', '7D', '14D'] as const)).map((p) => (
                 <button
@@ -908,8 +911,22 @@ export default function FounderDashboard() {
                 </button>
               ))}
             </div>
+            )}
           </div>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
+          {isPop && metrics.campaignHome?.ladder ? (() => {
+            const lad = metrics.campaignHome.ladder!
+            const pctOf = (n: number) => (lad.voters ? `${Math.round((100 * n) / lad.voters)}% of voters` : '')
+            return (
+              <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+                <EngineNode icon={<MdPeople size={26} />} color="#3B82F6" count={engK(lad.voters)} label="Voters" sub="reached" />
+                <EngineNode icon={<MdFavorite size={26} />} color="#22c55e" count={engK(lad.supporters)} label="Supporters" sub={pctOf(lad.supporters)} />
+                <EngineNode icon={<MdLocalFireDepartment size={26} />} color="#f59e0b" count={engK(lad.volunteers)} label="Volunteers" sub={pctOf(lad.volunteers)} />
+                <EngineNode icon={<MdVerified size={26} />} color="#a855f7" count={engK(lad.cadre)} label="Cadre" sub="badge holders" />
+                <EngineNode icon={<MdAssignment size={26} />} color="#10b981" count={engK(lad.grievances)} label="Grievances Logged" sub="all time" last />
+              </div>
+            )
+          })() : (
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label={brandLabel('Total Leads')} sub={engTopSub} />
             {isGigsView ? (
@@ -936,14 +953,15 @@ export default function FounderDashboard() {
               last
             />
           </div>
+          )}
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
             {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention - check the Follow-up Due column.`}
           </div>
         </section>
 
-        {/* Upcoming Events - owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Upcoming Events - POP gets the WIDE slot (rich reference cards); other brands keep it narrow */}
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-7' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -1109,8 +1127,8 @@ export default function FounderDashboard() {
 
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
-        {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Priority Lead Queue. POP: narrower (it's a compact list) so Activity Sources gets the width */}
+        <section className={`${popMix ? 'xl:col-span-5' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
@@ -1314,7 +1332,7 @@ export default function FounderDashboard() {
             <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
           )
           return (
-            <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+            <section className="xl:col-span-7 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
               <div className="flex items-center justify-between gap-3 shrink-0">
                 <div>
                   <div className="flex items-center gap-2">

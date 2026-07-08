@@ -1934,7 +1934,18 @@ export async function GET(request: NextRequest) {
         })
         const dailyActivity = hkeys.map((date, i) => ({ date, count: daily[i] }))
 
-        campaignHome = { events, attentionSeats, sources, dailyActivity, weekHour }
+        // Intensity ladder totals - the home Outreach Engine reads campaign
+        // stages (Voters → Supporters → Volunteers → Cadre → Grievances), not
+        // the generic marketing funnel.
+        const ladder = {
+          voters: L.filter((r) => (r.intensity ?? 0) >= 1).length,
+          supporters: L.filter((r) => (r.intensity ?? 0) >= 2).length,
+          volunteers: L.filter((r) => (r.intensity ?? 0) >= 3).length,
+          cadre: L.filter((r) => (r.intensity ?? 0) >= 4).length,
+          grievances: L.filter((r) => r.grievance_category).length,
+        }
+
+        campaignHome = { events, attentionSeats, sources, dailyActivity, weekHour, ladder }
       } catch (e) {
         console.error('[founder-metrics] campaignHome failed:', (e as Error).message)
       }
