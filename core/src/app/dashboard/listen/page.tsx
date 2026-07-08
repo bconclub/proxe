@@ -23,10 +23,24 @@ const ago = (iso: string) => {
 }
 const cap = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
+interface Source {
+  id: string; name: string; type: string; url: string | null
+  constituency: string | null; issue_category: string | null
+  active: boolean; last_fetched_at: string | null; last_item_count: number
+}
+
+const CATEGORIES = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other']
+
 export default function ListenPage() {
   const [d, setD] = useState<Digest | null>(null)
   const [days, setDays] = useState(7)
   const [loading, setLoading] = useState(true)
+  // Sources
+  const [sources, setSources] = useState<Source[]>([])
+  const [showSources, setShowSources] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [fetching, setFetching] = useState(false)
+  const [form, setForm] = useState({ name: '', url: '', issue_category: '' })
 
   const load = React.useCallback(() => {
     setLoading(true)
@@ -36,6 +50,36 @@ export default function ListenPage() {
       .finally(() => setLoading(false))
   }, [days])
   useEffect(() => { load() }, [load])
+
+  const loadSources = React.useCallback(() => {
+    fetch('/api/dashboard/listen/sources', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j?.sources) setSources(j.sources) })
+      .catch(() => {})
+  }, [])
+  useEffect(() => { loadSources() }, [loadSources])
+
+  const addSource = async () => {
+    if (!form.name.trim() || !form.url.trim()) return
+    await fetch('/api/dashboard/listen/sources', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: form.name.trim(), type: 'rss', url: form.url.trim(), issue_category: form.issue_category || undefined }),
+    }).catch(() => {})
+    setForm({ name: '', url: '', issue_category: '' }); setAdding(false); loadSources()
+  }
+  const toggleSource = async (s: Source) => {
+    await fetch('/api/dashboard/listen/sources', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id, active: !s.active }) }).catch(() => {})
+    loadSources()
+  }
+  const deleteSource = async (s: Source) => {
+    await fetch(`/api/dashboard/listen/sources?id=${s.id}`, { method: 'DELETE' }).catch(() => {})
+    loadSources()
+  }
+  const fetchNow = async () => {
+    setFetching(true)
+    try { await fetch('/api/dashboard/listen/sources/fetch', { method: 'POST' }) } catch {}
+    setFetching(false); loadSources(); load()
+  }
 
   const Stat = ({ label, value, color }: { label: string; value: number; color?: string }) => (
     <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 12, padding: '14px 16px' }}>
@@ -58,6 +102,51 @@ export default function ListenPage() {
           <option value={30}>30 days</option>
         </select>
         <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '7px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}><MdRefresh size={15} /> Refresh</button>
+      </div>
+
+      {/* ── SOURCES — see / add / fetch the feeds Listen pulls from ── */}
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: showSources ? 12 : 0, flexWrap: 'wrap' }}>
+          <button onClick={() => setShowSources((v) => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+            {showSources ? '▾' : '▸'} Sources <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-secondary)' }}>({sources.length}) · {sources.filter((s) => s.active).length} active</span>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => setAdding((v) => !v)} style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '6px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>+ Add source</button>
+          <button onClick={fetchNow} disabled={fetching} style={{ background: fetching ? 'var(--bg-hover)' : 'var(--accent-primary)', color: fetching ? 'var(--text-muted)' : '#fff', border: 'none', borderRadius: 8, padding: '6px 11px', fontSize: 12, fontWeight: 700, cursor: fetching ? 'default' : 'pointer' }}>{fetching ? 'Fetching…' : 'Fetch now'}</button>
+        </div>
+
+        {adding && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: 10, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 8 }}>
+            <input placeholder="Source name (e.g. Tribune Punjab)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} style={{ flex: '1 1 160px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 7, padding: '7px 9px', fontSize: 12 }} />
+            <input placeholder="RSS feed URL" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} style={{ flex: '2 1 260px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 7, padding: '7px 9px', fontSize: 12 }} />
+            <select value={form.issue_category} onChange={(e) => setForm({ ...form, issue_category: e.target.value })} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 7, padding: '7px 9px', fontSize: 12 }}>
+              <option value="">Auto-tag issue</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{cap(c)}</option>)}
+            </select>
+            <button onClick={addSource} style={{ background: 'var(--accent-primary)', color: '#fff', border: 'none', borderRadius: 7, padding: '7px 13px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Add</button>
+          </div>
+        )}
+
+        {showSources && (
+          sources.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No sources yet. Add an RSS feed to start pulling signals.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+              {sources.map((s) => (
+                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '8px 10px', opacity: s.active ? 1 : 0.55 }}>
+                  <span onClick={() => toggleSource(s)} title={s.active ? 'Active — click to pause' : 'Paused — click to activate'} style={{ width: 9, height: 9, borderRadius: 9, background: s.active ? '#22c55e' : 'var(--text-muted)', flexShrink: 0, cursor: 'pointer' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      {s.type.toUpperCase()}{s.issue_category ? ` · ${cap(s.issue_category)}` : ''}{s.last_fetched_at ? ` · ${s.last_item_count} items · ${ago(s.last_fetched_at)} ago` : ' · never fetched'}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteSource(s)} title="Remove source" style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 15, lineHeight: 1, flexShrink: 0 }}>×</button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       {!d || d.totals.signals === 0 ? (
