@@ -32,6 +32,7 @@ import {
   MdCall,
   MdLogout,
   MdHandshake,
+  MdMap,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
@@ -58,6 +59,9 @@ const navigation: NavItem[] = [
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
   // Scouts (lokazen = "Gigs") sits directly under Pipeline; feature-gated per brand.
   { name: 'Scouts', href: '/dashboard/scouts', icon: MdHandshake },
+  // War Room (pop) — the constituency map. Feature-gated; first-class nav for
+  // the campaign brand instead of hiding in the profile dropdown.
+  { name: 'War Room', href: '/war-room', icon: MdMap },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
@@ -69,11 +73,11 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Scouts/Gigs (index 5), after Flow (index 8).
-// Calls (index 3) and Scouts (index 5) are feature-gated per brand; their array
-// slots are counted here so the dividers land in the same rendered position
-// whether or not they are shown.
-const DIVIDER_AFTER_INDICES = [5, 8]
+// Divider positions: after War Room (index 6), after Flow (index 9).
+// Calls/Scouts/War Room are feature-gated per brand; their array slots are
+// counted here so the dividers land in the same rendered position whether or
+// not they are shown.
+const DIVIDER_AFTER_INDICES = [6, 9]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -507,6 +511,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
               // Feature toggle: Scouts segment (lokazen) only for brands with scouts on.
               if (item.href === '/dashboard/scouts' && !brandFeatures.scouts) return null
+              // Feature toggle: War Room only for brands with it on (pop).
+              if (item.href === '/war-room' && !brandFeatures.warRoom) return null
+              // POP is a campaign, not a sales org — keep the nav clear and
+              // direct: no sales Pipeline, no Flow builder, no Humans page.
+              if (brandId === 'pop' && ['/dashboard/pipeline', '/dashboard/flows', '/dashboard/humans'].includes(item.href)) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:

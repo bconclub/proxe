@@ -120,16 +120,17 @@ const POP_LEAN: Record<string, { label: string; color: string }> = {
   undecided: { label: 'Undecided', color: '#F59E0B' },
   opposed:   { label: 'Opposed',   color: '#EF4444' },
 }
-const POP_GRIEVANCE: Record<string, { label: string; icon: string; color: string }> = {
-  jobs:      { label: 'Jobs',       icon: '💼', color: '#3B82F6' },
-  water:     { label: 'Water',      icon: '💧', color: '#06B6D4' },
-  power:     { label: 'Power',      icon: '⚡', color: '#F59E0B' },
-  roads:     { label: 'Roads',      icon: '🛣️', color: '#A78BFA' },
-  drugs:     { label: 'Drugs',      icon: '💊', color: '#EC4899' },
-  farm_debt: { label: 'Farm Debt',  icon: '🌾', color: '#F97316' },
-  health:    { label: 'Health',     icon: '🏥', color: '#EF4444' },
-  education: { label: 'Education',  icon: '📚', color: '#8B5CF6' },
-  other:     { label: 'Other',      icon: '📌', color: '#6B7280' },
+// Clean minimal category pills — a colored dot + label, no emoji glyphs.
+const POP_GRIEVANCE: Record<string, { label: string; color: string }> = {
+  jobs:      { label: 'Jobs',      color: '#3B82F6' },
+  water:     { label: 'Water',     color: '#06B6D4' },
+  power:     { label: 'Power',     color: '#F59E0B' },
+  roads:     { label: 'Roads',     color: '#A78BFA' },
+  drugs:     { label: 'Drugs',     color: '#EC4899' },
+  farm_debt: { label: 'Farm Debt', color: '#F97316' },
+  health:    { label: 'Health',    color: '#EF4444' },
+  education: { label: 'Education', color: '#8B5CF6' },
+  other:     { label: 'Other',     color: '#6B7280' },
 }
 const POP_INTENT: Record<string, { label: string; color: string }> = {
   vote:      { label: 'Vote',      color: '#22C55E' },
@@ -142,6 +143,16 @@ const POP_LOOP: Record<string, { label: string; color: string }> = {
   raised:   { label: 'Raised',   color: '#F59E0B' },
   routed:   { label: 'Routed',   color: '#3B82F6' },
   resolved: { label: 'Resolved', color: '#22C55E' },
+}
+// WHY the person engaged (migration 023). Grievance is the column default so
+// it only gets a badge when a real grievance exists — the others always show.
+const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
+  grievance: { label: 'Grievance', color: '#F59E0B' },
+  support:   { label: 'Support',   color: '#22C55E' },
+  volunteer: { label: 'Volunteer', color: '#3B82F6' },
+  event:     { label: 'Event',     color: '#A855F7' },
+  info:      { label: 'Info',      color: '#06B6D4' },
+  outreach:  { label: 'Outreach',  color: '#F97316' },
 }
 // AC number lookup (numbered constituency chip) + a stable per-district color so
 // every row from the same district reads the same hue. Built from the war-room
@@ -730,8 +741,32 @@ export default function LeadsTable({
                   <option value="whatsapp">WhatsApp</option>
                   <option value="voice">Voice</option>
                   <option value="social">Social</option>
+                  {brandId === 'pop' && (
+                    <>
+                      <option value="d2d">D2D (door-to-door)</option>
+                      <option value="event">Event</option>
+                      <option value="landing">Landing page</option>
+                    </>
+                  )}
                 </select>
               )}
+              {/* D2D coverage count — how many People arrived via the field campaign */}
+              {brandId === 'pop' && (() => {
+                const d2dCount = leads.filter((l) => (l.first_touchpoint || l.source) === 'd2d').length
+                return d2dCount > 0 ? (
+                  <button
+                    onClick={() => setSourceFilter(sourceFilter === 'd2d' ? 'all' : 'd2d')}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+                    style={{
+                      border: `1px solid ${sourceFilter === 'd2d' ? '#F97316' : 'var(--border-primary)'}`,
+                      color: '#F97316', backgroundColor: sourceFilter === 'd2d' ? '#F9731622' : 'transparent',
+                    }}
+                    title="People logged through the door-to-door campaign"
+                  >
+                    D2D · {d2dCount}
+                  </button>
+                ) : null
+              })()}
 
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All statuses</option>
@@ -1093,6 +1128,9 @@ export default function LeadsTable({
                   referral: { label: 'Referral', color: '#10B981' },
                   organic: { label: 'Organic', color: '#84CC16' },
                   manual: { label: 'Manual', color: '#6B7280' },
+                  d2d: { label: 'D2D', color: '#F97316' },
+                  event: { label: 'Event', color: '#A855F7' },
+                  landing: { label: 'Landing', color: '#3B82F6' },
                   unknown: { label: '-', color: '#6B7280' },
                 }
 
@@ -1266,6 +1304,11 @@ export default function LeadsTable({
                   const capturedAt = pl.created_at || lead.timestamp
                   const leanCfg = pl.lean ? POP_LEAN[pl.lean] : null
                   const grvCfg = pl.grievance_category ? POP_GRIEVANCE[pl.grievance_category] : null
+                  // Engagement badge fills the grievance cell when there's no
+                  // grievance — a supporter/volunteer/event arrival is a complete
+                  // person, not a missing grievance. 'grievance' itself is the
+                  // column default, so it never shows as a standalone badge.
+                  const engCfg = pl.engagement_type && pl.engagement_type !== 'grievance' ? POP_ENGAGEMENT[pl.engagement_type] : null
                   const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
                   const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
                   const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
@@ -1407,10 +1450,11 @@ export default function LeadsTable({
                         {grvCfg ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
-                              style={{ backgroundColor: `${grvCfg.color}1f`, color: grvCfg.color }}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                              style={{ backgroundColor: `${grvCfg.color}14`, color: grvCfg.color, border: `1px solid ${grvCfg.color}33` }}
                             >
-                              <span aria-hidden="true">{grvCfg.icon}</span>{grvCfg.label}
+                              <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: grvCfg.color }} />
+                              {grvCfg.label}
                             </span>
                             {salience > 0 && (
                               <span className="text-[10px] tracking-tighter" title={`Salience ${salience}/3`} style={{ color: '#F59E0B' }}>
@@ -1418,6 +1462,14 @@ export default function LeadsTable({
                               </span>
                             )}
                           </div>
+                        ) : engCfg ? (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                            style={{ backgroundColor: `${engCfg.color}1f`, color: engCfg.color }}
+                            title={`Came in via ${engCfg.label.toLowerCase()} — no grievance raised`}
+                          >
+                            {engCfg.label}
+                          </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
