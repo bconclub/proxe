@@ -1,8 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
+
+// The lead-summary Claude prompt was hardcoded for Windchasers (aviation), so a
+// lokazen commercial-real-estate lead (owner listing a shop, brand seeking space,
+// scout) had NO domain that fit — Claude found no "course/pilot" info in a
+// property-details chat and fell back to the trivial "…in the In Sequence stage"
+// line. This makes the framing brand-aware so the summary reflects what the lead
+// actually said.
+function summaryDomain(brand: string): { who: string; s1: string; s2: string; dont: string; ex1: string; ex2: string } {
+  if (brand === 'lokazen') {
+    return {
+      who: 'Lokazen — a commercial real-estate marketplace in Bangalore. Every lead is one of three: an OWNER listing a commercial property, a BRAND looking for retail/commercial space, or a SCOUT (a gig worker who spots empty "to-let" shops).',
+      s1: 'Sentence 1: Who they are and which type (owner / brand / scout), with the ONE headline fact — e.g. "owner listing a 950 sqft ground-floor shop on BH Road, Nelamangala" or "brand seeking 600–1500 sqft in South Bangalore" or "scout onboarding, asked about the app".',
+      s2: 'Sentence 2: The concrete details they shared — owner: area, size, floor, rent, deposit/lock-in, availability; brand: area, size, budget, timeline; scout: their question or where they are in KYC/onboarding.',
+      dont: 'This is a commercial real-estate lead — NOT aviation, pilots, courses, or "business solutions". Never mention any of those.',
+      ex1: 'Praveen is an owner listing a 950 sqft ground-floor shop on BH Road, Nelamangala (Atri Square). Rent ₹1.5L fixed, 6-month advance, 3-year lock-in, no bargain; shared photos and a Maps link. Next: verify details and match to brands searching that area.',
+      ex2: 'Karan is a brand looking for ~600–1500 sqft commercial space in South Bangalore. Asked about availability and pricing but hasn\'t locked a requirement. Next: confirm budget and preferred micro-market, then share matching options.',
+    }
+  }
+  if (brand === 'windchasers') {
+    return {
+      who: 'an aviation training academy (Windchasers)',
+      s1: 'Sentence 1: Who they are and which course/program they\'re interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.',
+      s2: 'Sentence 2: What they asked about or what was discussed.',
+      dont: 'This is a pilot-training lead, not a business. Do not write that they "haven\'t shared information about their business".',
+      ex1: 'Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.',
+      ex2: 'Meera asked about cabin crew training cost and duration. Tried to book a call for Monday 3 PM but the slot didn\'t confirm and she went quiet - reach out to help her lock a time.',
+    }
+  }
+  return {
+    who: 'a business',
+    s1: 'Sentence 1: Who they are and what product/service they\'re interested in — only if actually known.',
+    s2: 'Sentence 2: What they asked about or what was discussed.',
+    dont: 'Only state what the conversation actually shows.',
+    ex1: 'Priya asked about pricing and what\'s included, and wanted to see a demo before deciding. Next: send options and confirm a demo time.',
+    ex2: 'Rahul compared two plans and asked about support and onboarding. Went quiet after the quote — follow up with a nudge.',
+  }
+}
+
+function buildLeadSummaryPrompt(parts: {
+  leadName: string; stageLabel: string; profileInfo: string; activitiesContext: string;
+  conversationBlock: string;
+}): string {
+  const d = summaryDomain(BRAND_ID)
+  return `Summarize this lead for ${d.who} in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
+${d.s1}
+${d.s2}
+Sentence 3: What happened (booked / pending / no response / lost) and what to do next.
+If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
+IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call, and reflect the key points + the next step.
+
+CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details. ${d.dont} If you don't know something, simply leave it out.
+If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
+
+Example:
+${d.ex1}
+
+Another example:
+${d.ex2}
+
+Keep it under 55 words. Be specific to what was actually said. No fluff.
+
+Lead: ${parts.leadName}
+Stage: ${parts.stageLabel}
+${parts.profileInfo ? 'Profile: ' + parts.profileInfo : ''}
+${parts.activitiesContext && parts.activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${parts.activitiesContext}\n` : ''}
+${parts.conversationBlock}`
+}
 
 // Helper function to format time ago
 function formatTimeAgo(dateString: string): string {
@@ -397,29 +465,16 @@ export async function GET(
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `Summarize this lead for an aviation training academy (Windchasers) in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
-Sentence 1: Who they are and which course/program they're interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.
-Sentence 2: What they asked about or what was discussed.
-Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
-If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
-IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
-
-CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
-If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
-
-Example:
-Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.
-
-Another example:
-Meera asked about cabin crew training cost and duration. Tried to book a call for Monday 3 PM but the slot didn't confirm and she went quiet - reach out to help her lock a time.
-
-Keep it under 50 words. Be specific to what was actually said. No fluff.
-
-Lead: ${lead.customer_name || 'Customer'}
-Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
-${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
-${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}`
+          const conversationBlock = fullConversationContext
+            ? `CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}`
+            : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`
+          const prompt = buildLeadSummaryPrompt({
+            leadName: lead.customer_name || 'Customer',
+            stageLabel: `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}`,
+            profileInfo: profileInfo.join(' | '),
+            activitiesContext,
+            conversationBlock,
+          })
 
           // Add timeout to prevent hanging
           const controller = new AbortController()
@@ -773,30 +828,13 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
         if (waProfile.city || webProfile.city) profileInfo.push(`City: ${waProfile.city || webProfile.city}`)
         if (waProfile.notes || webProfile.notes) profileInfo.push(`Notes: ${waProfile.notes || webProfile.notes}`)
 
-        const prompt = `Summarize this lead for an aviation training academy (Windchasers) in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
-Sentence 1: Who they are and which course/program they're interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.
-Sentence 2: What they asked about or what was discussed.
-Sentence 3: What happened (call booked / pending / no response / lost) and what to do next.
-If anything went wrong (booking failed, frustrated, asked for a human), say it clearly.
-IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call. Reflect the key points (e.g. medicals booked, loan plan, academy visit agreed, timing) and the next step — do NOT keep saying "team needs to confirm the slot" once the call notes show it was handled.
-
-CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details — do not guess their goals, background, or "business". Do not write that they "haven't shared information about their business"; this is a pilot-training lead, not a business. If you don't know something, simply leave it out.
-If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
-
-Example:
-Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.
-
-Another example:
-Meera asked about cabin crew training cost and duration. Tried to book a call for Monday 3 PM but the slot didn't confirm and she went quiet - reach out to help her lock a time.
-
-Keep it under 50 words. Be specific to what was actually said. No fluff.
-
-Lead: ${summaryData.leadName}
-Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
-${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
-${activitiesContext && activitiesContext !== 'No team activities' ? `\nTEAM NOTES & CALL LOGS (most recent first):\n${activitiesContext}\n` : ''}
-CONVERSATION (${conversationMessages.length} messages):
-${conversationContext || 'No messages yet'}`
+        const prompt = buildLeadSummaryPrompt({
+          leadName: summaryData.leadName,
+          stageLabel: `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}`,
+          profileInfo: profileInfo.join(' | '),
+          activitiesContext,
+          conversationBlock: `CONVERSATION (${conversationMessages.length} messages):\n${conversationContext || 'No messages yet'}`,
+        })
 
         // Add timeout to prevent hanging
         const controller = new AbortController()

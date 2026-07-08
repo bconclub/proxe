@@ -14,6 +14,11 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): lead summary was empty because the summarizer was hardcoded for Windchasers aviation
+
+- A lead with 20 messages of real content (Praveen Kumar — owner who shared full property details: 950 sqft, ground floor, ₹1.5L rent, 6mo advance, 3yr lock-in, BH Road Nelamangala) showed only "…is currently in the In Sequence stage." Root cause: `api/dashboard/leads/[id]/summary` built its Claude prompt with "Summarize this lead for an aviation training academy (Windchasers)… which course/program (CPL/PPL/helicopter)… this is a pilot-training lead, not a business." For a lokazen commercial-real-estate lead there was no matching domain, so Claude found no aviation info and the route fell back to the trivial stage line.
+- Made the summary framing brand-aware (`summaryDomain(BRAND_ID)` + `buildLeadSummaryPrompt`), used at both Claude call sites. Lokazen now summarizes as owner/brand/scout with the right headline facts (area, size, floor, rent, terms / requirement / onboarding stage); Windchasers keeps its aviation framing; other brands get a neutral business framing. The full conversation is still passed, so the model draws the details from what the lead actually typed.
+
 ## 2026-07-08 · fix(lokazen): scout chat invented a Play Store app + looped the user back to the same number
 
 - Live scout chat: asked for an app link, the AI fabricated `https://play.google.com/store/apps/details?id=com.lokazen.scout` (no such listing — nowhere in the prompt/config, pure hallucination), claimed "iOS and Android", and when the scout said "not available" it sent the fake link again. Root cause: the prompt tells the model "scouts submit through the Scout app" but gives no link and only forbids inventing "numbers/policy" — nothing about URLs.
