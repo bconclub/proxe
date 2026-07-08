@@ -61,7 +61,7 @@ export const popConfig: BrandConfig = {
     },
     {
       id: 'd2d',
-      name: 'Door to Door',
+      name: 'On Ground',
       description: 'Volunteer cadre activation - backend + monitoring on PROXe',
       status: 'wip',
       href: '/dashboard/d2d',
@@ -79,7 +79,7 @@ export const popConfig: BrandConfig = {
     },
     {
       id: 'listen',
-      name: 'Listen',
+      name: 'Listener',
       description: 'Listen first, engage better - sentiment capture (internal)',
       status: 'wip',
       href: '/dashboard/listen',

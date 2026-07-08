@@ -1,3 +1,8 @@
+## 2026-07-09 02:30 IST · chore(pop): artifact renames - On Ground + Listener
+
+- Switcher entries now read: Overview, War Room, On Ground (was Door to Door), Listener (was Listen), Pulse of Punjab.
+- (pending-sha)
+
 ## 2026-07-09 02:10 IST · feat(pop): calendar brand colors + light mode fix + full width, switcher pinning, denser home events
 
 - Campaign Events: full width layout, confirmed pills ride the brand saffron, tinted pills use theme text so LIGHT MODE is readable again (pale hardcoded text was invisible on white). Five more mock events fill the month (Mohalla Meetings, Youth Sports, Canal Water Fix Drive, Booth Committee Formation, Mandi Visit).
