@@ -45,9 +45,13 @@ interface CallRow {
   endedReason: string | null
   sentiment: string | null
   engine: 'vapi' | 'elevenlabs' | 'sarvam'
+  language: string | null
   turnCount: number
   createdAt: string
 }
+
+// Dialed language shown as its own column (pa/hi/en → readable label).
+const CALL_LANG_LABEL: Record<string, string> = { pa: 'Punjabi', hi: 'Hindi', en: 'English' }
 
 // Which engine placed the call — a small V1/V2/V3 badge on each row so it's
 // obvious at a glance what stack was used (Vapi vs ElevenLabs vs our Sarvam
@@ -301,6 +305,7 @@ export default function CallsTable() {
                 <tr className="text-[11px] uppercase tracking-wide border-b" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-primary)' }}>
                   <th className="px-4 py-2.5 font-medium">Contact</th>
                   <th className="px-3 py-2.5 font-medium">Direction</th>
+                  <th className="px-3 py-2.5 font-medium">Language</th>
                   <th className="px-3 py-2.5 font-medium hidden sm:table-cell">When</th>
                   <th className="px-3 py-2.5 font-medium">Duration</th>
                   <th className="px-3 py-2.5 font-medium hidden md:table-cell">Status</th>
@@ -343,6 +348,15 @@ export default function CallsTable() {
                           {out ? <MdCallMade size={14} /> : <MdCallReceived size={14} />}
                           <span className="hidden sm:inline">{out ? 'Outbound' : 'Inbound'}</span>
                         </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        {c.language ? (
+                          <span className="text-xs font-semibold rounded px-2 py-0.5" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                            {CALL_LANG_LABEL[c.language] || c.language}
+                          </span>
+                        ) : (
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
                       </td>
                       <td className="px-3 py-3 hidden sm:table-cell">
                         <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{fmtWhen(c.createdAt)}</span>

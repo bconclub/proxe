@@ -34,7 +34,6 @@ export async function POST(req: NextRequest) {
           .update({
             call_status: 'completed',
             call_duration_seconds: Math.round(body.durationSec || 0),
-            main_language: body.language ?? null,
             updated_at: new Date().toISOString(),
           })
           .eq('external_session_id', body.callId);
@@ -58,7 +57,8 @@ export async function POST(req: NextRequest) {
               .map((t: any, i: number) => ({
                 lead_id: sess?.lead_id ?? null,
                 channel: 'voice',
-                sender: t.role === 'assistant' ? 'assistant' : 'user',
+                message_type: 'text',
+                sender: t.role === 'assistant' ? 'agent' : 'customer',
                 content: String(t.content),
                 metadata: { call_id: body.callId, engine: 'sarvam', turn: i },
                 created_at: new Date(base + i * 1000).toISOString(),

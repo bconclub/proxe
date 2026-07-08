@@ -158,6 +158,7 @@ export async function GET(request: NextRequest) {
         endedReason: extra?.endedReason || null,
         sentiment: r.sentiment || null,
         engine,
+        language: (r.channel_data && r.channel_data.language) || null,
         turnCount: extra?.turnCount ?? 0,
         createdAt: r.created_at,
       }
@@ -195,7 +196,8 @@ export async function GET(request: NextRequest) {
             const rows = spoken.map((t, i) => ({
               lead_id: c.leadId,
               channel: 'voice',
-              sender: t.role === 'agent' ? 'assistant' : 'user',
+              message_type: 'text',
+              sender: t.role === 'agent' ? 'agent' : 'customer',
               content: String(t.message),
               metadata: { call_id: c.callId, engine: 'elevenlabs', turn: i },
               created_at: new Date(base + i * 1000).toISOString(),
@@ -220,6 +222,11 @@ export async function GET(request: NextRequest) {
         } catch { /* soft-fail — leave the row as-is */ }
       }))
     }
+
+    // Drop dead rows: calls that never connected (still queued, 0s, no turns).
+    // These are unanswered dials that only clutter the list. Done AFTER the V2
+    // sync so a call that actually completed isn't mistaken for dead.
+    calls = calls.filter((c) => !((c.status === 'queued' || !c.status) && (c.durationSeconds ?? 0) === 0 && (c.turnCount ?? 0) === 0))
 
     // Name search (post-join) — phone search already applied at the DB layer.
     if (search && search.length >= 2 && !/^\d+$/.test(search.replace(/\D/g, ''))) {

@@ -1,3 +1,9 @@
+## 2026-07-08 06:10 IST · feat(pop): Language column on Calls + drop dead rows + fix transcript writes
+
+- Language column added to the Calls list (after Direction): English/Hindi/Punjabi. Dialed language now stored at call time in voice_sessions.channel_data (jsonb; no schema change).
+- Dead rows removed: calls still queued at 0s with no turns (unanswered dials) are filtered out of the list.
+- Fixed two silent bugs: (1) v3-telemetry wrote main_language to voice_sessions, but that column doesn't exist — the whole status update failed, leaving V3 stuck "queued" (removed it). (2) transcript inserts (V2 + V3) were missing message_type and used wrong sender values, so they silently failed — now message_type:'text' + agent/customer to match V1.
+- `(pending-sha)`
 ## 2026-07-08 21:40 IST · feat(pop): Activity Sources panel + reference event cards + clustered War Room map
 
 - User-facing: home "Activity Heatmap" card replaced by the full-width **Activity Sources** panel (reference design): header stats strip (total touchpoints / vs prior 7d / daily avg), source-mix donut with % labels, per-source table (share, touchpoints, momentum vs prior 7d), purple Insights panel (most active channel, strong offline source, voice-led share), and the share-of-total stacked bar with legend. Priority Constituencies now spans full width above it.

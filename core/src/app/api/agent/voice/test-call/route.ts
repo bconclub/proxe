@@ -251,6 +251,9 @@ async function vapiTestCall(body: any) {
             call_direction: 'outbound',
             call_status: 'queued',
             brand: BRAND_ID,
+            // Store the dialed language so the Calls list can show it (no
+            // dedicated column — channel_data is jsonb and otherwise unused).
+            ...(voiceLang ? { channel_data: { language: voiceLang } } : {}),
             updated_at: new Date().toISOString(),
           };
 
@@ -393,6 +396,7 @@ async function elevenLabsTestCall(body: any) {
             call_direction: 'outbound',
             call_status: 'queued',
             brand: BRAND_ID,
+            ...(vp ? { channel_data: { language: vp.lang } } : {}),
             call_summary: 'engine:elevenlabs',
           });
           if (insErr) console.error('[test-call:11labs] voice_sessions insert failed:', insErr.message);
@@ -457,6 +461,7 @@ async function sarvamPipelineCall(body: any) {
           call_direction: 'outbound',
           call_status: 'queued',
           brand: BRAND_ID,
+          channel_data: { language: isVoiceLang(body.language) ? body.language : 'pa' },
           call_summary: 'engine:sarvam',
         });
         if (insErr) console.error('[test-call:sarvam] voice_sessions insert failed:', insErr.message);
