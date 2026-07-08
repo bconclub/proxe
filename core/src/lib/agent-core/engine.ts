@@ -144,6 +144,17 @@ User's message: ${input.message}`
     /\b(debited|deducted|charged|refunded?|not credited|credited|chargeback)\b|\b(money|amount|paisa|rupees?|rs\.?|₹|payment|payout|balance)\b[^.?!]*\b(debited|deducted|cut|gone|missing|stuck|check|not received|didn'?t (get|receive)|haven'?t (got|received)|pending|deducted)\b|\b(didn'?t|not|haven'?t|never)\b[^.?!]*\b(get|got|receive|received|credited|paid)\b[^.?!]*\b(money|amount|payment|payout|refund)\b/i
       .test(input.message || ''));
 
+  // 5c. Payment / transaction failures apply to ANY Lokazen audience — owners and
+  // brands PAY Lokazen, scouts get PAID BY Lokazen, so "money debited but payment
+  // failed", "amount deducted", "refund not received" is a SUPPORT issue for all
+  // three, never a reason to book a call. Complaint-shaped only (see isPaymentComplaint),
+  // so "what's the fee?" / "how do I pay?" never fires.
+  const paymentSupportIssue = brandId === 'lokazen' && isPaymentComplaint(input.message || '');
+  const supportEscalation = scoutSupportIssue || paymentSupportIssue;
+  // A payment problem must never become a booking — tell the model plainly and
+  // forbid the "your transaction was successful" hallucination.
+  if (paymentSupportIssue) systemPrompt += paymentSupportDirective();
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -178,8 +189,10 @@ User's message: ${input.message}`
   // book a call" AFTER walking the user down the booking path. Cutting the
   // tools off here means the flow never starts.
   const isScout = input.lokazenAudience === 'scout';
-  const lokazenBookingAction = !isScout && brandId === 'lokazen' && isLokazenBookingAction(input);
-  const needsBookingTools = !isScout && (input.channel === 'whatsapp' || lokazenBookingAction) &&
+  // A payment/transaction complaint (any audience) is support, not sales — never
+  // wire booking tools for it, so the model can't pivot the person into a call.
+  const lokazenBookingAction = !isScout && !supportEscalation && brandId === 'lokazen' && isLokazenBookingAction(input);
+  const needsBookingTools = !isScout && !supportEscalation && (input.channel === 'whatsapp' || lokazenBookingAction) &&
     (isBookingIntent(input.message) || !!existingBookingMessage || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
   // We capture this OUTSIDE try/catch so the post-generation hallucination
@@ -278,6 +291,10 @@ User's message: ${input.message}`
   // If user explicitly asked for a human, flag for follow-up regardless of AI response
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
+  } else if (paymentSupportIssue) {
+    // Payment/transaction problem (any audience) — raise a support request so the
+    // team gets the number + the exact complaint and can check the transaction.
+    await flagForHumanFollowup(supabase, input, `Payment/transaction issue: "${(input.message || '').slice(0, 160)}"`);
   } else if (scoutSupportIssue) {
     // Scout hit a problem — raise a support request so the team gets pinged with
     // the number + the issue. (No call for scouts; support goes this way.)
@@ -357,8 +374,16 @@ export async function* processStream(
     // Scouts never book — keep booking intent (and thus the booking tools) off
     // entirely for them, same as the WhatsApp path above.
     const isScout = input.lokazenAudience === 'scout';
-    const lokazenBookingAction = !isScout && brandId === 'lokazen' && isLokazenBookingAction(input);
-    const hasBookingIntent = !isScout &&
+    // Payment/transaction complaint (any audience) is support, not sales — keep
+    // booking off, same as the WhatsApp path. The web path has no escalation block
+    // of its own, so raise the support request here too — otherwise the directive
+    // makes the reply CLAIM "I've raised a request" while nothing actually fires.
+    const paymentSupportIssue = brandId === 'lokazen' && isPaymentComplaint(input.message || '');
+    if (paymentSupportIssue) {
+      await flagForHumanFollowup(supabase, input, `Payment/transaction issue: "${(input.message || '').slice(0, 160)}"`);
+    }
+    const lokazenBookingAction = !isScout && !paymentSupportIssue && brandId === 'lokazen' && isLokazenBookingAction(input);
+    const hasBookingIntent = !isScout && !paymentSupportIssue &&
       (isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
     // 2. Parallelize DB calls: KB search always runs (audience-scoped for
@@ -422,6 +447,9 @@ User's message: ${input.message}`
     });
     // Lock the model to the resolved audience (see the WhatsApp path above).
     systemPrompt += lokazenAudienceDirective(input, brandId);
+    // Payment problem → force the support path, ban the "transaction successful"
+    // hallucination (same as the WhatsApp path).
+    if (paymentSupportIssue) systemPrompt += paymentSupportDirective();
 
     // 4. Generate response — true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
@@ -590,6 +618,34 @@ This person is a Lokazen SCOUT (a gig worker who spots empty "To Let" shops and 
 CURRENT CONVERSATION AUDIENCE: ${label} (LOCKED)
 =================================================================================
 Apply the ${input.lokazenAudience.toUpperCase()} flow for this conversation. Do not switch this person into the Scout flow.`;
+}
+
+/**
+ * Complaint-shaped detector for a payment/transaction problem — money debited but
+ * payment failed, amount deducted, double charged, refund not received, etc. Kept
+ * deliberately complaint-shaped (needs a fail/debited/deducted/reversed signal, not
+ * just the word "payment") so a pricing QUESTION ("what's the fee?", "how do I
+ * pay?") never trips it. Applies to every Lokazen audience — owners/brands pay
+ * Lokazen, scouts are paid by Lokazen, so all three can hit a payment problem.
+ */
+function isPaymentComplaint(message: string): boolean {
+  return /\b(payment|transaction|txn|amount|money|paisa|rupees?|rs\.?|₹)\b[^.?!]*\b(fail|failed|failing|declin\w*|debited|deducted|cut|reversed|stuck|pending|not received|didn'?t (get|receive)|haven'?t (got|received)|not credited|gone|missing)\b|\b(debited|deducted|chargeback|double.?charged|charged twice|reversed)\b|\bpayment (shows?|is|got|marked|failed)\b|\brefund\b[^.?!]*\b(not|didn'?t|haven'?t|pending|stuck|failed)\b|\b(not|didn'?t|haven'?t)\b[^.?!]*\brefund/i
+    .test(message);
+}
+
+/**
+ * Appended to the system prompt when a payment/transaction problem is detected.
+ * Forces the SUPPORT path (no call booking) and bans the "your transaction was
+ * successful" hallucination we saw live.
+ */
+function paymentSupportDirective(): string {
+  return `\n\n=================================================================================
+PAYMENT / TRANSACTION PROBLEM (LOCKED — this turn is SUPPORT, not sales)
+=================================================================================
+This person reported a payment or transaction problem (money debited but payment failed, amount deducted, double charged, refund not received, etc.). Handle it as SUPPORT:
+- Do NOT offer, suggest, or start a call/consultation/site-visit booking. Never ask "what day/time works for a call". There is nothing to book here.
+- Acknowledge the specific issue in one line, confirm the phone number we should use, then say plainly: "I've raised a support request with the Lokazen team with your number and details — they'll check this and get back to you shortly."
+- Do NOT claim the payment succeeded, was reversed, or is fixed. Do NOT invent a resolution, a reference number, or a timeline. You are only raising the request.`;
 }
 
 function isLokazenBookingAction(input: AgentInput): boolean {
