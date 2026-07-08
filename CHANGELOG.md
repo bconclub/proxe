@@ -1,3 +1,9 @@
+## 2026-07-08 05:30 IST · feat(pop): transcript + recording for V2 (ElevenLabs) and V3
+
+- V2 was "completely blind": no transcript, no recording. Now the Calls list lazily pulls the ElevenLabs conversation → writes the transcript to conversations (list count + detail view work like V1) and sets a recording URL.
+- Recording proxy: /api/dashboard/calls/[id]/audio streams ElevenLabs audio (behind the API key) so the dashboard can play it; V1's public Vapi URL redirects through.
+- V3 transcript: the pipeline now ships the conversation text in its telemetry; the ingest writes it to conversations. (V3 recording still pending — needs audio capture.)
+- `(pending-sha)` + VPS pipeline redeploy
 ## 2026-07-08 04:55 IST · fix(pop): known-name calls no longer ask for the name at all
 
 - Greeting by name worked, but the agent still asked "what's your name?" because the numbered NAME step was still in the prompt body and a soft appended note didn't override it. Now, when the name is known: the NAME step line is physically replaced with an "already known" instruction, and a hard ‼️ directive is prepended at the top. Verified pa/hi/en: greets by name, no name-question phrasing remains.

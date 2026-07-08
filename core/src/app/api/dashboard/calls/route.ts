@@ -168,9 +168,13 @@ export async function GET(request: NextRequest) {
     // list load (capped, parallel) and persist so they land completed with the
     // real duration — the V2 equivalent of the Vapi webhook / V3 telemetry.
     const elKey = process.env.ELEVENLABS_API_KEY
+    // Enrich V2 rows that are pending OR missing their transcript — status,
+    // duration, transcript (→ conversations rows so the list count + detail view
+    // work like V1), and a recording proxy URL.
     const pendingEl = calls.filter(
-      (c) => c.engine === 'elevenlabs' && c.callId && (c.status === 'queued' || (c.durationSeconds ?? 0) === 0),
-    ).slice(0, 12)
+      (c) => c.engine === 'elevenlabs' && c.callId &&
+        (c.status === 'queued' || (c.durationSeconds ?? 0) === 0 || (c.turnCount ?? 0) === 0 || !c.recordingUrl),
+    ).slice(0, 10)
     if (elKey && pendingEl.length) {
       await Promise.all(pendingEl.map(async (c) => {
         try {
@@ -182,9 +186,36 @@ export async function GET(request: NextRequest) {
           const dur = Math.round(conv?.metadata?.call_duration_secs ?? conv?.call_duration_secs ?? 0)
           c.status = st === 'done' ? 'completed' : 'failed'
           c.durationSeconds = dur
-          if (typeof conv?.message_count === 'number') c.turnCount = conv.message_count
+
+          // Transcript → conversations rows (idempotent: only when none exist yet).
+          const transcript: any[] = Array.isArray(conv?.transcript) ? conv.transcript : []
+          const spoken = transcript.filter((t) => (t?.message || '').trim())
+          if (spoken.length && (c.turnCount ?? 0) === 0) {
+            const base = new Date(c.createdAt || Date.now()).getTime()
+            const rows = spoken.map((t, i) => ({
+              lead_id: c.leadId,
+              channel: 'voice',
+              sender: t.role === 'agent' ? 'assistant' : 'user',
+              content: String(t.message),
+              metadata: { call_id: c.callId, engine: 'elevenlabs', turn: i },
+              created_at: new Date(base + i * 1000).toISOString(),
+            }))
+            const { error: insErr } = await supabase.from('conversations').insert(rows)
+            if (!insErr) c.turnCount = spoken.length
+          } else if (typeof conv?.message_count === 'number') {
+            c.turnCount = conv.message_count
+          }
+
+          // Recording via the proxy (ElevenLabs audio needs the API key).
+          const recUrl = conv?.has_audio ? `/api/dashboard/calls/${c.callId}/audio` : null
+          if (recUrl) c.recordingUrl = recUrl
+
           await supabase.from('voice_sessions')
-            .update({ call_status: c.status, call_duration_seconds: dur, updated_at: new Date().toISOString() })
+            .update({
+              call_status: c.status, call_duration_seconds: dur,
+              ...(recUrl ? { recording_url: recUrl } : {}),
+              updated_at: new Date().toISOString(),
+            })
             .eq('external_session_id', c.callId)
         } catch { /* soft-fail — leave the row as-is */ }
       }))

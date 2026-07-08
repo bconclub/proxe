@@ -39,6 +39,33 @@ export async function POST(req: NextRequest) {
           })
           .eq('external_session_id', body.callId);
         if (error) console.error('[v3-telemetry] voice_sessions update failed:', error.message);
+
+        // Transcript → conversations rows (idempotent: only if none exist yet),
+        // so V3 calls show a transcript like V1/V2.
+        const transcript = Array.isArray(body.transcript) ? body.transcript : [];
+        if (transcript.length) {
+          const { count } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('channel', 'voice')
+            .filter('metadata->>call_id', 'eq', body.callId);
+          if (!count) {
+            const base = new Date(body.startedAt || Date.now()).getTime();
+            const { data: sess } = await supabase
+              .from('voice_sessions').select('lead_id').eq('external_session_id', body.callId).maybeSingle();
+            const rows = transcript
+              .filter((t: any) => (t?.content || '').trim())
+              .map((t: any, i: number) => ({
+                lead_id: sess?.lead_id ?? null,
+                channel: 'voice',
+                sender: t.role === 'assistant' ? 'assistant' : 'user',
+                content: String(t.content),
+                metadata: { call_id: body.callId, engine: 'sarvam', turn: i },
+                created_at: new Date(base + i * 1000).toISOString(),
+              }));
+            if (rows.length) await supabase.from('conversations').insert(rows);
+          }
+        }
       }
     } catch (e: any) {
       console.error('[v3-telemetry] status update failed (non-fatal):', e?.message);
