@@ -1,0 +1,2 @@
+# Shell scripts must stay LF — they run on Vercel's Linux builders.
+*.sh text eol=lf
