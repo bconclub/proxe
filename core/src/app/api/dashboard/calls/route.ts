@@ -163,6 +163,33 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // V2 (ElevenLabs) has no post-call webhook, so its rows sit at "queued·0s"
+    // forever. Lazily sync the still-pending ones from the conversation API on
+    // list load (capped, parallel) and persist so they land completed with the
+    // real duration — the V2 equivalent of the Vapi webhook / V3 telemetry.
+    const elKey = process.env.ELEVENLABS_API_KEY
+    const pendingEl = calls.filter(
+      (c) => c.engine === 'elevenlabs' && c.callId && (c.status === 'queued' || (c.durationSeconds ?? 0) === 0),
+    ).slice(0, 12)
+    if (elKey && pendingEl.length) {
+      await Promise.all(pendingEl.map(async (c) => {
+        try {
+          const cr = await fetch(`https://api.elevenlabs.io/v1/convai/conversations/${c.callId}`, { headers: { 'xi-api-key': elKey } })
+          if (!cr.ok) return
+          const conv: any = await cr.json()
+          const st = conv?.status
+          if (st !== 'done' && st !== 'failed') return // still in-progress/processing
+          const dur = Math.round(conv?.metadata?.call_duration_secs ?? conv?.call_duration_secs ?? 0)
+          c.status = st === 'done' ? 'completed' : 'failed'
+          c.durationSeconds = dur
+          if (typeof conv?.message_count === 'number') c.turnCount = conv.message_count
+          await supabase.from('voice_sessions')
+            .update({ call_status: c.status, call_duration_seconds: dur, updated_at: new Date().toISOString() })
+            .eq('external_session_id', c.callId)
+        } catch { /* soft-fail — leave the row as-is */ }
+      }))
+    }
+
     // Name search (post-join) — phone search already applied at the DB layer.
     if (search && search.length >= 2 && !/^\d+$/.test(search.replace(/\D/g, ''))) {
       const needle = search.toLowerCase()

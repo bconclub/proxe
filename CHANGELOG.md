@@ -1,3 +1,10 @@
+## 2026-07-08 18:00 IST · fix(pop): V2/V3 calls stop showing "queued · 0s"
+
+- V2 and V3 calls connected fine but the dashboard never moved them off "queued" (only V1 had the Vapi webhook). Now:
+  - V3: the telemetry ingest flips voice_sessions to completed + real duration.
+  - V2 (ElevenLabs, no webhook): the Calls list lazily syncs pending rows from the conversation API (capped, parallel) and persists completed + duration.
+- Note: V2's prompt now comes from our Voice Prompts editor (override) — editing ElevenLabs' own dashboard no longer applies, same as Vapi.
+- `(pending-sha)`
 ## 2026-07-08 17:35 IST · feat(pop): per-language latency comparison in the eval
 
 - The eval now records the DIALED language (V1 via Vapi call metadata, V3 via pipeline telemetry) instead of relying on flaky post-call extraction.
