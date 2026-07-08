@@ -14,6 +14,12 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): scout chat offered calls then apologized; money complaints got brand answers
+
+- **Scout offered a call, then "Sorry, I cannot book a call".** Booking tools were being wired for scout conversations in both engine paths (`process` and `processStream`); the tool handler then hard-refused via `scoutBookingBlock()` — but only AFTER the model had already walked the scout down the booking path, surfacing the refusal as a dumb apology. Fixed by never wiring the booking tools for scouts at all (`needsBookingTools`/`hasBookingIntent` and `lokazenBookingAction` now gate on `!isScout`), and guarding `advanceLokazenBookingAfterEmail` against scouts so a scout's "team will reach out" support line can't be rewritten into "what day/time works for a call".
+- **"My money has been debited, kindly check" got a generic brand/CRE reply, no support raised.** Two gaps: (1) the `scoutSupportIssue` detector had no money/payment branch, so no Slack "Scout support request" ping fired; broadened it to catch debited/deducted/charged/refund/not-credited/amount-cut/"kindly check" (still scoped to scout audience, so brand/owner fee questions and normal payout questions like "when will I get paid" never false-trigger). (2) The system prompt carried scout GUIDANCE but never told the model which audience THIS conversation was — so it drifted into the brand flow. Added a hard per-turn `lokazenAudienceDirective` audience LOCK appended to the system prompt (scout/brand/owner), forbidding calls + brand/CRE answers for scouts and mandating the SCOUT SUPPORT reply for any problem report.
+- No behavior change for Brand/Owner audiences or other brands.
+
 ## 2026-07-07 · fix(lokazen): Gigs tab "High Intent Leads" KPI always read 0
 
 - Same class of mismatch as the "Booked Calls / Events" card above: `lead_score` is a business-lead concept and scouts never get one, so this card was permanently stuck at 0 on the Gigs tab.
