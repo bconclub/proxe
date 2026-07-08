@@ -1,3 +1,8 @@
+## 2026-07-09 03:00 IST · fix(pop): Activity Sources overlap gone for real
+
+- The card content was taller than the fixed home row, so the share bar painted over the source table. Sized everything to actually fit: 148px donut, single line insight text, tighter table rows, legend row dropped (bar + table already carry the labels). Verified: zero overflowing elements, clear gap between table and bar at desktop width.
+- (pending-sha)
+
 ## 2026-07-09 02:30 IST · chore(pop): artifact renames - On Ground + Listener
 
 - Switcher entries now read: Overview, War Room, On Ground (was Door to Door), Listener (was Listen), Pulse of Punjab.

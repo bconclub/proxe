@@ -1357,40 +1357,33 @@ export default function FounderDashboard() {
                 </div>
               </div>
 
-              {/* one card, NO internal scroll: donut + insights on the left, per-source rows on the right, share bar below */}
-              <div className="flex-1 min-h-0 flex flex-col gap-3">
-                <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[220px,1fr] gap-4 items-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <SourceDonut mix={popMix} total={mixTotal} />
-                    <div className="flex flex-col gap-1.5 self-stretch">
+              {/* one card, no scroll, nothing overlapping: SMALL donut + insight lines
+                  left, compact table right, slim share bar pinned at the bottom.
+                  Everything is sized to fit the fixed home-row height. */}
+              <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+                <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[168px,1fr] gap-3 items-center overflow-hidden">
+                  <div className="flex flex-col items-center gap-1 min-h-0">
+                    <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
+                    <div className="flex flex-col gap-0.5 self-stretch">
                       {top && (
-                        <div className="flex items-center gap-2">
-                          {iconTile(top.magnet, 20)}
-                          <span className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Most active: <b style={{ color: magnetMeta(top.magnet).color }}>{magnetMeta(top.magnet).label}</b></span>
-                        </div>
+                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Most active: <b style={{ color: magnetMeta(top.magnet).color }}>{magnetMeta(top.magnet).label}</b></span>
                       )}
                       {offline && (
-                        <div className="flex items-center gap-2">
-                          {iconTile(offline.magnet, 20)}
-                          <span className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Strong offline: <b style={{ color: magnetMeta(offline.magnet).color }}>{magnetMeta(offline.magnet).label}</b></span>
-                        </div>
+                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Strong offline: <b style={{ color: magnetMeta(offline.magnet).color }}>{magnetMeta(offline.magnet).label}</b></span>
                       )}
-                      <div className="flex items-center gap-2">
-                        {iconTile('voice', 20)}
-                        <span className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Voice led: <b style={{ color: '#a78bfa' }}>{voiceShare}%</b></span>
-                      </div>
+                      <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Voice led: <b style={{ color: '#a78bfa' }}>{voiceShare}%</b></span>
                     </div>
                   </div>
                   <div className="rounded-lg border overflow-hidden self-center" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
                     {popMix.slice(0, 6).map((s) => (
-                      <div key={s.magnet} className="grid items-center px-3 py-[7px] border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.5fr) 0.5fr 0.7fr 0.7fr', borderColor: 'var(--border-primary)' }}>
+                      <div key={s.magnet} className="grid items-center px-2.5 py-1 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.5fr) 0.5fr 0.7fr 0.7fr', borderColor: 'var(--border-primary)' }}>
                         <span className="flex items-center gap-2 min-w-0">
-                          {iconTile(s.magnet, 20)}
-                          <span className="text-[11.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
+                          {iconTile(s.magnet, 18)}
+                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
                         </span>
-                        <span className="text-right text-[11.5px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
-                        <span className="text-right text-[11.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
-                        <span className="text-right text-[11px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
+                        <span className="text-right text-[11px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
+                        <span className="text-right text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
+                        <span className="text-right text-[10.5px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
                           {s.delta7 >= 0 ? <MdArrowUpward size={11} /> : <MdTrendingDown size={11} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
                         </span>
                       </div>
@@ -1398,23 +1391,13 @@ export default function FounderDashboard() {
                   </div>
                 </div>
 
-                {/* share-of-total bar + legend */}
-                <div className="shrink-0">
-                  <div className="flex h-5 rounded-full overflow-hidden">
-                    {popMix.map((s) => (
-                      <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
-                        {s.share >= 8 && <span className="text-[9.5px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5">
-                    {popMix.slice(0, 6).map((s) => (
-                      <span key={s.magnet} className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
-                        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: magnetMeta(s.magnet).color }} />
-                        {magnetMeta(s.magnet).label}
-                      </span>
-                    ))}
-                  </div>
+                {/* share-of-total bar (labels live inside it - no legend row) */}
+                <div className="shrink-0 flex h-4 rounded-full overflow-hidden">
+                  {popMix.map((s) => (
+                    <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
+                      {s.share >= 8 && <span className="text-[9px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
