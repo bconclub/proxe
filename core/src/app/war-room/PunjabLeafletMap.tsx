@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import raw from '@/data/punjab-ac.json';
-import { normName } from '@/lib/war-room/constituencies';
+import { normName, CONSTITUENCIES } from '@/lib/war-room/constituencies';
 import type { ColorMode } from './PunjabMap';
 
 interface SeatStat { constituency: string; count: number; topCategory: string | null; leanScore: number; voteShare: number; }
@@ -37,6 +37,14 @@ const LIGHT_P = { empty: '#EAEDF1', heatLo: '#FFE0C2', heatHi: '#E2570A', turnLo
 const DARK_P = { empty: '#16263C', heatLo: '#16273D', heatHi: SAFFRON, turnLo: '#16273D', turnHi: BLUE, leanMid: '#46566E', stroke: 'rgba(255,255,255,0.12)', sel: '#FFFFFF' };
 
 const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
+
+// district lookup for clustering (seat → district)
+const DISTRICT_BY_SEAT: Record<string, string> = Object.fromEntries(
+  CONSTITUENCIES.map((c) => [normName(c.name), c.district || 'Punjab']),
+);
+// Below this zoom the map shows one aggregated bubble per DISTRICT; clicking a
+// cluster flies into that district, where the per-seat bubbles take over.
+const CLUSTER_MAX_ZOOM = 8.75;
 
 export default function PunjabLeafletMap({
   mode, byConstituency, pulseSeat, selected, onSelect,
@@ -91,12 +99,66 @@ export default function PunjabLeafletMap({
     };
   };
 
-  // Rebuild the numbered count bubbles for the current data + mode.
+  // Rebuild the count bubbles for the current data + mode + zoom. Zoomed out →
+  // ONE aggregated cluster per district (click = fly into it); zoomed in →
+  // per-seat bubbles (click = open the seat drawer).
   const renderMarkers = () => {
     const grp = markersRef.current;
-    if (!grp) return;
+    const map = mapRef.current;
+    if (!grp || !map) return;
     grp.clearLayers();
     const data = dataRef.current;
+    const clustered = map.getZoom() < CLUSTER_MAX_ZOOM;
+
+    if (clustered) {
+      // aggregate by district: total voices, count-weighted centroid, member bounds
+      const byDist = new Map<string, { total: number; seats: number; latSum: number; lngSum: number; w: number; bounds: L.LatLngBounds | null; cats: Record<string, number>; leanSum: number; leanW: number }>();
+      data.forEach((s) => {
+        if (!s.count) return;
+        const center = centerByName.current[normName(s.constituency)];
+        if (!center) return;
+        const dist = DISTRICT_BY_SEAT[normName(s.constituency)] || 'Punjab';
+        const a = byDist.get(dist) || { total: 0, seats: 0, latSum: 0, lngSum: 0, w: 0, bounds: null, cats: {}, leanSum: 0, leanW: 0 };
+        a.total += s.count; a.seats++;
+        a.latSum += center.lat * s.count; a.lngSum += center.lng * s.count; a.w += s.count;
+        a.bounds = a.bounds ? a.bounds.extend(center) : L.latLngBounds(center, center);
+        if (s.topCategory) a.cats[s.topCategory] = (a.cats[s.topCategory] || 0) + s.count;
+        a.leanSum += s.leanScore * s.count; a.leanW += s.count;
+        byDist.set(dist, a);
+      });
+      const P = palette();
+      const maxTotal = Math.max(1, ...Array.from(byDist.values()).map((a) => a.total));
+      byDist.forEach((a, dist) => {
+        const clusterColor = (() => {
+          switch (modeRef.current) {
+            case 'heat': return mix(P.heatLo, P.heatHi, 0.25 + 0.75 * (a.total / maxTotal));
+            case 'lean': { const t = ((a.leanW ? a.leanSum / a.leanW : 0) + 1) / 2; return t < 0.5 ? mix(SAFFRON, P.leanMid, t * 2) : mix(P.leanMid, GREEN, (t - 0.5) * 2); }
+            case 'issue': { const top = Object.entries(a.cats).sort((x, y) => y[1] - x[1])[0]?.[0]; return ISSUE_COLORS[top || 'other'] || ISSUE_COLORS.other; }
+            case 'turnout': return mix(P.turnLo, P.turnHi, 0.25 + 0.75 * (a.total / maxTotal));
+          }
+        })();
+        const size = Math.round(42 + 34 * Math.sqrt(a.total / maxTotal)); // 42-76px
+        const center = L.latLng(a.latSum / a.w, a.lngSum / a.w);
+        const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${clusterColor};border:3px solid rgba(255,255,255,0.65);box-shadow:0 0 0 6px ${clusterColor}33,0 3px 10px rgba(0,0,0,0.4);display:grid;place-items:center;color:#fff;font-family:Inter,system-ui,sans-serif;line-height:1.05;text-align:center;cursor:pointer;">
+          <div><div style="font-weight:800;font-size:${size < 54 ? 13 : 15}px;">${fmtK(a.total)}</div><div style="font-size:8.5px;font-weight:600;opacity:0.85;">${a.seats} seats</div></div>
+        </div>`;
+        const icon = L.divIcon({ html, className: 'wr-count-marker', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+        const m = L.marker(center, { icon, riseOnHover: true, keyboard: false });
+        // click a cluster → zoom INTO the district; the zoomend re-render swaps to
+        // seat bubbles. fitBounds (instant) not flyTo — animated flights get
+        // cancelled by follow-on events in some environments. Deferred a tick so
+        // the same click reaching the map container can't interrupt it.
+        m.on('click', (e) => {
+          L.DomEvent.stop(e);
+          const b = a.bounds;
+          setTimeout(() => { if (b) map.fitBounds(b.pad(0.35), { maxZoom: 10.5, animate: false }); }, 0);
+        });
+        m.bindTooltip(`${dist} — ${fmtK(a.total)} voices · ${a.seats} seats · click to open`, { direction: 'top', offset: [0, -size / 2], opacity: 0.92, className: 'wr-leaflet-tip' });
+        grp.addLayer(m);
+      });
+      return;
+    }
+
     const max = Math.max(1, ...data.map((s) => s.count));
     data.forEach((s) => {
       if (!s.count) return;
@@ -127,6 +189,7 @@ export default function PunjabLeafletMap({
     const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: 14, zoomSnap: 0.25, scrollWheelZoom: true });
     map.attributionControl.setPrefix(false);
     mapRef.current = map;
+    ;(el as any)._wrMap = map; // dev/testing handle
 
     const dark = !(() => { const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim(); return bg && isLightHex(bg); })();
     L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
@@ -148,6 +211,8 @@ export default function PunjabLeafletMap({
     markersRef.current = L.layerGroup().addTo(map);
     map.fitBounds(gj.getBounds(), { padding: [16, 16] });
     map.on('click', () => onSelectRef.current(''));
+    // clusters ↔ seat bubbles swap on zoom
+    map.on('zoomend', renderMarkers);
     renderMarkers();
 
     // Robust sizing: Leaflet caches the container size at construction, which can

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
@@ -123,8 +123,12 @@ interface FounderMetrics {
       grievances: number; unresolved: number; loopHealthPct: number
       topCategory?: string | null; mood: number; supporters: number; volunteers: number; attention: number
     }>
-    sources: { total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }> }
+    sources: {
+      total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }>
+      total30d?: number; mix?: Array<{ magnet: string; count: number; share: number; delta7: number }>
+    }
     dailyActivity?: Array<{ date: string; count: number }>
+    weekHour?: number[][]
   }
 }
 
@@ -189,6 +193,56 @@ const MAGNET_META: Record<string, { label: string; color: string }> = {
   other: { label: 'Other', color: '#7a8aa0' },
 }
 const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
+
+// Channel glyphs for the Activity Sources panel (reference-design tiles).
+const MAGNET_ICON: Record<string, ReactNode> = {
+  whatsapp: <MdWhatsapp size={15} />,
+  voice: <MdMic size={15} />,
+  pulse_app: <MdSmartphone size={15} />,
+  qr: <MdQrCode2 size={15} />,
+  missed_call: <MdPhoneMissed size={15} />,
+  d2d: <MdDoorFront size={15} />,
+  event: <MdEvent size={15} />,
+  landing: <MdLanguage size={15} />,
+  web: <MdLanguage size={15} />,
+}
+const magnetIcon = (m: string) => MAGNET_ICON[m] || <MdFlashOn size={15} />
+
+// Donut (Source mix) for the Activity Sources panel - SVG arcs with the share
+// % labelled at each segment's mid-angle (segments >= 7% only).
+function SourceDonut({ mix, total }: { mix: Array<{ magnet: string; share: number; count: number }>; total: number }) {
+  const size = 210; const c = size / 2; const rOut = 96; const rIn = 60; const rLbl = 78
+  let angle = -90
+  const segs = mix.filter((s) => s.count > 0).map((s) => {
+    const sweep = (s.count / Math.max(mix.reduce((a, b) => a + b.count, 0), 1)) * 360
+    const seg = { ...s, from: angle, to: angle + sweep }
+    angle += sweep
+    return seg
+  })
+  const pt = (r: number, deg: number): [number, number] => {
+    const rad = (deg * Math.PI) / 180
+    return [c + r * Math.cos(rad), c + r * Math.sin(rad)]
+  }
+  const arcPath = (from: number, to: number) => {
+    const large = to - from > 180 ? 1 : 0
+    const [x1, y1] = pt(rOut, from); const [x2, y2] = pt(rOut, to)
+    const [x3, y3] = pt(rIn, to); const [x4, y4] = pt(rIn, from)
+    return `M ${x1} ${y1} A ${rOut} ${rOut} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 ${large} 0 ${x4} ${y4} Z`
+  }
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 230, height: 'auto', display: 'block', margin: '0 auto' }}>
+      {segs.map((s) => (
+        <path key={s.magnet} d={arcPath(s.from, Math.max(s.to - 1.2, s.from + 0.4))} fill={magnetMeta(s.magnet).color} />
+      ))}
+      {segs.filter((s) => s.share >= 7).map((s) => {
+        const [lx, ly] = pt(rLbl, (s.from + s.to) / 2)
+        return <text key={s.magnet} x={lx} y={ly + 3} fontSize={11} fontWeight={700} fill="#fff" textAnchor="middle">{s.share}%</text>
+      })}
+      <text x={c} y={c - 2} fontSize={22} fontWeight={800} fill="var(--text-primary)" textAnchor="middle">{fmtComma(total)}</text>
+      <text x={c} y={c + 16} fontSize={9.5} fill="var(--text-secondary)" textAnchor="middle">Total touchpoints</text>
+    </svg>
+  )
+}
 
 // Deterministic gentle daily climb from `start`→`end` with a small wave - for
 // the mock trend/sparkline series (no Math.random so renders are stable).
@@ -570,6 +624,9 @@ export default function FounderDashboard() {
   // matrix (touchpoints by weekday & hour).
   const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
   const weekHour = isPop ? metrics.campaignHome?.weekHour : undefined
+  // POP home: full-width "Activity Sources" panel (reference design) replaces
+  // the heatmap card when the 30d source mix is available.
+  const popMix = isPop && metrics.campaignHome?.sources?.mix?.length ? metrics.campaignHome.sources.mix : undefined
   const heatTotal = popHeat ? popHeat.reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatAvg = popHeat && popHeat.length ? Math.round((heatTotal / popHeat.length) * 10) / 10 : 0
   const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
@@ -896,47 +953,85 @@ export default function FounderDashboard() {
           <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
             {isPop && metrics.campaignHome ? (
               metrics.campaignHome.events.length > 0 ? (
-                metrics.campaignHome.events.map((ev) => {
-                  const t = ev.event_date ? countdownTint(ev.event_date) : { bg: 'var(--bg-tertiary)', color: 'var(--text-muted)' }
-                  return (
-                    <button
-                      key={ev.id} type="button" onClick={() => router.push('/dashboard/bookings')}
-                      className="w-full text-left p-2.5 rounded-lg transition-all border block"
-                      style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
-                          <p className="text-[10.5px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                            {[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}
-                            {ev.event_date ? ` · ${formatBookingWhen(ev.event_date)}` : ''}
-                          </p>
+                <div className="relative pl-5">
+                  {/* timeline rail (reference design): orange line + a dot per event */}
+                  <span className="absolute left-[5px] top-2 bottom-2 w-px" style={{ background: 'rgba(249,115,22,0.45)' }} />
+                  <div className="space-y-2">
+                  {metrics.campaignHome.events.map((ev) => {
+                    const d = ev.event_date ? new Date(ev.event_date) : null
+                    const dowIST = d ? d.toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const dayIST = d ? d.toLocaleDateString('en-IN', { day: '2-digit', timeZone: 'Asia/Kolkata' }) : ''
+                    const monIST = d ? d.toLocaleDateString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const timeIST = d ? d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
+                    const kind = /sabha/i.test(ev.title) ? { label: 'Sabha', c: '#a78bfa' }
+                      : /yatra|march/i.test(ev.title) ? { label: 'March', c: '#3b82f6' }
+                      : /cultural|night|awaaz/i.test(ev.title) ? { label: 'Cultural', c: '#c084fc' }
+                      : /rally/i.test(ev.title) ? { label: 'Rally', c: '#f97316' }
+                      : { label: 'Event', c: '#2ec4b6' }
+                    return (
+                      <button
+                        key={ev.id} type="button" onClick={() => router.push('/dashboard/bookings')}
+                        className="relative w-full text-left rounded-xl transition-all border block p-3"
+                        style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f97316' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                      >
+                        <span className="absolute -left-[19px] top-6 w-2.5 h-2.5 rounded-full border-2" style={{ background: '#f97316', borderColor: 'rgba(249,115,22,0.35)' }} />
+                        <div className="flex items-start gap-3">
+                          {/* date tile */}
+                          {d && (
+                            <span className="flex flex-col items-center rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: 'rgba(249,115,22,0.4)', minWidth: 46 }}>
+                              <span className="w-full text-center text-[9px] font-extrabold py-0.5" style={{ background: 'rgba(249,115,22,0.9)', color: '#0b0d12' }}>{dowIST}</span>
+                              <span className="text-[17px] font-extrabold leading-tight pt-0.5" style={{ color: 'var(--text-primary)' }}>{dayIST}</span>
+                              <span className="text-[9px] font-bold pb-1" style={{ color: '#f97316' }}>{monIST}</span>
+                            </span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: `${kind.c}1f`, color: kind.c, border: `1px solid ${kind.c}45` }}>{kind.label}</span>
+                            </div>
+                            <p className="text-[10.5px] truncate mt-1 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                              <MdPlace size={11} style={{ color: 'var(--text-muted)' }} />
+                              {[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}
+                            </p>
+                            {timeIST && (
+                              <p className="text-[10.5px] mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                                <MdAccessTime size={11} style={{ color: 'var(--text-muted)' }} /> {timeIST}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }}>
+                                <MdGroups size={12} /> {ev.going} Going
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.3)' }}>
+                                <MdStarBorder size={12} /> {ev.interested} Interested
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
+                                <MdPeople size={12} /> {ev.seatVolunteers} Volunteers
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
+                                <MdPeople size={12} /> {ev.seatSupporters} Supporters
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end justify-between self-stretch shrink-0 gap-2">
+                            {ev.event_date && (
+                              <span className="inline-flex items-center gap-1 text-[9.5px] px-2 py-1 rounded-full font-bold whitespace-nowrap border" style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', borderColor: 'rgba(249,115,22,0.45)' }}>
+                                <MdSchedule size={11} /> {formatCountdown(ev.event_date)}
+                              </span>
+                            )}
+                            <MdChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                          </div>
                         </div>
-                        {ev.event_date && (
-                          <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
-                            {formatCountdown(ev.event_date)}
-                          </span>
-                        )}
-                      </div>
-                      {/* Mobilization - the "how many volunteered / supporting" glance. */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.14)', color: '#22c55e' }}>
-                          {ev.going} going
-                        </span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.14)', color: '#f59e0b' }}>
-                          {ev.interested} interested
-                        </span>
-                        {(ev.seatVolunteers > 0 || ev.seatSupporters > 0) && (
-                          <span className="text-[10px] whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                            seat base: <b style={{ color: 'var(--text-secondary)' }}>{ev.seatVolunteers}</b> volunteers · <b style={{ color: 'var(--text-secondary)' }}>{ev.seatSupporters}</b> supporters
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })
+                      </button>
+                    )
+                  })}
+                  </div>
+                  <p className="text-[10px] text-center mt-2.5 flex items-center justify-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <MdCalendarToday size={11} /> All times shown in local time
+                  </p>
+                </div>
               ) : (
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet - create one from Events, and RSVPs will show here.</p>
               )
@@ -1015,7 +1110,7 @@ export default function FounderDashboard() {
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className={`${popMix ? 'xl:col-span-12' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
@@ -1118,7 +1213,8 @@ export default function FounderDashboard() {
           )}
         </section>
 
-        {/* Conversations Trend */}
+        {/* Conversations Trend (non-POP; POP gets the Activity Sources panel below) */}
+        {!popMix && (
         <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
@@ -1206,7 +1302,128 @@ export default function FounderDashboard() {
             </div>
           )}
         </section>
+        )}
       </div>
+
+      {/* ── ROW 4 (POP) · Activity Sources - unified 30d source mix panel ── */}
+      {popMix && (() => {
+        const mixTotal = metrics.campaignHome?.sources?.total30d || popMix.reduce((a, b) => a + b.count, 0)
+        const top = popMix[0]
+        const offline = popMix.find((s) => ['d2d', 'qr', 'event', 'missed_call'].includes(s.magnet))
+        const voiceShare = popMix.filter((s) => ['voice', 'missed_call'].includes(s.magnet)).reduce((a, b) => a + b.share, 0)
+        const iconTile = (m: string, size = 30) => (
+          <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
+        )
+        return (
+          <section className="wc-bento rounded-xl border p-4 sm:p-5 shrink-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+            {/* header: title + PROXe badge | stats strip */}
+            <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(139,92,246,0.16)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>PROXe</span>
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Unified source mix · last 30 days</p>
+              </div>
+              <div className="flex items-stretch rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                <div className="flex items-center gap-2.5 px-4 py-2.5">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}><MdShowChart size={17} /></span>
+                  <div>
+                    <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Total touchpoints</div>
+                    <div className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmtComma(mixTotal)}</div>
+                  </div>
+                </div>
+                <div className="w-px self-stretch" style={{ background: 'var(--border-primary)' }} />
+                <div className="flex flex-col justify-center px-4 py-2.5">
+                  <div className="text-sm font-extrabold flex items-center gap-1" style={{ color: heatChange >= 0 ? '#22c55e' : '#ef4444' }}>
+                    <MdTrendingUp size={15} /> {heatChange >= 0 ? '+' : ''}{heatChange}%
+                  </div>
+                  <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>vs prior 7d</div>
+                </div>
+                <div className="w-px self-stretch" style={{ background: 'var(--border-primary)' }} />
+                <div className="flex items-center gap-2.5 px-4 py-2.5">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}><MdCalendarToday size={15} /></span>
+                  <div>
+                    <div className="text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>Daily avg</div>
+                    <div className="text-lg font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{heatAvg}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* body: donut | table | insights */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4">
+              <div className="xl:col-span-3 rounded-xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Source mix</div>
+                <SourceDonut mix={popMix} total={mixTotal} />
+              </div>
+              <div className="xl:col-span-6 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                <div className="grid px-4 py-2.5 text-[11px] font-medium border-b" style={{ gridTemplateColumns: 'minmax(0,1.6fr) 0.6fr 0.9fr 0.8fr', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}>
+                  <span>Source</span><span className="text-right">Share</span><span className="text-right">Touchpoints</span><span className="text-right">vs prior 7d</span>
+                </div>
+                {popMix.slice(0, 6).map((s, i) => (
+                  <div key={s.magnet} className="grid items-center px-4 py-2.5 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.6fr) 0.6fr 0.9fr 0.8fr', borderColor: 'var(--border-primary)' }}>
+                    <span className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: magnetMeta(s.magnet).color }} />
+                      {iconTile(s.magnet)}
+                      <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
+                    </span>
+                    <span className="text-right text-[13px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
+                    <span className="text-right text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
+                    <span className="text-right text-[12.5px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {s.delta7 >= 0 ? <MdArrowUpward size={13} /> : <MdTrendingDown size={13} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="xl:col-span-3 rounded-xl border p-4 flex flex-col gap-3.5" style={{ borderColor: 'rgba(139,92,246,0.35)', background: 'rgba(139,92,246,0.06)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full" style={{ background: 'rgba(139,92,246,0.22)', color: '#a78bfa' }}><MdAutoAwesome size={14} /></span>
+                  <span className="text-[14px] font-bold" style={{ color: 'var(--text-primary)' }}>Insights</span>
+                </div>
+                {top && (
+                  <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+                    {iconTile(top.magnet, 38)}
+                    <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Most active channel:<br /><b style={{ color: magnetMeta(top.magnet).color, fontSize: 14 }}>{magnetMeta(top.magnet).label}</b></div>
+                  </div>
+                )}
+                {offline && (
+                  <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'rgba(139,92,246,0.2)' }}>
+                    {iconTile(offline.magnet, 38)}
+                    <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Strong offline source:<br /><b style={{ color: magnetMeta(offline.magnet).color, fontSize: 14 }}>{magnetMeta(offline.magnet).label}</b></div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  {iconTile('voice', 38)}
+                  <div className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>Voice-led sources<br />contribute <b style={{ color: '#a78bfa', fontSize: 14 }}>{voiceShare}%</b></div>
+                </div>
+              </div>
+            </div>
+
+            {/* footer: share-of-total stacked bar + legend */}
+            <div className="mt-4 rounded-xl border p-4 flex flex-col gap-3" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+              <div className="flex items-center gap-4 flex-wrap">
+                <span className="text-[12px] font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>Share of total<br />touchpoints</span>
+                <div className="flex-1 flex h-8 rounded-full overflow-hidden min-w-[240px]">
+                  {popMix.map((s) => (
+                    <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
+                      {s.share >= 6 && <span className="text-[11px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-x-6 gap-y-1.5 flex-wrap">
+                {popMix.slice(0, 6).map((s) => (
+                  <span key={s.magnet} className="flex items-center gap-1.5 text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: magnetMeta(s.magnet).color }} />
+                    {magnetMeta(s.magnet).label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      })()}
 
       {/* Lead Details Modal */}
       {showLeadModal && selectedLead && (

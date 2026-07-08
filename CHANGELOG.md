@@ -1,3 +1,11 @@
+## 2026-07-08 21:40 IST · feat(pop): Activity Sources panel + reference event cards + clustered War Room map
+
+- User-facing: home "Activity Heatmap" card replaced by the full-width **Activity Sources** panel (reference design): header stats strip (total touchpoints / vs prior 7d / daily avg), source-mix donut with % labels, per-source table (share, touchpoints, momentum vs prior 7d), purple Insights panel (most active channel, strong offline source, voice-led share), and the share-of-total stacked bar with legend. Priority Constituencies now spans full width above it.
+- User-facing: **Upcoming Events** cards rebuilt to the reference: orange timeline rail + dots, date tiles (SAT/11/JUL), event-type badges (Sabha/March/Cultural/Rally), pin + clock lines, Going/Interested/Volunteers/Supporters chips, countdown pill, chevron, "All times shown in local time" footer.
+- User-facing: **War Room map clustering** - zoomed out shows one aggregated bubble per district (total voices + seat count, halo ring); clicking a cluster zooms into that district where per-seat bubbles take over (click seat = drawer, as before). No more 115 overlapping bubbles.
+- API: founder-metrics campaignHome.sources gains total30d + mix[] (per-magnet 30d count/share + last-7d-vs-prior-7d delta).
+- `(d4d29608)`
+
 ## 2026-07-08 20:45 IST · feat(pop): Listen realness pass — real media, real logos, real trending phrases
 
 - User-facing: Signal Inbox shows the actual outlet's favicon as the source logo (news) and the article image / YouTube thumbnail on the row's right; Evidence Board is media-first (real photos, video play overlay, outlet header, click-through) instead of text boxes.

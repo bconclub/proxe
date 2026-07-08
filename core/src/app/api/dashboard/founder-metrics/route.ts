@@ -1893,9 +1893,29 @@ export async function GET(request: NextRequest) {
         const magCount: Record<string, number> = {}
         win.forEach((r) => { const m = r.magnet || 'other'; magCount[m] = (magCount[m] || 0) + 1 })
         const magTotal = win.length || 1
+        // Full 30-day unified source mix + per-source momentum (last 7d vs the
+        // 7d before) — feeds the home "Activity Sources" panel.
+        const d30 = new Date(now.getTime() - 30 * 86400000)
+        const d14 = new Date(now.getTime() - 14 * 86400000)
+        const win30 = L.filter((r) => r.created_at && new Date(r.created_at) >= d30)
+        const mag30: Record<string, { count: number; last7: number; prev7: number }> = {}
+        win30.forEach((r) => {
+          const m = r.magnet || 'other'
+          const a = mag30[m] || (mag30[m] = { count: 0, last7: 0, prev7: 0 })
+          a.count++
+          const t = new Date(r.created_at)
+          if (t >= sevenDaysAgo) a.last7++
+          else if (t >= d14) a.prev7++
+        })
+        const total30 = win30.length || 1
         const sources = {
           total7d: win.length,
           byMagnet: Object.entries(magCount).map(([magnet, count]) => ({ magnet, count, share: Math.round((100 * count) / magTotal) })).sort((a, b) => b.count - a.count),
+          total30d: win30.length,
+          mix: Object.entries(mag30).map(([magnet, a]) => ({
+            magnet, count: a.count, share: Math.round((100 * a.count) / total30),
+            delta7: a.prev7 ? Math.round(((a.last7 - a.prev7) / a.prev7) * 100) : (a.last7 > 0 ? 100 : 0),
+          })).sort((a, b) => b.count - a.count),
         }
 
         // 30-day daily voices captured — feeds the home activity heatmap.
