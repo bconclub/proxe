@@ -634,8 +634,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               // artifact switcher (first artifact), and Agent Tasks folds into
               // the Agents page — so neither is a separate nav row for POP.
               if (brandId === 'pop' && item.href && ['/dashboard', '/dashboard/pipeline', '/dashboard/flows', '/war-room', '/dashboard/tasks'].includes(item.href)) return null
-              // Check if we need a divider after the previous item
-              const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
+              // Check if we need a divider after the previous item. POP keeps
+              // the nav as one unbroken group (People · Chats · Calls · Events ·
+              // Humans · Agents · Knowledge · Configure), no section dividers.
+              const needsDivider = brandId !== 'pop' && DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
               //   • pathname exactly matches its href, OR
               //   • pathname starts with `${href}/` (i.e. user is on a
