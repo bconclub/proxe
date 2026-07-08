@@ -170,7 +170,7 @@ const smoothPath = (pts: [number, number][]) => {
 // Stacked smooth sentiment areas (red base, gray, green on top) with
 // tap-to-hide legend, per the reference design.
 function StackedSentiment({ series, hidden }: { series: Digest['dailySeries']; hidden: Set<string> }) {
-  const W = 620; const H = 190; const padL = 30; const padR = 6; const padB = 20; const padT = 8
+  const W = 620; const H = 300; const padL = 30; const padR = 6; const padB = 20; const padT = 8
   const on = (k: string) => !hidden.has(k)
   const stackOf = (dd: Digest['dailySeries'][number]) => {
     const neg = on('neg') ? dd.neg : 0
@@ -582,14 +582,14 @@ export default function ListenPage() {
                 <div style={{ flex: 1 }} />
                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>View all keywords</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 8, flex: 1 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gridAutoRows: '1fr', gap: 8, flex: 1 }}>
                 {d.keywords.slice(0, 8).map((k, i) => {
                   const prevN = Math.max(0, k.count - k.trend)
                   const pctT = prevN > 0 ? Math.round((k.trend / prevN) * 100) : (k.trend > 0 ? 100 : 0)
                   const cm = catMeta(k.category)
                   const rc = RANK_COLORS[i % RANK_COLORS.length]
                   return (
-                    <div key={k.word} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 11, padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div key={k.word} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 11, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 10.5, fontWeight: 800, color: rc }}>{i + 1}</span>
                         <span style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${cm.color}1f`, color: cm.color }}>{cm.icon}</span>
@@ -627,7 +627,7 @@ export default function ListenPage() {
                   <option value={7}>7 Days</option><option value={14}>14 Days</option><option value={30}>30 Days</option>
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 6, marginBottom: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 10 }}>
                 {([
                   ['Positive', d.totals.sentPositive, d.totals.prevSentPositive, '#22c55e', <MdMood key="p" size={15} />],
                   ['Neutral', d.totals.neutral, d.totals.prevNeutral, '#9ca3af', <MdSentimentNeutral key="n" size={15} />],
@@ -649,7 +649,7 @@ export default function ListenPage() {
                   )
                 })}
               </div>
-              <div style={{ position: 'relative', flex: 1 }}>
+              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
                 <StackedSentiment series={d.dailySeries} hidden={hiddenSeries} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
@@ -682,11 +682,11 @@ export default function ListenPage() {
                 const scoreColor = (v: number) => (v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444')
                 return (
                   <>
-                    <div style={{ display: 'flex', gap: 10, flex: 1, minHeight: 0 }}>
-                      <div style={{ flex: '0 0 42%', minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0, alignItems: 'center' }}>
+                      <div style={{ flex: '0 0 45%', minWidth: 0 }}>
                         <MoodMiniMap seats={rows.map((r) => ({ constituency: r.constituency, score: r.score }))} />
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(60px, 1fr) 44px minmax(60px, 1fr)', gap: 6, fontSize: 9.5, color: 'var(--text-muted)', fontWeight: 600, paddingBottom: 5, borderBottom: '1px solid var(--border-primary)' }}>
                           <span>Region</span><span>Mood Score</span><span>Sentiment Mix</span>
                         </div>
@@ -694,7 +694,7 @@ export default function ListenPage() {
                           const t = m.total || 1
                           const negP = Math.round((m.neg / t) * 100); const posP = Math.round((m.pos / t) * 100); const neuP = Math.max(0, 100 - negP - posP)
                           return (
-                            <div key={m.constituency} style={{ display: 'grid', gridTemplateColumns: 'minmax(60px, 1fr) 44px minmax(60px, 1fr)', gap: 6, alignItems: 'center', padding: '6px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--border-primary)' : 'none' }}>
+                            <div key={m.constituency} style={{ display: 'grid', gridTemplateColumns: 'minmax(60px, 1fr) 44px minmax(60px, 1fr)', gap: 6, alignItems: 'center', padding: '9px 0', borderBottom: i < rows.length - 1 ? '1px solid var(--border-primary)' : 'none' }}>
                               <span title={`${m.total} signals`} style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.constituency}</span>
                               <span style={{ fontSize: 10, fontWeight: 800, textAlign: 'center', color: '#0b0d12', background: scoreColor(m.score), borderRadius: 5, padding: '2px 0' }}>{m.score}</span>
                               <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', background: 'var(--bg-hover)', gap: 1 }}>

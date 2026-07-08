@@ -1,3 +1,8 @@
+## 2026-07-09 03:25 IST · fix(pop): Listen analytics cards fill their height - no dead space
+
+- Top Trending Keywords is an exact 2 x 4 stretch grid (no empty slot, tiles fill the column). Sentiment Over Time: KPI chips 2 x 2 and a taller centered chart. Mood by Region: bigger mini map, roomier rows, list vertically centered. All three cards measure identical heights with zero void at the bottom.
+- (pending-sha)
+
 ## 2026-07-09 03:00 IST · fix(pop): Activity Sources overlap gone for real
 
 - The card content was taller than the fixed home row, so the share bar painted over the source table. Sized everything to actually fit: 148px donut, single line insight text, tighter table rows, legend row dropped (bar + table already carry the labels). Verified: zero overflowing elements, clear gap between table and bar at desktop width.
