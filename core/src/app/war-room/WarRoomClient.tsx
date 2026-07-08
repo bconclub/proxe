@@ -16,6 +16,10 @@ const PunjabLeafletMap = dynamic(() => import('./PunjabLeafletMap'), {
 import { LeanDonut, SentimentGauge, TrendLines, GlowDonut, GlowSpark, GlowArea } from './WarCharts';
 import {
   MdWaterDrop, MdBolt, MdWork, MdAddRoad, MdLocalHospital, MdSchool, MdAgriculture, MdWarning, MdMoreHoriz,
+  MdInfoOutline, MdPeopleAlt, MdPerson, MdGroups, MdVolunteerActivism, MdStar, MdHowToVote, MdCampaign as MdCampaignIcon,
+  MdShare, MdMonitorHeart, MdVerifiedUser, MdTouchApp, MdTrendingUp as MdTrendUpIcon, MdAccessTime, MdWhatsapp,
+  MdSmartphone, MdMic, MdQrCode2, MdPhoneMissed, MdDoorFront, MdEvent, MdLanguage, MdCalendarToday, MdExpandMore,
+  MdBackHand, MdMyLocation, MdAutoAwesome as MdSparkIcon, MdOutlineCheckCircle, MdOutlineErrorOutline,
 } from 'react-icons/md';
 
 // ── palette ──
@@ -30,6 +34,40 @@ const CAT_ICON: Record<string, any> = { water: MdWaterDrop, power: MdBolt, jobs:
 const CAT_C: Record<string, string> = { water: '#2EC4B6', power: AMBER, jobs: BLUE, roads: PURPLE, health: '#FB7185', education: '#C77DFF', farm_debt: GREEN, drugs: '#FF5D73', other: '#7A8AA0' };
 // Gradient pairs (top→bottom) for the Channel Mix glow donut segments.
 const CHAN_GRAD: [string, string][] = [['#4ADE80', '#16A34A'], ['#60A5FA', '#2563EB'], ['#FB923C', '#EA580C'], ['#FBBF24', '#D97706'], ['#C4B5FD', '#7C3AED']];
+
+// Channel Mix ranked-bar meta (reference design): icon + color per magnet.
+const MAG_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  whatsapp: { label: 'WhatsApp', color: '#22c55e', icon: <MdWhatsapp size={13} /> },
+  pulse_app: { label: 'Pulse App', color: '#3b82f6', icon: <MdSmartphone size={13} /> },
+  voice: { label: 'Voice', color: '#a78bfa', icon: <MdMic size={13} /> },
+  qr: { label: 'QR', color: '#f59e0b', icon: <MdQrCode2 size={13} /> },
+  missed_call: { label: 'Missed Call', color: '#8b5cf6', icon: <MdPhoneMissed size={13} /> },
+  d2d: { label: 'D2D', color: '#4ade80', icon: <MdDoorFront size={13} /> },
+  event: { label: 'Event', color: '#60a5fa', icon: <MdEvent size={13} /> },
+  landing: { label: 'Landing', color: '#c084fc', icon: <MdLanguage size={13} /> },
+  web: { label: 'Web', color: '#38bdf8', icon: <MdLanguage size={13} /> },
+  other: { label: 'Other', color: '#7a8aa0', icon: <MdMoreHoriz size={13} /> },
+};
+const magMeta = (m: string) => MAG_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0', icon: <MdMoreHoriz size={13} /> };
+
+// Intensity ladder tier chrome (funnel row icon + conversion chip color).
+const TIER_ICON: Record<string, React.ReactNode> = {
+  contact: <MdPeopleAlt size={13} />, voter: <MdPerson size={13} />, supporter: <MdGroups size={13} />,
+  volunteer: <MdBackHand size={13} />, cadre: <MdStar size={13} />,
+};
+const TIER_BG: Record<string, string> = {
+  contact: 'linear-gradient(180deg,#2b3242,#20242e)',
+  voter: 'linear-gradient(180deg,#1f4fd8,#173a9c)',
+  supporter: 'linear-gradient(180deg,#16a34a,#0f7a37)',
+  volunteer: 'linear-gradient(180deg,#d97706,#a85a05)',
+  cadre: 'linear-gradient(180deg,#ea4b0f,#b23509)',
+};
+const MOB_META: [string, string, React.ReactNode][] = [
+  ['vote', 'Will vote', <MdHowToVote key="v" size={13} />],
+  ['volunteer', 'Will work', <MdMonitorHeart key="w" size={13} />],
+  ['rally', 'Will rally', <MdCampaignIcon key="r" size={13} />],
+  ['share', 'Will share', <MdShare key="s" size={13} />],
+];
 
 export interface WarRoomData {
   kpis: { total: number; today: number; activeConstituencies: number; raised: number; resolved: number; loopHealthPct: number };
@@ -289,76 +327,131 @@ export default function WarRoomClient() {
           </div>
 
           {/* BOTTOM ROW A - THE INTENSITY ENGINE (voter → supporter → volunteer → cadre) */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
-            <Panel title="Intensity Ladder" sub="Voter → Supporter → Volunteer → Cadre" h={mobile ? 250 : undefined}>
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 5, justifyContent: 'center' }}>
-                {INTENSITY_TIERS.map((t) => {
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 290 }}>
+            <Panel title="Intensity Ladder" sub="Voter → Supporter → Volunteer → Cadre" h={mobile ? 290 : undefined} icon={<MdVerifiedUser size={14} />} iconColor={AMBER} right={<InfoDot />}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) 62px 74px', gap: 8, fontSize: 8.5, letterSpacing: '0.06em', color: MUT, textTransform: 'uppercase', paddingBottom: 2 }}>
+                  <span /><span style={{ textAlign: 'right' }}>People</span><span style={{ textAlign: 'center' }}>Conversion</span>
+                </div>
+                {INTENSITY_TIERS.map((t, i) => {
                   const n = d?.intensity?.tiers?.[t.tier] ?? 0;
-                  const max = Math.max(...(d?.intensity?.tiers || [1]), 1);
-                  const conv = t.tier >= 2 ? d?.intensity?.conversion?.[t.tier - 2] : undefined;
+                  const prevN = i > 0 ? (d?.intensity?.tiers?.[t.tier - 1] ?? 0) : 0;
+                  const conv = i > 0 && prevN > 0 ? Math.round((1000 * n) / prevN) / 10 : null;
+                  const width = 100 - i * 10; // funnel narrows each tier
+                  const inset = i * 1.6;
                   return (
-                    <div key={t.key} style={{ display: 'grid', gridTemplateColumns: '74px 1fr 64px', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: MUT }}>{t.label}</span>
-                      <div style={{ height: 12, background: TRACK, borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ width: `${Math.max(2, (n / max) * 100)}%`, height: '100%', background: t.color, borderRadius: 4 }} />
+                    <div key={t.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) 62px 74px', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: `${width}%`, margin: '0 auto' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, height: 26, padding: '0 14px', color: '#fff', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', background: TIER_BG[t.key], clipPath: `polygon(${3 + inset}% 0, ${97 - inset}% 0, ${94 - inset}% 100%, ${6 + inset}% 100%)` }}>
+                          <span style={{ display: 'flex', opacity: 0.9, marginLeft: `${inset * 2}%` }}>{TIER_ICON[t.key]}</span>{t.label}
+                        </div>
                       </div>
-                      <span style={{ fontSize: 11, textAlign: 'right' }}><b>{n}</b>{conv !== undefined && <span style={{ color: MUT, fontSize: 9 }}> ·{conv}%↑</span>}</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, textAlign: 'right' }}>{n.toLocaleString('en-IN')}</span>
+                      <span style={{ textAlign: 'center' }}>
+                        {conv === null ? <span style={{ color: MUT }}>—</span> : (
+                          <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 7, padding: '2px 8px', color: t.color, background: `${t.color}1c`, border: `1px solid ${t.color}45` }}>{conv}%</span>
+                        )}
+                      </span>
                     </div>
                   );
                 })}
-                <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 10, color: MUT, flexWrap: 'wrap' }}>
-                  {(['vote', 'volunteer', 'rally', 'share'] as const).map((k) => (
-                    <span key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 8px' }}>
-                      {k === 'vote' ? 'Will vote' : k === 'volunteer' ? 'Will work' : k === 'rally' ? 'Will rally' : 'Will share'} <b style={{ color: TXT }}>{d?.mobilization[k] || 0}</b>
-                    </span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginTop: 8 }}>
+                  {MOB_META.map(([k, label, icon]) => (
+                    <div key={k} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 9, padding: '5px 8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 8, letterSpacing: '0.05em', color: MUT, textTransform: 'uppercase' }}>{icon}{label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, marginTop: 1 }}>{d?.mobilization[k] || 0}</div>
+                    </div>
                   ))}
                 </div>
               </div>
             </Panel>
-            <Panel title="Volunteer Pulse" sub="Tier 3+ energy" h={mobile ? 230 : undefined}>
+            <Panel title="Volunteer Pulse" sub="Tier 3+ energy" h={mobile ? 270 : undefined} icon={<MdMonitorHeart size={14} />} iconColor={AMBER} right={<InfoDot />}>
               {d?.volunteers && d.volunteers.total > 0 ? (
-                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: AMBER, lineHeight: 1 }}>{d.volunteers.total} <span style={{ fontSize: 10, color: MUT, fontWeight: 500 }}>volunteers+</span></div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {d.volunteers.byConstituency.map((v) => {
-                      const max = Math.max(...d.volunteers!.byConstituency.map((x) => x.count), 1);
-                      return (
-                        <div key={v.constituency} style={{ display: 'grid', gridTemplateColumns: '92px 1fr 22px', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                          <span style={{ color: MUT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.constituency}</span>
-                          <div style={{ height: 7, background: TRACK, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${(v.count / max) * 100}%`, height: '100%', background: AMBER, borderRadius: 3 }} /></div>
-                          <b style={{ textAlign: 'right' }}>{v.count}</b>
-                        </div>
-                      );
-                    })}
+                <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '96px 1fr', gap: 12, alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 34, fontWeight: 800, color: AMBER, lineHeight: 1 }}>{d.volunteers.total}</div>
+                      <div style={{ fontSize: 9, letterSpacing: '0.06em', color: MUT, textTransform: 'uppercase', marginTop: 3 }}>Volunteers+</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: GREEN, marginTop: 8, display: 'flex', alignItems: 'center', gap: 3 }}><MdTrendUpIcon size={13} /> 18%</div>
+                      <div style={{ fontSize: 9.5, color: MUT }}>vs last 14 days</div>
+                    </div>
+                    <div style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 10, padding: '7px 10px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '14px 1fr 24px', gap: 6, fontSize: 8.5, letterSpacing: '0.06em', color: MUT, textTransform: 'uppercase', paddingBottom: 4, borderBottom: `1px solid ${LINE}` }}>
+                        <span /><span>Location</span><span style={{ textAlign: 'right' }}>Vol+</span>
+                      </div>
+                      {d.volunteers.byConstituency.slice(0, 5).map((v, i) => {
+                        const max = Math.max(...d.volunteers!.byConstituency.map((x) => x.count), 1);
+                        return (
+                          <div key={v.constituency} style={{ display: 'grid', gridTemplateColumns: '14px 84px 1fr 24px', alignItems: 'center', gap: 6, fontSize: 10.5, padding: '4px 0' }}>
+                            <span style={{ color: MUT }}>{i + 1}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.constituency}</span>
+                            <div style={{ height: 7, background: 'rgba(0,0,0,0.25)', borderRadius: 4, overflow: 'hidden' }}><div style={{ width: `${(v.count / max) * 100}%`, height: '100%', background: 'linear-gradient(90deg,#f59e0b,#fbbf24)', borderRadius: 4 }} /></div>
+                            <b style={{ textAlign: 'right' }}>{v.count}</b>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', borderTop: `1px solid ${LINE}`, paddingTop: 5 }}>
-                    {d.volunteers.recent.map((v, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: MUT, padding: '2px 0' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mask(v.name, v.constituency)} · {v.constituency || 'Punjab'}</span>
-                        <span style={{ whiteSpace: 'nowrap' }}>{ago(v.created_at)}</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', border: `1px solid ${LINE}`, background: TRACK, borderRadius: 10, overflow: 'hidden' }}>
+                    {[
+                      [<MdTouchApp key="a" size={13} color={AMBER} />, 'Most Active', d.volunteers.byConstituency[0]?.constituency || 'Punjab'],
+                      [<MdTrendUpIcon key="b" size={13} color={GREEN} />, 'Trend', `Rising in ${d.volunteers.byConstituency.length} areas`],
+                      [<MdAccessTime key="c" size={13} color={MUT as string} />, 'Last Updated', 'Just now'],
+                    ].map(([icon, l, v], i) => (
+                      <div key={i} style={{ padding: '6px 9px', borderLeft: i ? `1px solid ${LINE}` : 'none', display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
+                        {icon as React.ReactNode}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 8.5, color: MUT, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{l as string}</div>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v as string}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : <Empty text="No volunteers yet - MyVoice and D2D feed this" />}
             </Panel>
-            <Panel title="D2D Coverage" sub="Field knocks" h={mobile ? 230 : undefined}>
+            <Panel title="D2D Coverage" sub="Field knocks" h={mobile ? 280 : undefined} icon={<MdVerifiedUser size={14} />} iconColor={AMBER} right={<InfoDot />}>
               {d?.d2d ? (
                 <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
-                    <St l="Knocks" v={d.d2d.totals.visits} />
-                    <St l="Met" v={`${d.d2d.totals.visits ? Math.round((100 * d.d2d.totals.met) / d.d2d.totals.visits) : 0}%`} />
-                    <St l="Workers" v={d.d2d.totals.workers} />
-                    <St l="Today" v={d.d2d.totals.today} />
-                  </div>
-                  <div style={{ height: 30, opacity: 0.9 }}><GlowSpark data={d.d2d.series} color={BLUE} /></div>
-                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {d.d2d.topWorkers.map((w) => (
-                      <div key={w.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
-                        <span style={{ color: MUT, whiteSpace: 'nowrap' }}><b style={{ color: TXT }}>{w.visits}</b> · {w.met} met</span>
+                    {[
+                      [<MdBackHand key="k" size={13} color={AMBER} />, 'Knocks', d.d2d.totals.visits.toLocaleString('en-IN')],
+                      [<MdMyLocation key="m" size={13} color={BLUE} />, 'Met', `${d.d2d.totals.visits ? Math.round((100 * d.d2d.totals.met) / d.d2d.totals.visits) : 0}%`],
+                      [<MdGroups key="w" size={13} color={GREEN} />, 'Workers', d.d2d.totals.workers],
+                      [<MdCalendarToday key="t" size={13} color={PURPLE} />, 'Today', d.d2d.totals.today],
+                    ].map(([icon, l, v], i) => (
+                      <div key={i} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 9, padding: '6px 8px', display: 'flex', gap: 6, alignItems: 'center', minWidth: 0 }}>
+                        {icon as React.ReactNode}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.1 }}>{v as React.ReactNode}</div>
+                          <div style={{ fontSize: 8, color: MUT, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{l as string}</div>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', fontSize: 8, color: MUT, textAlign: 'right', padding: '1px 0' }}>
+                      <span>{(() => { const mx = Math.max(...d.d2d!.series, 1); return mx >= 1000 ? `${(mx / 1000).toFixed(1)}K` : mx; })()}</span>
+                      <span>0</span>
+                    </div>
+                    <div style={{ flex: 1, height: 44, opacity: 0.95 }}><GlowSpark data={d.d2d.series} color={BLUE} /></div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: MUT, marginTop: -4, padding: '0 14px' }}>
+                    {(d.series?.days || []).filter((_, i) => i % 2 === 0).map((day) => <span key={day}>{day.slice(5)}</span>)}
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '14px 1fr 70px', gap: 6, fontSize: 8.5, letterSpacing: '0.06em', color: MUT, textTransform: 'uppercase', paddingBottom: 4, borderBottom: `1px solid ${LINE}` }}>
+                      <span /><span>Top Workers (Today)</span><span style={{ textAlign: 'right' }}>Knocks</span>
+                    </div>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                      {d.d2d.topWorkers.slice(0, 4).map((w, i) => (
+                        <div key={w.name} style={{ display: 'grid', gridTemplateColumns: '14px 1fr 70px', gap: 6, alignItems: 'center', fontSize: 11, padding: '3.5px 0' }}>
+                          <span style={{ color: MUT, fontSize: 10 }}>{i + 1}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
+                          <span style={{ color: MUT, whiteSpace: 'nowrap', textAlign: 'right' }}><b style={{ color: TXT }}>{w.visits}</b> · {w.met} met</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : <Empty text="No knocks logged yet - D2D field tool feeds this" />}
@@ -366,47 +459,111 @@ export default function WarRoomClient() {
           </div>
 
           {/* BOTTOM ROW B - INTELLIGENCE (channels, events, issues, listening) */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.9fr) minmax(0,1.3fr) minmax(0,1.05fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
-            <Panel title="Channel Mix" sub="By volume" h={mobile ? 190 : undefined}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 120, height: 120, flexShrink: 0 }}><GlowDonut segments={(d?.channelMix || []).map((c, i) => ({ name: c.magnet.replace('_', ' '), value: c.count, top: CHAN_GRAD[i % 5][0], bot: CHAN_GRAD[i % 5][1] }))} /></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {(d?.channelMix || []).map((c, i) => <span key={c.magnet} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: [GREEN, BLUE, SAFFRON, AMBER, PURPLE][i % 5] }} /><span style={{ textTransform: 'capitalize', color: MUT, width: 70 }}>{c.magnet.replace('_', ' ')}</span><b>{c.share}%</b></span>)}
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.95fr) minmax(0,1.2fr) minmax(0,1.1fr)', gap: 12, minHeight: mobile ? undefined : 290 }}>
+            <Panel title="Channel Mix" sub="By volume" h={mobile ? 260 : undefined} icon={<MdShare size={14} />} iconColor={AMBER} right={<InfoDot />}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+                {(d?.channelMix || []).slice(0, 9).map((c, i) => {
+                  const m = magMeta(c.magnet);
+                  const max = Math.max(...(d?.channelMix || []).map((x) => x.share), 1);
+                  return (
+                    <div key={c.magnet} style={{ display: 'grid', gridTemplateColumns: '13px 18px 76px 1fr 34px 44px', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                      <span style={{ color: MUT, fontSize: 10 }}>{i + 1}</span>
+                      <span style={{ color: m.color, display: 'flex' }}>{m.icon}</span>
+                      <span style={{ color: TXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}</span>
+                      <div style={{ height: 8, background: TRACK, borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.max(1.5, (c.share / max) * 100)}%`, height: '100%', background: `linear-gradient(90deg,${m.color},${m.color}cc)`, borderRadius: 4, boxShadow: `0 0 6px ${m.color}55` }} />
+                      </div>
+                      <b style={{ textAlign: 'right' }}>{c.share}%</b>
+                      <span style={{ color: MUT, textAlign: 'right', fontSize: 10 }}>( {c.count} )</span>
+                    </div>
+                  );
+                })}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: MUT, borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
+                  <span>Total Volume <b style={{ color: TXT }}>{(d?.channelMix || []).reduce((a, b) => a + b.count, 0).toLocaleString('en-IN')}</b></span>
+                  <span>Last 14 days</span>
                 </div>
               </div>
             </Panel>
-            <Panel title="Issue Trend (Top 5)" sub="14 days" h={mobile ? 240 : undefined}>
+            <Panel title="Issue Trend (Top 5)" sub="14 days" h={mobile ? 270 : undefined} icon={<MdTrendUpIcon size={14} />} iconColor={PURPLE} right={
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: MUT, background: TRACK, border: `1px solid ${LINE}`, borderRadius: 8, padding: '4px 9px' }}><MdCalendarToday size={11} /> Last 14 days <MdExpandMore size={13} /></span>
+            }>
               <div style={{ flex: 1, minHeight: 120 }}>
                 <GlowArea
                   days={(d?.series.days || []).map((day) => day.slice(5))}
                   series={(d?.series.categories || []).map((cat) => ({ name: cat, color: CAT_C[cat], data: d?.series.byCategory[cat] || [] }))}
                 />
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 9, color: MUT, marginTop: 4 }}>
-                {(d?.series.categories || []).map((c) => <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 3, textTransform: 'capitalize' }}><span style={{ width: 7, height: 7, borderRadius: 2, background: CAT_C[c] }} />{c.replace('_', ' ')}</span>)}
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', fontSize: 9.5, color: MUT, marginTop: 5, paddingBottom: 5, borderBottom: `1px solid ${LINE}` }}>
+                {(d?.series.categories || []).map((c) => <span key={c} style={{ display: 'flex', alignItems: 'center', gap: 4, textTransform: 'capitalize' }}><span style={{ width: 7, height: 7, borderRadius: 7, background: CAT_C[c] }} />{c.replace('_', ' ')}</span>)}
               </div>
+              {(() => {
+                const days = d?.series.days || [];
+                const cats = d?.series.categories || [];
+                const totals = days.map((_, i) => cats.reduce((a, c) => a + (d?.series.byCategory[c]?.[i] || 0), 0));
+                const peakI = totals.indexOf(Math.max(...totals, 0));
+                const mentions = totals.reduce((a, b) => a + b, 0);
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: MUT, paddingTop: 6 }}>
+                    <span>Peak: <b style={{ color: TXT }}>{days[peakI]?.slice(5) || '—'}</b></span>
+                    <span>Total Mentions <b style={{ color: TXT }}>{mentions.toLocaleString('en-IN')}</b></span>
+                  </div>
+                );
+              })()}
             </Panel>
-            <Panel title="Constituency Snapshot" sub="Top 5 by volume & salience" h={mobile ? 260 : undefined}>
-              <div style={{ overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                  <thead><tr style={{ color: MUT }}>{['Constituency', 'Vol', 'Supp', 'Lean', 'Opp'].map((h) => <th key={h} style={{ textAlign: h === 'Constituency' ? 'left' : 'right', padding: '3px 5px', fontWeight: 500 }}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {(d?.swing || []).slice(0, 5).map((s) => {
-                      const seat = d?.byConstituency.find((b) => b.constituency === s.constituency);
-                      const lean = seat?.leanScore ?? 0;
-                      return (
-                        <tr key={s.constituency} style={{ borderTop: `1px solid ${LINE}` }}>
-                          <td style={{ padding: '4px 5px', whiteSpace: 'nowrap' }}>{s.constituency}</td>
-                          <td style={{ padding: '4px 5px', textAlign: 'right' }}>{s.total}</td>
-                          <td style={{ padding: '4px 5px', textAlign: 'right', color: GREEN }}>{Math.round(((seat ? (lean + 1) / 2 : 0)) * 100)}%</td>
-                          <td style={{ padding: '4px 5px', textAlign: 'right', color: AMBER }}>{s.undecidedPct}%</td>
-                          <td style={{ padding: '4px 5px', textAlign: 'right', color: SAFFRON }}>{Math.max(0, 100 - s.undecidedPct - Math.round(((seat ? (lean + 1) / 2 : 0)) * 100))}%</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+            <Panel title="Constituency Snapshot" sub="Top 5 by volume & salience" h={mobile ? 300 : undefined} icon={<MdGroups size={14} />} iconColor={AMBER} right={<InfoDot />}>
+              {(() => {
+                const rows = (d?.swing || []).slice(0, 5).map((s) => {
+                  const seat = d?.byConstituency.find((b) => b.constituency === s.constituency);
+                  const lean = seat?.leanScore ?? 0;
+                  const supp = Math.round(((seat ? (lean + 1) / 2 : 0)) * 100);
+                  const opp = Math.max(0, 100 - s.undecidedPct - supp);
+                  return { ...s, supp, leanPct: s.undecidedPct, opp };
+                });
+                const MiniBar = ({ v, color }: { v: number; color: string }) => (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ minWidth: 26, textAlign: 'right', color, fontWeight: 700 }}>{v}%</span>
+                    <span style={{ width: 30, height: 5, background: TRACK, borderRadius: 3, overflow: 'hidden', display: 'inline-block' }}>
+                      <span style={{ display: 'block', width: `${v}%`, height: '100%', background: color, borderRadius: 3 }} />
+                    </span>
+                  </span>
+                );
+                const best = [...rows].sort((a, b) => b.supp - a.supp)[0];
+                const most = [...rows].sort((a, b) => b.total - a.total)[0];
+                const risky = [...rows].sort((a, b) => b.opp - a.opp)[0];
+                return (
+                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '13px minmax(0,1.2fr) 30px 66px 66px 66px', gap: 5, fontSize: 8.5, letterSpacing: '0.06em', color: MUT, textTransform: 'uppercase', paddingBottom: 4, borderBottom: `1px solid ${LINE}` }}>
+                        <span /><span>Constituency</span><span style={{ textAlign: 'right' }}>Vol</span><span style={{ textAlign: 'right' }}>Support</span><span style={{ textAlign: 'right' }}>Lean</span><span style={{ textAlign: 'right' }}>Opposition</span>
+                      </div>
+                      {rows.map((s, i) => (
+                        <div key={s.constituency} style={{ display: 'grid', gridTemplateColumns: '13px minmax(0,1.2fr) 30px 66px 66px 66px', gap: 5, alignItems: 'center', fontSize: 11, padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
+                          <span style={{ color: MUT, fontSize: 10 }}>{i + 1}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.constituency}</span>
+                          <span style={{ textAlign: 'right' }}>{s.total}</span>
+                          <span style={{ textAlign: 'right' }}><MiniBar v={s.supp} color={GREEN} /></span>
+                          <span style={{ textAlign: 'right' }}><MiniBar v={s.leanPct} color={AMBER} /></span>
+                          <span style={{ textAlign: 'right' }}><MiniBar v={s.opp} color="#ef4444" /></span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
+                      {[
+                        [<MdOutlineCheckCircle key="a" size={13} color={GREEN} />, 'Highest Support', best ? `${best.constituency} (${best.supp}%)` : '—'],
+                        [<MdMyLocation key="b" size={13} color={AMBER} />, 'Most Volume', most ? `${most.constituency} (${most.total})` : '—'],
+                        [<MdOutlineErrorOutline key="c" size={13} color="#ef4444" />, 'Rising Opposition', risky ? `${risky.constituency} (${risky.opp}%)` : '—'],
+                        [<MdSparkIcon key="d" size={13} color={PURPLE} />, 'Data Quality', '100%'],
+                      ].map(([icon, l, v], i) => (
+                        <div key={i} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 9, padding: '6px 7px', textAlign: 'center', minWidth: 0 }}>
+                          <div style={{ display: 'flex', justifyContent: 'center' }}>{icon as React.ReactNode}</div>
+                          <div style={{ fontSize: 8, color: MUT, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>{l as string}</div>
+                          <div style={{ fontSize: 9, fontWeight: 700, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v as string}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </Panel>
           </div>
         </div>
@@ -551,16 +708,18 @@ const card: React.CSSProperties = {
   WebkitBackdropFilter: 'blur(16px) saturate(140%)',
   boxShadow: '0 10px 30px rgba(2,6,23,0.10)',
 };
-function Panel({ title, sub, right, children, noPad, grow, h, clip }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; grow?: boolean; h?: number; clip?: boolean }) {
+function Panel({ title, sub, right, children, noPad, grow, h, clip, icon, iconColor }: { title: string; sub?: string; right?: React.ReactNode; children: React.ReactNode; noPad?: boolean; grow?: boolean; h?: number; clip?: boolean; icon?: React.ReactNode; iconColor?: string }) {
   return (
     <div style={{ ...card, display: 'flex', flexDirection: 'column', minHeight: 0, ...(grow ? { flex: 1 } : {}), ...(h ? { height: h, minHeight: h, flex: 'none' } : {}), ...(clip ? { overflow: 'hidden' } : {}) }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE}` }}>
-        <div><div style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</div>{sub && <div style={{ fontSize: 10, color: MUT }}>{sub}</div>}</div>{right}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderBottom: `1px solid ${LINE}` }}>
+        {icon && <span style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${iconColor || SAFFRON}1f`, color: iconColor || SAFFRON }}>{icon}</span>}
+        <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12.5, fontWeight: 700 }}>{title}</div>{sub && <div style={{ fontSize: 10, color: MUT }}>{sub}</div>}</div>{right}
       </div>
       <div style={{ padding: noPad ? 0 : 11, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>{children}</div>
     </div>
   );
 }
+const InfoDot = () => <MdInfoOutline size={14} color={'var(--text-muted)' as string} style={{ flexShrink: 0 }} />;
 function Kpi({ label, value, sub, trend, up, accent, spark }: { label: string; value: number | string; sub: string; trend: string; up: boolean; accent: string; spark?: number[] }) {
   return (
     <div style={{ ...card, padding: 12, position: 'relative', overflow: 'hidden' }}>

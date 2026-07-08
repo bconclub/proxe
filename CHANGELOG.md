@@ -1,3 +1,9 @@
+## 2026-07-09 01:30 IST · feat(pop): War Room bottom rows to reference design + clean artifact switcher
+
+- User-facing: Intensity Ladder is a real funnel now (trapezoid tiers with icons, PEOPLE column, per tier CONVERSION chips, Will vote / Will work / Will rally / Will share stat tiles). Volunteer Pulse: big count + trend, ranked LOCATION table with bars, Most Active / Trend / Last Updated footer strip. D2D Coverage: four icon stat tiles, area chart with axis labels, Top Workers (Today) list. Channel Mix: ranked horizontal bars with channel icons, % and counts, Total Volume footer. Issue Trend: range chip, centered legend, Peak + Total Mentions footer. Constituency Snapshot: mini bars for Support / Lean / Opposition + four insight tiles (Highest Support, Most Volume, Rising Opposition, Data Quality). Panel headers get icon tiles + info dots. No overlaps, rows rebalanced.
+- Artifact switcher stripped to five clean rows: Overview, War Room, Door to Door, Listen, Pulse of Punjab (click out). No descriptions, no status badges, no footer link. MyVoice removed from the list.
+- (pending-sha)
+
 ## 2026-07-09 00:40 IST · feat(pop): Campaign Events to reference design + home 50-50 with scroll free Activity Sources
 
 - User-facing: Campaign Events page rebuilt to the reference: KPI strip (Confirmed / Leadership Proposed / AI Suggested / Awaiting Sign-off with deltas), clickable legend filters, month grid with 4 typed pills (solid saffron / blue outline / dashed purple / dashed orange), day count badges, day selection, and the Event Intelligence rail: selected day breakdown per type, AI Rationale with confidence, Quick Actions (Approve actually confirms, Reject removes), overlap detection, Upcoming Approvals with priority chips.

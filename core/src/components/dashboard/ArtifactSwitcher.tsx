@@ -140,61 +140,17 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
             >
               <Icon size={16} />
             </span>
-            <span className="flex-1 min-w-0">
-              <span className="flex items-center" style={{ gap: '6px' }}>
-                <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>
-                  {a.name}
-                </span>
-                {a.external && <MdOpenInNew size={11} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
-                <span
-                  className="flex-shrink-0 rounded"
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: '8.5px',
-                    fontWeight: 700,
-                    letterSpacing: '0.06em',
-                    padding: '1.5px 5px',
-                    color: meta.color,
-                    backgroundColor: meta.bg,
-                  }}
-                >
-                  {meta.label}
-                </span>
+            {/* Clean rows: name only - no descriptions, no status badges */}
+            <span className="flex-1 min-w-0 flex items-center" style={{ gap: '6px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                {a.name}
               </span>
-              {a.description && (
-                <span
-                  className="block"
-                  style={{ fontSize: '10.5px', color: 'var(--text-secondary)', lineHeight: 1.35, marginTop: '2px' }}
-                >
-                  {a.description}
-                </span>
-              )}
+              {a.external && <MdOpenInNew size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
             </span>
             {isActive && <MdCheck size={15} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />}
           </button>
         )
       })}
-      <button
-        role="menuitem"
-        onClick={() => { onClose(); router.push('/dashboard/artifacts') }}
-        className="artifact-switcher-footer w-full text-left rounded-md"
-        style={{
-          marginTop: '4px',
-          padding: '7px 8px',
-          fontSize: '11px',
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          background: 'transparent',
-          border: 'none',
-          borderTop: '1px solid var(--border-primary)',
-          borderRadius: 0,
-          cursor: 'pointer',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
-      >
-        View all artifacts →
-      </button>
     </div>
   )
 }
