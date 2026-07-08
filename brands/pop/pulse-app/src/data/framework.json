@@ -1,0 +1,96 @@
+{
+  "program": {
+    "name": "Pulse of Punjab · ਸਭ ਦੀ ਸੁਣਾਂਗੇ",
+    "tagline": "ਸਭ ਦੀ ਸੁਣਾਂਗੇ · Sab di sunenge - Constituency-wise listening + mobilization. Punjabiyat Di Lehar. Har Pind. Har Shehar.",
+    "horizonMonths": 7,
+    "backend": "Proxy (TBD)"
+  },
+
+  "priorities": [
+    {
+      "id": "P1",
+      "name": "Frontline Engagement",
+      "color": "#1f6feb",
+      "goal": "Pick up every interaction - chat, comment, DM - on the page and respond.",
+      "kpis": ["interactions_captured", "response_rate", "avg_response_time"],
+      "modules": ["listening_tool", "auto_call", "grievance_automation"],
+      "listeningScope": {
+        "mode": "full_state_firehose",
+        "desc": "All-Punjab listening across platforms, bucketed by constituency.",
+        "sources": ["page_chat", "page_comments", "DMs", "public_mentions", "groups", "news_local"]
+      }
+    },
+    {
+      "id": "P2",
+      "name": "Cadre Mobilization",
+      "color": "#ff7a18",
+      "goal": "Activate and organize the party cadre - booth-level workers, volunteers and frontline karyakartas - into a mapped, deployable ground force.",
+      "kpis": ["cadre_onboarded", "booths_covered", "active_volunteers", "events_held"],
+      "modules": ["cadre_network", "booth_mapping", "events", "knowledge_base"]
+    },
+    {
+      "id": "P3",
+      "name": "Voter Conversion",
+      "color": "#3fb950",
+      "goal": "Final month - move engaged supporters to confirmed voters.",
+      "kpis": ["pledges", "verified_voters", "turnout_intent"],
+      "modules": ["conversion_journey", "whatsapp_flow"]
+    }
+  ],
+
+  "timeline": [
+    { "month": 1, "focus": "P1", "label": "Stand up listening tool, baseline interactions" },
+    { "month": 2, "focus": "P1", "label": "Auto-call + grievance automation live" },
+    { "month": 3, "focus": "P2", "label": "Cadre onboarding - booth workers & volunteers mapped" },
+    { "month": 4, "focus": "P2", "label": "Booth mapping + knowledge base seeded, events engine" },
+    { "month": 5, "focus": "P2", "label": "Per-constituency cadre deployment & pipeline tuning" },
+    { "month": 6, "focus": "P3", "label": "Conversion journey warm-up, WhatsApp funnel" },
+    { "month": 7, "focus": "P3", "label": "Voter conversion push - full user journey" }
+  ],
+
+  "engagement": {
+    "trigger": "Voter touchpoint (QR poster, page, event, door-to-door)",
+    "features": [
+      { "id": "volunteer",   "label": "Volunteer",     "icon": "🙋", "desc": "Sign up to help in your area" },
+      { "id": "stay_updated","label": "Stay Updated",  "icon": "🔔", "desc": "Opt in for constituency updates" },
+      { "id": "share_voice", "label": "Share Voice",   "icon": "📣", "desc": "Raise an issue / give feedback" },
+      { "id": "join_events", "label": "Join Events",   "icon": "📅", "desc": "RSVP to local events" },
+      { "id": "location",    "label": "Location-wise", "icon": "📍", "desc": "See what's near you by PIN" }
+    ]
+  },
+
+  "knowledgeBase": {
+    "purpose": "Right data for vote conversion. Structured so every interaction enriches a voter profile.",
+    "taxonomy": [
+      { "node": "Constituency facts", "items": ["demographics", "key issues", "past results", "booth list"] },
+      { "node": "Issue library", "items": ["water", "jobs", "agriculture", "drugs", "roads", "power"] },
+      { "node": "Talking points", "items": ["per-issue messaging", "FAQs", "rebuttals"] },
+      { "node": "Voter profile", "items": ["contact", "PIN/booth", "issues raised", "engagement score", "conversion stage"] }
+    ],
+    "feedsConversion": true
+  },
+
+  "grievancePipeline": {
+    "description": "Raise a grievance at your convenience -> schedule a call -> resolve.",
+    "stages": [
+      { "id": "raised",     "label": "Raised",        "desc": "Voter submits via scan / chat / comment" },
+      { "id": "scheduled",  "label": "Call Scheduled", "desc": "Voter picks a free time slot" },
+      { "id": "in_call",    "label": "In Call",        "desc": "Auto-call connects volunteer <-> voter" },
+      { "id": "resolved",   "label": "Resolved",       "desc": "Closed, feedback captured" },
+      { "id": "converted",  "label": "Converted",      "desc": "Resolution -> pledge / volunteer / vote" }
+    ]
+  },
+
+  "whatsappFlow": {
+    "role": "Lead magnet + traffic generator",
+    "steps": [
+      "Scan QR / click ad",
+      "Land on constituency page",
+      "Pick a feature (volunteer / voice / event)",
+      "Opt-in -> WhatsApp thread",
+      "Nurture sequence (updates, events, asks)",
+      "Grievance / call scheduling in-thread",
+      "Conversion ask (pledge / verify / turnout)"
+    ]
+  }
+}

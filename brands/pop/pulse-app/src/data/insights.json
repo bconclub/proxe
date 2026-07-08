@@ -1,0 +1,89 @@
+{
+  "_meta": {
+    "purpose": "Data-rich district intelligence for Pulse of Punjab. Researched real figures (Census 2011, ECI 2022, ECI 2024 LS) blended with flagged approximations where official per-district data is unavailable.",
+    "regionColors": { "Majha": "#FC7404", "Doaba": "#4EB457", "Malwa": "#2E8DE6" },
+    "turnoutNote": "ECI published constituency-level turnout, not clean per-district figures; district turnout values are indicative approximations.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/2022_Punjab_Legislative_Assembly_election",
+      "https://en.wikipedia.org/wiki/2024_Indian_general_election_in_Punjab",
+      "https://myneta.info/punjab2022/",
+      "https://www.eci.gov.in/",
+      "Census 2011 (census2011.co.in)"
+    ]
+  },
+  "overall": {
+    "turnoutPct": 71.95,
+    "totalElectors": 21499804,
+    "seats": { "AAP": 92, "INC": 18, "SAD": 3, "BJP": 2, "BSP": 1, "IND": 1 }
+  },
+  "regions": {
+    "Majha": ["Pathankot", "Gurdaspur", "Amritsar", "Tarn Taran"],
+    "Doaba": ["Kapurthala", "Jalandhar", "Hoshiarpur", "SBS Nagar"],
+    "Malwa": ["Rupnagar", "SAS Nagar", "Fatehgarh Sahib", "Ludhiana", "Moga", "Firozpur", "Fazilka", "Sri Muktsar Sahib", "Faridkot", "Bathinda", "Mansa", "Sangrur", "Barnala", "Malerkotla", "Patiala"]
+  },
+  "districts": {
+    "Pathankot": { "region": "Majha", "turnout2022": 68.5, "topIssues": ["water", "agriculture", "roads"], "economy": "Sub-mountainous border district; mixed agriculture, forestry and trade; gateway to J&K/Himachal" },
+    "Gurdaspur": { "region": "Majha", "turnout2022": 70.0, "topIssues": ["drugs", "agriculture", "unemployment"], "economy": "Agrarian border district; Batala foundry/machine-tool cluster; heroin transit corridor" },
+    "Amritsar": { "region": "Majha", "turnout2022": 64.0, "topIssues": ["drugs", "unemployment", "agriculture"], "economy": "Border/holy city; tourism, trade, textiles, food processing; high overdose burden" },
+    "Tarn Taran": { "region": "Majha", "turnout2022": 71.0, "topIssues": ["drugs", "agriculture", "health"], "economy": "Deeply agrarian border district; epicentre of the heroin/de-addiction crisis" },
+    "Kapurthala": { "region": "Doaba", "turnout2022": 71.5, "topIssues": ["migration", "unemployment", "agriculture"], "economy": "NRI-heavy Doaba; rail coach factory (RCF); top study-visa emigration" },
+    "Jalandhar": { "region": "Doaba", "turnout2022": 67.5, "topIssues": ["migration", "industry", "unemployment"], "economy": "Sports-goods and hand-tool capital; leather; major NRI hub with heavy youth out-migration" },
+    "Hoshiarpur": { "region": "Doaba", "turnout2022": 68.0, "topIssues": ["migration", "agriculture", "unemployment"], "economy": "Sub-mountainous Doaba; agriculture and small industry; historic high emigration" },
+    "SBS Nagar": { "region": "Doaba", "turnout2022": 70.0, "topIssues": ["migration", "agriculture", "unemployment"], "economy": "Smallest Doaba district (Nawanshahr); agrarian, very high NRI/diaspora linkage" },
+    "Rupnagar": { "region": "Malwa", "turnout2022": 70.5, "topIssues": ["industry", "agriculture", "water"], "economy": "Puadh foothills; thermal power, cement, IIT Ropar; mixed agriculture and tourism" },
+    "SAS Nagar": { "region": "Malwa", "turnout2022": 67.0, "topIssues": ["industry", "unemployment", "water"], "economy": "Mohali - Punjab's IT, biotech and services hub; over-exploited groundwater blocks" },
+    "Fatehgarh Sahib": { "region": "Malwa", "turnout2022": 73.0, "topIssues": ["water", "industry", "agriculture"], "economy": "Mandi Gobindgarh steel cluster ('Steel Town'); paddy-wheat on over-exploited groundwater" },
+    "Ludhiana": { "region": "Malwa", "turnout2022": 65.5, "topIssues": ["industry", "water", "unemployment"], "economy": "Largest industrial city - hosiery, bicycles, auto parts; over-exploited aquifers, Buddha Nullah pollution" },
+    "Moga": { "region": "Malwa", "turnout2022": 73.5, "topIssues": ["water", "agriculture", "debt"], "economy": "Core paddy-wheat belt, dark-zone groundwater; agro-processing (Nestlé); farmer debt" },
+    "Firozpur": { "region": "Malwa", "turnout2022": 75.0, "topIssues": ["drugs", "agriculture", "unemployment"], "economy": "Agrarian border district; heroin corridor and de-addiction focus; limited industry" },
+    "Fazilka": { "region": "Malwa", "turnout2022": 76.5, "topIssues": ["drugs", "agriculture", "debt"], "economy": "Border cotton/paddy (kinnow citrus belt); drug-trafficking corridor; farmer indebtedness" },
+    "Sri Muktsar Sahib": { "region": "Malwa", "turnout2022": 77.0, "topIssues": ["health", "agriculture", "debt"], "economy": "Cotton-belt with highest cancer incidence ('cancer belt'); paddy, kinnow; high farmer debt" },
+    "Faridkot": { "region": "Malwa", "turnout2022": 74.0, "topIssues": ["health", "agriculture", "debt"], "economy": "Cancer-belt district (origin of the 'cancer train'); cotton/paddy; agrarian distress" },
+    "Bathinda": { "region": "Malwa", "turnout2022": 76.0, "topIssues": ["health", "agriculture", "debt"], "economy": "Cotton hub; thermal power, refinery, fertilizer; high cancer incidence and farm debt" },
+    "Mansa": { "region": "Malwa", "turnout2022": 78.0, "topIssues": ["debt", "health", "agriculture"], "economy": "Most cotton-dependent district; among highest farmer-suicide and debt rates; cancer belt" },
+    "Sangrur": { "region": "Malwa", "turnout2022": 75.5, "topIssues": ["water", "agriculture", "debt"], "economy": "Intensive paddy-wheat, ALL blocks in the groundwater dark zone; high farmer debt" },
+    "Barnala": { "region": "Malwa", "turnout2022": 74.5, "topIssues": ["water", "agriculture", "debt"], "economy": "Small paddy-wheat district, most blocks over-exploited; cotton/agro trade; indebtedness" },
+    "Malerkotla": { "region": "Malwa", "turnout2022": 72.0, "topIssues": ["water", "agriculture", "unemployment"], "economy": "Newest district; agriculture plus power-loom/textile and food trade; dark-zone groundwater" },
+    "Patiala": { "region": "Malwa", "turnout2022": 68.0, "topIssues": ["water", "agriculture", "unemployment"], "economy": "Royal city; education, administration, some industry; intensive paddy-wheat, over-exploited groundwater" }
+  },
+  "lokSabha2024": [
+    { "name": "Gurdaspur", "winner": "Sukhjinder Singh Randhawa", "party": "INC" },
+    { "name": "Amritsar", "winner": "Gurjeet Singh Aujla", "party": "INC" },
+    { "name": "Khadoor Sahib", "winner": "Amritpal Singh", "party": "IND" },
+    { "name": "Jalandhar", "winner": "Charanjit Singh Channi", "party": "INC" },
+    { "name": "Hoshiarpur", "winner": "Raj Kumar Chabbewal", "party": "AAP" },
+    { "name": "Anandpur Sahib", "winner": "Malwinder Singh Kang", "party": "AAP" },
+    { "name": "Ludhiana", "winner": "Amrinder Singh Raja Warring", "party": "INC" },
+    { "name": "Fatehgarh Sahib", "winner": "Amar Singh", "party": "INC" },
+    { "name": "Faridkot", "winner": "Sarabjeet Singh Khalsa", "party": "IND" },
+    { "name": "Firozpur", "winner": "Sher Singh Ghubaya", "party": "INC" },
+    { "name": "Bathinda", "winner": "Harsimrat Kaur Badal", "party": "SAD" },
+    { "name": "Sangrur", "winner": "Gurmeet Singh Meet Hayer", "party": "AAP" },
+    { "name": "Patiala", "winner": "Dharamvir Gandhi", "party": "INC" }
+  ],
+  "demographics": {
+    "Pathankot": { "population": 676598, "literacyPct": null, "sexRatio": 860, "urbanPct": 44.1, "scPct": 30.6 },
+    "Gurdaspur": { "population": 2298323, "literacyPct": 79.95, "sexRatio": 895, "urbanPct": 28.7, "scPct": 25.3 },
+    "Amritsar": { "population": 2490656, "literacyPct": 76.27, "sexRatio": 889, "urbanPct": 53.6, "scPct": 31.0 },
+    "Tarn Taran": { "population": 1119627, "literacyPct": 67.81, "sexRatio": 900, "urbanPct": 12.7, "scPct": 33.7 },
+    "Kapurthala": { "population": 815168, "literacyPct": 79.07, "sexRatio": 912, "urbanPct": 34.65, "scPct": 33.9 },
+    "Jalandhar": { "population": 2193590, "literacyPct": 82.48, "sexRatio": 915, "urbanPct": 52.93, "scPct": 38.95 },
+    "Hoshiarpur": { "population": 1586625, "literacyPct": 84.59, "sexRatio": 961, "urbanPct": 21.1, "scPct": 35.1 },
+    "SBS Nagar": { "population": 612310, "literacyPct": 80.3, "sexRatio": 954, "urbanPct": 20.5, "scPct": 42.51 },
+    "Rupnagar": { "population": 684627, "literacyPct": 82.19, "sexRatio": 915, "urbanPct": 26.0, "scPct": 26.4 },
+    "SAS Nagar": { "population": 994628, "literacyPct": 83.8, "sexRatio": 879, "urbanPct": 54.76, "scPct": 21.74 },
+    "Fatehgarh Sahib": { "population": 600163, "literacyPct": 79.35, "sexRatio": 871, "urbanPct": 30.9, "scPct": 32.1 },
+    "Ludhiana": { "population": 3498739, "literacyPct": 82.2, "sexRatio": 873, "urbanPct": 59.16, "scPct": 26.39 },
+    "Moga": { "population": 995746, "literacyPct": 70.68, "sexRatio": 893, "urbanPct": 22.82, "scPct": 36.5 },
+    "Firozpur": { "population": 2029074, "literacyPct": 68.92, "sexRatio": 893, "urbanPct": 27.23, "scPct": 42.17 },
+    "Fazilka": { "population": 1027143, "literacyPct": 68.01, "sexRatio": 894, "urbanPct": 20.35, "scPct": 41.51 },
+    "Sri Muktsar Sahib": { "population": 901896, "literacyPct": 65.81, "sexRatio": 896, "urbanPct": 27.96, "scPct": 42.3 },
+    "Faridkot": { "population": 617508, "literacyPct": 69.55, "sexRatio": 890, "urbanPct": 35.1, "scPct": 38.9 },
+    "Bathinda": { "population": 1388525, "literacyPct": 68.28, "sexRatio": 868, "urbanPct": 35.95, "scPct": 32.44 },
+    "Mansa": { "population": 769751, "literacyPct": 61.83, "sexRatio": 883, "urbanPct": 21.3, "scPct": 33.6 },
+    "Sangrur": { "population": 1655169, "literacyPct": 67.99, "sexRatio": 885, "urbanPct": 31.2, "scPct": 27.9 },
+    "Barnala": { "population": 595527, "literacyPct": 67.82, "sexRatio": 876, "urbanPct": 32.02, "scPct": 32.24 },
+    "Malerkotla": { "population": 429754, "literacyPct": 72.62, "sexRatio": 896, "urbanPct": 40.5, "scPct": null },
+    "Patiala": { "population": 1895686, "literacyPct": 75.28, "sexRatio": 891, "urbanPct": 40.26, "scPct": 24.55 }
+  }
+}

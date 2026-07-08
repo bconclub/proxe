@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Pulse of Punjab",
+    "slug": "punjab-pulse",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "punjabpulse",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0A0E15",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0E15"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.punjabyatra.pulse",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      }
+    },
+    "android": {
+      "package": "in.punjabyatra.pulse",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0E15",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#F5A623"
+        }
+      ],
+      "expo-font"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://pop-proxe.vercel.app"
+    }
+  }
+}

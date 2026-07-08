@@ -1,0 +1,13 @@
+{
+  "_comment": "Starter pin-code -> constituency lookup. Expand freely. Key = 6-digit PIN, value = { constituency no, area }.",
+  "143001": { "no": 17, "area": "Amritsar Central" },
+  "143006": { "no": 18, "area": "Amritsar East" },
+  "144001": { "no": 35, "area": "Jalandhar Central" },
+  "141001": { "no": 63, "area": "Ludhiana Central" },
+  "147001": { "no": 115, "area": "Patiala" },
+  "151001": { "no": 92, "area": "Bathinda Urban" },
+  "152002": { "no": 76, "area": "Firozpur City" },
+  "160059": { "no": 53, "area": "SAS Nagar (Mohali)" },
+  "146001": { "no": 43, "area": "Hoshiarpur" },
+  "148001": { "no": 108, "area": "Sangrur" }
+}
