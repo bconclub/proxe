@@ -76,40 +76,43 @@ const EC = (s: string, t: string, color: string, opts: Partial<Edge> = {}): Edge
 const C_INTAKE = '#F06C18', C_ENGINE = '#a855f7', C_LADDER = '#38bdf8', C_FEED = '#22c55e', C_SIGNAL = '#2dd4bf', C_DIRECTIVE = '#ec4899'
 
 // ── lanes (x) ──  sources · MyVoice · engine/data · frontline · artifacts
+// Blasted-out spacing: ~560px between lanes (nodes are ~232 wide → ~330px of
+// clear gap), ~140px between rows. Nothing overlaps; every edge has open air.
+const LX = { a: -1120, b: -560, c: 0, d: 560, e: 1120 }
 const BASE_NODES: Node<BrainNodeData>[] = [
   // Lane A — LEAD SOURCES
-  N('src_head', 'entry', -840, -170, 'LEAD SOURCES', 'Every way a person enters', 'INTAKE'),
-  N('s_call', 'source', -840, -60, 'Outbound Calls', 'AI dialer reaches out'),
-  N('s_wa', 'source', -840, 30, 'WhatsApp Campaigns', 'Broadcasts + reply capture'),
-  N('s_qr', 'source', -840, 120, 'QR Codes', 'Posters, rallies, on-ground'),
-  N('s_web', 'source', -840, 210, 'Web / Landing', 'Forms + web chat'),
-  N('s_missed', 'source', -840, 300, 'Missed Call', 'Give a missed call to opt in'),
-  N('s_d2d', 'ladder', -840, 410, 'D2D Front End', 'Volunteer field app — the front end', 'ON-GROUND'),
+  N('src_head', 'entry', LX.a, -260, 'LEAD SOURCES', 'Every way a person enters', 'INTAKE'),
+  N('s_call', 'source', LX.a, -110, 'Outbound Calls', 'AI dialer reaches out'),
+  N('s_wa', 'source', LX.a, 30, 'WhatsApp Campaigns', 'Broadcasts + reply capture'),
+  N('s_qr', 'source', LX.a, 170, 'QR Codes', 'Posters, rallies, on-ground'),
+  N('s_web', 'source', LX.a, 310, 'Web / Landing', 'Forms + web chat'),
+  N('s_missed', 'source', LX.a, 450, 'Missed Call', 'Give a missed call to opt in'),
+  N('s_d2d', 'ladder', LX.a, 640, 'D2D Front End', 'Volunteer field app — the front end', 'ON-GROUND'),
 
   // Lane B — MYVOICE (lead-gen hub)
-  N('myvoice', 'hub', -500, 120, 'MyVoice', 'Enhanced lead-gen hub. Every channel funnels in; the voice + intent get captured.', 'LEAD GEN'),
+  N('myvoice', 'hub', LX.b, 150, 'MyVoice', 'Enhanced lead-gen hub. Every channel funnels in; the voice + intent get captured.', 'LEAD GEN'),
 
   // Lane C — ENGINE + DATA (+ Listen, D2D back end)
-  N('listen', 'data', -150, -170, 'PROXe Listen', 'External signals: social, news, WhatsApp, field chatter', 'SIGNALS'),
-  N('engine', 'engine', -150, 40, 'PROXe Engine', 'The back end. Understand → score → gauge intensity → route.', 'CORE'),
-  N('data', 'data', -150, 250, 'The Person Spine', 'One record per person, gauged on intensity 0-4. Everything reads and writes here.', 'DATA'),
-  N('d2d_back', 'engine', -150, 430, 'D2D Back End', 'PROXe runs the back end for the field app.', 'BACK END'),
+  N('listen', 'data', LX.c, -260, 'PROXe Listen', 'External signals: social, news, WhatsApp, field chatter', 'SIGNALS'),
+  N('engine', 'engine', LX.c, 40, 'PROXe Engine', 'The back end. Understand → score → gauge intensity → route.', 'CORE'),
+  N('data', 'data', LX.c, 360, 'The Person Spine', 'One record per person, gauged on intensity 0-4. Everything reads and writes here.', 'DATA'),
+  N('d2d_back', 'engine', LX.c, 640, 'D2D Back End', 'PROXe runs the back end for the field app.', 'BACK END'),
 
   // Lane D — THE FRONTLINE LADDER
-  N('fl_head', 'ladder', 230, -170, 'THE FRONTLINE', 'People climb by interactions', 'LADDER'),
-  N('contact', 'ladder', 230, -55, 'Contact', 'First touch'),
-  N('voter', 'ladder', 230, 35, 'Identified Voter', 'Placeable — booth / seat'),
-  N('supporter', 'ladder', 230, 125, 'Supporter', 'Earned by number of interactions'),
-  N('volunteer', 'ladder', 230, 215, 'Volunteer', 'Opts in to act on the ground'),
-  N('kyc', 'gate', 230, 320, 'KYC gate', 'Verify identity to promote', 'GATE'),
-  N('cadre', 'ladder', 230, 415, 'Cadre', 'Verified core worker'),
+  N('fl_head', 'ladder', LX.d, -260, 'THE FRONTLINE', 'People climb by interactions', 'LADDER'),
+  N('contact', 'ladder', LX.d, -110, 'Contact', 'First touch'),
+  N('voter', 'ladder', LX.d, 30, 'Identified Voter', 'Placeable — booth / seat'),
+  N('supporter', 'ladder', LX.d, 170, 'Supporter', 'Earned by number of interactions'),
+  N('volunteer', 'ladder', LX.d, 310, 'Volunteer', 'Opts in to act on the ground'),
+  N('kyc', 'gate', LX.d, 450, 'KYC gate', 'Verify identity to promote', 'GATE'),
+  N('cadre', 'ladder', LX.d, 590, 'Cadre', 'Verified core worker'),
 
   // Lane E — ARTIFACTS (the surfaces)
-  N('art_head', 'entry', 620, -170, 'ARTIFACTS', 'The surfaces you work in', 'SURFACES'),
-  N('overview', 'artifact', 620, -50, 'Overview', 'The whole engine scene — everything across artifacts and data.', 'AGGREGATE'),
-  N('warroom', 'artifact', 620, 80, 'War Room', 'What to act on right now.', 'ACT'),
-  N('d2d_art', 'artifact', 620, 210, 'Door to Door', "What's happening on the ground.", 'GROUND'),
-  N('pulse', 'artifact', 620, 340, 'Pulse App', 'Leader view — pushes directives into the War Room.', 'LEADER'),
+  N('art_head', 'entry', LX.e, -260, 'ARTIFACTS', 'The surfaces you work in', 'SURFACES'),
+  N('overview', 'artifact', LX.e, -90, 'Overview', 'The whole engine scene — everything across artifacts and data.', 'AGGREGATE'),
+  N('warroom', 'artifact', LX.e, 90, 'War Room', 'What to act on right now.', 'ACT'),
+  N('d2d_art', 'artifact', LX.e, 270, 'Door to Door', "What's happening on the ground.", 'GROUND'),
+  N('pulse', 'artifact', LX.e, 450, 'Pulse App', 'Leader view — pushes directives into the War Room.', 'LEADER'),
 ]
 
 const BASE_EDGES: Edge[] = [

@@ -132,15 +132,16 @@ export async function GET(req: NextRequest) {
       }
       return Array.from(out);
     };
-    const phraseStats: Record<string, { count: number; pos: number; neg: number; display: Record<string, number>; cats: Record<string, number> }> = {};
+    const phraseStats: Record<string, { count: number; pos: number; neg: number; display: Record<string, number>; cats: Record<string, number>; srcs: Record<string, number> }> = {};
     cur.forEach((s: any) => {
       const body = deOutlet(s.content || '');
       const toks = tokenize(body);
       phrasesOf(body).forEach((key) => {
-        const st = phraseStats[key] || (phraseStats[key] = { count: 0, pos: 0, neg: 0, display: {}, cats: {} });
+        const st = phraseStats[key] || (phraseStats[key] = { count: 0, pos: 0, neg: 0, display: {}, cats: {}, srcs: {} });
         st.count++;
         if (s.sentiment === 'positive') st.pos++; else if (s.sentiment === 'negative') st.neg++;
         if (s.issue_category) st.cats[s.issue_category] = (st.cats[s.issue_category] || 0) + 1;
+        if (s.source) st.srcs[s.source] = (st.srcs[s.source] || 0) + 1;
         // remember the original casing so "Anandpur Sahib rally" displays as written
         const n = key.split(' ').length;
         for (let i = 0; i + n <= toks.length; i++) {
@@ -162,7 +163,9 @@ export async function GET(req: NextRequest) {
     const keywords = kept.map(([key, st]) => {
       const display = Object.entries(st.display).sort((a, b) => b[1] - a[1])[0]?.[0] || key;
       const category = Object.entries(st.cats).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-      return { word: display, count: st.count, pos: st.pos, neg: st.neg, trend: st.count - (prevPhraseCount[key] || 0), category };
+      // top 3 platforms this phrase is being said on (dominant first)
+      const sources = Object.entries(st.srcs).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([source, n]) => ({ source, count: n as number }));
+      return { word: display, count: st.count, pos: st.pos, neg: st.neg, trend: st.count - (prevPhraseCount[key] || 0), category, sources };
     });
 
     // ── Signal inbox (recent, richest first) ──

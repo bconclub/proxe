@@ -29,7 +29,7 @@ interface Digest {
   whatProxeThinks: { heat: number; label: string; delta: number; text: string }
   recommendedActions: { title: string; detail: string; kind: string }[]
   trendingIssues: { category: string; count: number; prev: number; trend: number }[]
-  keywords: { word: string; count: number; pos: number; neg: number; trend: number; category: string | null }[]
+  keywords: { word: string; count: number; pos: number; neg: number; trend: number; category: string | null; sources?: { source: string; count: number }[] }[]
   recentSignals: SignalRow[]
   dailySeries: { day: string; pos: number; neg: number; neutral: number; total: number; crisis: number; opposition: number; positive: number }[]
   bySource: { source: string; count: number }[]
@@ -609,6 +609,13 @@ export default function ListenPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ fontSize: 10.5, fontWeight: 800, color: rc }}>{i + 1}</span>
                         <span style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${cm.color}1f`, color: cm.color }}>{cm.icon}</span>
+                        {/* the platforms this phrase is actually being said on */}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+                          {(k.sources || []).slice(0, 3).map((sc) => {
+                            const sm = srcMeta(sc.source)
+                            return <span key={sc.source} title={`${sm.label} · ${sc.count}`} style={{ width: 17, height: 17, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${sm.color}22`, color: sm.color }}>{sm.icon}</span>
+                          })}
+                        </span>
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.word}</div>

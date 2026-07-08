@@ -1,3 +1,9 @@
+## 2026-07-09 06:10 IST · feat(pop): Brain engine-map spread out (no overlap) + platform icons on trending keywords
+
+- Brain > Map: the engine connection flow was cramped (5 lanes ~340px apart, nodes ~232px wide → boxes and edges overlapping). Blasted the layout out — ~560px between lanes, ~140px between rows. Verified 24 nodes, ZERO overlapping pairs; fitView frames the whole flow so you can read exactly what feeds what.
+- Top Trending Keywords: each tile now shows the platform icons the phrase is actually being said on (X / YouTube / WhatsApp / News / etc.), dominant first, alongside the issue category - so it is clear where a keyword is trending. Digest API returns top-3 sources per keyword phrase.
+- (pending-sha)
+
 ## 2026-07-09 05:40 IST · feat(pop): X icon (no more Twitter bird), suppress Google-logo thumbnails, booth numbers to campaign scale
 
 - Signal Inbox / Source Mix / Evidence Board: the Twitter bird is replaced by the X logo everywhere (FaXTwitter), label X. Social signals surfaced so X / YouTube / Reddit / WhatsApp / Facebook / Instagram icons actually show at the top of the inbox.
