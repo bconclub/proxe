@@ -225,6 +225,30 @@ interface LeadsTableProps {
   title?: string
 }
 
+// Synthetic account ids / placeholder emails the owner & scout apps stamp before
+// a real name/email exists — e.g. "owner_9341333999_1783481293327@noemail.lokazen.in".
+// These are internal ids, never a person's contact, so they must never render as
+// the lead's name OR email. Mirrors cleanName() in api/agent/leads/inbound.
+function isSyntheticContact(v?: string | null): boolean {
+  const t = (v || '').trim()
+  if (!t) return false
+  return /@noemail\.|noreply|no-reply|placeholder/i.test(t) ||
+    /^(owner|brand|scout|connector|lead|user|customer)_\d/i.test(t)
+}
+const NAME_PLACEHOLDER_TOKENS = new Set([
+  'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
+  'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
+])
+function realName(v?: string | null): string {
+  const t = (v || '').trim()
+  if (!t || isSyntheticContact(t)) return ''
+  return t.toLowerCase().split(/\s+/).every((w) => NAME_PLACEHOLDER_TOKENS.has(w)) ? '' : t
+}
+function realEmail(v?: string | null): string {
+  const t = (v || '').trim()
+  return !t || isSyntheticContact(t) ? '' : t
+}
+
 export default function LeadsTable({
   limit: initialLimit,
   sourceFilter: initialSourceFilter,
@@ -897,9 +921,9 @@ export default function LeadsTable({
 
                 const uc = lead.unified_context || {}
                 const resolvedName =
-                  uc?.whatsapp?.profile?.full_name ||
-                  uc?.web?.profile?.full_name ||
-                  lead.name || ''
+                  realName(uc?.whatsapp?.profile?.full_name) ||
+                  realName(uc?.web?.profile?.full_name) ||
+                  realName(lead.name)
                 const brandName =
                   uc?.web?.what_is_your_brand_name ||
                   uc?.whatsapp?.what_is_your_brand_name ||
@@ -921,9 +945,11 @@ export default function LeadsTable({
                   uc?.city ||                       // top-level (set by /api/agent/leads/inbound)
                   ''
 
-                // If no name, use email as primary identifier
-                const displayName = resolvedName || lead.email || lead.phone || '-'
-                const isEmailAsName = !resolvedName && !!lead.email
+                // If no real name, fall back to a REAL email, then phone — never a
+                // synthetic @noemail id (that used to surface as the lead's "name").
+                const cleanEmail = realEmail(lead.email)
+                const displayName = resolvedName || cleanEmail || lead.phone || '-'
+                const isEmailAsName = !resolvedName && !!cleanEmail
 
                 // Scouts feature (lokazen): lead-type badge + scout lifecycle stage.
                 const lkz = showScouts ? (uc?.[brandId] || {}) : {}
@@ -1272,12 +1298,12 @@ export default function LeadsTable({
                             {lead.phone}
                           </a>
                         )}
-                        {lead.email && (
-                          <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
-                            {lead.email}
+                        {cleanEmail && (
+                          <a href={`mailto:${cleanEmail}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={cleanEmail}>
+                            {cleanEmail}
                           </a>
                         )}
-                        {!lead.phone && !lead.email && <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        {!lead.phone && !cleanEmail && <span style={{ color: 'var(--text-muted)' }}>—</span>}
                       </td>
 
                       {/* SOURCE — origin marketing source + entry point (real attribution) */}
@@ -1493,9 +1519,9 @@ export default function LeadsTable({
                           {lead.phone}
                         </a>
                       )}
-                      {lead.email && !isEmailAsName && (
-                        <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
-                          {lead.email}
+                      {cleanEmail && !isEmailAsName && (
+                        <a href={`mailto:${cleanEmail}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={cleanEmail}>
+                          {cleanEmail}
                         </a>
                       )}
                     </td>

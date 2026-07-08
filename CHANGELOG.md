@@ -14,6 +14,14 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): stop showing synthetic ids as a lead's name/email (list + modal)
+
+- A lead was showing its NAME and email as `owner_9341333999_1783481293327@noemail.lokazen.in` — an internal id the owner app stamps before a real name/email exists. The modal already hid it as the *email*, but the leads LIST used it as the *name* (falls back to email when no name), and the modal header showed it as the name.
+- Ingestion (`cleanName` in api/agent/leads/inbound): now also strips `@noemail.`/noreply/placeholder addresses and `<type>_<digits>…` internal ids, so the synthetic id is never stored as the name going forward.
+- Leads list (`LeadsTable`): added `realName`/`realEmail`/`isSyntheticContact` sanitizers — `displayName` now falls back real name → REAL email → phone → "—" (never the synthetic id), and the email cell hides synthetic addresses.
+- Lead modal (`LeadDetailsModal`): added a `displayName()` companion to the existing `displayEmail()`; the header shows "Unknown Lead" instead of the id, and the edit-name field pre-fills blank rather than with the id.
+- Root note: the id/"Property Owner" default originates in the off-repo lokazen owner app (`api/owner/auth/verify-otp`) — this is the defensive fix on PROXe's side; existing rows are corrected at display time immediately.
+
 ## 2026-07-08 · fix(lokazen): WhatsApp scout leads now classified as scout (land in Gigs, not Leads)
 
 - A WhatsApp lead saying "interested in becoming a Lokazen Scout" was sitting in the Leads tab. Two gaps: (1) `detectLokazenAudience` required `scout` + a narrow set of context words that "becoming / interested / application / help" weren't in, so it returned null; (2) the WhatsApp/meta route never ran audience detection or stamped `user_type` at all (only the web route did) — it only recovered a stored type and otherwise persisted the generic AI-intent userType.
