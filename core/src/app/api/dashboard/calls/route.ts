@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     if (leadIds.length) {
       const { data: leads } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, language')
         .in('id', leadIds)
       ;(leads || []).forEach((l: any) => leadMap.set(l.id, l))
     }
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
     if (convLeadIds.length) {
       const { data: moreLeads } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage')
+        .select('id, customer_name, email, phone, lead_score, lead_stage, language')
         .in('id', convLeadIds)
       ;(moreLeads || []).forEach((l: any) => leadMap.set(l.id, l))
     }
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
         endedReason: extra?.endedReason || null,
         sentiment: r.sentiment || null,
         engine,
-        language: (r.channel_data && r.channel_data.language) || null,
+        language: (r.channel_data && r.channel_data.language) || lead?.language || null,
         turnCount: extra?.turnCount ?? 0,
         createdAt: r.created_at,
       }
