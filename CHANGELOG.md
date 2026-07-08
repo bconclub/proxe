@@ -6,7 +6,7 @@
 - No hyphens anywhere: page copy, AI narrative strings, action texts, news titles (trailing outlet suffix stripped), source/author names in DB, Door to Door labels.
 - War Room map: cluster bubbles smaller (30-54px, tighter halo); constituency polygons no longer steal clicks aimed at bubbles - polygon click only activates when zoomed right in (>= 10.75).
 - D2D: worker rows now show real portrait photos (8 Unsplash portraits bundled at brands/pop/public/unsplash/workers, credited in _credits.json), initials fallback kept.
-- `(75e94c2b)`
+- `(5c390678)`
 
 ## 2026-07-08 06:10 IST · feat(pop): Language column on Calls + drop dead rows + fix transcript writes
 
