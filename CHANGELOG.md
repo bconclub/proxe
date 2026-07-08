@@ -14,6 +14,15 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(lokazen): payment/transaction problems now go to support, not a call booking
+
+- Live: a property OWNER messaged "my money got debited but the website shows payment failed". The chat correctly raised a support request once, then pivoted straight into a call-booking flow (date → time → email → "quick Lokazen call") and finally hallucinated "Hi Aman, your transaction was successful." The earlier scout-only fix didn't cover owners/brands.
+- Generalized the support path to ALL Lokazen audiences: a new complaint-shaped `isPaymentComplaint` detector (money debited / payment failed / amount deducted / double charged / refund not received, etc. — deliberately NOT pricing questions like "what's the fee?") now, on both engine paths:
+  - suppresses booking entirely (`supportEscalation` gates `needsBookingTools`/`hasBookingIntent`), so a payment problem can never become a call;
+  - appends a `paymentSupportDirective` audience-agnostic system-prompt lock that forces the "I've raised a support request with the team" reply and explicitly bans claiming the payment succeeded/was reversed/fixed (kills the "transaction was successful" hallucination);
+  - raises a Slack support handoff with the number + exact complaint (WhatsApp path via the existing flag block; web path now flags too, so its "I've raised a request" line is never a false claim).
+- Note (not in this repo): the separate autonomous follow-up **worker** (`brands/windchasers/worker/task-worker.js`, fork-parity copy runs the lokazen worker on a host) is the source of the unprompted "verify your listing / oops wrong chat" messages — it has NO audience lock and no brand filter. Flagged for a worker-side fix + deploy; not fixed here.
+
 ## 2026-07-08 · fix(lokazen): scout chat offered calls then apologized; money complaints got brand answers
 
 - **Scout offered a call, then "Sorry, I cannot book a call".** Booking tools were being wired for scout conversations in both engine paths (`process` and `processStream`); the tool handler then hard-refused via `scoutBookingBlock()` — but only AFTER the model had already walked the scout down the booking path, surfacing the refusal as a dumb apology. Fixed by never wiring the booking tools for scouts at all (`needsBookingTools`/`hasBookingIntent` and `lokazenBookingAction` now gate on `!isScout`), and guarding `advanceLokazenBookingAfterEmail` against scouts so a scout's "team will reach out" support line can't be rewritten into "what day/time works for a call".
