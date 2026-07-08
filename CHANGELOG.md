@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · fix(worker): bounce guard — stop messaging a lead whose last WhatsApp message failed to deliver
+
+- Reference worker only (`brands/windchasers/worker/task-worker.js`); the lokazen worker is a fork-parity copy running off-repo on a host and must be redeployed to pick this up.
+- Root of the "Team Lokazen — verify your listing / oops wrong chat" incident: the lead's `lokazen_lead_confirm` template had already FAILED to deliver, yet the autonomous worker still fired two free-form AI follow-ups at the same number. The worker had no check for prior delivery failure.
+- Added `lastOutboundWhatsAppFailed(leadId)` + a bounce guard in `processPendingTasks`: before executing any non-voice task, if the lead's most recent outbound WhatsApp message has a CONFIRMED failure (`metadata.delivery_status==='failed'` from the Meta status webhook, or `send_succeeded===false`), the task is cancelled and the lead's other pending WhatsApp tasks are cancelled too. Only confirmed failures block — an unconfirmed "sent" never does, so normal delivery is unaffected. In the reported case the failed lead-confirm template would have blocked both follow-ups outright.
+- Still outstanding (needs host access to deploy): the worker's missing audience lock (it never reads stored user_type, so it can flip owner↔brand) and its missing brand filter on the task query.
+
 ## 2026-07-08 · fix(lokazen): payment/transaction problems now go to support, not a call booking
 
 - Live: a property OWNER messaged "my money got debited but the website shows payment failed". The chat correctly raised a support request once, then pivoted straight into a call-booking flow (date → time → email → "quick Lokazen call") and finally hallucinated "Hi Aman, your transaction was successful." The earlier scout-only fix didn't cover owners/brands.

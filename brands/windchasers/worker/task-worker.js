@@ -2365,6 +2365,33 @@ async function processPendingTasks() {
         continue;
       }
 
+      // ── Bounce guard: stop piling messages on a lead whose LAST WhatsApp
+      // message FAILED to deliver. A confirmed delivery failure (bounced /
+      // invalid number, or the recipient blocked us) means every further send —
+      // especially free-form AI follow-ups — just stacks up undeliverable on a
+      // dead thread. This is exactly how the "verify your listing / oops wrong
+      // chat" messages went out AFTER a lead-confirm template had already failed
+      // to deliver. Voice tasks are exempt (different channel). ──
+      if (task.lead_id && task.task_type !== 'try_voice_call' && await lastOutboundWhatsAppFailed(task.lead_id)) {
+        await supabase.from('agent_tasks').update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: 'Bounce guard: last WhatsApp message to this lead failed to deliver',
+        }).eq('id', task.id);
+        // No point running the rest of a sequence at a number that isn't
+        // receiving anything — cancel this lead's other pending WhatsApp tasks too.
+        await supabase.from('agent_tasks').update({
+          status: 'cancelled',
+          completed_at: new Date().toISOString(),
+          error_message: 'Bounce guard: sequence stopped — WhatsApp not delivering',
+        })
+          .eq('lead_id', task.lead_id)
+          .eq('status', 'pending')
+          .neq('task_type', 'try_voice_call');
+        console.warn(`[ProcessTasks] Bounce guard: cancelled ${task.task_type} for ${task.lead_name} — last WhatsApp message failed to deliver.`);
+        continue;
+      }
+
       const result = await executeTask(task);
 
       // If task was skipped (e.g. lead already responded), mark completed with note
@@ -3687,6 +3714,28 @@ async function executeSendMessage(task, waPhone, fallbackMessage) {
   }
 
   return null;
+}
+
+/**
+ * True if the most recent OUTBOUND WhatsApp message to this lead FAILED to
+ * deliver — a confirmed Meta 'failed' receipt (delivery_status='failed', set by
+ * the meta status webhook) or an explicit send failure (send_succeeded===false).
+ * Used as a bounce guard so the worker stops messaging a number that isn't
+ * receiving anything. Only a CONFIRMED failure counts — an unconfirmed "sent"
+ * (no receipt yet) does NOT block, so normal delivery is never affected.
+ */
+async function lastOutboundWhatsAppFailed(leadId) {
+  const { data } = await supabase
+    .from('conversations')
+    .select('metadata')
+    .eq('lead_id', leadId)
+    .eq('channel', 'whatsapp')
+    .eq('sender', 'agent')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const md = data?.metadata || {};
+  return md.delivery_status === 'failed' || md.send_succeeded === false;
 }
 
 /**
