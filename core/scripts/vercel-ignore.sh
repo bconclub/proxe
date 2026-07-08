@@ -29,6 +29,17 @@ log() { echo "[vercel-ignore] $*"; }
 BRAND="${BRAND_ID:-${NEXT_PUBLIC_BRAND:-}}"
 if [ -z "$BRAND" ]; then log "no BRAND_ID/NEXT_PUBLIC_BRAND -> BUILD"; exit 1; fi
 
+# Each brand serves from exactly ONE production branch (bcon/lokazen/windchasers/
+# proxe -> main, pop -> migrate/one-core). A push to the OTHER active branch fires
+# a PREVIEW build for every brand that doesn't serve from it — doubled cost that
+# nobody consumes (the preview URLs are never the live site). Only ever build a
+# brand on its own production branch. (If VERCEL_ENV is unset we fall through and
+# let the scoping below decide, so this can't wrongly skip a real prod build.)
+if [ "${VERCEL_ENV:-}" = "preview" ]; then
+  log "preview build on '${VERCEL_GIT_COMMIT_REF:-?}' (not $BRAND's production branch) -> SKIP"
+  exit 0
+fi
+
 ALL_BRANDS="bcon pop proxe windchasers lokazen"
 
 # Conventional-commit scope -> brand id (empty = not a brand scope / generic).
