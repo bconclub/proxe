@@ -35,6 +35,11 @@ import {
   MdLogout,
   MdHandshake,
   MdMap,
+  MdSpaceDashboard,
+  MdDoorFront,
+  MdCampaign,
+  MdSensors,
+  MdPushPin,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
@@ -76,6 +81,13 @@ const navigation: NavItem[] = [
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
+// Artifact icon string-keys (from brand config) → components. Mirrors the
+// switcher's map so a pinned artifact shows the right glyph in the sidebar.
+const ARTIFACT_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
+  grid: MdSpaceDashboard, map: MdMap, pulse: MdMonitorHeart, door: MdDoorFront, megaphone: MdCampaign, radar: MdSensors,
+}
+const PINS_KEY = 'artifact-pins'
+
 // Divider positions: after War Room (index 6), after Flow (index 9).
 // Calls/Scouts/War Room are feature-gated per brand; their array slots are
 // counted here so the dividers land in the same rendered position whether or
@@ -98,6 +110,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const activeArtifact = brandArtifacts?.find(
     (a) => a.href && !a.external && (pathname === a.href || pathname.startsWith(`${a.href}/`))
   )
+  // Pinned artifacts surface in the main sidebar (kept in canonical config
+  // order). Live via the switcher's 'artifact-pins-changed' event + the native
+  // 'storage' event (other tabs).
+  const [pinnedIds, setPinnedIds] = useState<string[]>([])
+  useEffect(() => {
+    const read = () => { try { setPinnedIds(JSON.parse(localStorage.getItem(PINS_KEY) || '[]')) } catch { setPinnedIds([]) } }
+    read()
+    window.addEventListener('artifact-pins-changed', read)
+    window.addEventListener('storage', read)
+    return () => { window.removeEventListener('artifact-pins-changed', read); window.removeEventListener('storage', read) }
+  }, [])
+  const pinnedArtifacts = (brandArtifacts || []).filter((a) => pinnedIds.includes(a.id) && a.href && a.status !== 'coming_soon')
   const brandLogo = brandChat?.avatar?.source || '' // never fall back to another brand's asset
   // Transparent mark for the full-screen auth loader (jpg avatars render as a
   // square box). Falls back to the avatar when a brand has no dedicated mark.
@@ -560,6 +584,43 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: '8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
+            {/* Pinned artifacts — pinning one in the switcher surfaces it here, in
+                the main sidebar, in canonical config order. */}
+            {pinnedArtifacts.length > 0 && (
+              <div className="dashboard-layout-nav-pinned">
+                {pinnedArtifacts.map((a) => {
+                  const active = pathname === a.href || (!!a.href && a.href !== '/dashboard' && pathname.startsWith(a.href + '/'))
+                  const Icon = (a.icon && ARTIFACT_ICONS[a.icon]) || MdMap
+                  const pinStyle: React.CSSProperties = {
+                    fontSize: 13, fontWeight: active ? 600 : 500,
+                    color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    backgroundColor: active ? 'var(--accent-subtle)' : 'transparent',
+                    margin: '2px 0', borderRadius: 8, padding: '7px 10px 7px 0',
+                    display: 'flex', alignItems: 'center', width: showExpanded ? 'auto' : 40,
+                    textDecoration: 'none', cursor: 'pointer', transition: 'background-color 180ms ease, color 180ms ease',
+                  }
+                  const onEnter = (e: React.MouseEvent<HTMLElement>) => { if (!active) e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }
+                  const onLeave = (e: React.MouseEvent<HTMLElement>) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }
+                  const inner = (
+                    <>
+                      <span style={{ width: 40, minWidth: 40, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}><Icon size={16} /></span>
+                      {showExpanded && (
+                        <>
+                          <span className="flex-1 truncate" style={{ lineHeight: '20px' }}>{a.name}</span>
+                          <MdPushPin size={11} style={{ flexShrink: 0, color: 'var(--accent-primary)', opacity: 0.75, marginRight: 4 }} />
+                        </>
+                      )}
+                    </>
+                  )
+                  return a.external ? (
+                    <a key={`pin-${a.id}`} href={a.href} target="_blank" rel="noopener noreferrer" title={!showExpanded ? a.name : undefined} className="dashboard-layout-nav-item dashboard-layout-nav-item-pinned" style={pinStyle} onMouseEnter={onEnter} onMouseLeave={onLeave}>{inner}</a>
+                  ) : (
+                    <Link key={`pin-${a.id}`} href={a.href!} title={!showExpanded ? a.name : undefined} className="dashboard-layout-nav-item dashboard-layout-nav-item-pinned" style={pinStyle} onClick={() => { if (isMobile) setMobileSidebarOpen(false) }} onMouseEnter={onEnter} onMouseLeave={onLeave}>{inner}</Link>
+                  )
+                })}
+                <div style={{ borderTop: '1px solid var(--border-primary)', margin: '8px 12px 4px' }} />
+              </div>
+            )}
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null

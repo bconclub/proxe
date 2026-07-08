@@ -64,6 +64,9 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
     setPins((prev) => {
       const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
       try { localStorage.setItem(PINS_KEY, JSON.stringify(next)) } catch {}
+      // Broadcast so the sidebar nav can surface pinned artifacts live (same tab —
+      // the native 'storage' event only fires in OTHER tabs).
+      try { window.dispatchEvent(new CustomEvent('artifact-pins-changed', { detail: next })) } catch {}
       return next
     })
   }
