@@ -5,14 +5,14 @@
 - Sentiment Over Time: smooth bezier lines (mockup style). Mood by Region: seats under 5 signals filtered out (no more 100%-negative single-signal noise), softer segmented bars.
 - Page density tightened toward one-viewport fit (smaller KPI cards/gauge, single-line table rows).
 - Pipeline: listen_signals.image_url (migration 030, applied), RSS fetch extracts item images (media:content / enclosure / html-encoded img — TOI style) and merges on re-fetch to backfill.
-- `(pending-sha)`
+- `(fad2cb3a)`
 
 ## 2026-07-08 19:45 IST · feat(pop): PROXe Listen full mockup redesign
 
 - User-facing: Listen page rebuilt to the polished mockup — 5 KPI cards with sparklines + Heat Score gauge, rich Signal Inbox (source icon, sentiment + severity badges, chips, load-more), "What PROXe Thinks" AI panel with Recommended Actions (Escalate / Prepare Response / Monitor) and Source Mix grid, Trending Keywords table (trend arrows + sentiment dashes), Sentiment Over Time line chart, Mood by Region table with heat badges, Evidence Board carousel. Sources manager + Filters now behind header buttons.
 - Listen digest API: daily series now carries crisis/opposition/positive per day (sparklines), prev-window totals for delta chips, and per-keyword sentiment + trend.
 - Dev-only: next.config supports NEXT_DIST_DIR so parallel dev servers stop corrupting each other's .next chunks (root cause of "design changes not showing / breaking" — multiple chats' servers shared one build dir). Default unchanged; prod untouched.
-- `(pending-sha)`
+- `(f803072a + fa6e6adb)`
 
 ## 2026-07-08 05:30 IST · feat(pop): transcript + recording for V2 (ElevenLabs) and V3
 
