@@ -30,7 +30,11 @@ SELECT
   -- 026: intensity ladder + engagement (appended — CREATE OR REPLACE VIEW
   -- requires existing column order preserved)
   intensity,
-  engagement_type
+  engagement_type,
+  -- 029: grievance routing (appended, same reason)
+  assigned_worker_id,
+  routed_at,
+  resolved_at
 FROM all_leads
 WHERE brand = 'pop';
 
