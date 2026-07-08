@@ -1,3 +1,10 @@
+## 2026-07-08 03:40 IST · fix(pop): V3 pipeline TTS on eleven_v3 (Monika renders correctly)
+
+- V3's ElevenLabs TTS was on eleven_flash_v2_5, which mangles the Monika voice. eleven_v3 is the correct model (same as V1/RelevanceLab) but it's REJECTED (403) on ElevenLabs' realtime websocket — only the HTTP TTS service accepts it.
+- Switched the pipeline to ElevenLabsHttpTTSService for eleven_v3 (websocket service still used for flash/turbo/multilingual via env). Set ELEVENLABS_TTS_MODEL=eleven_v3 on the VPS.
+- Proven in-pipeline: eleven_v3 + Monika + Hindi → 25.6KB pcm_8000 audio, no error.
+- Trade-off: eleven_v3 has higher TTFB than flash; quality over latency per requirement.
+- VPS pipeline redeploy (not in repo) — this is a record entry.
 ## 2026-07-08 03:10 IST · fix(pop): restore V1 voice + put the prompt editor IN the Voice tab
 
 - V1 voice reverted to its native Monika + eleven_v3 (I'd swapped it to flash_v2_5, which changed how it sounded). A different TTS model is now opt-in via env only, never silently applied.
