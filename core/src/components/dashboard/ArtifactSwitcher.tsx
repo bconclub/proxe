@@ -8,7 +8,7 @@
 // Rendered inside the sidebar header (position: relative container). The
 // parent owns the open state; this component owns outside-click/Escape close.
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ArtifactDef, ArtifactStatus } from '@/configs/types'
 import {
@@ -21,7 +21,13 @@ import {
   MdOpenInNew,
   MdCheck,
   MdSpaceDashboard,
+  MdPushPin,
+  MdOutlinePushPin,
 } from 'react-icons/md'
+
+// Pinned artifacts float to the top - always in CONFIG order (Overview → War
+// Room → Door to Door → Listen → Pulse of Punjab), never in pin-click order.
+const PINS_KEY = 'artifact-pins'
 
 // Config keeps icons as string keys (stays serializable); the mapping to real
 // icon components lives here.
@@ -50,6 +56,19 @@ interface ArtifactSwitcherProps {
 export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }: ArtifactSwitcherProps) {
   const router = useRouter()
   const panelRef = useRef<HTMLDivElement>(null)
+  const [pins, setPins] = useState<string[]>([])
+  useEffect(() => {
+    try { setPins(JSON.parse(localStorage.getItem(PINS_KEY) || '[]')) } catch {}
+  }, [])
+  const togglePin = (id: string) => {
+    setPins((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      try { localStorage.setItem(PINS_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+  // pinned first, both groups keep the canonical config order
+  const ordered = [...artifacts.filter((a) => pins.includes(a.id)), ...artifacts.filter((a) => !pins.includes(a.id))]
 
   // Outside click + Escape close
   useEffect(() => {
@@ -105,11 +124,12 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
         <MdApps size={12} />
         ARTIFACTS
       </div>
-      {artifacts.map((a) => {
+      {ordered.map((a) => {
         const Icon = ICONS[a.icon || ''] || MdApps
         const meta = STATUS_META[a.status] || STATUS_META.coming_soon
         const clickable = Boolean(a.href)
         const isActive = a.id === activeId
+        const pinned = pins.includes(a.id)
         return (
           <button
             key={a.id}
@@ -148,6 +168,15 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
               {a.external && <MdOpenInNew size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />}
             </span>
             {isActive && <MdCheck size={15} style={{ flexShrink: 0, color: 'var(--accent-primary)' }} />}
+            <span
+              role="button"
+              aria-label={pinned ? `Unpin ${a.name}` : `Pin ${a.name}`}
+              title={pinned ? 'Unpin' : 'Pin to top'}
+              onClick={(e) => { e.stopPropagation(); togglePin(a.id) }}
+              style={{ flexShrink: 0, display: 'flex', padding: 3, borderRadius: 6, cursor: 'pointer', color: pinned ? 'var(--accent-primary)' : 'var(--text-muted)', opacity: pinned ? 1 : 0.6 }}
+            >
+              {pinned ? <MdPushPin size={14} /> : <MdOutlinePushPin size={14} />}
+            </span>
           </button>
         )
       })}

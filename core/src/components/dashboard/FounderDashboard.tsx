@@ -989,7 +989,7 @@ export default function FounderDashboard() {
                     return (
                       <button
                         key={ev.id} type="button" onClick={() => router.push('/dashboard/bookings')}
-                        className="relative w-full text-left rounded-xl transition-all border block p-3"
+                        className="relative w-full text-left rounded-xl transition-all border block p-2.5"
                         style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f97316' }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
@@ -998,7 +998,7 @@ export default function FounderDashboard() {
                         <div className="flex items-start gap-3">
                           {/* date tile */}
                           {d && (
-                            <span className="flex flex-col items-center rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: 'rgba(249,115,22,0.4)', minWidth: 46 }}>
+                            <span className="flex flex-col items-center rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: 'rgba(249,115,22,0.4)', minWidth: 42 }}>
                               <span className="w-full text-center text-[9px] font-extrabold py-0.5" style={{ background: 'rgba(249,115,22,0.9)', color: '#0b0d12' }}>{dowIST}</span>
                               <span className="text-[17px] font-extrabold leading-tight pt-0.5" style={{ color: 'var(--text-primary)' }}>{dayIST}</span>
                               <span className="text-[9px] font-bold pb-1" style={{ color: '#f97316' }}>{monIST}</span>
@@ -1018,7 +1018,7 @@ export default function FounderDashboard() {
                                 <MdAccessTime size={11} style={{ color: 'var(--text-muted)' }} /> {timeIST}
                               </p>
                             )}
-                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.3)' }}>
                                 <MdGroups size={12} /> {ev.going} Going
                               </span>

@@ -46,6 +46,11 @@ const MOCK: Ev[] = [
   { id: 'e12', title: 'AI · Farmers Outreach', place: 'Doaba', startOff: -5, endOff: -5, kind: 'ai', priority: 'Medium', rationale: 'MSP payment anger clustered in Doaba mandis; a farmers outreach visit would meet it head on.', confidence: 74 },
   { id: 'e14', title: 'Leadership · District Core Committee Meet', place: 'Jalandhar', startOff: 8, endOff: 8, kind: 'awaiting', priority: 'High' },
   { id: 'e15', title: 'AI · Skill Development Camp', place: 'Moga', startOff: 13, endOff: 13, kind: 'awaiting', priority: 'Medium', rationale: 'Youth employment chatter in Moga with zero scheduled response; a skill camp converts frustration to engagement.', confidence: 71 },
+  { id: 'e16', title: 'Mohalla Meeting Series', place: 'Amritsar East', startOff: -9, endOff: -8, kind: 'confirmed' },
+  { id: 'e17', title: 'Youth Sports Tournament', place: 'Hoshiarpur', startOff: 10, endOff: 11, kind: 'confirmed' },
+  { id: 'e18', title: 'AI · Canal Water Fix Drive', place: 'Patiala', startOff: 23, endOff: 24, kind: 'ai', priority: 'High', rationale: 'Canal water is the top trending phrase statewide; a visible fix drive in Patiala rides the wave.', confidence: 80 },
+  { id: 'e19', title: 'Booth Committee Formation', place: 'Ferozepur', startOff: 26, endOff: 27, kind: 'leadership' },
+  { id: 'e20', title: 'Mandi Visit · MSP dues', place: 'Sangrur', startOff: 5, endOff: 5, kind: 'confirmed' },
 ]
 
 const DAY = 86400000
@@ -54,20 +59,25 @@ const serial = (d: Date) => Math.floor(startOfDay(d).getTime() / DAY)
 const WD = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 
+const ACCENT = '#F06C18' // POP brand saffron (theme --accent-primary is a neutral gray, not the brand)
+// hex twin for alpha-composed tints ( var() cannot take a '1f' suffix )
+const ACCENT_HEX = '#F06C18'
+
 const KIND_META: Record<Kind, { label: string; color: string; icon: React.ReactNode }> = {
-  confirmed: { label: 'Confirmed', color: '#F06C18', icon: <MdCheckCircle size={11} /> },
+  confirmed: { label: 'Confirmed', color: ACCENT_HEX, icon: <MdCheckCircle size={11} /> },
   leadership: { label: 'Leadership Proposed', color: '#3b82f6', icon: <MdCampaign size={11} /> },
   ai: { label: 'AI Suggested', color: '#8b5cf6', icon: <MdAutoAwesome size={11} /> },
   awaiting: { label: 'Awaiting Sign-off', color: '#f59e0b', icon: <MdSchedule size={11} /> },
 }
 
-// pill style per kind (reference: solid saffron / blue outline / dashed purple / dashed orange)
+// pill style per kind. Confirmed rides the BRAND accent token; tinted pills use
+// theme text so light mode stays readable (hardcoded pale text vanished on white).
 function evStyle(kind: Kind): React.CSSProperties {
   switch (kind) {
-    case 'confirmed': return { background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: '1px solid #F06C18' }
-    case 'leadership': return { background: '#3b82f61a', color: '#dbeafe', border: '1px solid #3b82f6' }
-    case 'ai': return { background: '#8b5cf61f', color: '#ede9fe', border: '1px dashed #8b5cf6' }
-    case 'awaiting': return { background: '#f59e0b1a', color: '#fef3c7', border: '1px dashed #f59e0b' }
+    case 'confirmed': return { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+    case 'leadership': return { background: '#3b82f626', color: 'var(--text-primary)', border: '1px solid #3b82f6' }
+    case 'ai': return { background: '#8b5cf62b', color: 'var(--text-primary)', border: '1px dashed #8b5cf6' }
+    case 'awaiting': return { background: '#f59e0b26', color: 'var(--text-primary)', border: '1px dashed #f59e0b' }
   }
 }
 
@@ -157,7 +167,7 @@ export default function CampaignCalendar() {
   const evDate = (e: Ev & { s: number }) => new Date(e.s * DAY).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 310px', gap: 14, maxWidth: 1720, margin: '0 auto', alignItems: 'start' }} className="cc-wrap">
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 310px', gap: 14, width: '100%', alignItems: 'start' }} className="cc-wrap">
       <div style={{ minWidth: 0 }}>
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -175,7 +185,7 @@ export default function CampaignCalendar() {
 
         {/* KPI strip */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 10, marginBottom: 12 }}>
-          <Kpi icon={<MdEventAvailable size={20} />} color="#F06C18" label="Confirmed Events" value={counts.confirmed} sub="+6 vs last 30 days" subColor="#22c55e" />
+          <Kpi icon={<MdEventAvailable size={20} />} color={ACCENT_HEX} label="Confirmed Events" value={counts.confirmed} sub="+6 vs last 30 days" subColor="#22c55e" />
           <Kpi icon={<MdFlag size={20} />} color="#3b82f6" label="Leadership Proposed" value={counts.leadership} sub="+2 vs last 30 days" subColor="#22c55e" />
           <Kpi icon={<MdAutoAwesome size={20} />} color="#8b5cf6" label="AI Suggested" value={counts.ai} sub="+5 vs last 30 days" subColor="#22c55e" />
           <Kpi icon={<MdSchedule size={20} />} color="#f59e0b" label="Awaiting Sign-off" value={counts.awaiting} sub="Needs approval" subColor="#f59e0b" />
@@ -183,7 +193,7 @@ export default function CampaignCalendar() {
 
         {/* legend + filters */}
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, fontSize: 11.5, color: 'var(--text-secondary)' }}>
-          <Legend swatch={{ background: 'linear-gradient(90deg,#F06C18,#f0851f)' }} label="Confirmed" active={kindFilter === 'all' || kindFilter === 'confirmed'} onClick={() => setKindFilter(kindFilter === 'confirmed' ? 'all' : 'confirmed')} />
+          <Legend swatch={{ background: 'var(--accent-primary, #F06C18)' }} label="Confirmed" active={kindFilter === 'all' || kindFilter === 'confirmed'} onClick={() => setKindFilter(kindFilter === 'confirmed' ? 'all' : 'confirmed')} />
           <Legend swatch={{ background: '#8b5cf61f', border: '1px dashed #8b5cf6' }} label="AI Suggested" active={kindFilter === 'all' || kindFilter === 'ai'} onClick={() => setKindFilter(kindFilter === 'ai' ? 'all' : 'ai')} />
           <Legend swatch={{ background: '#3b82f61a', border: '1px solid #3b82f6' }} label="Leadership Proposed" active={kindFilter === 'all' || kindFilter === 'leadership'} onClick={() => setKindFilter(kindFilter === 'leadership' ? 'all' : 'leadership')} />
           <Legend swatch={{ background: '#f59e0b1a', border: '1px dashed #f59e0b' }} label="Awaiting Approval" active={kindFilter === 'all' || kindFilter === 'awaiting'} onClick={() => setKindFilter(kindFilter === 'awaiting' ? 'all' : 'awaiting')} />
@@ -227,10 +237,10 @@ export default function CampaignCalendar() {
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span>
                             {nOnDay >= 3 && (
-                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#0b0d12', background: '#F06C18', borderRadius: 10, padding: '1px 6px' }}>{nOnDay}</span>
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#0b0d12', background: ACCENT, borderRadius: 10, padding: '1px 6px' }}>{nOnDay}</span>
                             )}
                           </span>
-                          <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#fff' : 'var(--text-secondary)', background: isToday ? '#F06C18' : 'transparent', borderRadius: 12, padding: isToday ? '1px 7px' : 0 }}>{d.getDate()}</span>
+                          <span style={{ fontSize: 12, fontWeight: isToday ? 800 : 500, color: isToday ? '#fff' : 'var(--text-secondary)', background: isToday ? ACCENT : 'transparent', borderRadius: 12, padding: isToday ? '1px 7px' : 0 }}>{d.getDate()}</span>
                         </div>
                       </div>
                     )
@@ -331,7 +341,7 @@ export default function CampaignCalendar() {
           {/* quick actions */}
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 7 }}>Quick Actions</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 12 }}>
-            <button onClick={() => firstAiOnDay && approve(firstAiOnDay.id)} style={{ ...actionBtn, background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: 'none', opacity: firstAiOnDay ? 1 : 0.5 }}>Approve</button>
+            <button onClick={() => firstAiOnDay && approve(firstAiOnDay.id)} style={{ ...actionBtn, background: 'var(--accent-primary, #F06C18)', color: '#fff', border: 'none', opacity: firstAiOnDay ? 1 : 0.5 }}>Approve</button>
             <button onClick={() => firstAiOnDay && reject(firstAiOnDay.id)} style={{ ...actionBtn, opacity: firstAiOnDay ? 1 : 0.5 }}>Reject</button>
             <button style={{ ...actionBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><MdEventAvailable size={13} /> Convert to Event</button>
             <button style={{ ...actionBtn, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}><MdPersonAddAlt size={13} /> Assign Owner</button>
@@ -352,7 +362,7 @@ export default function CampaignCalendar() {
         <div style={railCard}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>Upcoming Approvals</span>
-            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#F06C18', cursor: 'pointer' }}>View all</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: ACCENT, cursor: 'pointer' }}>View all</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {approvals.map((e) => (
@@ -369,7 +379,7 @@ export default function CampaignCalendar() {
             ))}
             {approvals.length === 0 && <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Nothing pending. All proposals are signed off.</div>}
           </div>
-          <button style={{ ...actionBtn, width: '100%', marginTop: 12, background: 'linear-gradient(90deg,#F06C18,#f0851f)', color: '#fff', border: 'none' }}>Manage Approvals</button>
+          <button style={{ ...actionBtn, width: '100%', marginTop: 12, background: 'var(--accent-primary, #F06C18)', color: '#fff', border: 'none' }}>Manage Approvals</button>
         </div>
       </div>
 

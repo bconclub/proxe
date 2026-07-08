@@ -1,3 +1,11 @@
+## 2026-07-09 02:10 IST · feat(pop): calendar brand colors + light mode fix + full width, switcher pinning, denser home events
+
+- Campaign Events: full width layout, confirmed pills ride the brand saffron, tinted pills use theme text so LIGHT MODE is readable again (pale hardcoded text was invisible on white). Five more mock events fill the month (Mohalla Meetings, Youth Sports, Canal Water Fix Drive, Booth Committee Formation, Mandi Visit).
+- Artifact switcher: pin any artifact (pin icon per row, persisted); pinned items float to the top always in the canonical order Overview → War Room → Door to Door → Listen → Pulse of Punjab.
+- Home Upcoming Events: denser cards + list now pulls 8 events so more show at a glance.
+- Note: the face banner on the Pulse of Punjab app is the separate pulse-punjab repo, untouched here.
+- (pending-sha)
+
 ## 2026-07-09 01:30 IST · feat(pop): War Room bottom rows to reference design + clean artifact switcher
 
 - User-facing: Intensity Ladder is a real funnel now (trapezoid tiers with icons, PEOPLE column, per tier CONVERSION chips, Will vote / Will work / Will rally / Will share stat tiles). Volunteer Pulse: big count + trend, ranked LOCATION table with bars, Most Active / Trend / Last Updated footer strip. D2D Coverage: four icon stat tiles, area chart with axis labels, Top Workers (Today) list. Channel Mix: ranked horizontal bars with channel icons, % and counts, Total Volume footer. Issue Trend: range chip, centered legend, Peak + Total Mentions footer. Constituency Snapshot: mini bars for Support / Lean / Opposition + four insight tiles (Highest Support, Most Volume, Rising Opposition, Data Quality). Panel headers get icon tiles + info dots. No overlaps, rows rebalanced.

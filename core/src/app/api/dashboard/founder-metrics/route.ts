@@ -1830,7 +1830,7 @@ export async function GET(request: NextRequest) {
           supabase.from('campaign_events')
             .select('id, title, topic, constituency, district, venue, event_date, status')
             .in('status', ['planned', 'live'])
-            .order('event_date', { ascending: true }).limit(6),
+            .order('event_date', { ascending: true }).limit(8),
         ])
         const L: any[] = popLeads || []
         const EV: any[] = evRows || []
