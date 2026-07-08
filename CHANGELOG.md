@@ -1,3 +1,9 @@
+## 2026-07-09 04:00 IST · feat(pop): Booth Campaigns tab to reference design
+
+- User-facing: the On Ground Booth Campaigns tab is the full command view now: 6 KPI cards with sparklines (Active Campaigns, High Priority Booths, Doors Remaining, Photos Collected, Members Spoken To, Support Trend), Priority Campaigns cards (status badge, location + booths, doors progress, Contact/Support/Flags, priority pill + worker photo stack + Review/Assign/View), Booth Priority Queue table (priority pills, doors left + progress, contact/support bars, 7 day issue trend sparkline, last activity, assigned worker with photo, pagination), and a right rail: Priority Breakdown donut, Top Issues by Booth, Worker Allocation, Booths Needing Revisit.
+- All derived from the mock D2D visit data (deterministic, no Math.random); swaps to live d2d_visits aggregates later.
+- (pending-sha)
+
 ## 2026-07-09 03:25 IST · fix(pop): Listen analytics cards fill their height - no dead space
 
 - Top Trending Keywords is an exact 2 x 4 stretch grid (no empty slot, tiles fill the column). Sentiment Over Time: KPI chips 2 x 2 and a taller centered chart. Mood by Region: bigger mini map, roomier rows, list vertically centered. All three cards measure identical heights with zero void at the bottom.
