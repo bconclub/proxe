@@ -1,3 +1,8 @@
+## 2026-07-08 04:55 IST · fix(pop): known-name calls no longer ask for the name at all
+
+- Greeting by name worked, but the agent still asked "what's your name?" because the numbered NAME step was still in the prompt body and a soft appended note didn't override it. Now, when the name is known: the NAME step line is physically replaced with an "already known" instruction, and a hard ‼️ directive is prepended at the top. Verified pa/hi/en: greets by name, no name-question phrasing remains.
+- Applies to V1, V2, and V3 (the prompt endpoint the pipeline fetches).
+- `(pending-sha)`
 ## 2026-07-08 04:30 IST · feat(pop): V3 native Sarvam voice, name-aware greeting, V1 anti-cutoff
 
 - V3 voice: switched the pipeline's TTS from ElevenLabs (which anglicized Hindi/Punjabi — "English person speaking Hindi") to native Sarvam Bulbul (anushka). Proven: Hindi + Punjabi audio render natively. Env-switchable back to 11labs.

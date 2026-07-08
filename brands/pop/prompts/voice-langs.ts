@@ -189,10 +189,18 @@ const NAME_SALUTATION: Record<VoiceLang, RegExp> = {
   hi: /^(नमस्ते)/,
   en: /^(Hello|Hi)/i,
 };
-const NAME_DIRECTIVE: Record<VoiceLang, (n: string) => string> = {
-  pa: (n) => `\n\nCALLER KNOWN: tuhanu pata hai ki caller da naam "${n}" hai. Opening vich naam naal namaskar karo. Naam DObaara na poochho (step 1 NAME chhad do) — sidha AREA te jao.`,
-  hi: (n) => `\n\nCALLER KNOWN: आपको पता है कि कॉलर का नाम "${n}" है। Opening में नाम लेकर अभिवादन करें। नाम दोबारा न पूछें (step 1 NAME छोड़ दें) — सीधे AREA पर जाएं।`,
-  en: (n) => `\n\nCALLER KNOWN: you already know the caller's name is "${n}". Greet them by name in the opening. Do NOT ask for their name (skip step 1 NAME) — go straight to AREA.`,
+// Hard directive placed at the TOP of the prompt (early instructions dominate).
+const NAME_TOP: Record<VoiceLang, (n: string) => string> = {
+  pa: (n) => `‼️ CALLER DA NAAM PATA HAI: "${n}". Naam da sawaal KADE na poochho — tusi already jaande ho. Greeting vich naam naal bulao, te sidha AREA (ilaqa) te jao.`,
+  hi: (n) => `‼️ कॉलर का नाम पता है: "${n}"। नाम का सवाल कभी न पूछें — आप पहले से जानते हैं। अभिवादन में नाम लेकर बुलाएं, फिर सीधे AREA (इलाका) पर जाएं।`,
+  en: (n) => `‼️ CALLER'S NAME IS KNOWN: "${n}". NEVER ask for their name — you already have it. Greet them by name, then go straight to AREA.`,
+};
+// The "1. NAME — …" step line, replaced so the name question is physically gone.
+const NAME_STEP_RE = /^[ \t]*1\.\s*NAME\b.*$/m;
+const NAME_STEP_REPLACEMENT: Record<VoiceLang, (n: string) => string> = {
+  pa: (n) => `1. NAME — pehlaan hi pata hai: "${n}". Naam na poochho; naam naal bulao te aggey vadho.`,
+  hi: (n) => `1. NAME — पहले से पता है: "${n}"। नाम न पूछें; नाम लेकर बुलाएं और आगे बढ़ें।`,
+  en: (n) => `1. NAME — already known: "${n}". Do not ask; address them by name and move on.`,
 };
 
 export function withKnownName(vp: VoicePrompt, name?: string | null): VoicePrompt {
@@ -202,6 +210,9 @@ export function withKnownName(vp: VoicePrompt, name?: string | null): VoicePromp
   const opening = sal.test(vp.firstMessage)
     ? vp.firstMessage.replace(sal, `$1 ${n}${NAME_SUFFIX[vp.lang]}`)
     : vp.firstMessage;
-  const prompt = vp.prompt + NAME_DIRECTIVE[vp.lang](n);
+  // 1) delete the name question from the body, 2) prepend a hard top directive.
+  let body = vp.prompt;
+  if (NAME_STEP_RE.test(body)) body = body.replace(NAME_STEP_RE, NAME_STEP_REPLACEMENT[vp.lang](n));
+  const prompt = `${NAME_TOP[vp.lang](n)}\n\n${body}`;
   return { ...vp, opening, firstMessage: opening, prompt };
 }
