@@ -59,7 +59,7 @@ export default function BrainPage() {
                 <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>The Brain</h1>
                 <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--text-secondary)' }}>
                   {tab === 'brain' && 'Alive view — lobes fire on real activity. Thinks every 5 minutes, approval-gated.'}
-                  {tab === 'map' && 'How it thinks on every lead — sources, spine, ladders, gates. Live counts on the badges.'}
+                  {tab === 'map' && 'The whole engine wired up — lead sources → MyVoice → PROXe → the frontline ladder → your artifacts. Live counts on the badges.'}
                   {tab === 'eval' && 'Two benches — WhatsApp messages by permutation, and every voice call measured (latency, turns, cost). Switch below.'}
                   {tab === 'learning' && 'The recursive loop — what it reads, what it learned, what the thinking costs.'}
                 </p>
