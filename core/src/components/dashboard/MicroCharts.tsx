@@ -3,51 +3,61 @@
 import React from 'react'
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, YAxis, XAxis, CartesianGrid, LabelList } from 'recharts'
 
-// Activity heatmap: GitHub-contribution-style square grid, weekday-aligned
-// (rows = Sun to Sat, columns = weeks). Reads {date, count}[] (oldest first) and
-// shades each day by its share of the busiest day. Fixed small squares so it
-// stays a clean grid regardless of panel width.
-export function ActivityHeatmap({ data, color = 'var(--accent-primary)' }: { data: Array<{ date: string; count: number }>; color?: string }) {
+// ── heat colormap: dark → indigo → violet → fuchsia → pink → orange → amber ──
+function hexLerp(a: string, b: string, t: number): string {
+  const pa = a.replace('#', '').match(/\w\w/g)!.map((h) => parseInt(h, 16))
+  const pb = b.replace('#', '').match(/\w\w/g)!.map((h) => parseInt(h, 16))
+  return '#' + pa.map((x, i) => Math.round(x + (pb[i] - x) * t).toString(16).padStart(2, '0')).join('')
+}
+const HEAT_STOPS = ['#312e81', '#6d28d9', '#a21caf', '#db2777', '#f43f5e', '#f97316', '#fbbf24']
+function heatColor(f: number): string {
+  const x = Math.max(0, Math.min(1, f)) * (HEAT_STOPS.length - 1)
+  const i = Math.floor(x)
+  return i >= HEAT_STOPS.length - 1 ? HEAT_STOPS[HEAT_STOPS.length - 1] : hexLerp(HEAT_STOPS[i], HEAT_STOPS[i + 1], x - i)
+}
+
+// Activity heatmap — weekday-aligned (Mon→Sun rows, columns = weeks). Cells map
+// intensity onto a smooth indigo→pink→orange ramp, glowing at the top end.
+// Cells stretch to fill the card width (clean, even rectangles).
+export function ActivityHeatmap({ data }: { data: Array<{ date: string; count: number }>; color?: string }) {
   if (!data || data.length === 0) return null
-  const CELL = 14, GAP = 4
+  const CELL_H = 22, GAP = 4
   const max = Math.max(...data.map((d) => d.count), 1)
-  // 0 = empty track; otherwise 4 shade steps by fraction of the max day.
-  const shadeOf = (c: number): { bg: string; op: number } => {
-    if (c <= 0) return { bg: 'var(--bg-tertiary)', op: 1 }
-    const f = c / max
-    return { bg: color, op: f > 0.75 ? 1 : f > 0.5 ? 0.78 : f > 0.25 ? 0.55 : 0.32 }
-  }
+  const wd = (iso: string) => (new Date(iso).getDay() + 6) % 7 // 0 = Mon
   const first = new Date(data[0].date)
-  const startPad = isNaN(first.getTime()) ? 0 : first.getDay() // 0 = Sun
+  const startPad = isNaN(first.getTime()) ? 0 : wd(data[0].date)
   const cells: Array<{ date: string; count: number } | null> = [...Array(startPad).fill(null), ...data]
   const cols: Array<Array<{ date: string; count: number } | null>> = []
   for (let i = 0; i < cells.length; i += 7) cols.push(cells.slice(i, i + 7))
-  const fmtDate = (iso: string) => {
-    try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) } catch { return iso }
-  }
-  const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  const fmtDate = (iso: string) => { try { return new Date(iso).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) } catch { return iso } }
+  const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-      {/* weekday labels (fixed row height matches the cells) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: GAP }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', width: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: GAP, flexShrink: 0 }}>
         {WEEKDAYS.map((w, i) => (
-          <span key={i} style={{ height: CELL, fontSize: 8, lineHeight: `${CELL}px`, color: 'var(--text-muted)', opacity: i % 2 ? 0.9 : 0 }}>{w}</span>
+          <span key={i} style={{ height: CELL_H, fontSize: 9, lineHeight: `${CELL_H}px`, color: 'var(--text-muted)', width: 12, textAlign: 'center' }}>{w}</span>
         ))}
       </div>
-      {/* week columns - fixed-size squares, left-aligned, do not stretch */}
-      <div style={{ display: 'flex', gap: GAP }}>
+      <div style={{ display: 'flex', gap: GAP, flex: 1, minWidth: 0 }}>
         {cols.map((col, ci) => (
-          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: GAP }}>
+          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: GAP, flex: 1, minWidth: 0 }}>
             {Array.from({ length: 7 }, (_, ri) => {
               const cell = col[ri]
-              if (!cell) return <div key={ri} style={{ width: CELL, height: CELL }} />
-              const s = shadeOf(cell.count)
+              if (!cell) return <div key={ri} style={{ height: CELL_H, borderRadius: 5, background: 'transparent' }} />
+              const f = cell.count / max
+              const bg = cell.count <= 0 ? 'var(--bg-tertiary)' : heatColor(f)
               return (
                 <div
                   key={ri}
                   title={`${fmtDate(cell.date)} · ${cell.count} voices`}
-                  style={{ width: CELL, height: CELL, borderRadius: 3, background: s.bg, opacity: s.op, border: '1px solid var(--border-primary)' }}
+                  style={{
+                    height: CELL_H, borderRadius: 5,
+                    background: cell.count <= 0 ? 'var(--bg-tertiary)' : `linear-gradient(135deg, ${bg}, ${heatColor(Math.min(1, f + 0.12))})`,
+                    boxShadow: f > 0.6 ? `0 0 10px ${bg}88` : 'none',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                    transition: 'transform 120ms',
+                  }}
                 />
               )
             })}
@@ -56,6 +66,30 @@ export function ActivityHeatmap({ data, color = 'var(--accent-primary)' }: { dat
       </div>
     </div>
   )
+}
+
+// Peak weekday + (optional) peak hour from a daily series, for the heatmap chips.
+export function activityPeaks(data: Array<{ date: string; count: number }>, hourly?: Array<{ time: string; value: number }>): { peakDay: string | null; peakHour: string | null } {
+  let peakDay: string | null = null
+  if (data && data.length) {
+    const byWd = new Array(7).fill(0)
+    data.forEach((d) => { const wd = (new Date(d.date).getDay() + 6) % 7; if (wd >= 0 && wd <= 6) byWd[wd] += d.count })
+    const NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const mi = byWd.indexOf(Math.max(...byWd))
+    if (byWd[mi] > 0) peakDay = NAMES[mi]
+  }
+  let peakHour: string | null = null
+  if (hourly && hourly.length) {
+    const top = [...hourly].sort((a, b) => b.value - a.value)[0]
+    if (top && top.value > 0) {
+      const h = parseInt(String(top.time), 10)
+      if (Number.isFinite(h)) {
+        const to12 = (x: number) => `${((x + 11) % 12) + 1}${x < 12 ? 'AM' : 'PM'}`
+        peakHour = `${to12(h)}–${to12((h + 2) % 24)}`
+      }
+    }
+  }
+  return { peakDay, peakHour }
 }
 
 // Helper to get theme accent color

@@ -20,6 +20,7 @@ import {
   ActivityArea,
   ConversationsTrendChart,
   ActivityHeatmap,
+  activityPeaks,
   RadialProgress,
 } from './MicroCharts'
 
@@ -569,6 +570,7 @@ export default function FounderDashboard() {
   const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatPrev7 = popHeat ? popHeat.slice(-14, -7).reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatChange = heatPrev7 ? Math.round(((heatLast7 - heatPrev7) / heatPrev7) * 100) : 0
+  const heatPeaks = popHeat ? activityPeaks(popHeat, metrics.hourlyActivity) : null
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : brandLabel('Founder'))
   const firstName = displayName.split(' ')[0] || brandLabel('Founder')
   const profileInitials = getInitials(displayName)
@@ -1118,6 +1120,20 @@ export default function FounderDashboard() {
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{popHeat ? 'Activity Heatmap' : 'Conversations Trend'}</h3>
               <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{popHeat ? 'Voices captured per day · last 30 days' : 'Conversations initiated per day'}</p>
             </div>
+            {popHeat && (heatPeaks?.peakDay || heatPeaks?.peakHour) && (
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                {heatPeaks.peakDay && (
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    <MdTrendingUp size={13} style={{ color: '#22c55e' }} /> Peak day <b style={{ color: 'var(--text-primary)' }}>{heatPeaks.peakDay}</b>
+                  </span>
+                )}
+                {heatPeaks.peakHour && (
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    <MdSchedule size={13} style={{ color: '#a78bfa' }} /> Peak hour <b style={{ color: 'var(--text-primary)' }}>{heatPeaks.peakHour}</b>
+                  </span>
+                )}
+              </div>
+            )}
             {!popHeat && (
               <div className="flex items-center gap-0.5 shrink-0">
                 {(['7D', '14D', '30D'] as const).map((p) => (
