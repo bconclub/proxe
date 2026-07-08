@@ -4,7 +4,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { CONSTITUENCIES, DISTRICTS, TOTAL_SEATS } from '@/lib/war-room/constituencies';
 import { INTENSITY_TIERS } from '@/lib/pop/intensity';
-import PunjabMap, { type ColorMode } from './PunjabMap';
+import { type ColorMode } from './PunjabMap';
+import dynamic from 'next/dynamic';
+
+// Leaflet map is client-only (needs window) — load it without SSR. Matches the
+// Pulse Punjab leader app's map (real slippy tiles + drill-down).
+const PunjabLeafletMap = dynamic(() => import('./PunjabLeafletMap'), {
+  ssr: false,
+  loading: () => <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>Loading map…</div>,
+});
 import { LeanDonut, SentimentGauge, TrendLines, GlowDonut, GlowSpark, GlowArea } from './WarCharts';
 import {
   MdWaterDrop, MdBolt, MdWork, MdAddRoad, MdLocalHospital, MdSchool, MdAgriculture, MdWarning, MdMoreHoriz,
@@ -180,7 +188,7 @@ export default function WarRoomClient() {
                   <span>Low</span>
                 </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
-                  <PunjabMap mode={mode} byConstituency={d?.byConstituency || []} pulseSeat={pulse} selected={selected} onSelect={(n) => setSelected(n === selected ? null : n)} />
+                  <PunjabLeafletMap mode={mode} byConstituency={d?.byConstituency || []} pulseSeat={pulse} selected={selected} onSelect={(n) => setSelected(n && n === selected ? null : n || null)} />
                 </div>
               </div>
             </Panel>
