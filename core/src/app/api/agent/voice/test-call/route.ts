@@ -114,6 +114,42 @@ async function vapiTestCall(body: any) {
         }
       : null;
 
+  // A `model` override in Vapi is NOT deep-merged — it's validated standalone and
+  // REQUIRES provider (else: "model.provider must be one of …"). So to swap only
+  // the system prompt per language we must carry the assistant's real model
+  // config (provider/model/temperature/tools) and replace just its messages.
+  // Fetch it once; fall back to env/openai defaults if the read fails so a call
+  // still goes out. POP-only (other brands don't override the prompt).
+  let modelOverride: any = null;
+  if (voicePrompt) {
+    const sysMsg = { role: 'system', content: voicePrompt.prompt };
+    try {
+      const aRes = await fetch(`https://api.vapi.ai/assistant/${VAPI_ASSISTANT_ID}`, {
+        headers: { Authorization: `Bearer ${vapiKey}` },
+      });
+      const assistant = aRes.ok ? await aRes.json() : null;
+      const baseModel = assistant?.model;
+      if (baseModel?.provider) {
+        // Keep everything (provider/model/temp/tools/knowledgeBase); replace only
+        // the system message so tools + config stay intact.
+        const kept = { ...baseModel };
+        const nonSystem = Array.isArray(baseModel.messages)
+          ? baseModel.messages.filter((m: any) => m.role !== 'system')
+          : [];
+        modelOverride = { ...kept, messages: [sysMsg, ...nonSystem] };
+      }
+    } catch {
+      /* fall through to default below */
+    }
+    if (!modelOverride) {
+      modelOverride = {
+        provider: process.env.VAPI_POP_LLM_PROVIDER || 'openai',
+        model: process.env.VAPI_POP_LLM_MODEL || 'gpt-4o-mini',
+        messages: [sysMsg],
+      };
+    }
+  }
+
   try {
     const res = await fetch('https://api.vapi.ai/call', {
       method: 'POST',
@@ -133,7 +169,7 @@ async function vapiTestCall(body: any) {
           ...(voicePrompt
             ? {
                 firstMessage: voicePrompt.firstMessage,
-                model: { messages: [{ role: 'system', content: voicePrompt.prompt }] },
+                ...(modelOverride ? { model: modelOverride } : {}),
               }
             : {}),
           variableValues: {

@@ -1,3 +1,10 @@
+## 2026-07-08 14:40 IST · fix(pop): Vapi model override needs provider
+
+- Hindi/English (and Punjabi) test calls failed: "assistantOverrides.model.provider must be one of…". A Vapi `model` override is validated standalone and requires `provider`; we sent only `messages`.
+- Fix: fetch the assistant's real model (openai/gpt-4o), keep provider/model/tools, replace only the system message per language. Falls back to openai/gpt-4o-mini if the fetch fails.
+- User-facing: all 3 languages dial again on V1.
+- `(pending-sha)`
+
 # Changelog — company-wide
 
 > Company-wide log across all brands. Entries are tagged by repo/brand — **bcon**, **windchasers**, **proxe**, or **master** (the canonical template).
