@@ -54,15 +54,31 @@ const OPPO = /\bopposition|slams?|attacks?|accuses?|hits out|corruption|scam/i;
 const SEATS = CONSTITUENCIES.map((c) => ({ name: c.name, district: c.district, re: new RegExp(`\\b${c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i') }));
 const findSeat = (t: string) => SEATS.find((s) => s.re.test(t)) || null;
 
-function parseFeed(xml: string): Array<{ title: string; link: string }> {
-  const out: Array<{ title: string; link: string }> = [];
+// Item image: media:content / media:thumbnail / enclosure / first <img> in the
+// description html. Feeds vary wildly; try them in that order.
+const itemImage = (block: string): string | null => {
+  // feeds embed the image raw, inside CDATA, or html-ENCODED (&lt;img … TOI does
+  // this) — so also try after entity-decoding.
+  const decoded = decode(unCdata(block));
+  const m =
+    block.match(/<media:content[^>]*url="([^"]+)"[^>]*>/i) ||
+    block.match(/<media:thumbnail[^>]*url="([^"]+)"[^>]*>/i) ||
+    block.match(/<enclosure[^>]*url="([^"]+\.(?:jpe?g|png|webp|gif)[^"]*)"[^>]*>/i) ||
+    block.match(/<img[^>]*src=["']([^"']+)["']/i) ||
+    decoded.match(/<img[^>]*src=["']([^"']+)["']/i);
+  const u = m ? decode(m[1]).trim() : null;
+  return u && /^https?:\/\//i.test(u) ? u.slice(0, 1000) : null;
+};
+
+function parseFeed(xml: string): Array<{ title: string; link: string; image: string | null }> {
+  const out: Array<{ title: string; link: string; image: string | null }> = [];
   // RSS <item> then Atom <entry>
   const blocks = [...xml.matchAll(/<item[\s>][\s\S]*?<\/item>/gi), ...xml.matchAll(/<entry[\s>][\s\S]*?<\/entry>/gi)];
   for (const b of blocks) {
     const block = b[0];
     const title = tag(block, 'title');
     const link = tag(block, 'link') || atomLink(block);
-    if (title && link) out.push({ title, link: link.trim() });
+    if (title && link) out.push({ title, link: link.trim(), image: itemImage(block) });
     if (out.length >= ITEMS_PER_FEED) break;
   }
   return out;
@@ -118,12 +134,15 @@ export async function POST(req: NextRequest) {
             is_crisis: isCrisis,
             is_opposition: OPPO.test(text),
             is_positive: POS.test(text),
+            image_url: it.image,
             brand: BRAND_ID,
           };
         });
-        // on conflict (url, brand) do nothing → dedup already-ingested articles.
+        // on conflict (url, brand) MERGE — dedups already-ingested articles while
+        // backfilling newly-parsed fields (image_url). created_at isn't in the
+        // row payload so the original ingest time is preserved.
         const { data: ins, error: insErr } = await sb.from('listen_signals')
-          .upsert(rows, { onConflict: 'url,brand', ignoreDuplicates: true })
+          .upsert(rows, { onConflict: 'url,brand', ignoreDuplicates: false })
           .select('id');
         if (insErr) console.error('[listen/fetch] insert failed for', src.name, insErr.message);
         else inserted = (ins || []).length;

@@ -1,3 +1,12 @@
+## 2026-07-08 20:45 IST · feat(pop): Listen realness pass — real media, real logos, real trending phrases
+
+- User-facing: Signal Inbox shows the actual outlet's favicon as the source logo (news) and the article image / YouTube thumbnail on the row's right; Evidence Board is media-first (real photos, video play overlay, outlet header, click-through) instead of text boxes.
+- Trending Keywords now surface actual phrases being said across pulled signals ("canal water", "MSP payment", "Opposition holding rally") via 2-3 word n-gram mining with the issue category shown under each — publisher names stripped so outlets don't rank.
+- Sentiment Over Time: smooth bezier lines (mockup style). Mood by Region: seats under 5 signals filtered out (no more 100%-negative single-signal noise), softer segmented bars.
+- Page density tightened toward one-viewport fit (smaller KPI cards/gauge, single-line table rows).
+- Pipeline: listen_signals.image_url (migration 030, applied), RSS fetch extracts item images (media:content / enclosure / html-encoded img — TOI style) and merges on re-fetch to backfill.
+- `(pending-sha)`
+
 ## 2026-07-08 19:45 IST · feat(pop): PROXe Listen full mockup redesign
 
 - User-facing: Listen page rebuilt to the polished mockup — 5 KPI cards with sparklines + Heat Score gauge, rich Signal Inbox (source icon, sentiment + severity badges, chips, load-more), "What PROXe Thinks" AI panel with Recommended Actions (Escalate / Prepare Response / Monitor) and Source Mix grid, Trending Keywords table (trend arrows + sentiment dashes), Sentiment Over Time line chart, Mood by Region table with heat badges, Evidence Board carousel. Sources manager + Filters now behind header buttons.

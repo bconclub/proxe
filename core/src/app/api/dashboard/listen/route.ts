@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const cut = now - days * 86400000;
 
     const { data: sigs, error } = await sb.from('listen_signals')
-      .select('source, content, url, author, sentiment, issue_category, constituency, district, severity, is_crisis, is_opposition, is_positive, created_at')
+      .select('source, content, url, author, image_url, sentiment, issue_category, constituency, district, severity, is_crisis, is_opposition, is_positive, created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(8000);
@@ -110,34 +110,65 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // ── Trending keywords (freq from content, stopword-filtered) ──
-    const wordStats: Record<string, { count: number; pos: number; neg: number }> = {};
+    // ── Trending phrases — what is actually being said across the pulled
+    // signals right now: 2-3 word n-grams (doc frequency, stopword boundaries),
+    // not generic category words. Each carries sentiment, trend vs the prior
+    // window, and the dominant issue category underneath it.
+    // strip the trailing "- Outlet Name" news feeds append, so publisher names
+    // don't rank as trending phrases
+    const deOutlet = (t: string) => (t || '').replace(/\s[-–|]\s[^-–|]{2,60}$/, '');
+    const tokenize = (t: string) => (t || '').replace(/[^A-Za-zऀ-੿\s'-]/g, ' ').split(/\s+/).filter(Boolean);
+    const isStop = (w: string) => w.length < 3 || STOP.has(w.toLowerCase());
+    const phrasesOf = (content: string): string[] => {
+      const toks = tokenize(content);
+      const out = new Set<string>();
+      for (let n = 3; n >= 2; n--) {
+        for (let i = 0; i + n <= toks.length; i++) {
+          const gram = toks.slice(i, i + n);
+          if (isStop(gram[0]) || isStop(gram[n - 1])) continue; // no stopword edges
+          if (gram.some((w) => w.length < 3)) continue;
+          out.add(gram.join(' ').toLowerCase());
+        }
+      }
+      return Array.from(out);
+    };
+    const phraseStats: Record<string, { count: number; pos: number; neg: number; display: Record<string, number>; cats: Record<string, number> }> = {};
     cur.forEach((s: any) => {
-      const seen = new Set<string>();
-      (s.content || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).forEach((w: string) => {
-        if (w.length < 4 || STOP.has(w) || seen.has(w)) return;
-        seen.add(w);
-        const st = wordStats[w] || (wordStats[w] = { count: 0, pos: 0, neg: 0 });
+      const body = deOutlet(s.content || '');
+      const toks = tokenize(body);
+      phrasesOf(body).forEach((key) => {
+        const st = phraseStats[key] || (phraseStats[key] = { count: 0, pos: 0, neg: 0, display: {}, cats: {} });
         st.count++;
         if (s.sentiment === 'positive') st.pos++; else if (s.sentiment === 'negative') st.neg++;
+        if (s.issue_category) st.cats[s.issue_category] = (st.cats[s.issue_category] || 0) + 1;
+        // remember the original casing so "Anandpur Sahib rally" displays as written
+        const n = key.split(' ').length;
+        for (let i = 0; i + n <= toks.length; i++) {
+          const seg = toks.slice(i, i + n).join(' ');
+          if (seg.toLowerCase() === key) { st.display[seg] = (st.display[seg] || 0) + 1; break; }
+        }
       });
     });
-    const prevWordCount: Record<string, number> = {};
-    prev.forEach((s: any) => {
-      const seen = new Set<string>();
-      (s.content || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).forEach((w: string) => {
-        if (w.length < 4 || STOP.has(w) || seen.has(w)) return;
-        seen.add(w);
-        prevWordCount[w] = (prevWordCount[w] || 0) + 1;
-      });
+    const prevPhraseCount: Record<string, number> = {};
+    prev.forEach((s: any) => phrasesOf(deOutlet(s.content || '')).forEach((key) => { prevPhraseCount[key] = (prevPhraseCount[key] || 0) + 1; }));
+    // drop 2-grams fully contained in an equal-or-stronger 3-gram (keep the fuller phrase)
+    const ranked = Object.entries(phraseStats).filter(([, st]) => st.count >= 2).sort((a, b) => b[1].count - a[1].count);
+    const kept: [string, typeof phraseStats[string]][] = [];
+    for (const [key, st] of ranked) {
+      const swallowed = kept.some(([k2, st2]) => k2.includes(key) && st2.count >= st.count * 0.8);
+      if (!swallowed) kept.push([key, st]);
+      if (kept.length >= 16) break;
+    }
+    const keywords = kept.map(([key, st]) => {
+      const display = Object.entries(st.display).sort((a, b) => b[1] - a[1])[0]?.[0] || key;
+      const category = Object.entries(st.cats).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      return { word: display, count: st.count, pos: st.pos, neg: st.neg, trend: st.count - (prevPhraseCount[key] || 0), category };
     });
-    const keywords = Object.entries(wordStats).map(([word, st]) => ({
-      word, count: st.count, pos: st.pos, neg: st.neg, trend: st.count - (prevWordCount[word] || 0),
-    })).sort((a, b) => b.count - a.count).slice(0, 16);
 
     // ── Signal inbox (recent, richest first) ──
     const recentSignals = cur.slice(0, 60).map((s: any) => ({
       content: (s.content || '').slice(0, 240), source: s.source, url: s.url || null,
+      author: s.author || null, image_url: s.image_url || null,
       sentiment: s.sentiment, issue_category: s.issue_category, constituency: s.constituency,
       severity: s.severity, is_crisis: !!s.is_crisis, is_opposition: !!s.is_opposition, is_positive: !!s.is_positive,
       created_at: s.created_at,

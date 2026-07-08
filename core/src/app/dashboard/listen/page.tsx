@@ -14,8 +14,8 @@ import { FaTwitter, FaFacebookF, FaInstagram, FaYoutube, FaWhatsapp, FaRegNewspa
 
 // ── types ──────────────────────────────────────────────────────────────────
 interface SignalRow {
-  content: string; source: string; url: string | null; sentiment: string | null
-  issue_category: string | null; constituency: string | null; severity: number | null
+  content: string; source: string; url: string | null; author: string | null; image_url: string | null
+  sentiment: string | null; issue_category: string | null; constituency: string | null; severity: number | null
   is_crisis: boolean; is_opposition: boolean; is_positive: boolean; created_at: string
 }
 interface Digest {
@@ -24,7 +24,7 @@ interface Digest {
   whatProxeThinks: { heat: number; label: string; delta: number; text: string }
   recommendedActions: { title: string; detail: string; kind: string }[]
   trendingIssues: { category: string; count: number; prev: number; trend: number }[]
-  keywords: { word: string; count: number; pos: number; neg: number; trend: number }[]
+  keywords: { word: string; count: number; pos: number; neg: number; trend: number; category: string | null }[]
   recentSignals: SignalRow[]
   dailySeries: { day: string; pos: number; neg: number; neutral: number; total: number; crisis: number; opposition: number; positive: number }[]
   bySource: { source: string; count: number }[]
@@ -61,6 +61,29 @@ const SRC_META: Record<string, { label: string; icon: React.ReactNode; color: st
 }
 const srcMeta = (s: string) => SRC_META[s] || { label: cap(s), icon: <MdOutlineRssFeed size={14} />, color: 'var(--text-secondary)' }
 
+// Real outlet logo for news items: the article domain's favicon. Social
+// signals keep their brand glyph.
+const hostOf = (url: string | null) => { try { return url ? new URL(url).hostname.replace(/^www\./, '') : null } catch { return null } }
+const faviconOf = (url: string | null) => { const h = hostOf(url); return h ? `https://www.google.com/s2/favicons?sz=64&domain=${h}` : null }
+const ytThumb = (url: string | null) => {
+  const m = url?.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]{6,})/)
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null
+}
+const mediaOf = (s: SignalRow) => s.image_url || ytThumb(s.url)
+
+function SourceGlyph({ s, size = 30 }: { s: SignalRow; size?: number }) {
+  const m = srcMeta(s.source)
+  const fav = s.source === 'news' ? faviconOf(s.url) : null
+  return (
+    <span style={{ width: size, height: size, borderRadius: size * 0.28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${m.color}1f`, color: m.color, flexShrink: 0, overflow: 'hidden' }}>
+      {fav
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={fav} alt="" width={size - 10} height={size - 10} style={{ borderRadius: 4 }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        : m.icon}
+    </span>
+  )
+}
+
 const sentBadge = (s: SignalRow) => {
   const sent = s.sentiment === 'positive' ? 'Positive' : s.sentiment === 'negative' ? 'Negative' : 'Neutral'
   const c = sent === 'Positive' ? '#22c55e' : sent === 'Negative' ? '#ef4444' : '#9ca3af'
@@ -75,7 +98,7 @@ const sevBadge = (s: SignalRow) => {
 
 // ── tiny SVG pieces ────────────────────────────────────────────────────────
 function Sparkline({ data, color }: { data: number[]; color: string }) {
-  const W = 110; const H = 40
+  const W = 96; const H = 30
   if (!data.length) return null
   const max = Math.max(...data, 1); const min = Math.min(...data, 0)
   const span = max - min || 1
@@ -88,7 +111,7 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 }
 
 function HeatGauge({ score }: { score: number }) {
-  const r = 34; const cx = 44; const cy = 44
+  const r = 27; const cx = 35; const cy = 35
   const start = 135; const sweep = 270
   const polar = (deg: number) => { const rad = (deg * Math.PI) / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)] }
   const arc = (from: number, to: number) => {
@@ -98,43 +121,56 @@ function HeatGauge({ score }: { score: number }) {
   }
   const val = start + (Math.max(0, Math.min(100, score)) / 100) * sweep
   return (
-    <svg width={88} height={88} style={{ display: 'block', flexShrink: 0 }}>
+    <svg width={70} height={70} style={{ display: 'block', flexShrink: 0 }}>
       <defs>
         <linearGradient id="heatGrad" x1="0" y1="1" x2="1" y2="0">
           <stop offset="0%" stopColor="#f59e0b" /><stop offset="100%" stopColor="#f97316" />
         </linearGradient>
       </defs>
-      <path d={arc(start, start + sweep)} fill="none" stroke="var(--bg-hover)" strokeWidth={9} strokeLinecap="round" />
-      {score > 0 && <path d={arc(start, val)} fill="none" stroke="url(#heatGrad)" strokeWidth={9} strokeLinecap="round" />}
+      <path d={arc(start, start + sweep)} fill="none" stroke="var(--bg-hover)" strokeWidth={7} strokeLinecap="round" />
+      {score > 0 && <path d={arc(start, val)} fill="none" stroke="url(#heatGrad)" strokeWidth={7} strokeLinecap="round" />}
     </svg>
   )
 }
 
 function SentimentChart({ series }: { series: Digest['dailySeries'] }) {
-  const W = 620; const H = 210; const padL = 30; const padB = 24; const padT = 12
+  const W = 620; const H = 172; const padL = 28; const padB = 22; const padT = 10
   const max = Math.max(...series.map((d) => Math.max(d.pos, d.neg, d.neutral)), 4)
-  const x = (i: number) => padL + (i / Math.max(series.length - 1, 1)) * (W - padL - 8)
+  const x = (i: number) => padL + (i / Math.max(series.length - 1, 1)) * (W - padL - 10)
   const y = (v: number) => padT + (1 - v / max) * (H - padT - padB)
-  const line = (key: 'pos' | 'neg' | 'neutral') => series.map((d, i) => `${x(i)},${y(d[key])}`).join(' ')
+  // Catmull-Rom → cubic bezier for smooth mockup-style lines
+  const smooth = (pts: [number, number][]) => {
+    if (pts.length < 2) return ''
+    let dPath = `M ${pts[0][0]} ${pts[0][1]}`
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)]
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6
+      dPath += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
+    }
+    return dPath
+  }
+  const pts = (key: 'pos' | 'neg' | 'neutral'): [number, number][] => series.map((dd, i) => [x(i), y(dd[key])])
+  const posPts = pts('pos')
   const ticks = [0, Math.round(max / 3), Math.round((2 * max) / 3), max]
   const labelEvery = Math.ceil(series.length / 8)
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
       {ticks.map((t) => (
         <g key={t}>
-          <line x1={padL} x2={W - 8} y1={y(t)} y2={y(t)} stroke="var(--border-primary)" strokeDasharray="3 4" strokeWidth={0.6} />
+          <line x1={padL} x2={W - 10} y1={y(t)} y2={y(t)} stroke="var(--border-primary)" strokeDasharray="3 4" strokeWidth={0.6} />
           <text x={padL - 6} y={y(t) + 3} fontSize={9} fill="var(--text-muted)" textAnchor="end">{t}</text>
         </g>
       ))}
-      <polygon points={`${x(0)},${y(0)} ${line('pos')} ${x(series.length - 1)},${y(0)}`} fill="rgba(34,197,94,0.10)" />
-      <polyline points={line('pos')} fill="none" stroke="#22c55e" strokeWidth={2} strokeLinejoin="round" />
-      <polyline points={line('neutral')} fill="none" stroke="#9ca3af" strokeWidth={1.6} strokeLinejoin="round" />
-      <polyline points={line('neg')} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" />
-      {series.map((d, i) => (
+      <path d={`${smooth(posPts)} L ${posPts[posPts.length - 1][0]} ${y(0)} L ${posPts[0][0]} ${y(0)} Z`} fill="rgba(34,197,94,0.10)" stroke="none" />
+      <path d={smooth(pts('neutral'))} fill="none" stroke="#6b7280" strokeWidth={1.5} />
+      <path d={smooth(pts('neg'))} fill="none" stroke="#ef4444" strokeWidth={2} />
+      <path d={smooth(posPts)} fill="none" stroke="#22c55e" strokeWidth={2} />
+      {series.map((dd, i) => (
         <g key={i}>
-          <circle cx={x(i)} cy={y(d.pos)} r={2.4} fill="#22c55e" />
-          <circle cx={x(i)} cy={y(d.neg)} r={2.4} fill="#ef4444" />
-          {i % labelEvery === 0 && <text x={x(i)} y={H - 6} fontSize={9} fill="var(--text-muted)" textAnchor="middle">{d.day}</text>}
+          <circle cx={x(i)} cy={y(dd.pos)} r={2.2} fill="#22c55e" />
+          <circle cx={x(i)} cy={y(dd.neg)} r={2.2} fill="#ef4444" />
+          {i % labelEvery === 0 && <text x={x(i)} y={H - 5} fontSize={9} fill="var(--text-muted)" textAnchor="middle">{dd.day}</text>}
         </g>
       ))}
     </svg>
@@ -205,9 +241,16 @@ export default function ListenPage() {
     return rows
   }, [d, filter])
 
-  const evidence = useMemo(() => (d ? d.recentSignals.filter((s) => s.url || s.is_crisis || (s.severity || 0) >= 3).slice(0, 16) : []), [d])
+  // Evidence = the receipts. Media-rich signals first (real images / video
+  // thumbnails), then crisis/high-severity linked items.
+  const evidence = useMemo(() => {
+    if (!d) return []
+    const withMedia = d.recentSignals.filter((s) => mediaOf(s))
+    const rest = d.recentSignals.filter((s) => !mediaOf(s) && (s.is_crisis || (s.severity || 0) >= 3) && s.url)
+    return [...withMedia, ...rest].slice(0, 16)
+  }, [d])
 
-  const card: React.CSSProperties = { background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 16 }
+  const card: React.CSSProperties = { background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 13 }
   const badge = (color: string, text: string) => (
     <span style={{ fontSize: 10.5, fontWeight: 700, color, background: `${color}1a`, border: `1px solid ${color}40`, borderRadius: 6, padding: '2px 8px', whiteSpace: 'nowrap' }}>{text}</span>
   )
@@ -227,7 +270,7 @@ export default function ListenPage() {
         <span style={{ color, display: 'flex' }}>{icon}</span>{label}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>{value}</div>
+        <div style={{ fontSize: 27, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>{value}</div>
         <Sparkline data={spark} color={color} />
       </div>
       {delta(deltaPct)}
@@ -312,10 +355,10 @@ export default function ListenPage() {
           {loading ? 'Loading signals…' : 'No signals in this window yet. Add sources and Fetch now, or let the bridges (WhatsApp scan, call centre, volunteer reports) feed /api/agent/listen/log.'}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* ── KPI strip ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {kpi('Signals', d.totals.signals, '#3b82f6', <MdSensors size={16} />, pct(d.totals.signals, d.totals.prevSignals), d.dailySeries.map((x) => x.total))}
             {kpi('Crisis', d.totals.crisis, '#ef4444', <MdWarning size={16} />, pct(d.totals.crisis, d.totals.prevCrisis), d.dailySeries.map((x) => x.crisis))}
             {kpi('Positive', d.totals.positive, '#22c55e', <MdNorthEast size={16} />, pct(d.totals.positive, d.totals.prevPositive), d.dailySeries.map((x) => x.positive))}
@@ -326,7 +369,7 @@ export default function ListenPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <div>
-                  <div style={{ fontSize: 34, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>{d.heatScore}<span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}> /100</span></div>
+                  <div style={{ fontSize: 27, fontWeight: 800, lineHeight: 1, color: 'var(--text-primary)' }}>{d.heatScore}<span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)' }}> /100</span></div>
                   <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: '#f97316' }}>{d.heatLabel}</span>
                     {delta(d.heatScore - d.prevHeat, ' pts vs last period')}
@@ -338,7 +381,7 @@ export default function ListenPage() {
           </div>
 
           {/* ── inbox + right rail ── */}
-          <div className="listen-main-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 2fr)', gap: 16, alignItems: 'start' }}>
+          <div className="listen-main-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 2fr)', gap: 12, alignItems: 'start' }}>
             {/* Signal Inbox */}
             <div style={{ ...card, padding: 0, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '14px 16px', borderBottom: '1px solid var(--border-primary)' }}>
@@ -353,23 +396,30 @@ export default function ListenPage() {
                   const firstBreak = s.content.search(/[.!?]\s|[.!?]$/)
                   const title = firstBreak > 15 && firstBreak < 120 ? s.content.slice(0, firstBreak + 1) : s.content.slice(0, 90)
                   const rest = s.content.slice(title.length).trim()
+                  const media = mediaOf(s)
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '12px 16px', borderBottom: i < Math.min(inbox.length, inboxLimit) - 1 ? '1px solid var(--border-primary)' : 'none' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 8, marginTop: 12, flexShrink: 0, background: s.is_crisis ? '#ef4444' : sb.color === '#22c55e' ? '#22c55e' : '#3b82f6' }} />
-                      <span style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${m.color}1f`, color: m.color, flexShrink: 0 }}>{m.icon}</span>
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 14px', borderBottom: i < Math.min(inbox.length, inboxLimit) - 1 ? '1px solid var(--border-primary)' : 'none' }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 7, flexShrink: 0, background: s.is_crisis ? '#ef4444' : sb.color === '#22c55e' ? '#22c55e' : '#3b82f6' }} />
+                      <SourceGlyph s={s} size={30} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
                           {s.url ? <a href={s.url} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{title}</a> : title}
                         </div>
-                        {rest && <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{rest}</div>}
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                          {s.source === 'news' && s.author ? `${s.author}${rest ? ' · ' : ''}` : ''}{rest}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '46%' }}>
-                        {chip(m.label)}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, justifyContent: 'flex-end' }}>
+                        {chip(s.source === 'news' ? (hostOf(s.url) || m.label) : m.label)}
                         {s.constituency && chip(s.constituency)}
                         {badge(sb.color, sb.text)}
                         {badge(sv.color, sv.text)}
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 20, textAlign: 'right' }}>{ago(s.created_at)}</span>
+                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)', minWidth: 22, textAlign: 'right' }}>{ago(s.created_at)}</span>
                       </div>
+                      {media && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={media} alt="" style={{ width: 70, height: 40, objectFit: 'cover', borderRadius: 7, flexShrink: 0, background: 'var(--bg-hover)' }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
                     </div>
                   )
                 })}
@@ -438,7 +488,7 @@ export default function ListenPage() {
           </div>
 
           {/* ── analytics row: keywords | sentiment chart | mood by region ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, alignItems: 'stretch' }}>
             {/* Trending Keywords */}
             <div style={card}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
@@ -453,9 +503,12 @@ export default function ListenPage() {
                   const dashColor = k.neg > k.pos ? '#ef4444' : k.pos > k.neg ? '#22c55e' : '#f59e0b'
                   const dashes = Math.max(1, Math.min(5, Math.round((Math.max(k.pos, k.neg) / Math.max(k.count, 1)) * 5)))
                   return (
-                    <div key={k.word} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 52px 34px 70px', gap: 6, alignItems: 'center', padding: '7px 2px', borderBottom: i < 7 ? '1px solid var(--border-primary)' : 'none', fontSize: 12.5 }}>
+                    <div key={k.word} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 52px 34px 70px', gap: 6, alignItems: 'center', padding: '6px 2px', borderBottom: i < 7 ? '1px solid var(--border-primary)' : 'none', fontSize: 12.5 }}>
                       <span style={{ color: '#f97316', fontWeight: 700, fontSize: 11 }}>{i + 1}</span>
-                      <span style={{ color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cap(k.word)}</span>
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{k.word}</span>
+                        {k.category && <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}> · {cap(k.category)}</span>}
+                      </span>
                       <span style={{ textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>{k.count}</span>
                       <span style={{ display: 'flex', justifyContent: 'center' }}>{k.trend > 0 ? <MdNorthEast size={13} color="#22c55e" /> : k.trend < 0 ? <MdSouthEast size={13} color="#ef4444" /> : <MdTrendingFlat size={13} color="var(--text-muted)" />}</span>
                       <span style={{ display: 'flex', gap: 3 }}>
@@ -493,17 +546,17 @@ export default function ListenPage() {
                 <span>Region</span><span>Mood</span><span style={{ textAlign: 'right' }}>Neg</span><span style={{ textAlign: 'right' }}>Neu</span><span style={{ textAlign: 'right' }}>Pos</span><span style={{ textAlign: 'right' }}>Heat</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {d.moodBySeat.slice(0, 8).map((m, i) => {
+                {d.moodBySeat.filter((m) => m.total >= 5).slice(0, 8).map((m, i) => {
                   const t = m.total || 1
-                  const negP = Math.round((m.neg / t) * 100); const neuP = Math.round((m.neutral / t) * 100); const posP = Math.round((m.pos / t) * 100)
+                  const negP = Math.round((m.neg / t) * 100); const posP = Math.round((m.pos / t) * 100); const neuP = Math.max(0, 100 - negP - posP)
                   const heatBg = m.heat >= 70 ? '#ef4444' : m.heat >= 55 ? '#f97316' : m.heat >= 40 ? '#f59e0b' : '#22c55e'
                   return (
                     <div key={m.constituency} style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 1fr) minmax(80px, 1.4fr) 38px 38px 38px 30px', gap: 6, alignItems: 'center', padding: '7px 0', borderBottom: i < 7 ? '1px solid var(--border-primary)' : 'none' }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.constituency}</span>
-                      <div style={{ display: 'flex', height: 7, borderRadius: 4, overflow: 'hidden', background: 'var(--bg-hover)' }}>
-                        <div style={{ width: `${negP}%`, background: '#ef4444' }} />
-                        <div style={{ width: `${neuP}%`, background: '#6b7280' }} />
-                        <div style={{ width: `${posP}%`, background: '#22c55e' }} />
+                      <span title={`${m.total} signals`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.constituency}</span>
+                      <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', background: 'var(--bg-hover)', gap: 1 }}>
+                        {negP > 0 && <div style={{ width: `${negP}%`, background: '#dc2626', borderRadius: 3 }} />}
+                        {neuP > 0 && <div style={{ width: `${neuP}%`, background: '#4b5563', borderRadius: 3 }} />}
+                        {posP > 0 && <div style={{ width: `${posP}%`, background: '#16a34a', borderRadius: 3 }} />}
                       </div>
                       <span style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-secondary)' }}>{negP}%</span>
                       <span style={{ fontSize: 11, textAlign: 'right', color: 'var(--text-secondary)' }}>{neuP}%</span>
@@ -528,22 +581,41 @@ export default function ListenPage() {
               <div ref={evidenceRef} style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '4px 16px 16px', scrollbarWidth: 'thin' }}>
                 {evidence.map((s, i) => {
                   const m = srcMeta(s.source)
-                  return (
-                    <div key={i} style={{ flex: '0 0 250px', background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ width: 26, height: 26, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${m.color}1f`, color: m.color, flexShrink: 0 }}>{m.icon}</span>
-                        <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.label}{s.constituency ? ` · ${s.constituency}` : ''}</span>
-                        <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{ago(s.created_at)}</span>
-                      </div>
-                      <p style={{ fontSize: 12, lineHeight: 1.45, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', minHeight: 52 }}>{s.content}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {s.is_crisis && badge('#ef4444', 'Crisis')}
-                        {s.issue_category && chip(cap(s.issue_category))}
-                        <div style={{ flex: 1 }} />
-                        {s.url && <a href={s.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, fontWeight: 600, color: '#f97316', textDecoration: 'none' }}>Open →</a>}
+                  const media = mediaOf(s)
+                  const isVideo = !!ytThumb(s.url) || s.source === 'youtube'
+                  const outlet = s.source === 'news' ? (s.author || hostOf(s.url) || m.label) : m.label
+                  const card = (
+                    <div style={{ flex: '0 0 240px', width: 240, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                      {media && (
+                        <div style={{ position: 'relative', height: 100, background: 'var(--bg-hover)' }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={media} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
+                          {isVideo && (
+                            <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <span style={{ width: 34, height: 34, borderRadius: 34, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, paddingLeft: 3 }}>▶</span>
+                            </span>
+                          )}
+                          <span style={{ position: 'absolute', top: 8, right: 8 }}>{s.is_crisis && badge('#ef4444', 'Crisis')}</span>
+                        </div>
+                      )}
+                      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <SourceGlyph s={s} size={22} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{outlet}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ago(s.created_at)}</span>
+                        </div>
+                        <p style={{ fontSize: 11.5, lineHeight: 1.4, color: media ? 'var(--text-secondary)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: media ? 2 : 5, WebkitBoxOrient: 'vertical', flex: 1 }}>{s.content}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          {!media && s.is_crisis && badge('#ef4444', 'Crisis')}
+                          {s.constituency && chip(s.constituency)}
+                          {s.issue_category && chip(cap(s.issue_category))}
+                        </div>
                       </div>
                     </div>
                   )
+                  return s.url
+                    ? <a key={i} href={s.url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', display: 'flex' }}>{card}</a>
+                    : <React.Fragment key={i}>{card}</React.Fragment>
                 })}
               </div>
             </div>
