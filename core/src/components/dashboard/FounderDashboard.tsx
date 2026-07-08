@@ -21,6 +21,8 @@ import {
   ConversationsTrendChart,
   ActivityHeatmap,
   activityPeaks,
+  WeekHourHeatmap,
+  peaksFromWeekHour,
   RadialProgress,
 } from './MicroCharts'
 
@@ -563,14 +565,17 @@ export default function FounderDashboard() {
     : range === '30D'
       ? metrics.totalConversations.trend30D
       : metrics.totalConversations.trend7D
-  // POP home → activity heatmap over 30 days instead of the line trend.
+  // POP home → weekday×hour activity heatmap instead of the line trend. Totals
+  // come from the 30-day daily series; the grid + peaks come from the weekHour
+  // matrix (touchpoints by weekday & hour).
   const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
+  const weekHour = isPop ? metrics.campaignHome?.weekHour : undefined
   const heatTotal = popHeat ? popHeat.reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatAvg = popHeat && popHeat.length ? Math.round((heatTotal / popHeat.length) * 10) / 10 : 0
   const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatPrev7 = popHeat ? popHeat.slice(-14, -7).reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatChange = heatPrev7 ? Math.round(((heatLast7 - heatPrev7) / heatPrev7) * 100) : 0
-  const heatPeaks = popHeat ? activityPeaks(popHeat, metrics.hourlyActivity) : null
+  const heatPeaks = weekHour ? peaksFromWeekHour(weekHour) : null
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : brandLabel('Founder'))
   const firstName = displayName.split(' ')[0] || brandLabel('Founder')
   const profileInitials = getInitials(displayName)
@@ -1118,7 +1123,7 @@ export default function FounderDashboard() {
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{popHeat ? 'Activity Heatmap' : 'Conversations Trend'}</h3>
-              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{popHeat ? 'Voices captured per day · last 30 days' : 'Conversations initiated per day'}</p>
+              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{popHeat ? 'Voter touchpoints by day & hour · last 30 days' : 'Conversations initiated per day'}</p>
             </div>
             {popHeat && (heatPeaks?.peakDay || heatPeaks?.peakHour) && (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
@@ -1151,11 +1156,11 @@ export default function FounderDashboard() {
           <div className="flex-1 min-h-0 flex flex-col justify-center">
             {popHeat && popHeat.length ? (
               <>
-                <ActivityHeatmap data={popHeat} color="var(--accent-primary)" />
+                {weekHour ? <WeekHourHeatmap weekHour={weekHour} /> : <ActivityHeatmap data={popHeat} color="var(--accent-primary)" />}
                 <div className="flex items-center justify-end gap-1.5 mt-2 text-[9px]" style={{ color: 'var(--text-muted)' }}>
                   <span>Less</span>
-                  {[0.3, 0.52, 0.78, 1].map((op) => (
-                    <span key={op} style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--accent-primary)', opacity: op, border: '1px solid var(--border-primary)' }} />
+                  {['#312e81', '#a21caf', '#f43f5e', '#fbbf24'].map((c) => (
+                    <span key={c} style={{ width: 10, height: 10, borderRadius: 2, background: c, border: '1px solid var(--border-primary)' }} />
                   ))}
                   <span>More</span>
                 </div>
@@ -1169,7 +1174,7 @@ export default function FounderDashboard() {
           <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
             <div>
               <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{popHeat ? fmtComma(heatTotal) : convTotal}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{popHeat ? 'Voices · 30d' : 'Total'}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{popHeat ? 'Touchpoints · 30d' : 'Total'}</div>
             </div>
             <div>
               <KpiDelta change={popHeat ? heatChange : convChange} />

@@ -1903,10 +1903,18 @@ export async function GET(request: NextRequest) {
         const hkeys = Array.from({ length: HDAYS }, (_, i) => new Date(now.getTime() - (HDAYS - 1 - i) * 86400000).toISOString().slice(0, 10))
         const hidx: Record<string, number> = Object.fromEntries(hkeys.map((k, i) => [k, i]))
         const daily = new Array(HDAYS).fill(0)
-        L.forEach((r) => { const i = hidx[new Date(r.created_at).toISOString().slice(0, 10)]; if (i !== undefined) daily[i]++ })
+        // weekHour[dayOfWeek 0=Sun..6=Sat][hour 0..23] — the touchpoint rhythm
+        // that feeds the weekday x hour Activity Heatmap.
+        const weekHour = Array.from({ length: 7 }, () => new Array(24).fill(0))
+        L.forEach((r) => {
+          const dt = new Date(r.created_at)
+          if (isNaN(dt.getTime())) return
+          const i = hidx[dt.toISOString().slice(0, 10)]
+          if (i !== undefined) { daily[i]++; weekHour[dt.getUTCDay()][dt.getUTCHours()]++ }
+        })
         const dailyActivity = hkeys.map((date, i) => ({ date, count: daily[i] }))
 
-        campaignHome = { events, attentionSeats, sources, dailyActivity }
+        campaignHome = { events, attentionSeats, sources, dailyActivity, weekHour }
       } catch (e) {
         console.error('[founder-metrics] campaignHome failed:', (e as Error).message)
       }

@@ -92,6 +92,82 @@ export function activityPeaks(data: Array<{ date: string; count: number }>, hour
   return { peakDay, peakHour }
 }
 
+// ── Weekday × hour heatmap ──────────────────────────────────────────────────
+// The reference layout: 7 weekday rows (Mon→Sun) × 12 two-hour columns. Each
+// cell is the touchpoint count for that weekday+slot over the window, coloured
+// by intensity on the same indigo→pink→orange ramp. This concentrates activity
+// into a real hotspot (evenings) so colour genuinely tracks volume — unlike the
+// old weekday×week view where 30 days collapsed into ~5 near-identical columns.
+const to12h = (x: number) => `${((x + 11) % 12) + 1} ${x < 12 ? 'AM' : 'PM'}`
+export function WeekHourHeatmap({ weekHour }: { weekHour: number[][] }) {
+  if (!weekHour || weekHour.length !== 7) return null
+  const BUCKETS = 12 // 2-hour columns
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun from getUTCDay indexing (Sun=0)
+  const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+  const grid = dayOrder.map((d) => {
+    const hrs = weekHour[d] || []
+    const b = new Array(BUCKETS).fill(0)
+    for (let h = 0; h < 24; h++) b[Math.floor(h / 2)] += hrs[h] || 0
+    return b
+  })
+  const max = Math.max(1, ...grid.flat())
+  const bucketRange = (b: number) => `${to12h(b * 2)}–${to12h((b * 2 + 2) % 24)}`
+  // Column labels at a few anchor buckets so the axis reads without clutter.
+  const axis: Record<number, string> = { 0: '12a', 3: '6a', 6: '12p', 9: '6p' }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
+      {grid.map((row, ri) => (
+        <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 12, fontSize: 9, color: 'var(--text-muted)', textAlign: 'center', flexShrink: 0 }}>{DAY_LABELS[ri]}</span>
+          <div style={{ display: 'flex', gap: 3, flex: 1, minWidth: 0 }}>
+            {row.map((count, ci) => {
+              const f = count / max
+              const bg = count <= 0 ? 'var(--bg-tertiary)' : heatColor(f)
+              return (
+                <div
+                  key={ci}
+                  title={`${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][ri]} · ${bucketRange(ci)} · ${count} touchpoints`}
+                  style={{
+                    flex: 1, minWidth: 0, height: 18, borderRadius: 4,
+                    background: count <= 0 ? 'var(--bg-tertiary)' : `linear-gradient(135deg, ${bg}, ${heatColor(Math.min(1, f + 0.12))})`,
+                    boxShadow: f > 0.66 ? `0 0 9px ${bg}99` : 'none',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                  }}
+                />
+              )
+            })}
+          </div>
+        </div>
+      ))}
+      {/* hour axis */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <span style={{ width: 12, flexShrink: 0 }} />
+        <div style={{ display: 'flex', gap: 3, flex: 1, minWidth: 0 }}>
+          {Array.from({ length: BUCKETS }, (_, ci) => (
+            <span key={ci} style={{ flex: 1, minWidth: 0, fontSize: 8, color: 'var(--text-muted)', textAlign: 'center' }}>{axis[ci] || ''}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Peak weekday + peak 2-hour window from a weekday×hour matrix, for the chips.
+export function peaksFromWeekHour(weekHour?: number[][]): { peakDay: string | null; peakHour: string | null } {
+  if (!weekHour || weekHour.length !== 7) return { peakDay: null, peakHour: null }
+  const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const byDay = weekHour.map((h) => h.reduce((a, b) => a + b, 0))
+  const di = byDay.indexOf(Math.max(...byDay))
+  const peakDay = byDay[di] > 0 ? DAY[di] : null
+  const byHour = new Array(24).fill(0)
+  weekHour.forEach((h) => h.forEach((v, i) => { byHour[i] += v }))
+  let bestB = 0, bestV = -1
+  for (let b = 0; b < 12; b++) { const v = (byHour[b * 2] || 0) + (byHour[b * 2 + 1] || 0); if (v > bestV) { bestV = v; bestB = b } }
+  const peakHour = bestV > 0 ? `${to12h(bestB * 2)}–${to12h((bestB * 2 + 2) % 24)}` : null
+  return { peakDay, peakHour }
+}
+
 // Helper to get theme accent color
 const getAccentColor = () => {
   if (typeof window === 'undefined') return 'var(--accent-primary)'
