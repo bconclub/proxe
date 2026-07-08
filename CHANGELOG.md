@@ -14,6 +14,13 @@
 >
 > **Propagation principle:** a change that belongs to every brand — even a small one made in a single brand like BCON — should flow **brand → `master` → all branches**, so the canonical core stays the source of truth and nothing diverges. Log it in the relevant per-brand changelog **and** here.
 
+## 2026-07-08 · feat(lokazen): capture + show owner property details in the lead modal
+
+- An owner who typed full property details in chat (Praveen — 950 sqft, ground floor, ₹1.5L rent, 6mo advance, 3yr lock-in, BH Road Nelamangala, Maps link) had NONE of it captured as structured data — the agent replied conversationally and the modal showed nothing. Only form-submitted owners got the structured `unified_context.lokazen.*` fields.
+- **Capture:** extended the engine's `update_lead_profile` tool with the commercial-property fields (property_type, size sqft, rent, floor, deposit/terms, availability, area/locality, Maps link) and stored them in the brand namespace using the SAME field names the inbound-form path writes — so a typed detail lands in the same structured slot a form submission does.
+- **Display:** added a "Property details" block to `LeadDetailsModal` (reads `unified_context.lokazen`, so it's null/hidden for every other brand) showing property/size/floor/rent/deposit/area/availability + a "View on Google Maps" link. Works immediately for form-submitted owners; populates for chat owners as the tool captures.
+- Known gap (scoped next): `update_lead_profile` is only wired when the engine is in a tool/booking flow, so a pure free-text detail-dump with no booking intent (exactly Praveen's case) isn't captured yet — that needs an always-on property extractor on the WhatsApp/web message path (extend `extractProfileFromConversation`). Modal + capture-when-in-flow shipped now.
+
 ## 2026-07-08 · fix(web): persist the pre-chat name the widget passes, so web leads stop showing "Hi there"
 
 - Web-chat route accepted a pre-chat name (`session.user.name`) and used it for the AI greeting, but the ONLY thing ever promoted to `customer_name` was the AI-extracted chat name (`profile.full_name`). So a website lead that entered their name still saved a nameless card and got "Hi there" on the welcome template.

@@ -1064,7 +1064,7 @@ function buildBookingTools(
     },
     {
       name: 'update_lead_profile',
-      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, or website URL. Can be called multiple times as new details emerge. Only include fields explicitly shared - never guess.',
+      description: 'Save lead profile details whenever the user shares personal, business, OR commercial-property information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, website URL — and (Lokazen) whenever a property OWNER shares any listing detail (property type, size in sqft, rent, floor, deposit/advance/lock-in terms, availability, area/locality, or a Google Maps link) or a BRAND shares their space requirement. Capture these even mid-conversation and across several messages — call it each time a new detail appears. Only include fields explicitly shared - never guess.',
       input_schema: {
         type: 'object',
         properties: {
@@ -1095,6 +1095,38 @@ function buildBookingTools(
           notes: {
             type: 'string',
             description: 'Any other notable detail (e.g. "has 3 employees", "launched 2 months ago")',
+          },
+          property_type: {
+            type: 'string',
+            description: 'Lokazen only: kind of commercial property the OWNER is listing (e.g. "shop", "showroom", "office", "cloud kitchen").',
+          },
+          property_size_sqft: {
+            type: 'string',
+            description: 'Lokazen: property/space size in sq ft (e.g. "950").',
+          },
+          monthly_rent: {
+            type: 'string',
+            description: 'Lokazen: monthly rent the owner is asking OR the brand\'s rent budget (e.g. "1.5 lakh", "₹90k").',
+          },
+          floor: {
+            type: 'string',
+            description: 'Lokazen: which floor the space is on (e.g. "ground", "1st + 2nd").',
+          },
+          deposit_or_terms: {
+            type: 'string',
+            description: 'Lokazen: deposit / advance / lock-in / other commercial terms (e.g. "6 months advance, 3-year lock-in, no bargain").',
+          },
+          availability: {
+            type: 'string',
+            description: 'Lokazen: when the space is available / possession timing.',
+          },
+          area_locality: {
+            type: 'string',
+            description: 'Lokazen: area / locality / micro-market of the property or requirement (e.g. "BH Road, Nelamangala").',
+          },
+          maps_url: {
+            type: 'string',
+            description: 'Lokazen: a Google Maps link the user shared for the property.',
           },
         },
         required: [],
@@ -1473,8 +1505,11 @@ function buildBookingTools(
 
     update_lead_profile: async (toolInput: Record<string, any>) => {
       const { full_name, email, city, company, business_type, website_url, notes } = toolInput;
+      // Lokazen commercial-property details (owner listings / brand requirements).
+      const { property_type, property_size_sqft, monthly_rent, floor, deposit_or_terms, availability, area_locality, maps_url } = toolInput;
+      const hasPropertyDetail = !!(property_type || property_size_sqft || monthly_rent || floor || deposit_or_terms || availability || area_locality || maps_url);
 
-      if (!full_name && !email && !city && !company && !business_type && !website_url && !notes) {
+      if (!full_name && !email && !city && !company && !business_type && !website_url && !notes && !hasPropertyDetail) {
         return JSON.stringify({ success: false, error: 'No profile data provided.' });
       }
 
@@ -1550,6 +1585,25 @@ function buildBookingTools(
           updatedCtx.website_url = url;
         }
 
+        // Lokazen: store commercial-property details in the brand namespace using
+        // the SAME field names the inbound-form path writes, so an owner who TYPES
+        // their details in chat gets the same structured capture (and the same
+        // modal display) a form submission gets. Free-text was previously lost —
+        // the agent replied but nothing landed in the structured fields.
+        if (hasPropertyDetail) {
+          const brandKey = getCurrentBrandId();
+          const brandCtx = { ...(updatedCtx[brandKey] || {}) };
+          if (property_type) brandCtx.property_type = String(property_type).trim();
+          if (property_size_sqft) brandCtx.property_size_sqft = String(property_size_sqft).trim();
+          if (monthly_rent) brandCtx.asking_rent_monthly = String(monthly_rent).trim();
+          if (floor) brandCtx.floor = String(floor).trim();
+          if (deposit_or_terms) brandCtx.deposit = String(deposit_or_terms).trim();
+          if (availability) brandCtx.availability_date = String(availability).trim();
+          if (area_locality) brandCtx.property_zone = String(area_locality).trim();
+          if (maps_url) brandCtx.google_maps_url = String(maps_url).trim();
+          updatedCtx[brandKey] = brandCtx;
+        }
+
         leadUpdates.unified_context = {
           ...updatedCtx,
           [channelKey]: { ...existingChannel, profile },
@@ -1594,6 +1648,14 @@ function buildBookingTools(
         if (business_type) saved.push(`type: ${business_type}`);
         if (website_url) saved.push(`website: ${website_url}`);
         if (notes) saved.push(`notes: ${notes}`);
+        if (property_type) saved.push(`property: ${property_type}`);
+        if (property_size_sqft) saved.push(`size: ${property_size_sqft} sqft`);
+        if (monthly_rent) saved.push(`rent: ${monthly_rent}`);
+        if (floor) saved.push(`floor: ${floor}`);
+        if (deposit_or_terms) saved.push(`terms: ${deposit_or_terms}`);
+        if (availability) saved.push(`available: ${availability}`);
+        if (area_locality) saved.push(`area: ${area_locality}`);
+        if (maps_url) saved.push(`maps: ${maps_url}`);
 
         console.log(`[Engine] Lead profile updated: ${saved.join(', ')}`);
         return JSON.stringify({ success: true, updated: saved });

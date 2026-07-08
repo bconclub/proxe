@@ -2100,6 +2100,42 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
+                {/* Lokazen: commercial-property details (owner listing / brand
+                    requirement). Reads the lokazen namespace, so it's null (and
+                    renders nothing) for every other brand. Populated by the
+                    inbound form path AND by update_lead_profile when an owner
+                    types the details in chat. */}
+                {(() => {
+                  const lkz: any = currentLead.unified_context?.lokazen || {};
+                  const rows = ([
+                    ['Property', lkz.property_type],
+                    ['Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
+                    ['Floor', lkz.floor],
+                    ['Rent', lkz.asking_rent_monthly],
+                    ['Deposit / terms', lkz.deposit],
+                    ['Area', lkz.property_zone || lkz.city],
+                    ['Available', lkz.availability_date],
+                  ] as Array<[string, string | null | undefined]>).filter((r) => !!r[1]);
+                  const maps = lkz.google_maps_url;
+                  if (rows.length === 0 && !maps) return null;
+                  return (
+                    <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                      <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Property details</span>
+                      {rows.map(([label, value]) => (
+                        <div key={label} className="flex items-center justify-between gap-2 text-xs">
+                          <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                          <span className="text-right truncate max-w-[60%]" style={{ color: 'var(--text-secondary)' }} title={String(value)}>{value}</span>
+                        </div>
+                      ))}
+                      {maps && (
+                        <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline mt-0.5" style={{ color: 'var(--accent-primary, #10b981)' }}>
+                          View on Google Maps →
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* TYPE / COURSE / EDUCATION / TIMELINE — extracted profile fields */}
                 {(() => {
                   const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
