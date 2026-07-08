@@ -1,3 +1,10 @@
+## 2026-07-08 19:45 IST · feat(pop): PROXe Listen full mockup redesign
+
+- User-facing: Listen page rebuilt to the polished mockup — 5 KPI cards with sparklines + Heat Score gauge, rich Signal Inbox (source icon, sentiment + severity badges, chips, load-more), "What PROXe Thinks" AI panel with Recommended Actions (Escalate / Prepare Response / Monitor) and Source Mix grid, Trending Keywords table (trend arrows + sentiment dashes), Sentiment Over Time line chart, Mood by Region table with heat badges, Evidence Board carousel. Sources manager + Filters now behind header buttons.
+- Listen digest API: daily series now carries crisis/opposition/positive per day (sparklines), prev-window totals for delta chips, and per-keyword sentiment + trend.
+- Dev-only: next.config supports NEXT_DIST_DIR so parallel dev servers stop corrupting each other's .next chunks (root cause of "design changes not showing / breaking" — multiple chats' servers shared one build dir). Default unchanged; prod untouched.
+- `(pending-sha)`
+
 ## 2026-07-08 05:30 IST · feat(pop): transcript + recording for V2 (ElevenLabs) and V3
 
 - V2 was "completely blind": no transcript, no recording. Now the Calls list lazily pulls the ElevenLabs conversation → writes the transcript to conversations (list count + detail view work like V1) and sets a recording URL.

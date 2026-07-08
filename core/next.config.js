@@ -24,6 +24,10 @@ console.log(`[next.config] building "${BRAND_ID}" from ${BRAND_DIR}`)
 
 const nextConfig = {
   reactStrictMode: true,
+  // Parallel dev servers from this same folder corrupt each other's .next
+  // chunks (ChunkLoadError). Opt into an isolated build dir per server with
+  // NEXT_DIST_DIR; default stays .next so Vercel/prod is untouched.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   env: {
     NEXT_PUBLIC_BRAND: BRAND_ID,
     NEXT_PUBLIC_BRAND_ID: BRAND_ID,
