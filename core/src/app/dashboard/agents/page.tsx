@@ -5,8 +5,10 @@ import WebAgentSettingsClient from '../settings/web-agent/WebAgentSettingsClient
 import InstagramAgentTab from './InstagramAgentTab';
 import WhatsAppAgentTab from './WhatsAppAgentTab';
 import VoiceAgentTab from './VoiceAgentTab';
+import TasksPage from '../tasks/page';
+import { getBrandConfig } from '@/configs';
 import { FaWhatsapp, FaInstagram } from 'react-icons/fa';
-import { MdLanguage, MdMic } from 'react-icons/md';
+import { MdLanguage, MdMic, MdChecklist } from 'react-icons/md';
 import type { IconType } from 'react-icons';
 
 const tabs: Array<{
@@ -52,6 +54,12 @@ const tabs: Array<{
 
 export default function AgentsPage() {
   const [active, setActive] = useState('Web');
+  // POP folds its automated Agent Tasks queue in here as a tab (it's no longer a
+  // separate nav row). Other brands keep Agent Tasks in the main nav.
+  const isPop = getBrandConfig().brand === 'pop';
+  const visibleTabs = isPop
+    ? [...tabs, { id: 'Tasks', label: 'Agent Tasks', icon: MdChecklist, activeClass: 'bg-[var(--accent-primary)] text-white', inactiveClass: 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]' }]
+    : tabs;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -70,7 +78,7 @@ export default function AgentsPage() {
       <div className="px-6 pt-6 pb-0 border-b border-[var(--border-primary)]">
         <h1 className="text-xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Agents</h1>
         <div className="flex gap-1">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActive(tab.id)}
@@ -94,6 +102,11 @@ export default function AgentsPage() {
         {active === 'WhatsApp' && <WhatsAppAgentTab />}
         {active === 'Instagram' && <InstagramAgentTab />}
         {active === 'Voice' && <VoiceAgentTab />}
+        {active === 'Tasks' && (
+          <div className="h-full overflow-y-auto">
+            <TasksPage />
+          </div>
+        )}
       </div>
     </div>
   );

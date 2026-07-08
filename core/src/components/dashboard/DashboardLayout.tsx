@@ -68,9 +68,10 @@ const navigation: NavItem[] = [
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
   { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
-  // SYSTEM
-  { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
+  // SYSTEM — Humans (the team) sits before Agents; POP folds Agent Tasks into
+  // the Agents page, so it's not a separate row there.
   { name: 'Humans', href: '/dashboard/humans', icon: MdPeople },
+  { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
@@ -567,10 +568,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               // Feature toggle: War Room only for brands with it on (pop).
               if (item.href === '/war-room' && !brandFeatures.warRoom) return null
               // POP is a campaign, not a sales org — keep the nav clear and
-              // direct: no sales Pipeline, no Flow builder, no Humans page.
-              // War Room is reachable from the collapsed sidebar / brand logo, so
-              // it's kept out of the main menu list too.
-              if (brandId === 'pop' && item.href && ['/dashboard/pipeline', '/dashboard/flows', '/war-room'].includes(item.href)) return null
+              // direct: no sales Pipeline, no Flow builder. War Room is reachable
+              // from the brand logo/artifact switcher. Overview lives IN the
+              // artifact switcher (first artifact), and Agent Tasks folds into
+              // the Agents page — so neither is a separate nav row for POP.
+              if (brandId === 'pop' && item.href && ['/dashboard', '/dashboard/pipeline', '/dashboard/flows', '/war-room', '/dashboard/tasks'].includes(item.href)) return null
               // Check if we need a divider after the previous item
               const needsDivider = DIVIDER_AFTER_INDICES.includes(index - 1)
               // Match the nav item active when:
