@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   MdContentCopy, MdCheckCircle, MdPhone, MdGraphicEq, MdSignalCellularAlt,
-  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd,
+  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd, MdEdit,
 } from 'react-icons/md';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
@@ -293,7 +293,12 @@ export default function VoiceAgentTab() {
                     );
                   })}
                 </div>
-                <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>Agent opens in {LANGS[lang].label}, then follows the caller's language.</p>
+                <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>Agent opens in {LANGS[lang].label}, then follows the caller&apos;s language.</span>
+                  <a href="/dashboard/settings/voice-prompts" style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, color: 'var(--accent-primary)' }}>
+                    <MdEdit size={12} /> Edit prompts
+                  </a>
+                </p>
               </div>
             )}
 

@@ -1,3 +1,10 @@
+## 2026-07-08 16:30 IST · feat(pop): one core place for voice prompts (Configure → Voice Prompts)
+
+- New dashboard editor: per language (pa/hi/en), three fields — Opening (start line), Prompt (body), Closing (end lines). Saved to dashboard_settings; read by BOTH V1 (Vapi) and V3 (Sarvam pipeline). No deploy, no Vapi — edits apply on the next call.
+- V1 test-call and V3 pipeline both resolve the prompt from this one place (DB override → brand file default). Editing Vapi's dashboard no longer matters.
+- Prompts restructured into opening/body/closing with a compose() that rebuilds the system prompt. Diction default fixed: "sunange" (was "sunenge").
+- "Edit prompts" link added on the Voice agent tab.
+- `(pending-sha)` + VPS pipeline redeploy
 ## 2026-07-08 15:55 IST · feat(pop): V1/V2/V3 engine badge on every Calls row
 
 - Each call in the Calls list now shows a V1/V2/V3 badge next to the contact — derived from the engine:<name> marker on the session (Vapi / ElevenLabs / Sarvam). See at a glance what placed each call.

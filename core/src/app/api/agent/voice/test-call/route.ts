@@ -2,11 +2,13 @@ import { getBrandConfig, getCurrentBrandId, BRAND_ID } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/services';
 import { ensureOrUpdateLead } from '@/lib/services/leadManager';
-// POP grievance voice prompts per starting language (pa/hi/en). Overriding the
-// prompt + opening per call (below) is what carries the no-repeat guardrail onto
-// the LIVE assistant without touching the API-managed golden config — and lets us
-// dial the same number in any of the three languages for A/B testing.
-import { popVoicePrompt, VOICE_ASR_LANG } from '@brand/prompts/voice-langs';
+// POP grievance voice prompts per starting language (pa/hi/en). Resolved from the
+// ONE core place — the dashboard-editable override in dashboard_settings, falling
+// back to the brand file defaults. Overriding the Vapi prompt + opening per call
+// (below) carries the edited prompt onto the LIVE assistant without touching the
+// API-managed golden config, and lets us dial the same number in any language.
+import { VOICE_ASR_LANG, isVoiceLang } from '@brand/prompts/voice-langs';
+import { resolveVoicePrompt } from '@/lib/server/voicePromptConfig';
 
 // Two outbound flavors, picked per brand:
 //
@@ -47,8 +49,9 @@ async function vapiTestCall(body: any) {
   // so (a) the no-repeat guardrail is always on and (b) the same number can be
   // dialed in any language. Other brands keep their own assistant prompt.
   const isPopGrievance = BRAND_ID === 'pop';
-  const voiceLang = isPopGrievance ? popVoicePrompt(body.language).lang : null;
-  const voicePrompt = isPopGrievance ? popVoicePrompt(body.language) : null;
+  // Resolve from the dashboard-editable override (falls back to file defaults).
+  const voicePrompt = isPopGrievance ? await resolveVoicePrompt(body.language) : null;
+  const voiceLang = voicePrompt?.lang ?? null;
 
   const name = (contactName || leadName || '').trim();
   // POP grievance calls have NO business concept — ignore any businessName the
@@ -374,7 +377,7 @@ async function sarvamPipelineCall(body: any) {
   try {
     const res = await fetch(`${url}/start`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to: e164, language: popVoicePrompt(body.language).lang }),
+      body: JSON.stringify({ to: e164, language: isVoiceLang(body.language) ? body.language : 'pa' }),
     });
     const data = await res.json().catch(() => ({}));
     // pipeline returns { status: <vobiz http status>, body: <vobiz response text> }
