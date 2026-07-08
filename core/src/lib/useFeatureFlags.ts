@@ -8,6 +8,8 @@ export interface FeatureFlags {
   brain?: boolean
   pipelineFunnel?: boolean
   followUpSequence?: boolean
+  warRoom?: boolean
+  scouts?: boolean
 }
 
 /**
