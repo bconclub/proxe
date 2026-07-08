@@ -69,7 +69,7 @@ const getStageColor = (stage: string | null) => {
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
-// Scouts have their OWN lifecycle — they don't run brand/owner follow-up
+// Scouts have their OWN lifecycle - they don't run brand/owner follow-up
 // sequences, so the STAGE column shows the scout's actual progress derived from
 // the latest scout_event PROXe received (logged in -> KYC -> submitting -> active),
 // not a generic lead stage.
@@ -78,7 +78,7 @@ const SCOUT_STAGE_BY_EVENT: Record<string, string> = {
   kyc_submitted: 'KYC started',
   kyc_verified: 'KYC done',
   upi_added: 'UPI added',
-  // A scout who is submitting shops IS an active scout — no separate "submitting"
+  // A scout who is submitting shops IS an active scout - no separate "submitting"
   // stage. Each photo submission still fires its own message (scout_submission_
   // received); it just doesn't create a new stage. Payout keeps them Active too.
   submission: 'Active',
@@ -120,7 +120,7 @@ const POP_LEAN: Record<string, { label: string; color: string }> = {
   undecided: { label: 'Undecided', color: '#F59E0B' },
   opposed:   { label: 'Opposed',   color: '#EF4444' },
 }
-// Clean minimal category pills — a colored dot + label, no emoji glyphs.
+// Clean minimal category pills - a colored dot + label, no emoji glyphs.
 const POP_GRIEVANCE: Record<string, { label: string; color: string }> = {
   jobs:      { label: 'Jobs',      color: '#3B82F6' },
   water:     { label: 'Water',     color: '#06B6D4' },
@@ -137,7 +137,7 @@ const POP_INTENT: Record<string, { label: string; color: string }> = {
   volunteer: { label: 'Volunteer', color: '#3B82F6' },
   rally:     { label: 'Rally',     color: '#F97316' },
   share:     { label: 'Share',     color: '#A78BFA' },
-  none:      { label: '—',         color: '#6B7280' },
+  none:      { label: '-',         color: '#6B7280' },
 }
 const POP_LOOP: Record<string, { label: string; color: string }> = {
   raised:   { label: 'Raised',   color: '#F59E0B' },
@@ -145,7 +145,7 @@ const POP_LOOP: Record<string, { label: string; color: string }> = {
   resolved: { label: 'Resolved', color: '#22C55E' },
 }
 // WHY the person engaged (migration 023). Grievance is the column default so
-// it only gets a badge when a real grievance exists — the others always show.
+// it only gets a badge when a real grievance exists - the others always show.
 const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
   grievance: { label: 'Grievance', color: '#F59E0B' },
   support:   { label: 'Support',   color: '#22C55E' },
@@ -154,7 +154,7 @@ const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
   info:      { label: 'Info',      color: '#06B6D4' },
   outreach:  { label: 'Outreach',  color: '#F97316' },
 }
-// HOW they came in — the real acquisition channel (magnet, migration 022/023),
+// HOW they came in - the real acquisition channel (magnet, migration 022/023),
 // far more meaningful for a campaign than generic marketing "source" (Direct).
 const POP_MAGNET: Record<string, { label: string; color: string }> = {
   whatsapp:    { label: 'WhatsApp',   color: '#22C55E' },
@@ -166,7 +166,7 @@ const POP_MAGNET: Record<string, { label: string; color: string }> = {
   event:       { label: 'Event',      color: '#2EC4B6' },
   landing:     { label: 'Landing',    color: '#6EA5D4' },
 }
-// WHO they are on the intensity ladder — the "type" a director scans for.
+// WHO they are on the intensity ladder - the "type" a director scans for.
 const POP_TIER: Record<number, { label: string; color: string }> = {
   0: { label: 'Contact',   color: '#7A8AA0' },
   1: { label: 'Voter',     color: '#3B82F6' },
@@ -203,7 +203,7 @@ function timeAgo(dateStr: string | null | undefined): string {
 
 /**
  * Format a stored booking time to a 12-hour display string. Bookings are stored
- * in TWO formats — 24h "HH:MM" (web flow, e.g. "17:00") and 12h "H:MM AM/PM"
+ * in TWO formats - 24h "HH:MM" (web flow, e.g. "17:00") and 12h "H:MM AM/PM"
  * (WhatsApp flow, e.g. "3:00 PM"). The old inline parser split on ":" and read
  * the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (PM silently dropped).
  * This handles both: keep an explicit AM/PM, otherwise convert from 24h.
@@ -212,7 +212,7 @@ function formatBookingTime(raw: unknown): string {
   if (raw == null) return ''
   const s = String(raw).trim()
   if (!s) return ''
-  // Already 12-hour with an explicit period — normalise and keep it.
+  // Already 12-hour with an explicit period - normalise and keep it.
   const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
   if (ampm) {
     const h = parseInt(ampm[1], 10)
@@ -257,7 +257,7 @@ interface LeadsTableProps {
 }
 
 // Synthetic account ids / placeholder emails the owner & scout apps stamp before
-// a real name/email exists — e.g. "owner_9341333999_1783481293327@noemail.lokazen.in".
+// a real name/email exists - e.g. "owner_9341333999_1783481293327@noemail.lokazen.in".
 // These are internal ids, never a person's contact, so they must never render as
 // the lead's name OR email. Mirrors cleanName() in api/agent/leads/inbound.
 function isSyntheticContact(v?: string | null): boolean {
@@ -297,7 +297,7 @@ export default function LeadsTable({
   // both are kept out of the sales Leads view and counts. The Gigs page filters
   // to the 'gig' umbrella (scout OR connector).
   const GIG_TYPES = ['scout', 'connector']
-  // Scout segment — gated by the brand's features.scouts toggle (lokazen) so
+  // Scout segment - gated by the brand's features.scouts toggle (lokazen) so
   // scout UI never leaks into brands that don't run scouts.
   const showScouts = Boolean(brandConfig.features?.scouts)
   const searchParams = useSearchParams()
@@ -403,7 +403,7 @@ export default function LeadsTable({
         return (brandData.user_type || brandData.business_type) === userTypeFilter
       })
     } else if (showScouts) {
-      // Gig workers (scout/connector) have their own page — keep them out of
+      // Gig workers (scout/connector) have their own page - keep them out of
       // the general Leads view, which is brand + property-owner only.
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
@@ -736,7 +736,7 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
-              {/* Scouts feature: Brand vs Property Owner vs Scout is the primary filter — show it first. */}
+              {/* Scouts feature: Brand vs Property Owner vs Scout is the primary filter - show it first. */}
               {showScouts && !hideUserTypeFilter && (
                 <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
                   <option value="all">All leads</option>
@@ -770,7 +770,7 @@ export default function LeadsTable({
                   )}
                 </select>
               )}
-              {/* D2D coverage count — how many People arrived via the field campaign */}
+              {/* D2D coverage count - how many People arrived via the field campaign */}
               {brandId === 'pop' && (() => {
                 const d2dCount = leads.filter((l) => (l.first_touchpoint || l.source) === 'd2d').length
                 return d2dCount > 0 ? (
@@ -852,7 +852,7 @@ export default function LeadsTable({
             </Link>
           )}
 
-          {/* Add Lead — prominent + button, sits at the far right of the header */}
+          {/* Add Lead - prominent + button, sits at the far right of the header */}
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-1.5 pl-2 pr-3 py-1.5 text-xs font-semibold rounded-md text-[var(--text-button)] shadow-sm transition-transform hover:scale-[1.04]"
@@ -865,7 +865,7 @@ export default function LeadsTable({
         </div>
       </div>
 
-      {/* Table — min-h-0 lets this flex child shrink so it scrolls INTERNALLY
+      {/* Table - min-h-0 lets this flex child shrink so it scrolls INTERNALLY
           (instead of the page scrolling), which is what makes the sticky <thead>
           actually stay put. Without min-h-0 the child grows to content height,
           the page scrolls, and the "sticky" header rides away with it. */}
@@ -873,7 +873,7 @@ export default function LeadsTable({
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           {brandId === 'pop' ? (
             <colgroup>
-              {/* POP constituent view — widths sum to 100% */}
+              {/* POP constituent view - widths sum to 100% */}
               <col style={{ width: '13%' }} />  {/* Constituent (name + captured) */}
               <col style={{ width: '8%' }} />   {/* Type (intensity tier) */}
               <col style={{ width: '10%' }} />  {/* Contact (phone) */}
@@ -968,11 +968,11 @@ export default function LeadsTable({
                 const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
                 // brandLabel: voter brands (pop) rename sales stages for display
-                // only — filtering/storage still use the raw lead_stage value.
+                // only - filtering/storage still use the raw lead_stage value.
                 const displayStage = brandLabel(stage || 'New')
                 const stageColor = getStageColor(stage || 'New')
                 // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
-                // first — never the last_touchpoint, since that gets overwritten
+                // first - never the last_touchpoint, since that gets overwritten
                 // by any later interaction (e.g. a logged call flips to 'voice').
                 const source = (lead.first_touchpoint || lead.source || lead.last_touchpoint || 'unknown').toLowerCase()
                 const lastTouch = (lead.last_touchpoint || '').toLowerCase()
@@ -988,7 +988,7 @@ export default function LeadsTable({
                   uc?.whatsapp?.what_is_your_brand_name ||
                   uc?.whatsapp?.profile?.company ||
                   uc?.web?.profile?.company || ''
-                // City — check every known location:
+                // City - check every known location:
                 //   brand-namespaced (set by inbound endpoint + AI extractor)
                 //   channel profile blocks (legacy)
                 //   raw_form_fields (from website form submissions)
@@ -1004,7 +1004,7 @@ export default function LeadsTable({
                   uc?.city ||                       // top-level (set by /api/agent/leads/inbound)
                   ''
 
-                // If no real name, fall back to a REAL email, then phone — never a
+                // If no real name, fall back to a REAL email, then phone - never a
                 // synthetic @noemail id (that used to surface as the lead's "name").
                 const cleanEmail = realEmail(lead.email)
                 const displayName = resolvedName || cleanEmail || lead.phone || '-'
@@ -1020,7 +1020,7 @@ export default function LeadsTable({
                 const isScoutRow = showScouts && lkzUserType === 'scout'
                 const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
                 const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyleFor(rowStage) : (stageColor.style || {})
-                // Scout's "area covered" is their single most useful field — dedupe
+                // Scout's "area covered" is their single most useful field - dedupe
                 // repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
                 const scoutLocation = isScoutRow
                   ? Array.from(new Set(String(lkz.scout_area_covered || '').split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
@@ -1040,12 +1040,12 @@ export default function LeadsTable({
                 // SOURCE column = where the lead actually came from.
                 //
                 // TOP badge: prefer utm_source (Google / Meta / Instagram /
-                //   YouTube / etc. — the ad platform that drove the visit)
+                //   YouTube / etc. - the ad platform that drove the visit)
                 //   so a "Google ad → Web → PAT" lead reads as Google, not
                 //   Web. Falls back to the channel medium (Web/WhatsApp/etc.)
                 //   when no UTM is present (direct traffic, organic, etc.).
                 //
-                // SUB line: the specific entry point — usually form_type
+                // SUB line: the specific entry point - usually form_type
                 //   (PAT, Demo Booked, …). If form_type is missing we fall
                 //   back to utm_medium (cpc, social, organic) so the line
                 //   still tells you HOW they got here.
@@ -1058,7 +1058,7 @@ export default function LeadsTable({
                 // utm_source='ig' should show as Instagram, not WhatsApp.
                 //
                 // Priority chain (matches the server-side deriveSource logic):
-                //   1. utm_source (explicit marketing tracking — gold signal)
+                //   1. utm_source (explicit marketing tracking - gold signal)
                 //   2. raw_form_fields.channel IF it's a marketing channel
                 //      (ig / fb / facebook_ads / google_ads / etc.)
                 //   3. attribution.source IF it's a marketing channel
@@ -1113,7 +1113,7 @@ export default function LeadsTable({
                     : ''
 
                 // Platform values that arrive as first_touchpoint but should
-                // NEVER render as a source — they describe the surface the
+                // NEVER render as a source - they describe the surface the
                 // lead used to message us, not the marketing source. When the
                 // resolver falls all the way through to channelConfig[source]
                 // and the source is one of these, show 'Direct' instead so
@@ -1122,7 +1122,7 @@ export default function LeadsTable({
                   'whatsapp', 'web', 'form', 'voice', 'social',
                 ])
 
-                // utmSourceRaw drives the SOURCE pill — same priority chain.
+                // utmSourceRaw drives the SOURCE pill - same priority chain.
                 const utmSourceRaw = attrSource !== 'direct' ? attrSource : String(
                   uc?.web?.utm?.source ||
                   uc?.landing_page?.utm_source ||
@@ -1199,7 +1199,7 @@ export default function LeadsTable({
                   // Override label with the prettier server-side label if present
                   if (attrSourceLabel) srcCfg = { ...srcCfg, label: attrSourceLabel }
                 } else if (attrSourceLabel) {
-                  // Attribution present with an unmapped source — use the label as-is
+                  // Attribution present with an unmapped source - use the label as-is
                   srcCfg = { label: attrSourceLabel, color: '#6366F1' }
                 } else if (utmSourceRaw) {
                   srcCfg = {
@@ -1210,7 +1210,7 @@ export default function LeadsTable({
                   }
                 } else if (source && NON_MARKETING_PLATFORMS.has(source)) {
                   // Final fallback fired with a platform source (whatsapp/
-                  // web/voice/etc.) — don't render it as a marketing pill.
+                  // web/voice/etc.) - don't render it as a marketing pill.
                   // These leads simply have no marketing attribution.
                   srcCfg = { label: 'Direct', color: '#6B7280' }
                 } else {
@@ -1327,7 +1327,7 @@ export default function LeadsTable({
                   const leanCfg = pl.lean ? POP_LEAN[pl.lean] : null
                   const grvCfg = pl.grievance_category ? POP_GRIEVANCE[pl.grievance_category] : null
                   // Engagement badge fills the grievance cell when there's no
-                  // grievance — a supporter/volunteer/event arrival is a complete
+                  // grievance - a supporter/volunteer/event arrival is a complete
                   // person, not a missing grievance. 'grievance' itself is the
                   // column default, so it never shows as a standalone badge.
                   const engCfg = pl.engagement_type && pl.engagement_type !== 'grievance' ? POP_ENGAGEMENT[pl.engagement_type] : null
@@ -1349,7 +1349,7 @@ export default function LeadsTable({
                       style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
                       onClick={() => handleRowClick(lead)}
                     >
-                      {/* CONSTITUENT — name + captured date */}
+                      {/* CONSTITUENT - name + captured date */}
                       <td className="px-3 py-2">
                         <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                           {displayName}
@@ -1361,12 +1361,12 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* TYPE — intensity tier: who this person is (Voter→Cadre) */}
+                      {/* TYPE - intensity tier: who this person is (Voter→Cadre) */}
                       <td className="px-3 py-2 text-center">
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
                           style={{ backgroundColor: `${tierCfg.color}22`, color: tierCfg.color, border: `1px solid ${tierCfg.color}44` }}
-                          title={`Intensity tier ${typeof pl.intensity === 'number' ? pl.intensity : 0} — ${tierCfg.label}`}
+                          title={`Intensity tier ${typeof pl.intensity === 'number' ? pl.intensity : 0} - ${tierCfg.label}`}
                         >
                           {tierCfg.label}
                         </span>
@@ -1377,7 +1377,7 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* CONTACT — phone + email (when provided) */}
+                      {/* CONTACT - phone + email (when provided) */}
                       <td className="px-3 py-2">
                         {lead.phone && (
                           <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
@@ -1389,10 +1389,10 @@ export default function LeadsTable({
                             {cleanEmail}
                           </a>
                         )}
-                        {!lead.phone && !cleanEmail && <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        {!lead.phone && !cleanEmail && <span style={{ color: 'var(--text-muted)' }}>-</span>}
                       </td>
 
-                      {/* CAME IN VIA — the real acquisition channel (magnet), not
+                      {/* CAME IN VIA - the real acquisition channel (magnet), not
                           generic marketing "source". Falls back to the touchpoint. */}
                       <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                         {magnetCfg ? (
@@ -1404,12 +1404,12 @@ export default function LeadsTable({
                           </span>
                         ) : (
                           <span className="text-[10px] whitespace-nowrap capitalize" style={{ color: 'var(--text-muted)' }}>
-                            {(pl.magnet || subSource || '—').replace(/_/g, ' ')}
+                            {(pl.magnet || subSource || '-').replace(/_/g, ' ')}
                           </span>
                         )}
                       </td>
 
-                      {/* LAST TOUCH — last channel + actor (real attribution) */}
+                      {/* LAST TOUCH - last channel + actor (real attribution) */}
                       <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                         {(() => {
                           const actor = (lead.unified_context as any)?.last_actor || null
@@ -1433,7 +1433,7 @@ export default function LeadsTable({
                           } else if (actor?.type === 'proxe') {
                             actorBadge = { label: 'PROXe', tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
                           }
-                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>-</span>
                           return (
                             <div className="flex flex-col items-center gap-0.5">
                               {channelCfg && (
@@ -1451,7 +1451,7 @@ export default function LeadsTable({
                         })()}
                       </td>
 
-                      {/* CONSTITUENCY — numbered AC chip + seat + district color pill */}
+                      {/* CONSTITUENCY - numbered AC chip + seat + district color pill */}
                       <td className="px-3 py-2">
                         {pl.constituency ? (
                           <>
@@ -1482,11 +1482,11 @@ export default function LeadsTable({
                             )}
                           </>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* GRIEVANCE — category badge + salience + text */}
+                      {/* GRIEVANCE - category badge + salience + text */}
                       <td className="px-3 py-2">
                         {grvCfg ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1507,12 +1507,12 @@ export default function LeadsTable({
                           <span
                             className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
                             style={{ backgroundColor: `${engCfg.color}1f`, color: engCfg.color }}
-                            title={`Came in via ${engCfg.label.toLowerCase()} — no grievance raised`}
+                            title={`Came in via ${engCfg.label.toLowerCase()} - no grievance raised`}
                           >
                             {engCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                         {pl.grievance_text && (
                           <div className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }} title={pl.grievance_text}>
@@ -1521,7 +1521,7 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* LEAN — pill */}
+                      {/* LEAN - pill */}
                       <td className="px-3 py-2 text-center">
                         {leanCfg ? (
                           <span
@@ -1531,11 +1531,11 @@ export default function LeadsTable({
                             {leanCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* INTENT — action badge */}
+                      {/* INTENT - action badge */}
                       <td className="px-3 py-2 text-center">
                         {intentCfg ? (
                           <span
@@ -1545,11 +1545,11 @@ export default function LeadsTable({
                             {intentCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* LOOP — status badge */}
+                      {/* LOOP - status badge */}
                       <td className="px-3 py-2 text-center">
                         {loopCfg ? (
                           <span
@@ -1559,7 +1559,7 @@ export default function LeadsTable({
                             {loopCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -1647,13 +1647,13 @@ export default function LeadsTable({
                             ''
                           ).trim()
                           if (!pageUrl) return null
-                          // Show only the path — strip any query string (utm_*, etc.)
+                          // Show only the path - strip any query string (utm_*, etc.)
                           // regardless of whether the URL is absolute or relative.
                           let pathOnly = pageUrl.split('?')[0].split('#')[0]
                           try {
                             const u = new URL(pageUrl)
                             // Click redirectors (fb.me, wa.me, m.me, l.facebook.com) carry a
-                            // meaningless short-link id as their path — e.g. a WhatsApp
+                            // meaningless short-link id as their path - e.g. a WhatsApp
                             // Clickthrough lead's "/9qqSZr45W". Don't show it.
                             const REDIRECTOR_HOSTS = ['fb.me', 'wa.me', 'm.me', 'l.facebook.com', 'lm.facebook.com']
                             if (REDIRECTOR_HOSTS.includes(u.hostname.replace(/^www\./, ''))) return null
@@ -1728,11 +1728,11 @@ export default function LeadsTable({
                         }
 
                         if (!actorBadge && !channelCfg) {
-                          return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          return <span style={{ color: 'var(--text-muted)' }}>-</span>
                         }
 
                         // Channel is the primary signal (which surface the
-                        // last touch landed on); the actor — if any — is a
+                        // last touch landed on); the actor - if any - is a
                         // sub-line "@username" beneath it.
                         return (
                           <div className="flex flex-col items-center gap-0.5">
@@ -1830,11 +1830,11 @@ export default function LeadsTable({
                           </div>
                         )
                       })() : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                       )}
                     </td>
 
-                    {/* Aviation columns — chip styling so the row reads as a
+                    {/* Aviation columns - chip styling so the row reads as a
                         scannable set of tags rather than mixed text + chips */}
                     {showAviationColumns && (
                       <td className="px-3 py-2 text-xs text-center">
@@ -1846,7 +1846,7 @@ export default function LeadsTable({
                             {lead.unified_context[brandId].user_type}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                     )}
@@ -1860,7 +1860,7 @@ export default function LeadsTable({
                             {lead.unified_context[brandId].course_interest}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                     )}
@@ -1869,11 +1869,11 @@ export default function LeadsTable({
                       const wc = uc[brandId] || uc.windchasers || {}
                       const rawScore = wc.pat_score ?? uc.raw_form_fields?.total_score ?? null
                       const patRaw = rawScore != null ? Number(rawScore) : null
-                      // Display as /100 — see docs/pat-scoring.md
+                      // Display as /100 - see docs/pat-scoring.md
                       const patScore100 = patRaw != null && !isNaN(patRaw)
                         ? (wc.pat_score_100 ?? Math.round((patRaw * 100) / 150))
                         : null
-                      // Tier — derive from raw if not stored (e.g. legacy raw_form_fields)
+                      // Tier - derive from raw if not stored (e.g. legacy raw_form_fields)
                       const storedTier = String(
                         wc.pat_tier || uc.raw_form_fields?.tier || ''
                       ).toLowerCase().trim()
@@ -1908,7 +1908,7 @@ export default function LeadsTable({
                               <span className="text-[9px] opacity-70">/100</span>
                             </span>
                           ) : (
-                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
                         </td>
                       )
@@ -1923,7 +1923,7 @@ export default function LeadsTable({
                               {lkz.scout_area_covered}
                             </span>
                           ) : (
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
@@ -1932,7 +1932,7 @@ export default function LeadsTable({
                               {lkz.scout_knows_properties === 'yes' ? 'Yes' : lkz.scout_knows_properties === 'not_yet' ? 'Not yet' : lkz.scout_knows_properties}
                             </span>
                           ) : (
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
                         </td>
                       </>
@@ -1949,7 +1949,7 @@ export default function LeadsTable({
                           {lead.unified_context.owner.name}
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                       )}
                     </td>
                   </tr>
@@ -1968,7 +1968,7 @@ export default function LeadsTable({
         onStatusUpdate={updateLeadStatus}
       />
 
-      {/* Add Lead Modal — realtime subscription refreshes the list on insert */}
+      {/* Add Lead Modal - realtime subscription refreshes the list on insert */}
       <AddLeadModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

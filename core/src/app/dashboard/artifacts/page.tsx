@@ -1,9 +1,9 @@
 'use client'
 
-// ARTIFACTS OVERVIEW — the product surface for the brand's artifact stack.
+// ARTIFACTS OVERVIEW - the product surface for the brand's artifact stack.
 // One card per artifact: status, link, and the full feature checklist with
 // per-feature status pills (live / wip / planned). Config-driven from
-// getBrandConfig().artifacts — the feature list IS the roadmap.
+// getBrandConfig().artifacts - the feature list IS the roadmap.
 
 import React from 'react'
 import { useRouter } from 'next/navigation'
@@ -42,7 +42,7 @@ export default function ArtifactsPage() {
       <div style={{ marginBottom: '18px' }}>
         <h1 style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Artifacts</h1>
         <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Every artifact runs on the same engine and the same people — one person, one intensity ladder (voter → supporter → volunteer → cadre), many lenses.
+          Every artifact runs on the same engine and the same people - one person, one intensity ladder (voter → supporter → volunteer → cadre), many lenses.
         </p>
       </div>
 

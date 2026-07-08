@@ -10,7 +10,7 @@ export const popConfig: BrandConfig = {
     headerName: 'Pulse of Punjab',
     welcomeSequence: [
       { text: "Hi, I am PROXe, Pulse of Punjab's AI assistant.", delay: 0 },
-      { text: 'Raise a grievance, get campaign updates, or volunteer — how can I help?', delay: 800 },
+      { text: 'Raise a grievance, get campaign updates, or volunteer - how can I help?', delay: 800 },
     ],
   },
   // Pulse of Punjab (POP) runs the full grievance-driven campaign stack:
@@ -20,12 +20,12 @@ export const popConfig: BrandConfig = {
   // until live numbers are wired.
   features: {
     voice: true,
-    brain: true, // enabled for POP — the Calls tab is the voice A/B latency bench
+    brain: true, // enabled for POP - the Calls tab is the voice A/B latency bench
     pipelineFunnel: true,
     followUpSequence: true,
     warRoom: true,
   },
-  // POP artifacts — the surfaces built on top of the engine. Clicking the
+  // POP artifacts - the surfaces built on top of the engine. Clicking the
   // sidebar brand header opens the artifact switcher listing these. All of
   // them read/write the SAME person variables in all_leads (phone = merge
   // key); see brands/pop/docs/artifacts.md for the full architecture.
@@ -33,7 +33,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'overview',
       name: 'Overview',
-      description: 'Campaign command dashboard — the engine home',
+      description: 'Campaign command dashboard - the engine home',
       status: 'live',
       href: '/dashboard',
       icon: 'grid',
@@ -41,7 +41,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'war-room',
       name: 'War Room',
-      description: 'The command center — voices, seats, intensity, grievance loop',
+      description: 'The command center - voices, seats, intensity, grievance loop',
       status: 'live',
       href: '/war-room',
       icon: 'map',
@@ -49,7 +49,7 @@ export const popConfig: BrandConfig = {
         { name: 'Live state dashboard', status: 'live' },
         { name: 'Constituency dashboards', status: 'live' },
         { name: 'Heat maps (117 seats)', status: 'live' },
-        { name: 'Lead funnel — intensity ladder', status: 'live' },
+        { name: 'Lead funnel - intensity ladder', status: 'live' },
         { name: 'Volunteer monitoring', status: 'live' },
         { name: 'Daily targets', status: 'live' },
         { name: 'Event monitoring', status: 'live' },
@@ -62,7 +62,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'pulse-app',
       name: 'Pulse Punjab',
-      description: 'Leadership intelligence — the leader-facing app',
+      description: 'Leadership intelligence - the leader-facing app',
       status: 'wip',
       href: 'https://pulse-punjab.vercel.app',
       external: true,
@@ -70,7 +70,7 @@ export const popConfig: BrandConfig = {
       features: [
         { name: 'Emerging issues (API)', status: 'live' },
         { name: 'Constituency mood (API)', status: 'live' },
-        { name: 'MLA performance — derived from our data (API)', status: 'live' },
+        { name: 'MLA performance - derived from our data (API)', status: 'live' },
         { name: 'Volunteer energy (API)', status: 'live' },
         { name: 'Push recommendations to War Room team', status: 'live' },
         { name: 'Issue heat maps (app render)', status: 'wip' },
@@ -80,7 +80,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'd2d',
       name: 'Door2Door',
-      description: 'Volunteer cadre activation — backend + monitoring on PROXe',
+      description: 'Volunteer cadre activation - backend + monitoring on PROXe',
       status: 'wip',
       icon: 'door',
       features: [
@@ -97,7 +97,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'myvoice',
       name: 'MyVoice',
-      description: 'Citizen-facing app/web — raise your voice, join the wave',
+      description: 'Citizen-facing app/web - raise your voice, join the wave',
       status: 'wip',
       icon: 'megaphone',
       features: [
@@ -118,7 +118,7 @@ export const popConfig: BrandConfig = {
     {
       id: 'listen',
       name: 'PROXe Listen',
-      description: 'Listen first, engage better — sentiment capture (internal)',
+      description: 'Listen first, engage better - sentiment capture (internal)',
       status: 'wip',
       href: '/dashboard/listen',
       icon: 'radar',
@@ -138,7 +138,7 @@ export const popConfig: BrandConfig = {
     },
   ],
   // Voter-native dashboard vocabulary. POP's audience is citizens/voters, not
-  // sales leads — the dashboard shell's business-CRM words are remapped here
+  // sales leads - the dashboard shell's business-CRM words are remapped here
   // (key = default English string used in core components, via brandLabel()).
   labels: {
     // Overview KPIs
@@ -159,14 +159,14 @@ export const popConfig: BrandConfig = {
     'Lead': 'Person',
     'High Intent': 'High Salience',
     'Comparing': 'Undecided',
-    'Push to book a call': 'Call back — hear them out',
+    'Push to book a call': 'Call back - hear them out',
     'Share pricing + offers': 'Send grievance status update',
     'Share program details': 'Share campaign update',
     'Onboard / next steps': 'Invite to volunteer',
     // Misc shell
     'Founder': 'Team',
     'Customer Journey': 'Voter Journey',
-    // Stage names (display-only — the stored lead_stage values are unchanged)
+    // Stage names (display-only - the stored lead_stage values are unchanged)
     'Qualified': 'Supporter',
     'Booking Made': 'Call Scheduled',
     'Converted': 'Volunteer',
@@ -180,7 +180,7 @@ export const popConfig: BrandConfig = {
   },
   styles: {
     themePath: '@/styles/theme.css',
-    // No pop block in theme.css — widget derives its palette from colors below.
+    // No pop block in theme.css - widget derives its palette from colors below.
     colorVarsFromConfig: true,
   },
   chatStructure: {

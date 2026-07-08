@@ -59,10 +59,10 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
-  // Gigs tab only — scout lifecycle stage breakdown (all zero otherwise). Same
+  // Gigs tab only - scout lifecycle stage breakdown (all zero otherwise). Same
   // stage derivation as the Gigs table's STATUS column, so they never disagree.
   gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
-  // Gigs tab only — scouts reaching KYC-started in the last 7 days (0 otherwise).
+  // Gigs tab only - scouts reaching KYC-started in the last 7 days (0 otherwise).
   kycStarted7D?: number
   // POP-only: inbound/outbound voice volume for the Calls KPI card (ported from the pop fork).
   calls?: {
@@ -140,7 +140,7 @@ function formatBookingWhen(iso: string): string {
 
 // Human-readable duration from milliseconds (agent reply latency).
 function fmtMs(ms: number): string {
-  if (!ms || ms <= 0) return '—'
+  if (!ms || ms <= 0) return '-'
   if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`
   const h = Math.floor(ms / 3_600_000)
@@ -187,7 +187,7 @@ const MAGNET_META: Record<string, { label: string; color: string }> = {
 }
 const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
 
-// Deterministic gentle daily climb from `start`→`end` with a small wave — for
+// Deterministic gentle daily climb from `start`→`end` with a small wave - for
 // the mock trend/sparkline series (no Math.random so renders are stable).
 function popDailySeries(n: number, end: number, start: number): Array<{ value: number }> {
   const out: Array<{ value: number }> = []
@@ -202,7 +202,7 @@ function popDailySeries(n: number, end: number, start: number): Array<{ value: n
 
 // POP pitch dashboard: overlay campaign-scale ENGINE/KPI aggregates onto the real
 // metrics so the overview reads like a live statewide operation. Lists (lead
-// queues, bookings) stay real — only the headline numbers are mocked. Pop only.
+// queues, bookings) stay real - only the headline numbers are mocked. Pop only.
 function popMockMetrics(real: FounderMetrics): FounderMetrics {
   const conv7D = popDailySeries(7, 8832, 6100)
   const conv14D = popDailySeries(14, 8832, 4200)
@@ -243,7 +243,7 @@ export default function FounderDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
-  // Leads/Gigs tab (lokazen only, see showGigsTab) — identical dashboard,
+  // Leads/Gigs tab (lokazen only, see showGigsTab) - identical dashboard,
   // wired to a different slice of the same founder-metrics endpoint.
   const [view, setView] = useState<'leads' | 'gigs'>('leads')
 
@@ -251,7 +251,7 @@ export default function FounderDashboard() {
   // to have"). Active Conversations defaults to Today (24h); the trend to 7D.
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
   const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
-  // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
+  // Engine Overview funnel - All-time snapshot by default, with 7d/14d windows.
   // POP adds a Today (24h) window (cohort funnel ported from the pop fork).
   const [engineRange, setEngineRange] = useState<'Today' | '7D' | '14D' | 'All'>('All')
   // Top-bar user profile menu.
@@ -267,7 +267,7 @@ export default function FounderDashboard() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (cancelled) return
-        // Prefer the name set in User Management (dashboard_users.full_name) —
+        // Prefer the name set in User Management (dashboard_users.full_name) -
         // that's the field the admin edits. Fall back to auth metadata, then to
         // the email prefix. Editing the name in User Management must reflect here.
         let name = ''
@@ -284,7 +284,7 @@ export default function FounderDashboard() {
           name = (meta.full_name as string) || (meta.name as string) || ''
         }
         setUser({ name, email: user?.email || '' })
-      } catch { /* soft-fail — greeting falls back to "Founder" */ }
+      } catch { /* soft-fail - greeting falls back to "Founder" */ }
     })()
     return () => { cancelled = true }
   }, [])
@@ -521,10 +521,10 @@ export default function FounderDashboard() {
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
-  // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
+  // Engine Overview - the lead-funnel nodes (Total/Engaged/Warm) follow its
   // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
   // range in the metrics yet).
-  // BCON/POP: cohort funnel for the selected window — all five nodes scale together
+  // BCON/POP: cohort funnel for the selected window - all five nodes scale together
   // (leads acquired in the window → how far each got). Falls back to the old
   // per-metric counts (identical to core's expressions) when `funnel` is absent.
   const fn = hasNewHomeLook ? metrics.funnel?.[engineRange] : undefined
@@ -534,7 +534,7 @@ export default function FounderDashboard() {
   const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
   const engBooked = fn ? fn.booked : (flow.booked || 0)
   // Gigs tab: Engaged/Warm/Follow-up Due/Booked don't mean anything for
-  // scouts — the funnel that matters is their onboarding lifecycle (same
+  // scouts - the funnel that matters is their onboarding lifecycle (same
   // stage derivation the Gigs table's STATUS column uses), so all 4 middle+
   // last nodes swap to it. Slot 1 (Total Leads) stays as-is either way.
   const isGigsView = showGigsTab && view === 'gigs'
@@ -543,12 +543,12 @@ export default function FounderDashboard() {
   // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
   const engK = (n: number): number | string => (isPop ? abbrevK(n) : n)
   const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
-  // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
+  // Active Conversations card - its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
   const tc = metrics.totalConversations
   const acValue = acRange === '7D' ? tc.count7D : acRange === '14D' ? tc.count14D : (tc.count1D ?? 0)
   const acLabel = acRange === 'Today' ? 'in the last 24 hours' : acRange === '7D' ? 'in the last 7 days' : 'in the last 14 days'
-  // Conversations Trend — its own toggle (7d / 14d / 30d). Real per-day series
+  // Conversations Trend - its own toggle (7d / 14d / 30d). Real per-day series
   // (distinct leads messaged/day); old trends.conversations.data came back ~flat.
   const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
   const rangeLabel = `last ${rangeDays} days`
@@ -577,7 +577,7 @@ export default function FounderDashboard() {
   const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
   // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
   // BCON/POP: health follows the REPLY RATE shown on the card (not the
-  // response-time bucket) — so a 100% reply rate never reads as "Fair" (ported
+  // response-time bucket) - so a 100% reply rate never reads as "Fair" (ported
   // from those forks). Other brands keep core's responseHealth.status verbatim.
   const replyRate = Math.round(rm?.responseRate ?? 0)
   const healthLevel: 'good' | 'warning' | 'critical' = hasNewHomeLook
@@ -591,7 +591,7 @@ export default function FounderDashboard() {
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
-      {/* Subtle bento entrance — cards fade + rise in, lightly staggered. Plays
+      {/* Subtle bento entrance - cards fade + rise in, lightly staggered. Plays
           once on mount (DOM persists across the 60s metric refresh, so it doesn't
           replay). Respects reduced-motion. */}
       <style>{`
@@ -604,13 +604,13 @@ export default function FounderDashboard() {
           .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
         }
       `}</style>
-      {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
+      {/* ── ROW 0 · Top bar - greeting + range toggle + controls + profile ── */}
       <header className="flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
             {greeting}, {firstName} <span aria-hidden>👋</span>
           </h1>
-          {/* lokazen only: Leads (business leads) / Gigs (scouts + connectors) —
+          {/* lokazen only: Leads (business leads) / Gigs (scouts + connectors) -
               same dashboard below, wired to a different slice of the same data. */}
           {showGigsTab && (
             <div
@@ -626,7 +626,7 @@ export default function FounderDashboard() {
                   aria-selected={view === v}
                   onClick={() => {
                     if (v === view) return
-                    // Show the loader immediately on tab switch — otherwise the
+                    // Show the loader immediately on tab switch - otherwise the
                     // PREVIOUS tab's numbers stay on screen (now mislabeled
                     // under the new tab) for however long the new-scope fetch
                     // takes. loadMetrics's finally clears this once it resolves.
@@ -710,7 +710,7 @@ export default function FounderDashboard() {
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
       <div className={`wc-bento grid grid-cols-2 md:grid-cols-3 ${features.voice ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-3 sm:gap-4 shrink-0`}>
-        {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
+        {/* Card 1 - Active Conversations: own toggle (24h / 7d / 14d). */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, #3B82F6 ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, #3B82F6 ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -745,8 +745,8 @@ export default function FounderDashboard() {
           })()}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
-        {/* Card 2 — Leads: hot/sales-ready leads PROXe scored. Gigs: engaged
-            scouts (active conversation on WhatsApp or social, last 7 days) —
+        {/* Card 2 - Leads: hot/sales-ready leads PROXe scored. Gigs: engaged
+            scouts (active conversation on WhatsApp or social, last 7 days) -
             lead_score doesn't apply to scouts, so "High Intent" always read 0. */}
         {isGigsView ? (
           <KpiCard
@@ -768,7 +768,7 @@ export default function FounderDashboard() {
             onClick={() => router.push('/dashboard/leads?filter=hot')}
           />
         )}
-        {/* Follow-up Health — status + ring; whole card follows the status colour. */}
+        {/* Follow-up Health - status + ring; whole card follows the status colour. */}
         <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthLevel === 'good' ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
@@ -812,7 +812,7 @@ export default function FounderDashboard() {
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
         />
-        {/* Calls — inbound + outbound voice volume (links to the Calls view).
+        {/* Calls - inbound + outbound voice volume (links to the Calls view).
             Only shown when the Voice/Calls feature is enabled for this brand. */}
         {features.voice && (
           <KpiCard
@@ -874,11 +874,11 @@ export default function FounderDashboard() {
           </div>
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
-            {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention — check the Follow-up Due column.`}
+            {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention - check the Follow-up Due column.`}
           </div>
         </section>
 
-        {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
+        {/* Upcoming Events - owner-aware (narrower so Engine Overview is more prominent) */}
         <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
@@ -913,7 +913,7 @@ export default function FounderDashboard() {
                           </span>
                         )}
                       </div>
-                      {/* Mobilization — the "how many volunteered / supporting" glance. */}
+                      {/* Mobilization - the "how many volunteered / supporting" glance. */}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.14)', color: '#22c55e' }}>
                           {ev.going} going
@@ -931,7 +931,7 @@ export default function FounderDashboard() {
                   )
                 })
               ) : (
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet — create one from Events, and RSVPs will show here.</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet - create one from Events, and RSVPs will show here.</p>
               )
             ) : metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.map((booking) => (
@@ -944,7 +944,7 @@ export default function FounderDashboard() {
                 >
                   <InitialsAvatar name={booking.name} size={24} />
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name · date · owner, with the recency-coloured
+                    {/* Line 1 - name · date · owner, with the recency-coloured
                         countdown chip on the right (only thing that's coloured). */}
                     <div className="flex items-center justify-between gap-2">
                       {hasNewHomeLook ? (
@@ -975,7 +975,7 @@ export default function FounderDashboard() {
                         </span>
                       ) })()}
                     </div>
-                    {/* Line 2 — free-text booking title when present; otherwise a
+                    {/* Line 2 - free-text booking title when present; otherwise a
                         detail composed from the structured intent we already captured
                         (program · who · timeline) so the row is never bare. No third line.
                         POP (fork parity): event title only, nothing composed. */}
@@ -1032,7 +1032,7 @@ export default function FounderDashboard() {
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                     >
-                      {/* Unresolved count — the headline attention number */}
+                      {/* Unresolved count - the headline attention number */}
                       <div className="shrink-0 flex flex-col items-center justify-center rounded-lg" style={{ width: 44, height: 44, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.25)' }}>
                         <span className="text-[15px] font-bold leading-none" style={{ color: '#ef4444' }}>{s.unresolved}</span>
                         <span className="text-[8px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>open</span>
@@ -1056,7 +1056,7 @@ export default function FounderDashboard() {
                 })}
               </div>
             ) : (
-              <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No seats need attention — grievance loops are healthy.</div>
+              <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No seats need attention - grievance loops are healthy.</div>
             )
           ) : metrics.leadsNeedingAttention.length > 0 ? (
             <div className="overflow-auto flex-1 min-h-0">
@@ -1164,7 +1164,7 @@ export default function FounderDashboard() {
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
             </div>
           </div>
-          {/* POP — WHERE IT CAME FROM: entry-channel mix, last 7 days. Turns the
+          {/* POP - WHERE IT CAME FROM: entry-channel mix, last 7 days. Turns the
               trend from "how many" into "how many + from where" at a glance. */}
           {isPop && metrics.campaignHome && metrics.campaignHome.sources.byMagnet.length > 0 && (
             <div className="mt-2.5 shrink-0">

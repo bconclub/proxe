@@ -3,28 +3,23 @@
 import React from 'react'
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, BarChart, Bar, RadialBarChart, RadialBar, ResponsiveContainer, Tooltip, YAxis, XAxis, CartesianGrid, LabelList } from 'recharts'
 
-// Activity heatmap — GitHub-contribution-style square grid, weekday-aligned
-// (rows = Sun→Sat, columns = weeks). Reads {date, count}[] (oldest→newest) and
-// buckets counts into 5 shades. Clean, at-a-glance "what's happening across N
-// days" — used for the POP campaign home.
+// Activity heatmap: GitHub-contribution-style square grid, weekday-aligned
+// (rows = Sun to Sat, columns = weeks). Reads {date, count}[] (oldest first) and
+// shades each day by its share of the busiest day. Fixed small squares so it
+// stays a clean grid regardless of panel width.
 export function ActivityHeatmap({ data, color = 'var(--accent-primary)' }: { data: Array<{ date: string; count: number }>; color?: string }) {
   if (!data || data.length === 0) return null
+  const CELL = 14, GAP = 4
   const max = Math.max(...data.map((d) => d.count), 1)
-  // 0 → empty; then 4 buckets by fraction of max.
+  // 0 = empty track; otherwise 4 shade steps by fraction of the max day.
   const shadeOf = (c: number): { bg: string; op: number } => {
     if (c <= 0) return { bg: 'var(--bg-tertiary)', op: 1 }
     const f = c / max
-    const op = f > 0.75 ? 1 : f > 0.5 ? 0.78 : f > 0.25 ? 0.52 : 0.3
-    return { bg: color, op }
+    return { bg: color, op: f > 0.75 ? 1 : f > 0.5 ? 0.78 : f > 0.25 ? 0.55 : 0.32 }
   }
-  // Pad the front so the first cell lands on its real weekday.
   const first = new Date(data[0].date)
   const startPad = isNaN(first.getTime()) ? 0 : first.getDay() // 0 = Sun
-  const cells: Array<{ date: string; count: number } | null> = [
-    ...Array(startPad).fill(null),
-    ...data,
-  ]
-  // Chunk into week-columns of 7 (Sun→Sat top→bottom).
+  const cells: Array<{ date: string; count: number } | null> = [...Array(startPad).fill(null), ...data]
   const cols: Array<Array<{ date: string; count: number } | null>> = []
   for (let i = 0; i < cells.length; i += 7) cols.push(cells.slice(i, i + 7))
   const fmtDate = (iso: string) => {
@@ -34,25 +29,25 @@ export function ActivityHeatmap({ data, color = 'var(--accent-primary)' }: { dat
 
   return (
     <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-      {/* weekday labels */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingTop: 2 }}>
+      {/* weekday labels (fixed row height matches the cells) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: GAP }}>
         {WEEKDAYS.map((w, i) => (
-          <span key={i} style={{ height: 15, fontSize: 8, lineHeight: '15px', color: 'var(--text-muted)', opacity: i % 2 ? 0.9 : 0 }}>{w}</span>
+          <span key={i} style={{ height: CELL, fontSize: 8, lineHeight: `${CELL}px`, color: 'var(--text-muted)', opacity: i % 2 ? 0.9 : 0 }}>{w}</span>
         ))}
       </div>
-      {/* week columns */}
-      <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+      {/* week columns - fixed-size squares, left-aligned, do not stretch */}
+      <div style={{ display: 'flex', gap: GAP }}>
         {cols.map((col, ci) => (
-          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+          <div key={ci} style={{ display: 'flex', flexDirection: 'column', gap: GAP }}>
             {Array.from({ length: 7 }, (_, ri) => {
               const cell = col[ri]
-              if (!cell) return <div key={ri} style={{ aspectRatio: '1', borderRadius: 3, background: 'transparent' }} />
+              if (!cell) return <div key={ri} style={{ width: CELL, height: CELL }} />
               const s = shadeOf(cell.count)
               return (
                 <div
                   key={ri}
                   title={`${fmtDate(cell.date)} · ${cell.count} voices`}
-                  style={{ aspectRatio: '1', borderRadius: 3, background: s.bg, opacity: s.op, border: '1px solid var(--border-primary)' }}
+                  style={{ width: CELL, height: CELL, borderRadius: 3, background: s.bg, opacity: s.op, border: '1px solid var(--border-primary)' }}
                 />
               )
             })}
@@ -91,7 +86,7 @@ export function Sparkline({ data, color, height = 40, showGradient = false, ampl
   // Pin the Y domain to the series' own range so EVERY day's movement uses the
   // full height instead of squishing into a thin band under one dominant spike
   // (which read as "flat and low"). `amplify` pads the domain so the range
-  // fills `amplify` fraction of the height — taller spikes, slight headroom.
+  // fills `amplify` fraction of the height - taller spikes, slight headroom.
   const vals = data.map((d) => d.value)
   let lo = vals.length ? Math.min(...vals) : 0
   let hi = vals.length ? Math.max(...vals) : 1
@@ -391,7 +386,7 @@ export function MiniBarChart({ data, color = 'var(--accent-primary)', height = 4
   )
 }
 
-// Conversations Trend — line chart with Y-axis gridlines, dots + per-day value
+// Conversations Trend - line chart with Y-axis gridlines, dots + per-day value
 // labels (matches the dashboard's "axis + labelled points" trend style). Day
 // labels are derived as the last N days ending today (series has no date field).
 export function ConversationsTrendChart({ data, color, days, animate = true }: {

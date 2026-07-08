@@ -7,7 +7,7 @@ import { INTENSITY_TIERS } from '@/lib/pop/intensity';
 import { type ColorMode } from './PunjabMap';
 import dynamic from 'next/dynamic';
 
-// Leaflet map is client-only (needs window) — load it without SSR. Matches the
+// Leaflet map is client-only (needs window) - load it without SSR. Matches the
 // Pulse Punjab leader app's map (real slippy tiles + drill-down).
 const PunjabLeafletMap = dynamic(() => import('./PunjabLeafletMap'), {
   ssr: false,
@@ -52,7 +52,7 @@ export interface WarRoomData {
   liveFeed: { id: string; name: string | null; constituency: string | null; category: string | null; created_at: string }[];
   series: { days: string[]; total: number[]; resolved: number[]; categories: string[]; byCategory: Record<string, number[]>; seats: string[]; bySeat: Record<string, number[]>; mobilization: Record<string, number[]> };
   sentiment: { net: number; shiftPp: number; label: string };
-  // D2D field coverage (d2d_visits) — null when no knocks / query degraded.
+  // D2D field coverage (d2d_visits) - null when no knocks / query degraded.
   d2d: {
     totals: { visits: number; met: number; not_home: number; refused: number; revisit: number; today: number; workers: number };
     byConstituency: { constituency: string; visits: number; met: number; metRate: number }[];
@@ -82,7 +82,7 @@ const EMPTY: Filters = { constituency: '', district: '', channel: '', language: 
 function mask(name: string | null, c: string | null) { if (name && name.trim().length > 1) { const f = name.trim().split(/\s+/)[0]; return f.length > 2 ? f[0] + '••••' : f; } return `Constituent, ${c || 'Punjab'}`; }
 function ago(iso: string) { const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; }
 
-// War Room is used on phones a lot — switch from the fixed single-viewport
+// War Room is used on phones a lot - switch from the fixed single-viewport
 // desktop grid to a stacked, scrolling layout below this width.
 function useIsMobile(bp = 820) {
   const [m, setM] = useState(false);
@@ -132,10 +132,10 @@ export default function WarRoomClient() {
     const ch = sb.channel('wr').on('postgres_changes', { event: '*', schema: 'public', table: 'all_leads' }, (p: any) => {
       const seat = p.new?.constituency || p.old?.constituency; if (seat) { setPulse(seat); setTimeout(() => setPulse(null), 2500); } fetchData();
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'd2d_visits' }, (p: any) => {
-      // A knock from the field tool — pulse the seat and refresh D2D coverage.
+      // A knock from the field tool - pulse the seat and refresh D2D coverage.
       const seat = p.new?.constituency; if (seat) { setPulse(seat); setTimeout(() => setPulse(null), 2500); } fetchData();
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaign_recommendations' }, () => {
-      // Leader pushed a directive — refresh so it lands in the Directives tab.
+      // Leader pushed a directive - refresh so it lands in the Directives tab.
       fetchData();
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'listen_signals' }, () => {
       fetchData();
@@ -153,7 +153,7 @@ export default function WarRoomClient() {
         {/* HEADER */}
         <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 8 : 12, padding: mobile ? '10px 12px' : '12px 18px', flexWrap: 'wrap', borderBottom: `1px solid ${LINE}` }}>
           <div>
-            <div style={{ fontSize: mobile ? 16 : 19, fontWeight: 800, letterSpacing: '-0.02em' }}>Pulse of Punjab <span style={{ color: MUT, fontWeight: 500, fontSize: mobile ? 13 : 15 }}>War Room</span></div>
+            <div style={{ fontSize: mobile ? 16 : 19, fontWeight: 800, letterSpacing: '-0.02em' }}>War Room</div>
             <div style={{ fontSize: 11, color: MUT, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: GREEN, animation: 'wr-pulse 2s infinite' }} />Real-time political intelligence across Punjab</div>
           </div>
           <div style={{ flex: 1 }} />
@@ -172,7 +172,7 @@ export default function WarRoomClient() {
             <Kpi label="Captured Today" value={d?.kpis.today ?? 0} sub="Since midnight" trend="+12%" up accent={GREEN} spark={d?.series.total?.slice(-7)} />
             <Kpi label="Active Seats" value={d?.kpis.activeConstituencies ?? 0} sub={`of ${TOTAL_SEATS}`} trend="+5" up accent={BLUE} spark={d?.series.total} />
             <Kpi label="Loop Health" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${d?.kpis.resolved ?? 0} / ${d?.kpis.raised ?? 0} resolved`} trend="+3pp" up accent={GREEN} spark={d?.series.resolved} />
-            <Kpi label="Sentiment Shift" value={`${(d?.sentiment.shiftPp ?? 0) >= 0 ? '+' : ''}${d?.sentiment.shiftPp ?? 0}pp`} sub="vs 7d ago" trend={d?.sentiment.label || '—'} up={(d?.sentiment.shiftPp ?? 0) >= 0} accent={PURPLE} spark={d?.series.total} />
+            <Kpi label="Sentiment Shift" value={`${(d?.sentiment.shiftPp ?? 0) >= 0 ? '+' : ''}${d?.sentiment.shiftPp ?? 0}pp`} sub="vs 7d ago" trend={d?.sentiment.label || '-'} up={(d?.sentiment.shiftPp ?? 0) >= 0} accent={PURPLE} spark={d?.series.total} />
           </div>
 
           {/* MAIN GRID: map | center | feed (stacks on mobile) */}
@@ -271,7 +271,7 @@ export default function WarRoomClient() {
                     );
                   })
                 ) : (
-                  (d?.recommendations || []).length === 0 ? <Empty text="No directives yet — the leader app pushes here" /> : d!.recommendations!.map((r) => (
+                  (d?.recommendations || []).length === 0 ? <Empty text="No directives yet - the leader app pushes here" /> : d!.recommendations!.map((r) => (
                     <div key={r.id} style={{ padding: '8px 12px', borderBottom: `1px solid ${LINE}` }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'flex-start' }}>
                         <b style={{ fontSize: 12, lineHeight: 1.3 }}>{r.title}</b>
@@ -298,7 +298,7 @@ export default function WarRoomClient() {
             </Panel>
           </div>
 
-          {/* BOTTOM ROW A — THE INTENSITY ENGINE (voter → supporter → volunteer → cadre) */}
+          {/* BOTTOM ROW A - THE INTENSITY ENGINE (voter → supporter → volunteer → cadre) */}
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.25fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
             <Panel title="Intensity Ladder" sub="Voter → Supporter → Volunteer → Cadre" h={mobile ? 250 : undefined}>
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 5, justifyContent: 'center' }}>
@@ -384,7 +384,7 @@ export default function WarRoomClient() {
                     ))}
                   </div>
                 </div>
-              ) : <Empty text="No volunteers yet — MyVoice and D2D feed this" />}
+              ) : <Empty text="No volunteers yet - MyVoice and D2D feed this" />}
             </Panel>
             <Panel title="D2D Coverage" sub="Field knocks" h={mobile ? 230 : undefined}>
               {d?.d2d ? (
@@ -405,11 +405,11 @@ export default function WarRoomClient() {
                     ))}
                   </div>
                 </div>
-              ) : <Empty text="No knocks logged yet — D2D field tool feeds this" />}
+              ) : <Empty text="No knocks logged yet - D2D field tool feeds this" />}
             </Panel>
           </div>
 
-          {/* BOTTOM ROW B — INTELLIGENCE (channels, events, issues, listening) */}
+          {/* BOTTOM ROW B - INTELLIGENCE (channels, events, issues, listening) */}
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,0.85fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.05fr)', gap: 12, minHeight: mobile ? undefined : 232 }}>
             <Panel title="Channel Mix" sub="By volume" h={mobile ? 190 : undefined}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -435,7 +435,7 @@ export default function WarRoomClient() {
                     </div>
                   ))}
                 </div>
-              ) : <Empty text="No events planned — create from Events API" />}
+              ) : <Empty text="No events planned - create from Events API" />}
             </Panel>
             <Panel title="Issue Trend (Top 5)" sub="14 days" h={mobile ? 240 : undefined}>
               <div style={{ flex: 1, minHeight: 120 }}>
@@ -479,7 +479,7 @@ export default function WarRoomClient() {
                     {d.listen.bySource.slice(0, 4).map((s) => <span key={s.source} style={{ background: TRACK, borderRadius: 10, padding: '1px 7px', textTransform: 'capitalize' }}>{s.source.replace('_', ' ')} {s.count}</span>)}
                   </div>
                 </div>
-              ) : <Empty text="No signals yet — Listen bridges feed this" />}
+              ) : <Empty text="No signals yet - Listen bridges feed this" />}
             </Panel>
             <Panel title="Constituency Snapshot" sub="Top 5 by volume & salience" h={mobile ? 260 : undefined}>
               <div style={{ overflowY: 'auto' }}>
@@ -513,7 +513,7 @@ export default function WarRoomClient() {
         </div>
       </div>
 
-      {/* DRAWER — rich per-constituency detail */}
+      {/* DRAWER - rich per-constituency detail */}
       {selected && (() => {
         const ref = CONSTITUENCIES.find((c) => c.name === selected);
         const sd = d?.seatDetails?.[selected];
@@ -531,7 +531,7 @@ export default function WarRoomClient() {
                   </div>
                   <Chip on={false} onClick={() => setSelected(null)}>✕</Chip>
                 </div>
-                <div style={{ color: MUT, fontSize: 11, marginTop: 4 }}>{(sd?.district || ref?.district) || '—'}{ref?.region ? ` · ${ref.region}` : ''}</div>
+                <div style={{ color: MUT, fontSize: 11, marginTop: 4 }}>{(sd?.district || ref?.district) || '-'}{ref?.region ? ` · ${ref.region}` : ''}</div>
               </div>
 
               {sd && total > 0 ? (

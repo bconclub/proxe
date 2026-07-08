@@ -1,6 +1,6 @@
 'use client'
 
-// PROXE LISTEN — "Listen first, engage better." The GI/PI + comms team's
+// PROXE LISTEN - "Listen first, engage better." The GI/PI + comms team's
 // sentiment board: trending issues, crisis alerts, source mix, mood by seat.
 // Reads GET /api/dashboard/listen (signals land via POST /api/agent/listen/log
 // from WhatsApp-scan / call-centre / volunteer / future scraper bridges).
@@ -50,7 +50,7 @@ export default function ListenPage() {
         <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-hover)', color: 'var(--accent-primary)' }}><MdSensors size={20} /></span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h1 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>PROXe Listen</h1>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Listen first, engage better — signals across social, news, WhatsApp, call centre & the field.</p>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Listen first, engage better - signals across social, news, WhatsApp, call centre & the field.</p>
         </div>
         <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)', borderRadius: 9, padding: '7px 10px', fontSize: 12 }}>
           <option value={7}>7 days</option>
@@ -62,7 +62,7 @@ export default function ListenPage() {
 
       {!d || d.totals.signals === 0 ? (
         <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 12, padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
-          {loading ? 'Loading signals…' : 'No signals in this window yet. Bridges (WhatsApp media scan, call centre, volunteer reports, scrapers) POST to /api/agent/listen/log — once they feed, this board comes alive.'}
+          {loading ? 'Loading signals…' : 'No signals in this window yet. Bridges (WhatsApp media scan, call centre, volunteer reports, scrapers) POST to /api/agent/listen/log - once they feed, this board comes alive.'}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -80,7 +80,7 @@ export default function ListenPage() {
                 {d.crisisAlerts.map((a, i) => (
                   <div key={i} style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>
                     {a.content}
-                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}> — {cap(a.source)}{a.constituency ? ` · ${a.constituency}` : ''} · sev {a.severity} · {ago(a.created_at)}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}> - {cap(a.source)}{a.constituency ? ` · ${a.constituency}` : ''} · sev {a.severity} · {ago(a.created_at)}</span>
                   </div>
                 ))}
               </div>

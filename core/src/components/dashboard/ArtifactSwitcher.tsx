@@ -1,6 +1,6 @@
 'use client'
 
-// Artifact switcher — dropdown on the sidebar brand header for brands that
+// Artifact switcher - dropdown on the sidebar brand header for brands that
 // define `artifacts` in their config (POP: War Room, Pulse Punjab, D2D, Lead
 // Now, Listener). Each artifact is a surface built on the same engine + person
 // variables; this is the one place to jump between them.
@@ -42,7 +42,7 @@ const STATUS_META: Record<ArtifactStatus, { label: string; color: string; bg: st
 
 interface ArtifactSwitcherProps {
   artifacts: ArtifactDef[]
-  activeId?: string      // artifact matching the current route — highlighted + checked
+  activeId?: string      // artifact matching the current route - highlighted + checked
   open: boolean
   onClose: () => void
 }
