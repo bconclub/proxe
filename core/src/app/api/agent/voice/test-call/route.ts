@@ -180,6 +180,14 @@ async function vapiTestCall(body: any) {
             ? {
                 firstMessage: voicePrompt.firstMessage,
                 ...(modelOverride ? { model: modelOverride } : {}),
+                // Force the Indian-accent voice (Monika) on a multilingual model
+                // so English isn't rendered US-accented. flash_v2_5 keeps the
+                // voice's native accent across pa/hi/en; both env-tunable.
+                voice: {
+                  provider: '11labs',
+                  voiceId: process.env.VAPI_POP_TTS_VOICE || '1qEiC6qsybMkmnNdVMbK',
+                  model: process.env.VAPI_POP_TTS_MODEL || 'eleven_flash_v2_5',
+                },
               }
             : {}),
           variableValues: {
@@ -311,6 +319,11 @@ async function elevenLabsTestCall(body: any) {
   const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
   const name = (contactName || leadName || '').trim();
 
+  // POP: drive the ElevenLabs agent in the SELECTED language with the SAME
+  // one-core-place prompt (the agent otherwise runs its hardcoded pa default —
+  // why V2 Hindi didn't work). Per-call overrides were enabled on the agent.
+  const vp = BRAND_ID === 'pop' ? await resolveVoicePrompt(body.language) : null;
+
   try {
     const res = await fetch('https://api.elevenlabs.io/v1/convai/sip-trunk/outbound-call', {
       method: 'POST',
@@ -319,6 +332,19 @@ async function elevenLabsTestCall(body: any) {
         agent_id: ELEVENLABS_AGENT_ID,
         agent_phone_number_id: ELEVENLABS_PHONE_NUMBER_ID,
         to_number: e164,
+        ...(vp
+          ? {
+              conversation_initiation_client_data: {
+                conversation_config_override: {
+                  agent: {
+                    language: vp.lang,
+                    first_message: vp.firstMessage,
+                    prompt: { prompt: vp.prompt },
+                  },
+                },
+              },
+            }
+          : {}),
       }),
     });
     const data = await res.json();

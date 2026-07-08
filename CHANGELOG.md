@@ -1,3 +1,9 @@
+## 2026-07-08 17:05 IST · fix(pop): Indian-accent voice everywhere + V2 speaks the selected language
+
+- V2 Hindi didn't work because the ElevenLabs agent was hardcoded to Punjabi and blocked per-call overrides. Enabled language/first_message/prompt overrides on the agent and wired V2 to the same one-core-place prompt in the selected language.
+- English came out US-accented on V1/V2 (eleven_v3 models neutralize accent). V1 now forces the Monika voice on eleven_flash_v2_5 (keeps the Indian accent across pa/hi/en) — matching V3.
+- Voice is now Monika (1qEiC6qsybMkmnNdVMbK) + flash_v2_5 across V1 and V3; V2 uses Monika via its agent.
+- `(pending-sha)` + V2 agent config PATCH (live)
 ## 2026-07-08 16:30 IST · feat(pop): one core place for voice prompts (Configure → Voice Prompts)
 
 - New dashboard editor: per language (pa/hi/en), three fields — Opening (start line), Prompt (body), Closing (end lines). Saved to dashboard_settings; read by BOTH V1 (Vapi) and V3 (Sarvam pipeline). No deploy, no Vapi — edits apply on the next call.
