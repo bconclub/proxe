@@ -108,7 +108,7 @@ export default function DetailContent({
 
       <Divider />
       <Txt size={11} weight="bold" dim style={styles.section}>
-        WORKFORCE YOU CAN MOVE
+        FRONTLINE YOU CAN MOVE
       </Txt>
       <Txt size={10.5} faint style={{ marginTop: -6, marginBottom: 10 }}>
         {activeWorkforce.toLocaleString()} boots on the ground here. Tap a group to push a mobilise directive to your team.
@@ -172,7 +172,7 @@ export default function DetailContent({
           pushWorkforce(
             'all',
             `Mobilise the ground in ${c.name}`,
-            `Workforce ready in ${c.name}: ${(p.volunteers || 0).toLocaleString()} volunteers, ${(p.supporters ?? 0).toLocaleString()} supporters, ${(p.cadre ?? 0).toLocaleString()} cadre (${activeWorkforce.toLocaleString()} boots on the ground). Leader requests activation.`,
+            `Frontline ready in ${c.name}: ${(p.volunteers || 0).toLocaleString()} volunteers, ${(p.supporters ?? 0).toLocaleString()} supporters, ${(p.cadre ?? 0).toLocaleString()} cadre (${activeWorkforce.toLocaleString()} boots on the ground). Leader requests activation.`,
           )
         }
       >
