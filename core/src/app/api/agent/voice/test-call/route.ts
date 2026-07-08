@@ -2,6 +2,11 @@ import { getBrandConfig, getCurrentBrandId, BRAND_ID } from '@/configs';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/services';
 import { ensureOrUpdateLead } from '@/lib/services/leadManager';
+// POP grievance voice prompts per starting language (pa/hi/en). Overriding the
+// prompt + opening per call (below) is what carries the no-repeat guardrail onto
+// the LIVE assistant without touching the API-managed golden config — and lets us
+// dial the same number in any of the three languages for A/B testing.
+import { popVoicePrompt, VOICE_ASR_LANG } from '@brand/prompts/voice-langs';
 
 // Two outbound flavors, picked per brand:
 //
@@ -36,6 +41,14 @@ const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
 async function vapiTestCall(body: any) {
   const { phone, leadName, contactName, businessName, industry } = body;
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
+
+  // POP grievance: which starting language this call runs in (pa/hi/en). We
+  // override the assistant's system prompt + opening with the matching variant
+  // so (a) the no-repeat guardrail is always on and (b) the same number can be
+  // dialed in any language. Other brands keep their own assistant prompt.
+  const isPopGrievance = BRAND_ID === 'pop';
+  const voiceLang = isPopGrievance ? popVoicePrompt(body.language).lang : null;
+  const voicePrompt = isPopGrievance ? popVoicePrompt(body.language) : null;
 
   const name = (contactName || leadName || '').trim();
   // POP grievance calls have NO business concept — ignore any businessName the
@@ -86,12 +99,18 @@ async function vapiTestCall(body: any) {
   // transcriber (set in the Vapi dashboard) wins — that assistant is POP-dedicated,
   // so tuning it in Vapi is the clean home for this, and an unconditional code
   // override would otherwise silently mask whatever's picked in the dashboard.
+  // Transcriber language follows the selected call language (pa-IN/hi-IN/en-IN)
+  // so constituent replies aren't fed to an English-only model and returned as
+  // garbage (the loop-the-opening bug). Provider/model stay env-tunable; the
+  // per-call language wins over the static env language.
+  const asrLanguage =
+    (voiceLang && VOICE_ASR_LANG[voiceLang]) || process.env.VAPI_POP_TRANSCRIBER_LANGUAGE;
   const popTranscriber =
     BRAND_ID === 'pop' && process.env.VAPI_POP_TRANSCRIBER_PROVIDER
       ? {
           provider: process.env.VAPI_POP_TRANSCRIBER_PROVIDER,
           ...(process.env.VAPI_POP_TRANSCRIBER_MODEL ? { model: process.env.VAPI_POP_TRANSCRIBER_MODEL } : {}),
-          ...(process.env.VAPI_POP_TRANSCRIBER_LANGUAGE ? { language: process.env.VAPI_POP_TRANSCRIBER_LANGUAGE } : {}),
+          ...(asrLanguage ? { language: asrLanguage } : {}),
         }
       : null;
 
@@ -107,6 +126,16 @@ async function vapiTestCall(body: any) {
         assistantId: VAPI_ASSISTANT_ID,
         assistantOverrides: {
           ...(popTranscriber ? { transcriber: popTranscriber } : {}),
+          // Per-language prompt + opening. Deep-merged by Vapi, so only the
+          // system message + first line change — provider/model/voice stay as
+          // configured on the assistant. This is where the no-repeat guardrail
+          // lands on every live call.
+          ...(voicePrompt
+            ? {
+                firstMessage: voicePrompt.firstMessage,
+                model: { messages: [{ role: 'system', content: voicePrompt.prompt }] },
+              }
+            : {}),
           variableValues: {
             'vh-contactname': name,
             'vh-greetingname': greetingName,
@@ -301,7 +330,8 @@ async function sarvamPipelineCall(body: any) {
   }
   try {
     const res = await fetch(`${url}/start`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: e164 }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: e164, language: popVoicePrompt(body.language).lang }),
     });
     const data = await res.json().catch(() => ({}));
     // pipeline returns { status: <vobiz http status>, body: <vobiz response text> }

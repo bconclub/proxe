@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MdContentCopy, MdCheckCircle, MdPhone, MdGraphicEq, MdSignalCellularAlt,
-  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward,
+  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd,
 } from 'react-icons/md';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 
@@ -28,7 +28,23 @@ export default function VoiceAgentTab() {
   // POP-only A/B: which engine dials — V1 (Vapi orchestration + 11labs voice) or
   // V2 (ElevenLabs end-to-end: its own STT+LLM+TTS). Same number either way.
   const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>('vapi');
+  // POP-only: starting language for the grievance call. The agent begins here and
+  // switches to whatever language the caller speaks. Lets us test pa/hi/en calls
+  // individually. Same number, same engine — only the prompt + opening change.
+  const [lang, setLang] = useState<'pa' | 'hi' | 'en'>('pa');
+  const LANGS: Record<'pa' | 'hi' | 'en', { label: string; native: string }> = {
+    pa: { label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+    hi: { label: 'Hindi', native: 'हिंदी' },
+    en: { label: 'English', native: 'English' },
+  };
   const [elapsed, setElapsed] = useState(0);
+  // Manual-hangup flag: set by End Call so the status poll stops and never
+  // re-shows "Talking" after the user has ended it. A ref (not state) so the
+  // running poll loop reads the latest value without a re-subscribe.
+  const endedRef = useRef(false);
+  // The live call id being polled — needed so End Call can tell the backend
+  // which call to hang up.
+  const callIdRef = useRef<string | null>(null);
   const callActive = !!live && live.status !== 'ended';
   useEffect(() => {
     if (!callActive) return;
@@ -64,15 +80,18 @@ export default function VoiceAgentTab() {
     setStatus('');
     setElapsed(0);
     setLive(null);
+    endedRef.current = false;
+    callIdRef.current = null;
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...vals, direction: 'cold_intro', engine }),
+        body: JSON.stringify({ ...vals, direction: 'cold_intro', engine, language: lang }),
       });
       const data = await res.json();
       if (data.success && data.callId) {
         setStatus('');
+        callIdRef.current = String(data.callId);
         if (engine === 'vapi') {
           // Vapi exposes live status via our call-status proxy.
           setLive({ status: 'queued' });
@@ -99,16 +118,35 @@ export default function VoiceAgentTab() {
   async function pollStatus(id: string, eng?: string) {
     for (let i = 0; i < 80; i++) {
       await new Promise((r) => setTimeout(r, 3000));
+      if (endedRef.current) return; // ended from the dashboard — stop polling
       try {
         const q = `id=${encodeURIComponent(id)}${eng ? `&engine=${eng}` : ''}`;
         const r = await fetch(`/api/agent/voice/call-status?${q}`);
         const d = await r.json();
+        if (endedRef.current) return;
         if (d && d.status) {
           setLive({ status: d.status, reasonText: d.reasonText, durationSeconds: d.durationSeconds });
           if (d.ended) break;
         }
       } catch { /* transient — keep polling */ }
     }
+  }
+
+  // End the live call from the dashboard. Clears the UI immediately (so it can
+  // never stay stuck on "Talking"), then best-effort tells the backend to hang
+  // up the actual phone call.
+  async function hangUp() {
+    endedRef.current = true;
+    const id = callIdRef.current;
+    setLive({ status: 'ended', reasonText: 'Ended from dashboard' });
+    if (!id) return;
+    try {
+      await fetch('/api/agent/voice/end-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, engine }),
+      });
+    } catch { /* UI already cleared; backend end is best-effort */ }
   }
 
   function callState(l: NonNullable<typeof live>) {
@@ -233,6 +271,32 @@ export default function VoiceAgentTab() {
               </div>
             )}
 
+            {/* Starting language (pop grievance) — agent begins here, switches to the caller */}
+            {isPop && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Starting language</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['pa', 'hi', 'en'] as const).map((val) => {
+                    const on = lang === val;
+                    return (
+                      <button key={val} onClick={() => setLang(val)} disabled={calling}
+                        style={{
+                          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '9px 12px', borderRadius: 10,
+                          fontSize: 13, fontWeight: 800, cursor: calling ? 'not-allowed' : 'pointer',
+                          background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                        }}>
+                        <span style={{ fontSize: 15 }}>{LANGS[val].native}</span>
+                        <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.8 }}>{LANGS[val].label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>Agent opens in {LANGS[lang].label}, then follows the caller's language.</p>
+              </div>
+            )}
+
             {/* active flow */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-secondary)' }}>
               <MdLink size={15} style={{ color: 'var(--accent-primary)' }} />
@@ -273,6 +337,16 @@ export default function VoiceAgentTab() {
                   </div>
                   {live.status !== 'placed' && (s.active || live.durationSeconds != null) && (
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{mmss(secs)}</span>
+                  )}
+                  {s.active && (
+                    <button onClick={hangUp} title="End call"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 999,
+                        border: '1px solid #ef444455', background: '#ef44441a', color: '#ef4444',
+                        fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flex: 'none',
+                      }}>
+                      <MdCallEnd size={16} /> End Call
+                    </button>
                   )}
                 </div>
               );
