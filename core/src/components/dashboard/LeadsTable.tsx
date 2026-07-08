@@ -154,6 +154,26 @@ const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
   info:      { label: 'Info',      color: '#06B6D4' },
   outreach:  { label: 'Outreach',  color: '#F97316' },
 }
+// HOW they came in — the real acquisition channel (magnet, migration 022/023),
+// far more meaningful for a campaign than generic marketing "source" (Direct).
+const POP_MAGNET: Record<string, { label: string; color: string }> = {
+  whatsapp:    { label: 'WhatsApp',   color: '#22C55E' },
+  voice:       { label: 'Voice',      color: '#8B5CF6' },
+  pulse_app:   { label: 'Pulse App',  color: '#A78BFA' },
+  qr:          { label: 'QR Scan',    color: '#F06C18' },
+  missed_call: { label: 'Missed Call',color: '#F59E0B' },
+  d2d:         { label: 'Door-to-Door', color: '#FB7185' },
+  event:       { label: 'Event',      color: '#2EC4B6' },
+  landing:     { label: 'Landing',    color: '#6EA5D4' },
+}
+// WHO they are on the intensity ladder — the "type" a director scans for.
+const POP_TIER: Record<number, { label: string; color: string }> = {
+  0: { label: 'Contact',   color: '#7A8AA0' },
+  1: { label: 'Voter',     color: '#3B82F6' },
+  2: { label: 'Supporter', color: '#22C55E' },
+  3: { label: 'Volunteer', color: '#F59E0B' },
+  4: { label: 'Cadre',     color: '#F06C18' },
+}
 // AC number lookup (numbered constituency chip) + a stable per-district color so
 // every row from the same district reads the same hue. Built from the war-room
 // reference (117 ECI seats). Hash→hue gives a deterministic mid-tone that works
@@ -854,14 +874,15 @@ export default function LeadsTable({
           {brandId === 'pop' ? (
             <colgroup>
               {/* POP constituent view — widths sum to 100% */}
-              <col style={{ width: '14%' }} />  {/* Constituent (name + captured) */}
-              <col style={{ width: '11%' }} />  {/* Contact (phone) */}
-              <col style={{ width: '12%' }} />  {/* Source (origin + entry point) */}
-              <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
+              <col style={{ width: '13%' }} />  {/* Constituent (name + captured) */}
+              <col style={{ width: '8%' }} />   {/* Type (intensity tier) */}
+              <col style={{ width: '10%' }} />  {/* Contact (phone) */}
+              <col style={{ width: '9%' }} />   {/* Came in via (magnet) */}
+              <col style={{ width: '9%' }} />   {/* Last Touch (channel + actor) */}
               <col style={{ width: '12%' }} />  {/* Constituency (+ district·booth) */}
-              <col style={{ width: '18%' }} />  {/* Grievance (category + salience + text) */}
-              <col style={{ width: '9%' }} />   {/* Lean */}
-              <col style={{ width: '7%' }} />   {/* Intent */}
+              <col style={{ width: '17%' }} />  {/* Grievance (category + salience + text) */}
+              <col style={{ width: '8%' }} />   {/* Lean */}
+              <col style={{ width: '8%' }} />   {/* Intent */}
               <col style={{ width: '6%' }} />   {/* Loop */}
             </colgroup>
           ) : (
@@ -890,8 +911,9 @@ export default function LeadsTable({
               {(brandId === 'pop'
                 ? [
                     { label: 'Constituent',  align: 'left'   as const },
+                    { label: 'Type',         align: 'center' as const },
                     { label: 'Contact',      align: 'left'   as const },
-                    { label: 'Source',       align: 'center' as const },
+                    { label: 'Came in via',  align: 'center' as const },
                     { label: 'Last Touch',   align: 'center' as const },
                     { label: 'Constituency', align: 'left'   as const },
                     { label: 'Grievance',    align: 'left'   as const },
@@ -1311,6 +1333,9 @@ export default function LeadsTable({
                   const engCfg = pl.engagement_type && pl.engagement_type !== 'grievance' ? POP_ENGAGEMENT[pl.engagement_type] : null
                   const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
                   const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
+                  // TYPE = intensity tier (who they are); magnet = how they came in.
+                  const tierCfg = POP_TIER[typeof pl.intensity === 'number' ? pl.intensity : 0] || POP_TIER[0]
+                  const magnetCfg = pl.magnet ? POP_MAGNET[pl.magnet] : null
                   const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
                   const seatRef = pl.constituency ? POP_AC_BY_NAME.get(normSeat(pl.constituency)) : undefined
                   const acNo = seatRef?.no
@@ -1336,6 +1361,22 @@ export default function LeadsTable({
                         )}
                       </td>
 
+                      {/* TYPE — intensity tier: who this person is (Voter→Cadre) */}
+                      <td className="px-3 py-2 text-center">
+                        <span
+                          className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                          style={{ backgroundColor: `${tierCfg.color}22`, color: tierCfg.color, border: `1px solid ${tierCfg.color}44` }}
+                          title={`Intensity tier ${typeof pl.intensity === 'number' ? pl.intensity : 0} — ${tierCfg.label}`}
+                        >
+                          {tierCfg.label}
+                        </span>
+                        {engCfg && (
+                          <div className="text-[9px] mt-0.5 uppercase tracking-wide" style={{ color: engCfg.color }} title="Why they engaged">
+                            {engCfg.label}
+                          </div>
+                        )}
+                      </td>
+
                       {/* CONTACT — phone + email (when provided) */}
                       <td className="px-3 py-2">
                         {lead.phone && (
@@ -1351,21 +1392,21 @@ export default function LeadsTable({
                         {!lead.phone && !cleanEmail && <span style={{ color: 'var(--text-muted)' }}>—</span>}
                       </td>
 
-                      {/* SOURCE — origin marketing source + entry point (real attribution) */}
+                      {/* CAME IN VIA — the real acquisition channel (magnet), not
+                          generic marketing "source". Falls back to the touchpoint. */}
                       <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
-                        <div className="flex flex-col items-center gap-0.5">
+                        {magnetCfg ? (
                           <span
-                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                            style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ backgroundColor: `${magnetCfg.color}22`, color: magnetCfg.color }}
                           >
-                            {srcCfg.label}
+                            {magnetCfg.label}
                           </span>
-                          {subSource && (
-                            <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
-                              {subSource}
-                            </span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="text-[10px] whitespace-nowrap capitalize" style={{ color: 'var(--text-muted)' }}>
+                            {(pl.magnet || subSource || '—').replace(/_/g, ' ')}
+                          </span>
+                        )}
                       </td>
 
                       {/* LAST TOUCH — last channel + actor (real attribution) */}

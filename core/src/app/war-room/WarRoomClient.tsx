@@ -95,23 +95,12 @@ export default function WarRoomClient() {
   const [pulse, setPulse] = useState<string | null>(null);
   const mobile = useIsMobile();
   const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
-  // AI summary strip
-  const [summary, setSummary] = useState<{ summary: string | null; generatedAt: string | null }>({ summary: null, generatedAt: null });
-  const [summaryBusy, setSummaryBusy] = useState(false);
   // Live Feed panel tab: citizen feed vs leader directives
   const [feedTab, setFeedTab] = useState<'feed' | 'directives'>('feed');
   // Daily targets inline editor
   const [editTargets, setEditTargets] = useState(false);
   const [targetDraft, setTargetDraft] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetch('/api/war-room/summary', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((j) => j && setSummary(j)).catch(() => {});
-  }, []);
-  const generateSummary = async () => {
-    setSummaryBusy(true);
-    try { const r = await fetch('/api/war-room/summary', { method: 'POST' }); if (r.ok) setSummary(await r.json()); } catch {}
-    setSummaryBusy(false);
-  };
   const saveTargets = async () => {
     const body: Record<string, number> = {};
     Object.entries(targetDraft).forEach(([k, v]) => { const n = Number(v); if (Number.isFinite(n) && n >= 0) body[k] = n; });
@@ -176,19 +165,6 @@ export default function WarRoomClient() {
             <Kpi label="Active Seats" value={d?.kpis.activeConstituencies ?? 0} sub={`of ${TOTAL_SEATS}`} trend="+5" up accent={BLUE} spark={d?.series.total} />
             <Kpi label="Loop Health" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${d?.kpis.resolved ?? 0} / ${d?.kpis.raised ?? 0} resolved`} trend="+3pp" up accent={GREEN} spark={d?.series.resolved} />
             <Kpi label="Sentiment Shift" value={`${(d?.sentiment.shiftPp ?? 0) >= 0 ? '+' : ''}${d?.sentiment.shiftPp ?? 0}pp`} sub="vs 7d ago" trend={d?.sentiment.label || '—'} up={(d?.sentiment.shiftPp ?? 0) >= 0} accent={PURPLE} spark={d?.series.total} />
-          </div>
-
-          {/* AI SUMMARY STRIP — command-center readout, cached + on-demand */}
-          <div style={{ ...card, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 12px' }}>
-            <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', color: PURPLE, border: `1px solid ${LINE}`, borderRadius: 6, padding: '3px 7px', background: 'rgba(167,139,250,0.10)' }}>AI BRIEF</span>
-            <div style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.5 }}>
-              {summary.summary
-                ? <>{summary.summary} <span style={{ color: MUT, fontSize: 10, whiteSpace: 'nowrap' }}>· {summary.generatedAt ? ago(summary.generatedAt) + ' ago' : ''}</span></>
-                : <span style={{ color: MUT }}>No brief yet — generate a command-center summary of the last 7 days.</span>}
-            </div>
-            <button onClick={generateSummary} disabled={summaryBusy} style={{ flexShrink: 0, background: summaryBusy ? TRACK : 'rgba(167,139,250,0.16)', color: summaryBusy ? MUT : TXT, border: `1px solid ${LINE}`, borderRadius: 8, padding: '5px 11px', fontSize: 11, fontWeight: 600, cursor: summaryBusy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>
-              {summaryBusy ? 'Analysing…' : summary.summary ? 'Regenerate' : 'Generate'}
-            </button>
           </div>
 
           {/* MAIN GRID: map | center | feed (stacks on mobile) */}

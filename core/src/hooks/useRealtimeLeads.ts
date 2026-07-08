@@ -40,13 +40,15 @@ interface Lead {
   salience?: number | null
   action_intent?: string | null
   loop_status?: string | null
+  engagement_type?: string | null
+  intensity?: number | null
 }
 
 // Extra columns that exist ONLY on POP's all_leads (migration 022). Appended to
 // the select string for the pop brand only — keeps the shared query intact for
 // every other brand whose schema lacks these columns.
 const POP_COLUMNS =
-  ', constituency, district, booth, language, lean, magnet, grievance_category, grievance_text, salience, action_intent, loop_status'
+  ', constituency, district, booth, language, lean, magnet, grievance_category, grievance_text, salience, action_intent, loop_status, engagement_type, intensity'
 
 export function useRealtimeLeads() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -131,6 +133,8 @@ export function useRealtimeLeads() {
             salience: lead.salience ?? null,
             action_intent: lead.action_intent ?? null,
             loop_status: lead.loop_status ?? null,
+            engagement_type: lead.engagement_type ?? null,
+            intensity: lead.intensity ?? null,
           } : {}),
         }))
 
