@@ -155,6 +155,10 @@ export interface LeadNotice {
   detailFields?: Pair[];          // structured detail (2-col bold-label fields)
   title?: string;                 // headline text, e.g. "New lead" / "Needs human follow-up"
   footer?: string;                // small italic footer suffix
+  // URL buttons (work from an incoming webhook — no Slack app needed). Each
+  // opens a link (e.g. the lead in the dashboard). TRUE in-Slack state buttons
+  // (Resolved without leaving Slack) would need a Slack app + request URL.
+  actions?: { text: string; url: string; style?: 'primary' | 'danger' }[];
 }
 
 /** A lead alert — new lead, hot lead, or a needs-human escalation. */
@@ -181,6 +185,20 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   ]));
 
   if (l.footer) content.push(context(`_${clean(l.footer)}_`));
+
+  // Action buttons (URL buttons — open the lead in the dashboard so a human can
+  // act / mark it resolved there). Rendered when actions are supplied.
+  if (l.actions?.length) {
+    content.push({
+      type: 'actions',
+      elements: l.actions.slice(0, 5).map((a) => ({
+        type: 'button',
+        text: { type: 'plain_text', text: a.text.slice(0, 75), emoji: false },
+        url: a.url,
+        ...(a.style ? { style: a.style } : {}),
+      })),
+    });
+  }
 
   const text = `${title} · ${brand}: ${who}${l.score != null ? ` · score ${l.score}` : ''}`;
   return brandedSend(title, brand, content, text);

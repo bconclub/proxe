@@ -935,6 +935,7 @@ async function flagForHumanFollowup(
     // channel reads "Scout support request" (with the number + issue) rather than
     // a generic lead follow-up.
     const isScout = input.lokazenAudience === 'scout';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
     const slackResult = await notifySlackLead({
       brandLabel,
       title: isScout ? 'Scout support request' : 'Needs human follow-up',
@@ -944,7 +945,10 @@ async function flagForHumanFollowup(
       leadType: audienceLabel,
       source: input.channel || null,
       detail: reason,
-      footer: isScout ? 'scout support' : 'needs human',
+      footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
+      // Working URL button (no Slack app needed) — opens the conversation so the
+      // team can act and mark it resolved in the dashboard.
+      actions: [{ text: 'View lead in dashboard', url: `${appUrl}/dashboard/inbox?lead=${lead.id}`, style: 'primary' }],
     });
     // notifySlackLead soft-fails SILENTLY (no log at all) when SLACK_WEBHOOK_URL
     // isn't set — the AI tells the person "I've raised a support request" and

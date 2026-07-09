@@ -414,7 +414,52 @@ export default function VoiceOrb() {
     const ac = new AbortController()
     abortRef.current = ac
     const t0 = performance.now()
+    // Live elapsed-seconds counter while the brain gathers + writes — so the
+    // wait reads as real progress, not a ring that seems to hang.
+    const secTimer = setInterval(() => {
+      if (modeRef.current === 'thinking') setSubtitle(`${((performance.now() - t0) / 1000).toFixed(1)}s`)
+      else clearInterval(secTimer)
+    }, 100)
+    // Shared TTS helpers — defined up-front so the instant greeting can use them.
+    const tts = (chunk: string) => fetch('/api/dashboard/brain/briefing', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'tts', text: chunk }), signal: ac.signal,
+    }).then((r) => r.json())
+    // retry once — a failed rest-chunk must NOT stop the briefing mid-thought
+    const ttsRetry = async (chunk: string) => {
+      const a = await tts(chunk).catch(() => null)
+      if (a?.audio) return a
+      return tts(chunk).catch(() => null)
+    }
     try {
+      // 0. INSTANT greeting — a canned personalized opener ("Hi <name>, let me
+      // pull together everything from today…") voiced in ~1.5s (one TTS hop, no
+      // LLM), so the orb starts talking almost immediately instead of sitting
+      // silent behind a spinning ring. It plays FIRST; the real briefing follows
+      // seamlessly once it's ready. greetDone resolves when the greeting audio
+      // ends, so the briefing never overlaps it.
+      let greetDone: Promise<void> = Promise.resolve()
+      const greetP = fetch('/api/dashboard/brain/briefing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'greet', ...(question ? { question } : {}) }), signal: ac.signal,
+      }).then((r) => r.json())
+        // mode:greet returns the audio itself (flash model); fall back to a tts
+        // call only if the server couldn't voice it.
+        .then((g) => (g?.audio ? g : (g?.text ? tts(g.text) : null)))
+        .then((a) => {
+          if (!a?.audio || modeRef.current !== 'thinking') return
+          const ga = new Audio(`data:${a.mime};base64,${a.audio}`)
+          audioRef.current = ga
+          clearInterval(stepTimer); clearInterval(secTimer)
+          setCaption(''); setSubtitle('')
+          thinkStartRef.current = null
+          ringDoneFrameRef.current = frameRef.current // ring completes the moment we speak
+          setModeBoth('speaking')
+          wireAnalyser(ga).catch(() => {})
+          greetDone = new Promise<void>((res) => { ga.onended = () => res(); ga.onerror = () => res(); ga.onpause = () => res() })
+          ga.play().catch(() => {})
+        }).catch(() => {})
+
       // 1. the words (fast — Groq when configured)
       const tr = await fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -431,17 +476,6 @@ export default function VoiceOrb() {
       if (firstChunk.length < 45 && sentences[1]) { firstChunk = `${firstChunk} ${sentences[1]}`; restStart = 2 }
       const restChunk = sentences.slice(restStart).join(' ')
 
-      const tts = (chunk: string) => fetch('/api/dashboard/brain/briefing', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'tts', text: chunk }), signal: ac.signal,
-      }).then((r) => r.json())
-      // retry once — a failed rest-chunk must NOT stop the briefing mid-thought
-      const ttsRetry = async (chunk: string) => {
-        const a = await tts(chunk).catch(() => null)
-        if (a?.audio) return a
-        return tts(chunk).catch(() => null)
-      }
-
       const firstP = tts(firstChunk)
       // preload the rest: the Audio element is built the moment its bytes land,
       // so the handoff after the first sentence is gapless
@@ -457,9 +491,14 @@ export default function VoiceOrb() {
         : Promise.resolve(null)
 
       const first = await firstP
-      clearInterval(stepTimer)
+      clearInterval(stepTimer); clearInterval(secTimer)
       if (first?.error || !first?.audio) throw new Error(first?.error || 'voice unavailable right now — try again in a moment')
       const ttfaMs = Math.round(performance.now() - t0)
+      // Wait for the instant greeting to finish so the briefing never talks over
+      // it. If the greeting never played (failed), greetDone is already resolved.
+      // If the user tapped stop during the greeting, mode is idle → bail.
+      await greetP.catch(() => {}); await greetDone
+      if (modeRef.current === 'idle' || modeRef.current === 'error') return
 
       // subtitles per chunk
       const firstSents = splitSentences(firstChunk)
@@ -522,7 +561,7 @@ export default function VoiceOrb() {
         setTimeout(() => el?.removeEventListener('click', resume, { capture: true } as any), 20000)
       }
     } catch (e: any) {
-      clearInterval(stepTimer)
+      clearInterval(stepTimer); clearInterval(secTimer)
       thinkStartRef.current = null
       if (e?.name === 'AbortError') return
       setCaption(e?.message || 'could not reach the brain')

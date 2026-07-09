@@ -100,6 +100,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // ── mode: greet — an INSTANT personalized opener (no LLM) so the orb speaks
+    // within ~1.5s (just a TTS round-trip) instead of waiting the full
+    // text-gen + TTS (~5s) in silence. Client fires this in parallel with
+    // mode:text, plays the greeting first, then the real briefing. ───────────
+    if (mode === 'greet') {
+      const { data: profile } = await authClient
+        .from('dashboard_users').select('full_name').eq('id', user.id).maybeSingle()
+      const fullName = (profile?.full_name || user.email?.split('@')[0] || '').trim()
+      const firstName = fullName.split(/\s+/)[0] || 'there'
+      const q = typeof body?.question === 'string' && body.question.trim()
+      const text = q
+        ? `One moment ${firstName}, let me look that up.`
+        : `Hi ${firstName}, let me pull together everything from today. One moment.`
+      // Voice the greeting with the FASTEST model (flash) — it's a fixed canned
+      // line, so speed matters far more than expressiveness, and it must land in
+      // well under a second to feel instant. The real briefing still uses v3.
+      const key = process.env.ELEVENLABS_API_KEY
+      if (!key) return NextResponse.json({ text, firstName })
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || getBrainConfig().voiceId
+      const t0 = Date.now()
+      const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
+        method: 'POST',
+        headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, model_id: 'eleven_flash_v2_5' }),
+      }).catch(() => null)
+      if (!ttsRes || !ttsRes.ok) return NextResponse.json({ text, firstName })
+      const audio = Buffer.from(await ttsRes.arrayBuffer()).toString('base64')
+      console.log(`[brain/briefing] greet TTS (flash) ${Date.now() - t0}ms`)
+      return NextResponse.json({ text, firstName, audio, mime: 'audio/mpeg' })
+    }
+
     // ── mode: tts — voice a chunk of text (brand voice, ONE voice per brand) ──
     if (mode === 'tts') {
       const text = String(body?.text || '').slice(0, 2000)
