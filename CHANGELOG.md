@@ -1,3 +1,13 @@
+## 2026-07-09 13:00 IST · feat(pop): War Room windowed REACH/LOOP + Listen density pass
+
+- User-facing: War Room REACH card drops the "118 seats" figure and gains a shared Today / 7D / 14D / 28D window switcher that also drives the Response Loop card (windowed reach + resolved-per-window counts).
+- User-facing: Leader "Directives" now render brand-scoped (were leaking across brands) and are visually elevated over AI suggestions (fatter accent rail + saffron tint). Live-feed panel widened 270→340px. Header shows a Syncing/Refreshing state so the slow aggregate reads as working, not frozen.
+- User-facing: PROXe Listen — Top Trending Keyword tiles compacted to ~half height with a bigger signal count; Sentiment-Over-Time chart shortened; Evidence Board media cards now show 3 lines (was 2).
+- API: /api/war-room/data returns reachWindows + loopWindows (cumulative reach and resolved-per-window) from the momentum block; the recommendations query is now brand-filtered.
+- Data: re-dated POP constituents into an upward ramp toward today (2,456 today / 27k total) so the War Room series reads as steady growth.
+- Verified: leader push→War Room Directives roundtrip confirmed on BOTH local and pop-proxe prod (POST 200 → GET returns it).
+- `(ecdc97c2)`
+
 ## 2026-07-09 12:30 IST · feat(pop): Brain voice orb — speaks today's briefing (Groq + ElevenLabs Monika Sogam)
 
 - User-facing: The Brain tab is now a living voice orb. Tap it and it gathers today's context (brain overview, war room, leader pushes, news buzz from listen_signals) and SPEAKS the daily briefing in Monika Sogam's voice (eleven_v3, multilingual_v2 fallback, one deterministic voice). Greets the signed-in human by first name; campaign vocabulary only (voices/constituencies/grievances — never "leads"); system refers to itself as PROXe, never "AI".
