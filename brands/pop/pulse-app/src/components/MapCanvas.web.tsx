@@ -92,6 +92,17 @@ const PUNJAB_BOUNDS: [[number, number], [number, number]] = (() => {
 
 const MAX_SEATS = Math.max(...DISTRICTS.map((d) => d.seats.length));
 
+// Focus mask — a world-covering polygon with every constituency punched out as a
+// hole. Filled with the map background it hides the neighbouring states so only
+// Punjab shows. Coords are already [lat,lng] here.
+const PUNJAB_MASK: [number, number][][] = (() => {
+  const world: [number, number][] = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
+  const holes = polygons
+    .map((p) => p.coords.filter((c) => finite(c.latitude) && finite(c.longitude)).map((c) => [c.latitude, c.longitude] as [number, number]))
+    .filter((r) => r.length > 2);
+  return [world, ...holes];
+})();
+
 // ── Styles (light theme) — injected once ─────────────────────────────────────
 function ensureLeafletCss() {
   if (typeof document === 'undefined') return;
@@ -219,7 +230,7 @@ export default function MapCanvas({ pulse, colorMode, activeNo, onSelect, zoomEn
     const el = hostRef.current as HTMLElement | null;
     if (!el || mapRef.current) return;
 
-    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: 16, zoomSnap: 0.25 });
+    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: 16, zoomSnap: 0.25, maxBoundsViscosity: 1.0 });
     map.attributionControl.setPrefix(false);
     el.classList.add('pop-map');
     mapRef.current = map;
@@ -232,7 +243,14 @@ export default function MapCanvas({ pulse, colorMode, activeNo, onSelect, zoomEn
       attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(map);
 
-    const fitPunjab = () => map.fitBounds(PUNJAB_BOUNDS, { padding: [24, 24] });
+    // Hide everything outside Punjab with the map background.
+    L.polygon(PUNJAB_MASK as any, { stroke: false, fillColor: '#EAECEF', fillOpacity: 1, fillRule: 'evenodd', interactive: false, className: 'pop-focus-mask' }).addTo(map);
+
+    // Lock the camera to Punjab: no panning into neighbouring states, no zooming
+    // out past the state fitting the frame.
+    const lockPunjab = () => { map.setMinZoom(map.getBoundsZoom(L.latLngBounds(PUNJAB_BOUNDS), false, L.point(24, 24))); };
+    const fitPunjab = () => { map.fitBounds(PUNJAB_BOUNDS, { padding: [24, 24] }); lockPunjab(); };
+    map.setMaxBounds(L.latLngBounds(PUNJAB_BOUNDS).pad(0.12));
     fitPunjab();
 
     // Choropleth (subtle heat wash under the dots).
@@ -289,7 +307,7 @@ export default function MapCanvas({ pulse, colorMode, activeNo, onSelect, zoomEn
     // pane stays offset from where the (independently-positioned) marker dots
     // render, which reads as the map "moving around" / not matching itself. Force
     // a few unconditional re-measures after mount to guarantee a correct sync.
-    const forceResync = () => map.invalidateSize();
+    const forceResync = () => { map.invalidateSize(); lockPunjab(); };
     const raf = requestAnimationFrame(forceResync);
     const t1 = setTimeout(forceResync, 300);
     const t2 = setTimeout(forceResync, 1000);

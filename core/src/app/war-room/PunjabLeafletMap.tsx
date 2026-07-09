@@ -38,6 +38,25 @@ const DARK_P = { empty: '#16263C', heatLo: '#16273D', heatHi: SAFFRON, turnLo: '
 
 const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
 
+// Build a "focus mask": a world-covering polygon with the whole Punjab AC set
+// punched out as holes. Filled with the page background it hides every
+// neighbouring state (Haryana, HP, Rajasthan, …) so only Punjab shows — the way
+// the old map did. GeoJSON is [lng,lat]; Leaflet wants [lat,lng], so flip.
+function buildPunjabMask(fc: any): [number, number][][] {
+  const world: [number, number][] = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
+  const holes: [number, number][][] = [];
+  for (const f of (fc.features || [])) {
+    const g = f.geometry;
+    if (!g) continue;
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+    for (const poly of polys) {
+      const ext = poly[0]; // exterior ring only
+      if (Array.isArray(ext)) holes.push(ext.map((c: number[]) => [c[1], c[0]] as [number, number]));
+    }
+  }
+  return [world, ...holes];
+}
+
 // district lookup for clustering (seat → district)
 const DISTRICT_BY_SEAT: Record<string, string> = Object.fromEntries(
   CONSTITUENCIES.map((c) => [normName(c.name), c.district || 'Punjab']),
@@ -189,7 +208,7 @@ export default function PunjabLeafletMap({
     const el = hostRef.current;
     if (!el || mapRef.current) return;
 
-    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: 14, zoomSnap: 0.25, scrollWheelZoom: true });
+    const map = L.map(el, { zoomControl: true, attributionControl: true, minZoom: 6, maxZoom: 14, zoomSnap: 0.25, scrollWheelZoom: true, maxBoundsViscosity: 1.0 });
     map.attributionControl.setPrefix(false);
     mapRef.current = map;
     ;(el as any)._wrMap = map; // dev/testing handle
@@ -198,6 +217,11 @@ export default function PunjabLeafletMap({
     L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
       subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(map);
+
+    // Focus mask — hide everything outside Punjab with the page background so the
+    // neighbouring states never show. Sits above the tiles, below the choropleth.
+    const maskBg = (getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()) || (dark ? '#0b0f14' : '#f4f1ea');
+    L.polygon(buildPunjabMask(raw as any) as any, { stroke: false, fillColor: maskBg, fillOpacity: 1, fillRule: 'evenodd', interactive: false, className: 'wr-focus-mask' }).addTo(map);
 
     const gj = L.geoJSON(raw as any, {
       style: (f: any) => styleFor(f.properties.name),
@@ -219,6 +243,10 @@ export default function PunjabLeafletMap({
 
     markersRef.current = L.layerGroup().addTo(map);
     map.fitBounds(gj.getBounds(), { padding: [16, 16] });
+    // Lock the view to Punjab: can't pan into neighbouring states, can't zoom out
+    // past the state fitting the frame.
+    map.setMaxBounds(gj.getBounds().pad(0.12));
+    map.setMinZoom(map.getBoundsZoom(gj.getBounds(), false, L.point(16, 16)));
     map.on('click', () => onSelectRef.current(''));
     // clusters ↔ seat bubbles swap on zoom
     map.on('zoomend', renderMarkers);
@@ -227,7 +255,7 @@ export default function PunjabLeafletMap({
     // Robust sizing: Leaflet caches the container size at construction, which can
     // be wrong before the surrounding flex/grid settles. Re-measure a couple of
     // times + on every resize so the map never renders collapsed or overflowing.
-    const invalidate = () => { map.invalidateSize(); map.fitBounds(gj.getBounds(), { padding: [16, 16] }); };
+    const invalidate = () => { map.invalidateSize(); map.fitBounds(gj.getBounds(), { padding: [16, 16] }); map.setMinZoom(map.getBoundsZoom(gj.getBounds(), false, L.point(16, 16))); };
     const t1 = setTimeout(invalidate, 120);
     const t2 = setTimeout(invalidate, 400);
     const ro = new ResizeObserver(() => map.invalidateSize());

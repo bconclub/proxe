@@ -1,3 +1,11 @@
+## 2026-07-09 13:15 IST · feat(pop): lock the map to Punjab (mask + bounds) — War Room + leader app
+
+- Both slippy maps (War Room PunjabLeafletMap + the Pulse leader app MapCanvas) showed the whole region — Haryana, HP, Rajasthan, Chandigarh — because the CartoDB tiles fill the bounding box and you could pan/zoom out into them. Now focused on Punjab only, like the old map:
+  - Focus mask: a world-covering polygon with all 117 constituencies punched out as holes (evenodd), filled with the page background — every neighbouring state is hidden, only Punjab shows.
+  - maxBounds clamped to Punjab (viscosity 1.0) so you cannot pan into other states; minZoom raised to the Punjab-fit zoom so you cannot zoom out to the subcontinent.
+  - Drill-down and all bubbles/interactions unchanged.
+- (pending-sha)
+
 ## 2026-07-09 13:00 IST · feat(pop): War Room windowed REACH/LOOP + Listen density pass
 
 - User-facing: War Room REACH card drops the "118 seats" figure and gains a shared Today / 7D / 14D / 28D window switcher that also drives the Response Loop card (windowed reach + resolved-per-window counts).
