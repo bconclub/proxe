@@ -96,6 +96,40 @@ export async function GET(req: NextRequest) {
       loopHealthPct: raised ? Math.round((100 * resolved) / raised) : 0,
     };
 
+    // ── MOMENTUM (7d & 14d change in reach) ──────────────────────────────────
+    // The KPI strip's deltas used to be hardcoded fake strings. Compute the real
+    // change: last-7d vs prior-7d, and last-14d vs prior-14d touchpoint volume.
+    // Exact via indexed counts on the unfiltered view (the capped R scan can only
+    // cover the recent window, so a 14d/28d comparison needs true counts);
+    // filtered views fall back to the recent-rows sample.
+    const d28 = now - 28 * 86400000;
+    const pctChg = (cur: number, prev: number) => (prev > 0 ? Math.round((100 * (cur - prev)) / prev) : cur > 0 ? 100 : 0);
+    const momentum = { reach7dPct: 0, reach14dPct: 0 };
+    if (noFilter) {
+      try {
+        const cSince = async (ms: number) => {
+          const { count } = await sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).gte('created_at', new Date(ms).toISOString());
+          return count || 0;
+        };
+        const [c7, c14, c28, cToday, resCount] = await Promise.all([
+          cSince(d7), cSince(d14), cSince(d28), cSince(todayStart),
+          sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).eq('loop_status', 'resolved').then((r) => r.count || 0),
+        ]);
+        momentum.reach7dPct = pctChg(c7, c14 - c7);
+        momentum.reach14dPct = pctChg(c14, c28 - c14);
+        kpis.today = cToday; // exact today across the full view, not the sample
+        // Exact loop health over the whole dataset (the sample denominator read
+        // as a misleading "/8000"; the real base is baseTotal).
+        kpis.resolved = resCount;
+        kpis.raised = baseTotal;
+        kpis.loopHealthPct = baseTotal ? Math.round((100 * resCount) / baseTotal) : 0;
+      } catch (e) { console.error('[war-room/data] momentum:', (e as Error).message); }
+    } else {
+      const inWin = (a: number, b: number) => R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= a && t < b; }).length;
+      momentum.reach7dPct = pctChg(inWin(d7, now + 1), inWin(d14, d7));
+      momentum.reach14dPct = pctChg(inWin(d14, now + 1), inWin(d28, d14));
+    }
+
     // ── byCategory (+ salience-weighted + 7d trend) ──
     const byCategory = CATEGORIES.map((cat) => {
       const items = R.filter((r) => (r.grievance_category || 'other') === cat);
@@ -108,6 +142,17 @@ export async function GET(req: NextRequest) {
     // ── lean overall + swing ──
     const leanOverall: Record<string, number> = { supporter: 0, leaning: 0, undecided: 0, opposed: 0 };
     R.forEach((r) => { if (r.lean && leanOverall[r.lean] !== undefined) leanOverall[r.lean]++; });
+    // The lean donut summed the capped R sample, so it always read a flat "8000
+    // voices" (the scan cap) instead of the real electorate. Scale the sample's
+    // proportions up to the true total so the donut shows organic, campaign-scale
+    // numbers. Unfiltered only; filtered views keep the exact sample counts.
+    if (noFilter && baseTotal > R.length) {
+      const leanSampleTotal = Object.values(leanOverall).reduce((s, x) => s + x, 0);
+      if (leanSampleTotal > 0) {
+        const scale = baseTotal / leanSampleTotal;
+        for (const k of Object.keys(leanOverall)) leanOverall[k] = Math.round(leanOverall[k] * scale);
+      }
+    }
 
     const bySeat = new Map<string, any[]>();
     R.forEach((r) => { if (r.constituency) { (bySeat.get(r.constituency) || bySeat.set(r.constituency, []).get(r.constituency))!.push(r); } });
@@ -209,7 +254,14 @@ export async function GET(req: NextRequest) {
     const avg = (arr: any[]) => (arr.length ? arr.reduce((s, r) => s + (LS[r.lean] ?? 0), 0) / arr.length : 0);
     const last7 = R.filter((r) => new Date(r.created_at).getTime() >= d7);
     const prev7 = R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= d14 && t < d7; });
-    const sentiment = { net: Math.round(net * 100) / 100, shiftPp: Math.round((avg(last7) - avg(prev7)) * 100), label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral' };
+    const last14 = R.filter((r) => new Date(r.created_at).getTime() >= d14);
+    const prev14 = R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= d28 && t < d14; });
+    const sentiment = {
+      net: Math.round(net * 100) / 100,
+      shiftPp: Math.round((avg(last7) - avg(prev7)) * 100),
+      shift14Pp: Math.round((avg(last14) - avg(prev14)) * 100),
+      label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral',
+    };
 
     // ── D2D coverage (d2d_visits — the field tool's knocks) ──
     // Separate table, separate try/catch: a d2d failure must never take the
@@ -408,7 +460,7 @@ export async function GET(req: NextRequest) {
       }
     } catch (e) { console.error('[war-room/data] listen failed:', (e as Error).message); }
 
-    return NextResponse.json({ kpis, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d, intensity, volunteers, events, targets, recommendations, listen });
+    return NextResponse.json({ kpis, momentum, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d, intensity, volunteers, events, targets, recommendations, listen });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });

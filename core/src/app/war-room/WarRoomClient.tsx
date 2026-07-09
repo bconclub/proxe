@@ -71,6 +71,7 @@ const MOB_META: [string, string, React.ReactNode][] = [
 
 export interface WarRoomData {
   kpis: { total: number; today: number; activeConstituencies: number; raised: number; resolved: number; loopHealthPct: number };
+  momentum?: { reach7dPct: number; reach14dPct: number };
   byCategory: { category: string; count: number; salienceWeighted: number; trend7d: number }[];
   leanOverall: Record<string, number>;
   swing: { constituency: string; total: number; undecided: number; undecidedPct: number }[];
@@ -89,7 +90,7 @@ export interface WarRoomData {
   channelMix: { magnet: string; count: number; share: number }[];
   liveFeed: { id: string; name: string | null; constituency: string | null; category: string | null; created_at: string }[];
   series: { days: string[]; total: number[]; resolved: number[]; categories: string[]; byCategory: Record<string, number[]>; seats: string[]; bySeat: Record<string, number[]>; mobilization: Record<string, number[]> };
-  sentiment: { net: number; shiftPp: number; label: string };
+  sentiment: { net: number; shiftPp: number; shift14Pp?: number; label: string };
   // D2D field coverage (d2d_visits) - null when no knocks / query degraded.
   d2d: {
     totals: { visits: number; met: number; not_home: number; refused: number; revisit: number; today: number; workers: number };
@@ -193,14 +194,49 @@ export default function WarRoomClient() {
 
         {/* SCROLL BODY (single-VH scroll on desktop; page scroll on mobile) */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: mobile ? '10px 12px 18px' : '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* KPI ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: mobile ? 8 : 12 }}>
-            <Kpi label="Voter Touchpoints" value={d?.kpis.total ?? 0} sub="Across all 117 seats" trend="+14%" up accent={SAFFRON} spark={d?.series.total} />
-            <Kpi label="Touchpoints Today" value={d?.kpis.today ?? 0} sub="Since midnight" trend="+12%" up accent={GREEN} spark={d?.series.total?.slice(-7)} />
-            <Kpi label="Active Seats" value={d?.kpis.activeConstituencies ?? 0} sub={`of ${TOTAL_SEATS}`} trend="+5" up accent={BLUE} spark={d?.series.total} />
-            <Kpi label="Loop Health" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${d?.kpis.resolved ?? 0} / ${d?.kpis.raised ?? 0} resolved`} trend="+3pp" up accent={GREEN} spark={d?.series.resolved} />
-            <Kpi label="Sentiment Shift" value={`${(d?.sentiment.shiftPp ?? 0) >= 0 ? '+' : ''}${d?.sentiment.shiftPp ?? 0}pp`} sub="vs 7d ago" trend={d?.sentiment.label || '-'} up={(d?.sentiment.shiftPp ?? 0) >= 0} accent={PURPLE} spark={d?.series.total} />
-          </div>
+          {/* HEADLINE + 4-PILLAR KPI STRIP — the "main idea" a director reads first:
+              Reach (are we growing contact?) · Standing (are people with us, which
+              way moving?) · Battlegrounds (which seats decided now?) · Loop (are we
+              acting?). Deltas are the REAL 7d/14d change, not hardcoded strings. */}
+          {(() => {
+            const leanT = LEAN_KEYS.reduce((s, k) => s + (d?.leanOverall[k] || 0), 0) || 1;
+            const supPct = Math.round(((d?.leanOverall.supporter || 0) / leanT) * 100);
+            const undPct = Math.round(((d?.leanOverall.undecided || 0) / leanT) * 100);
+            const swingCount = (d?.swing || []).filter((s) => s.undecidedPct >= 30 && s.total >= 5).length;
+            const topIssue = ((d?.byCategory || []).find((c) => c.category !== 'other')?.category || 'issues').replace('_', ' ');
+            const r7 = d?.momentum?.reach7dPct ?? 0, r14 = d?.momentum?.reach14dPct ?? 0;
+            const s7 = d?.sentiment.shiftPp ?? 0, s14 = d?.sentiment.shift14Pp ?? 0;
+            const net = d?.sentiment.net ?? 0;
+            const dir = (v: number): 'up' | 'down' | 'flat' => (v > 0 ? 'up' : v < 0 ? 'down' : 'flat');
+            const sgn = (v: number) => (v >= 0 ? '+' : '');
+            return (
+              <>
+                {d && (
+                  <div style={{ ...card, padding: mobile ? '9px 12px' : '10px 14px', display: 'flex', alignItems: 'center', gap: 9, borderLeft: `3px solid ${SAFFRON}` }}>
+                    <MdSparkIcon size={16} color={SAFFRON} style={{ flexShrink: 0 }} />
+                    <div style={{ fontSize: mobile ? 11.5 : 13, lineHeight: 1.45, color: MUT }}>
+                      Sentiment <b style={{ color: net >= 0 ? GREEN : SAFFRON }}>{d.sentiment.label} {sgn(net)}{net}</b>
+                      {' · '}<b style={{ color: TXT }}>{fmtN(d.kpis.total)}</b> reached across <b style={{ color: TXT }}>{d.kpis.activeConstituencies}/{TOTAL_SEATS}</b> seats
+                      {' ('}<b style={{ color: dir(r7) === 'down' ? SAFFRON : GREEN }}>{sgn(r7)}{r7}%</b> wk{')'}
+                      {' · '}<b style={{ color: TXT }}>{undPct}%</b> undecided{swingCount ? <> · <b style={{ color: AMBER }}>{swingCount}</b> swing seats</> : null}
+                      {' · '}<b style={{ color: TXT, textTransform: 'capitalize' }}>{topIssue}</b> is the #1 issue
+                      {' · loop '}<b style={{ color: TXT }}>{d.kpis.loopHealthPct}%</b>
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: mobile ? 8 : 12 }}>
+                  <Kpi label="Reach" value={fmtN(d?.kpis.total ?? 0)} sub={`${fmtN(d?.kpis.today ?? 0)} today · ${TOTAL_SEATS} seats`} accent={SAFFRON} spark={d?.series.total}
+                    badges={[{ t: `7d ${sgn(r7)}${r7}%`, dir: dir(r7) }, { t: `14d ${sgn(r14)}${r14}%`, dir: dir(r14) }]} />
+                  <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={d?.series.total}
+                    badges={[{ t: `7d ${sgn(s7)}${s7}pp`, dir: dir(s7) }, { t: `14d ${sgn(s14)}${s14}pp`, dir: dir(s14) }]} />
+                  <Kpi label="Battlegrounds" value={`${d?.kpis.activeConstituencies ?? 0}`} sub={`of ${TOTAL_SEATS} seats live`} accent={BLUE} spark={d?.series.total}
+                    badges={[{ t: `${swingCount} swing`, dir: 'flat' }]} />
+                  <Kpi label="Response Loop" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${fmtN(d?.kpis.resolved ?? 0)} of ${fmtN(d?.kpis.raised ?? 0)} resolved`} accent={AMBER} spark={d?.series.resolved}
+                    badges={[{ t: `${fmtN(d?.kpis.resolved ?? 0)} closed`, dir: 'flat' }]} />
+                </div>
+              </>
+            );
+          })()}
 
           {/* MAIN GRID: map | center | feed (stacks on mobile) */}
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: mobile ? undefined : 620 }}>
@@ -299,28 +335,40 @@ export default function WarRoomClient() {
                     );
                   })
                 ) : (
-                  (d?.recommendations || []).length === 0 ? <Empty text="No directives yet - the leader app pushes here" /> : d!.recommendations!.map((r) => (
-                    <div key={r.id} style={{ padding: '8px 12px', borderBottom: `1px solid ${LINE}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'flex-start' }}>
+                  (d?.recommendations || []).length === 0 ? <Empty text="No directives yet - the leader app pushes here" /> : d!.recommendations!.map((r) => {
+                    // Quickly-understandable at a glance: a colored source rail +
+                    // plain-language tag say WHO is asking (AI vs the leader) before
+                    // the title even registers.
+                    const isAi = r.source === 'ai';
+                    const acc = isAi ? PURPLE : SAFFRON;
+                    return (
+                      <div key={r.id} style={{ padding: '9px 12px', borderBottom: `1px solid ${LINE}`, borderLeft: `3px solid ${acc}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', color: acc, background: `${acc}1c`, borderRadius: 5, padding: '1px 5px' }}>
+                            {isAi ? <><MdSparkIcon size={10} /> AI suggests</> : <><MdCampaignIcon size={10} /> Leader directive</>}
+                          </span>
+                          {r.constituency && <span style={{ fontSize: 9, color: MUT }}>{r.constituency}</span>}
+                          <span style={{ flex: 1 }} />
+                          <span style={{ fontSize: 10, color: MUT, whiteSpace: 'nowrap' }}>{ago(r.created_at)}</span>
+                        </div>
                         <b style={{ fontSize: 12, lineHeight: 1.3 }}>{r.title}</b>
-                        <span style={{ fontSize: 10, color: MUT, whiteSpace: 'nowrap' }}>{ago(r.created_at)}</span>
+                        {r.body && <div style={{ fontSize: 11, color: MUT, marginTop: 2, lineHeight: 1.35 }}>{r.body}</div>}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                          <span style={{ flex: 1 }} />
+                          {r.status === 'new' ? (
+                            <>
+                              <Chip on={false} onClick={() => ackReco(r.id, 'acked')}>Ack</Chip>
+                              <Chip on={false} onClick={() => ackReco(r.id, 'actioned')}>Done</Chip>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 3, color: r.status === 'actioned' ? GREEN : BLUE }}>
+                              <MdOutlineCheckCircle size={11} /> {r.status === 'actioned' ? 'Done' : 'Acked'}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      {r.body && <div style={{ fontSize: 11, color: MUT, marginTop: 2 }}>{r.body}</div>}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: r.source === 'ai' ? PURPLE : SAFFRON }}>{r.source}</span>
-                        {r.constituency && <span style={{ fontSize: 9, color: MUT }}>· {r.constituency}</span>}
-                        <span style={{ flex: 1 }} />
-                        {r.status === 'new' ? (
-                          <>
-                            <Chip on={false} onClick={() => ackReco(r.id, 'acked')}>Ack</Chip>
-                            <Chip on={false} onClick={() => ackReco(r.id, 'actioned')}>Done</Chip>
-                          </>
-                        ) : (
-                          <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: r.status === 'actioned' ? GREEN : BLUE }}>{r.status}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </Panel>
@@ -720,12 +768,22 @@ function Panel({ title, sub, right, children, noPad, grow, h, clip, icon, iconCo
   );
 }
 const InfoDot = () => <MdInfoOutline size={14} color={'var(--text-muted)' as string} style={{ flexShrink: 0 }} />;
-function Kpi({ label, value, sub, trend, up, accent, spark }: { label: string; value: number | string; sub: string; trend: string; up: boolean; accent: string; spark?: number[] }) {
+// Compact organic number format: 27000 → "27,000", 1234 → "1,234". Indian
+// grouping to match the campaign's audience.
+function fmtN(n: number): string { return (n || 0).toLocaleString('en-IN'); }
+type KpiBadge = { t: string; dir: 'up' | 'down' | 'flat' };
+function Kpi({ label, value, sub, badges, accent, spark }: { label: string; value: number | string; sub: string; badges: KpiBadge[]; accent: string; spark?: number[] }) {
+  const bc = (dir: KpiBadge['dir']) => (dir === 'up' ? GREEN : dir === 'down' ? SAFFRON : MUT);
+  const ba = (dir: KpiBadge['dir']) => (dir === 'up' ? '↑' : dir === 'down' ? '↓' : '·');
   return (
     <div style={{ ...card, padding: 12, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
         <div style={{ fontSize: 10, color: MUT, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-        <span style={{ fontSize: 10, fontWeight: 700, color: up ? GREEN : SAFFRON, background: `${up ? GREEN : SAFFRON}1c`, borderRadius: 6, padding: '1px 5px' }}>{up ? '↑' : '↓'} {trend}</span>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {badges.map((b, i) => (
+            <span key={i} style={{ fontSize: 9, fontWeight: 700, color: bc(b.dir), background: `${bc(b.dir)}1c`, borderRadius: 6, padding: '1px 5px', whiteSpace: 'nowrap' }}>{ba(b.dir)} {b.t}</span>
+          ))}
+        </div>
       </div>
       <div style={{ fontSize: 26, fontWeight: 800, color: accent, lineHeight: 1.15, marginTop: 2 }}>{value}</div>
       <div style={{ fontSize: 10, color: MUT }}>{sub}</div>

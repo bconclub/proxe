@@ -1,3 +1,12 @@
+## 2026-07-09 07:20 IST · feat(pop): War Room reframed to the 4 things that matter + real 7d/14d momentum
+
+- The KPI strip is now the 4 pillars a war room actually answers: Reach (are we growing contact?), Standing (are people with us, which way moving?), Battlegrounds (which seats decided now?), Response Loop (are we acting?). Was 5 cards with a redundant "Touchpoints Today".
+- Deltas are REAL now, not hardcoded strings. The old +14% / +12% / +5 / +3pp were literal fake values. Each card shows the actual 7-day AND 14-day change: reach momentum via exact indexed counts (last-7d vs prior-7d, last-14d vs prior-14d), sentiment shift in pp for both windows.
+- Added a synthesized one-line "main idea" headline above the strip: "Sentiment {label} {net} · {reach} reached across {active}/117 seats (+X% wk) · {undecided}% undecided · {N} swing seats · {issue} #1 · loop {pct}%" - the single glance a director takes.
+- Killed the misleading "8000 voices" donut: that number was the scan CAP (R.length), not real. Support/Lean/Opposed now scales the sample's proportions to the true electorate total so the donut reads at campaign scale. Loop Health denominator is the exact full-dataset total, not "/8000". Numbers formatted with grouping (27,000 not 27000).
+- Directives are quickly understandable: a colored source rail + plain-language tag ("AI suggests" / "Leader directive" with icon) say WHO is asking before the title registers; cleaner acked/done state.
+- (pending-sha)
+
 ## 2026-07-09 06:40 IST · fix: tolerate friendly/malformed CLAUDE_MODEL so AI scoring + snapshots stop 404ing
 
 - Root cause: CLAUDE_MODEL was set to "sonnet_5" (not a real model ID). Every Claude call using it 404'd, so lead re-scoring silently fell back to rule-based scores and the AI narrative surfaces (war-room summary, brain) failed. The retired-model remap did not cover this class of typo.
