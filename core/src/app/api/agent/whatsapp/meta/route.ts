@@ -196,6 +196,10 @@ export async function POST(request: NextRequest) {
 
       let messageText: string | undefined;
       let triggerKind: 'text' | 'button' | 'interactive_button' | 'interactive_list' = 'text';
+      // Media (photo / document) the customer sent — captured AFTER the lead is
+      // created (see below), downloaded from Meta and stored so it shows on the
+      // lead. Previously image messages hit the `else` and were dropped whole.
+      let mediaToCapture: { id?: string; mime?: string; kind: 'image' | 'document' } | null = null;
 
       if (msg.type === 'text') {
         messageText = msg.text?.body;
@@ -212,6 +216,13 @@ export async function POST(request: NextRequest) {
           messageText = inter.list_reply?.title;
           triggerKind = 'interactive_list';
         }
+      } else if (msg.type === 'image' || msg.type === 'document') {
+        // Owner/scout sent a photo (or a doc). Keep the caption as the message so
+        // the conversation continues naturally; download + attach the media below.
+        const media = msg.type === 'image' ? msg.image : msg.document;
+        mediaToCapture = { id: media?.id, mime: media?.mime_type, kind: msg.type };
+        messageText = (media?.caption && String(media.caption).trim())
+          || (msg.type === 'image' ? '[shared a photo]' : '[shared a document]');
       } else {
         console.log(`[meta/webhook] Skipping unsupported message type: ${msg.type}`);
         continue;
@@ -249,6 +260,13 @@ export async function POST(request: NextRequest) {
         brand,
         triggerKind,
       });
+
+      // Capture any attached media AFTER the lead exists (fire-and-forget so it
+      // never blocks the reply). Downloads from Meta → Supabase Storage → lead.
+      if (mediaToCapture?.id) {
+        captureWhatsAppMedia(mediaToCapture.id, customerPhone, mediaToCapture.mime, mediaToCapture.kind, brand)
+          .catch((e) => console.error('[meta/media] capture failed:', e?.message || e));
+      }
     }
 
     return NextResponse.json({ status: 'processed' }, { status: 200 });
@@ -257,6 +275,62 @@ export async function POST(request: NextRequest) {
     // Still return 200 to prevent Meta from retrying
     return NextResponse.json({ status: 'error' }, { status: 200 });
   }
+}
+
+// ─── WhatsApp media capture ───────────────────────────────────────────────────
+// Meta Cloud API sends only a media_id for photos/docs. Resolve it to a
+// short-lived download URL, fetch the bytes (auth required), store them in a
+// Supabase Storage bucket, and attach the public URL to the lead so the property
+// gallery can show real photos. Bucket 'lead-media' must exist (public read).
+async function captureWhatsAppMedia(
+  mediaId: string,
+  customerPhone: string,
+  mime: string | undefined,
+  kind: 'image' | 'document',
+  brand: string,
+): Promise<void> {
+  const token = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  if (!token) { console.warn('[meta/media] META_WHATSAPP_ACCESS_TOKEN not set — cannot download media'); return; }
+  const supabase = getServiceClient();
+  if (!supabase) return;
+
+  // 1. media_id → temporary download URL + mime
+  const lookup = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(mediaId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!lookup.ok) { console.error('[meta/media] lookup failed', lookup.status, await lookup.text().catch(() => '')); return; }
+  const info = await lookup.json();
+  const url: string | undefined = info?.url;
+  const mimeType: string = info?.mime_type || mime || (kind === 'image' ? 'image/jpeg' : 'application/octet-stream');
+  if (!url) { console.error('[meta/media] no url in media info'); return; }
+
+  // 2. download the bytes (the URL also requires the token)
+  const bin = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!bin.ok) { console.error('[meta/media] download failed', bin.status); return; }
+  const buf = Buffer.from(await bin.arrayBuffer());
+  if (buf.length > 15_000_000) { console.warn('[meta/media] media over 15MB, skipping'); return; }
+
+  // 3. store in Supabase Storage
+  const ext = (mimeType.split('/')[1] || 'bin').split(';')[0].replace(/[^a-z0-9]/gi, '') || 'bin';
+  const phoneKey = String(customerPhone).replace(/\D/g, '');
+  const path = `${brand}/${phoneKey}/${Date.now()}-${mediaId.slice(-8)}.${ext}`;
+  const { error: upErr } = await supabase.storage.from('lead-media').upload(path, buf, { contentType: mimeType, upsert: true });
+  if (upErr) { console.error('[meta/media] upload failed:', upErr.message); return; }
+  const publicUrl = supabase.storage.from('lead-media').getPublicUrl(path).data?.publicUrl;
+  if (!publicUrl) return;
+
+  // 4. attach to the lead (brand-namespaced, capped at the last 10)
+  const normalizedPhone = normalizePhone(customerPhone);
+  const { data: lead } = await supabase
+    .from('all_leads').select('id, unified_context').eq('customer_phone_normalized', normalizedPhone).maybeSingle();
+  if (!lead) { console.warn('[meta/media] no lead for', normalizedPhone); return; }
+  const ctx = lead.unified_context || {};
+  const bctx = ctx[brand] || {};
+  const imgs = Array.isArray(bctx.property_images) ? bctx.property_images : [];
+  imgs.push({ url: publicUrl, kind, at: new Date().toISOString() });
+  ctx[brand] = { ...bctx, property_images: imgs.slice(-10) };
+  await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', lead.id);
+  console.log(`[meta/media] captured ${kind} for lead ${lead.id} → ${publicUrl}`);
 }
 
 // ─── Channel Performance Tracking ─────────────────────────────────────────────

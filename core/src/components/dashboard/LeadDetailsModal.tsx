@@ -2133,7 +2133,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     ['Other details', otherDetails],
                   ] as Array<[string, string | null | undefined]>).filter((r) => !!r[1]);
                   const maps = lkz.google_maps_url;
-                  if (allRows.length === 0 && !maps && !lkz.property_id) return null;
+                  if (allRows.length === 0 && !maps && !lkz.property_id && !(Array.isArray(lkz.property_images) && lkz.property_images.length)) return null;
                   const previewRows = allRows.slice(0, 4);
                   const hasMore = allRows.length > previewRows.length || !!maps || !!lkz.property_id;
                   return (
@@ -2185,6 +2185,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </a>
                             )}
                             {lkz.property_id && <LokazenPropertyGallery propertyId={String(lkz.property_id)} />}
+                            {/* Photos the customer sent over WhatsApp (captured to
+                                Supabase Storage). Direct URLs — click to open full. */}
+                            {Array.isArray(lkz.property_images) && lkz.property_images.length > 0 && (
+                              <div className="mt-3">
+                                <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Photos shared ({lkz.property_images.length})</span>
+                                <div className="flex flex-wrap gap-2 mt-1.5">
+                                  {lkz.property_images.map((img: any, i: number) => (
+                                    <a key={i} href={typeof img === 'string' ? img : img?.url} target="_blank" rel="noopener noreferrer"
+                                      style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-primary)', display: 'block', flexShrink: 0, background: '#000' }}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={typeof img === 'string' ? img : img?.url} alt="Shared photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

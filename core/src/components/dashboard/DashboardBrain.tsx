@@ -157,6 +157,67 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MSGS[0])
   const endRef = useRef<HTMLDivElement | null>(null)
 
+  // ── Draggable dock bubble ────────────────────────────────────────────────
+  // The persistent bottom-right bubble can be picked up and dropped anywhere;
+  // its position is remembered across page changes and reloads. Only active in
+  // `dock` mode — the inline "Ask PROXe" button is unaffected.
+  const DOCK_SIZE = 52
+  const DOCK_MARGIN = 16
+  const dockRef = useRef<HTMLButtonElement | null>(null)
+  const [dockPos, setDockPos] = useState<{ x: number; y: number } | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const drag = useRef({ active: false, moved: false, startX: 0, startY: 0, offX: 0, offY: 0 })
+
+  const clampToViewport = useCallback((x: number, y: number) => ({
+    x: Math.min(Math.max(x, DOCK_MARGIN), window.innerWidth - DOCK_SIZE - DOCK_MARGIN),
+    y: Math.min(Math.max(y, DOCK_MARGIN), window.innerHeight - DOCK_SIZE - DOCK_MARGIN),
+  }), [])
+
+  // Restore saved position (or default to bottom-right) once mounted, and keep
+  // it on-screen when the window resizes.
+  useEffect(() => {
+    if (!dock) return
+    let initial = { x: window.innerWidth - DOCK_SIZE - 24, y: window.innerHeight - DOCK_SIZE - 24 }
+    try {
+      const saved = localStorage.getItem('proxe-brain-dock-pos')
+      if (saved) {
+        const p = JSON.parse(saved)
+        if (typeof p?.x === 'number' && typeof p?.y === 'number') initial = p
+      }
+    } catch { /* ignore bad JSON */ }
+    setDockPos(clampToViewport(initial.x, initial.y))
+    const onResize = () => setDockPos((cur) => (cur ? clampToViewport(cur.x, cur.y) : cur))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [dock, clampToViewport])
+
+  const onDockPointerDown = useCallback((e: React.PointerEvent) => {
+    const rect = dockRef.current?.getBoundingClientRect()
+    if (!rect) return
+    drag.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY, offX: e.clientX - rect.left, offY: e.clientY - rect.top }
+    dockRef.current?.setPointerCapture(e.pointerId)
+    setDragging(true)
+  }, [])
+
+  const onDockPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = drag.current
+    if (!d.active) return
+    if (Math.abs(e.clientX - d.startX) > 4 || Math.abs(e.clientY - d.startY) > 4) d.moved = true
+    setDockPos(clampToViewport(e.clientX - d.offX, e.clientY - d.offY))
+  }, [clampToViewport])
+
+  const onDockPointerUp = useCallback((e: React.PointerEvent) => {
+    const d = drag.current
+    if (!d.active) return
+    d.active = false
+    setDragging(false)
+    dockRef.current?.releasePointerCapture(e.pointerId)
+    setDockPos((cur) => {
+      if (cur) { try { localStorage.setItem('proxe-brain-dock-pos', JSON.stringify(cur)) } catch { /* quota */ } }
+      return cur
+    })
+  }, [])
+
   // Rotate the loading status so it reads as real work, not a stuck "Thinking…".
   useEffect(() => {
     if (!loading) return
@@ -200,23 +261,45 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     <>
       {/* Brain button — stacked under the eye (14) + bell (54). */}
       <button
-        onClick={() => setOpen(true)}
-        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center gap-1.5 rounded-full transition hover:opacity-90`}
+        ref={dockRef}
+        onClick={() => { if (dock && drag.current.moved) return; setOpen(true) }}
+        onPointerDown={dock ? onDockPointerDown : undefined}
+        onPointerMove={dock ? onDockPointerMove : undefined}
+        onPointerUp={dock ? onDockPointerUp : undefined}
+        className={`${inline ? 'relative' : 'fixed'} ${dock ? '' : 'shadow-lg transition hover:opacity-90'} z-[60] flex items-center justify-center gap-1.5 rounded-full`}
         style={{
           ...(inline
             ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
             : dock
-              // Persistent PiP dock — bottom-right, always available and surviving
-              // page changes (mounted in the dashboard layout, not the page).
-              ? { bottom: '24px', right: '24px', backgroundColor: 'var(--accent-primary)', border: 'none', color: '#fff', width: '52px', height: '52px', boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }
+              // Persistent, draggable frosted-glass "drop" — icon only, blurred
+              // translucent bubble. Position remembered across pages/reloads;
+              // mounted in the dashboard layout so it survives navigation.
+              ? {
+                  left: dockPos ? `${dockPos.x}px` : undefined,
+                  top: dockPos ? `${dockPos.y}px` : undefined,
+                  right: dockPos ? undefined : '24px',
+                  bottom: dockPos ? undefined : '24px',
+                  width: `${DOCK_SIZE}px`,
+                  height: `${DOCK_SIZE}px`,
+                  color: 'var(--accent-primary)',
+                  background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
+                  backdropFilter: 'blur(16px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+                  border: '1px solid color-mix(in srgb, var(--text-primary) 14%, transparent)',
+                  boxShadow: dragging ? '0 14px 40px rgba(0,0,0,0.4)' : '0 8px 30px rgba(0,0,0,0.28)',
+                  cursor: dragging ? 'grabbing' : 'grab',
+                  touchAction: 'none',
+                  transform: dragging ? 'scale(1.06)' : 'scale(1)',
+                  transition: 'transform 140ms ease, box-shadow 140ms ease',
+                }
               : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           ...(dock ? {} : { height: '36px' }),
           ...(inline && label ? { padding: '0 12px' } : (dock ? {} : { width: '36px' })),
         }}
-        aria-label="Ask PROXe"
-        title="Ask PROXe"
+        aria-label={dock ? 'Ask PROXe — drag to move' : 'Ask PROXe'}
+        title={dock ? 'Ask PROXe (drag to move)' : 'Ask PROXe'}
       >
-        <ProxeMark size={18} />
+        <ProxeMark size={dock ? 24 : 18} />
         {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
       </button>
 
