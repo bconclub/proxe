@@ -20,6 +20,36 @@
       "port": 4007
     },
     {
+      "name": "pop-core-c",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&set NEXT_DIST_DIR=.next-c&&node scripts/stage-brand.js&&npx next dev -p 4013"],
+      "port": 4013
+    },
+    {
+      "name": "pop-core-d",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&set NEXT_DIST_DIR=.next-d&&node scripts/stage-brand.js&&npx next dev -p 4014"],
+      "port": 4014
+    },
+    {
+      "name": "pop-core-e",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&set NEXT_DIST_DIR=.next-e&&node scripts/stage-brand.js&&npx next dev -p 4015"],
+      "port": 4015
+    },
+    {
+      "name": "pop-core-b",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&node scripts/stage-brand.js&&npx next dev -p 4012"],
+      "port": 4012
+    },
+    {
+      "name": "pop-core-f",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=pop&&set NEXT_DIST_DIR=.next-f&&node scripts/stage-brand.js&&npx next dev -p 4016"],
+      "port": 4016
+    },
+    {
       "name": "lokazen",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&npm run dev"],
@@ -72,6 +102,12 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd .multi\\lokazen-fresh&&set BRAND_ID=lokazen&&npx next dev -p 4009"],
       "port": 4009
+    },
+    {
+      "name": "lokazen-site",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\user\\Lokazen && set NODE_TLS_REJECT_UNAUTHORIZED=0 && npx next dev --webpack -p 4011"],
+      "port": 4011
     },
     {
       "name": "kargil-gas",

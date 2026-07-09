@@ -1,3 +1,13 @@
+## 2026-07-09 12:30 IST · feat(pop): Brain voice orb — speaks today's briefing (Groq + ElevenLabs Monika Sogam)
+
+- User-facing: The Brain tab is now a living voice orb. Tap it and it gathers today's context (brain overview, war room, leader pushes, news buzz from listen_signals) and SPEAKS the daily briefing in Monika Sogam's voice (eleven_v3, multilingual_v2 fallback, one deterministic voice). Greets the signed-in human by first name; campaign vocabulary only (voices/constituencies/grievances — never "leads"); system refers to itself as PROXe, never "AI".
+- User-facing: ? button fans out quick questions (constituencies / leader actions / news buzzing / needs attention); language switcher bottom-right (EN / ਪੰਜਾਬੀ / हिंदी); one-line rolling subtitles synced to the audio; loading ring fills while connecting and closes when the voice starts.
+- Speed: words come from Groq llama-3.3-70b (~3-4s incl. data gather, Claude fallback); first sentence TTS'd in parallel with the rest so speech starts in ~6s; gathered context cached 90s so quick-question taps answer in ~1-3s; context slimmed to ~2k tokens to stay under Groq's TPM cap.
+- Eval: every run logs llmMs/engine/ttsFirstMs/ttfaMs/chars/language/question to a rolling Redis list (brain:voice:runs) — GET /api/dashboard/brain/briefing returns them, ready for the Eval → Calls "brain voice" surface.
+- Orb rendering: brand-accent colors, calm motion, light-theme-aware inks (no white smudge on light), ripples only on the blob itself, malleable blob while speaking, radar sweep chrome. Brain page keeps all four tabs (Brain / Map / Eval / Learning), header is just the heading.
+- Also: launch.json gains pop-core-f (port 4016, own dist dir) for this session's isolated dev server.
+- `(pending-sha)`
+
 ## 2026-07-09 09:45 IST · fix: commit the Configure sub-route pages (appearance / notifications / widget)
 
 - The Configure card launcher links to /dashboard/settings/{appearance,notifications,widget}, but those three route pages were untracked - so those cards 404'd on prod. Committed the three page.tsx files (each self-contained, importing only already-committed shared modules) so the links resolve. No other threads' in-flight work touched.

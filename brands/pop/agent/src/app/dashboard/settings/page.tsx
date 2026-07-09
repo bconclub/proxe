@@ -1,711 +1,127 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+// Configure — a card grid launcher. Every setting area is one card; the inline
+// sections that used to live on this page moved to their own routes:
+//   Appearance → /dashboard/settings/appearance
+//   Widget Appearance → /dashboard/settings/widget
+//   Notifications & Sounds → /dashboard/settings/notifications
+
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { useTheme } from '@/components/dashboard/ThemeProvider';
 import {
-  SOUND_LABELS,
-  type SoundEvent,
-  isMuted,
-  setMuted as persistMuted,
-  isEventEnabled,
-  setEventEnabled,
-  preview as previewSound,
-} from '@/lib/sound-prefs';
-import { ACCENT_THEMES } from '@/lib/accent-theme';
-import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
-import { getCurrentBrandId } from '@/configs';
+  MdPsychology, MdGroup, MdGridView, MdOutlineForum, MdHub,
+  MdNotificationsActive, MdPalette, MdChatBubbleOutline, MdToken,
+} from 'react-icons/md';
+import { getBrandConfig } from '@/configs';
 
-const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
-  { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
-  { ev: 'update', hint: 'Pop on a stage or score change' },
-  { ev: 'ready', hint: 'Cue when the home page finishes loading' },
-];
-
-type WidgetStyle = 'searchbar' | 'bubble';
+type Card = {
+  href: string;
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  color: string; // icon tile tint
+  chips?: Array<{ label: string; tone?: string }>;
+  gated?: boolean;
+};
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
-  const [selectedTheme, setSelectedTheme] = useState(getCurrentBrandId());
-  const [saved, setSaved] = useState(false);
-  const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
-  const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
-  const [widgetStyleError, setWidgetStyleError] = useState<string | null>(null);
-  const [loadingWidgetStyle, setLoadingWidgetStyle] = useState(true);
+  const brain = !!getBrandConfig().features?.brain;
 
-  // Notification sound prefs (mirror localStorage via the sound-prefs helper).
-  const [soundMuted, setSoundMuted] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState<Record<SoundEvent, boolean>>({
-    new: true, update: true, ready: true,
-  });
-
-  // Hydrate sound prefs on mount (localStorage is client-only).
-  useEffect(() => {
-    setSoundMuted(isMuted());
-    setSoundEnabled({
-      new: isEventEnabled('new'),
-      update: isEventEnabled('update'),
-      ready: isEventEnabled('ready'),
-    });
-  }, []);
-
-  function toggleMuted() {
-    setSoundMuted((m) => {
-      const next = !m;
-      persistMuted(next);
-      // Global: applies to every user on their next load.
-      saveGlobalPrefs({ sounds: { muted: next, ...soundEnabled } });
-      return next;
-    });
-  }
-  function toggleEvent(ev: SoundEvent) {
-    setSoundEnabled((prev) => {
-      const next = { ...prev, [ev]: !prev[ev] };
-      setEventEnabled(ev, next[ev]);
-      saveGlobalPrefs({ sounds: { muted: soundMuted, ...next } });
-      return next;
-    });
-  }
-
-  // Load + (re)apply saved accent theme. Depends on `theme` (dark/light) so the
-  // accent CSS vars are re-applied after a dark/light switch — otherwise the
-  // ThemeProvider re-sets the base vars on toggle and the chosen accent is lost.
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('bcon-accent-theme');
-    if (savedTheme) {
-      setSelectedTheme(savedTheme);
-      applyTheme(savedTheme);
-    } else {
-      // Default to the active brand's theme
-      applyTheme(getCurrentBrandId());
-    }
-  }, [theme]);
-
-  // Load saved widget style on mount
-  useEffect(() => {
-    async function fetchWidgetStyle() {
-      try {
-        const response = await fetch('/api/dashboard/settings/widget-style', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setWidgetStyle(data.style || 'searchbar');
-        }
-      } catch (error) {
-        console.error('Error fetching widget style:', error);
-      } finally {
-        setLoadingWidgetStyle(false);
-      }
-    }
-    fetchWidgetStyle();
-  }, []);
-
-  // Apply theme to CSS variables
-  function applyTheme(themeId: string) {
-    const theme = ACCENT_THEMES.find(t => t.id === themeId);
-    if (theme) {
-      document.documentElement.style.setProperty('--accent-primary', theme.color);
-      document.documentElement.style.setProperty('--accent-light', theme.color);
-      document.documentElement.style.setProperty('--accent-subtle', `${theme.color}20`);
-    }
-  }
-
-  // Handle theme selection
-  function handleThemeSelect(themeId: string) {
-    setSelectedTheme(themeId);
-    applyTheme(themeId);
-    localStorage.setItem('bcon-accent-theme', themeId);
-    // Global: every user picks up this accent on their next load.
-    saveGlobalPrefs({ theme: { accent: themeId } });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }
-
-  // Handle widget style selection
-  async function handleWidgetStyleSelect(style: WidgetStyle) {
-    const previousStyle = widgetStyle;
-    setWidgetStyle(style);
-    setWidgetStyleError(null);
-    
-    try {
-      const response = await fetch('/api/dashboard/settings/widget-style', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ style }),
-      });
-
-      if (response.ok) {
-        setWidgetStyleSaved(true);
-        setTimeout(() => setWidgetStyleSaved(false), 2000);
-      } else {
-        const error = await response.json();
-        console.error('Error saving widget style:', error);
-        
-        // Show error message
-        if (response.status === 403) {
-          setWidgetStyleError('Admin access required to change widget style');
-        } else if (response.status === 401) {
-          setWidgetStyleError('Please log in to save settings');
-        } else {
-          setWidgetStyleError(error.error || 'Failed to save widget style');
-        }
-        
-        // Revert on error
-        setWidgetStyle(previousStyle);
-        setTimeout(() => setWidgetStyleError(null), 5000);
-      }
-    } catch (error) {
-      console.error('Error saving widget style:', error);
-      setWidgetStyleError('Network error. Please try again.');
-      // Revert on error
-      setWidgetStyle(previousStyle);
-      setTimeout(() => setWidgetStyleError(null), 5000);
-    }
-  }
+  const CARDS: Card[] = [
+    {
+      href: '/dashboard/settings/brain', title: 'The Brain',
+      desc: 'The living brain — tap the orb and it speaks today’s briefing in the agent’s voice.',
+      icon: <MdPsychology size={22} />, color: '#8b5cf6',
+      chips: [{ label: '● Alive', tone: '#22c55e' }], gated: !brain,
+    },
+    {
+      href: '/dashboard/settings/users', title: 'Team & Access',
+      desc: 'Invite teammates, set roles, revoke access. Every lead action is logged by name.',
+      icon: <MdGroup size={22} />, color: '#3b82f6',
+    },
+    {
+      href: '/dashboard/settings/features', title: 'Features',
+      desc: 'Switch Voice/Calls, Dashboard Brain and other features on or off — no redeploy.',
+      icon: <MdGridView size={22} />, color: '#22c55e',
+    },
+    {
+      href: '/dashboard/settings/whatsapp-templates', title: 'WhatsApp Templates',
+      desc: 'Create and submit message templates to Meta for approval, and track status.',
+      icon: <MdOutlineForum size={22} />, color: '#25d366',
+    },
+    {
+      href: '/dashboard/config', title: 'Integrations & Connections',
+      desc: 'Connection status for every integration, which secrets are set, channels and sources.',
+      icon: <MdHub size={22} />, color: '#6366f1',
+    },
+    {
+      href: '/dashboard/settings/notifications', title: 'Notifications & Sounds',
+      desc: 'Master mute, per-event sound toggles, and previews.',
+      icon: <MdNotificationsActive size={22} />, color: '#f59e0b',
+    },
+    {
+      href: '/dashboard/settings/appearance', title: 'Appearance',
+      desc: 'Dark or light mode, accent color, and a live preview of the theme.',
+      icon: <MdPalette size={22} />, color: '#ec4899',
+    },
+    {
+      href: '/dashboard/settings/widget', title: 'Widget Appearance',
+      desc: 'How the widget appears on your website — search bar or floating chat bubble.',
+      icon: <MdChatBubbleOutline size={22} />, color: '#a855f7',
+    },
+    {
+      href: '/tokens', title: 'Token Usage',
+      desc: 'Roughly how much Claude spend goes to agent chat, scoring, and notes.',
+      icon: <MdToken size={22} />, color: '#64748b',
+      chips: [{ label: 'Test', tone: '#f59e0b' }],
+    },
+  ];
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-4xl">
-        {/* Team & Access — link to user management */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Team & Access
-          </h2>
-          <a
-            href="/dashboard/settings/users"
-            className="block p-6 rounded-lg hover:bg-[var(--bg-hover)] transition-colors border border-transparent hover:border-[var(--border-primary)]"
-            style={{ background: 'var(--bg-secondary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
-                  Manage users
-                </h3>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  Invite teammates, set roles, and revoke access. Every lead-related action is logged with the user&rsquo;s name.
-                </p>
-              </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
-        </div>
+      <div className="p-6" style={{ maxWidth: 1120 }}>
+        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Configure</h1>
+        <p className="text-xs mb-6" style={{ color: 'var(--text-secondary)' }}>Everything that shapes how PROXe runs, in one place.</p>
 
-        {/* Appearance Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Appearance
-          </h2>
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Dashboard Mode
-            </h3>
-            <div className="grid grid-cols-2 gap-4 max-w-sm">
-              {[
-                { id: 'bw-dark', label: 'Dark', icon: '🌙' },
-                { id: 'bw-light', label: 'Light', icon: '☀️' },
-              ].map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => {
-                    setTheme(mode.id as 'bw-dark' | 'bw-light');
-                    // Global: dashboard mode for everyone on next load.
-                    saveGlobalPrefs({ theme: { mode: mode.id as 'bw-dark' | 'bw-light' } });
-                  }}
-                  className="p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2"
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    borderColor: theme === mode.id ? 'var(--accent-primary)' : 'transparent',
-                  }}
-                >
-                  <span className="text-2xl">{mode.icon}</span>
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {mode.label}
-                  </span>
-                  {theme === mode.id && (
-                    <span className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
-                      ✓ Active
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        <style>{`
+          .cfg-card { transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+          .cfg-card:hover { transform: translateY(-2px); border-color: var(--accent-primary) !important; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+          .cfg-card:hover .cfg-arrow { opacity: 1; transform: translateX(0); }
+        `}</style>
 
-        {/* Theme Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Theme
-          </h2>
-          
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Accent Color
-            </h3>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {ACCENT_THEMES.map((theme) => (
-                <button
-                  key={theme.id}
-                  onClick={() => handleThemeSelect(theme.id)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    selectedTheme === theme.id ? 'border-current' : 'border-transparent'
-                  }`}
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    borderColor: selectedTheme === theme.id ? theme.color : 'transparent',
-                  }}
-                >
-                  {/* Color Preview Circle */}
-                  <div
-                    className="w-12 h-12 rounded-full mx-auto mb-3"
-                    style={{ background: theme.color }}
-                  />
-                  
-                  {/* Theme Name */}
-                  <p 
-                    className="text-sm font-medium text-center"
-                    style={{ color: 'var(--text-primary)' }}
-                  >
-                    {theme.name}
-                  </p>
-                  
-                  {/* Color Code */}
-                  <p 
-                    className="text-xs text-center mt-1"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {theme.color}
-                  </p>
-                  
-                  {/* Selected Indicator */}
-                  {selectedTheme === theme.id && (
-                    <div 
-                      className="mt-2 text-xs text-center font-medium"
-                      style={{ color: theme.color }}
-                    >
-                      ✓ Active
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Saved Notification */}
-            {saved && (
-              <div 
-                className="mt-4 p-3 rounded-lg text-sm text-center"
-                style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
-              >
-                Theme saved successfully!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Widget Appearance Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Widget Appearance
-          </h2>
-          
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <h3 className="text-sm font-medium mb-4" style={{ color: 'var(--text-secondary)' }}>
-              Choose how the chat widget appears on your website
-            </h3>
-            
-            {loadingWidgetStyle ? (
-              <div className="text-center py-8">
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Loading...
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Search Bar Option */}
-                <button
-                  onClick={() => handleWidgetStyleSelect('searchbar')}
-                  className={`p-6 rounded-lg border-2 transition-all text-left ${
-                    widgetStyle === 'searchbar'
-                      ? 'border-current'
-                      : 'border-transparent hover:border-[var(--border-primary)]'
-                  }`}
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    borderColor:
-                      widgetStyle === 'searchbar'
-                        ? 'var(--accent-primary)'
-                        : 'transparent',
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h4
-                        className="text-base font-semibold mb-1"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        Search Bar
-                      </h4>
-                      <p
-                        className="text-xs"
-                        style={{ color: 'var(--text-secondary)' }}
-                      >
-                        Search bar at bottom of page
-                      </p>
-                    </div>
-                    {widgetStyle === 'searchbar' && (
-                      <div
-                        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--button-bg)' }}
-                      >
-                        <svg
-                          className="w-4 h-4 text-[var(--text-button)]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Visual Preview */}
-                  <div
-                    className="mt-4 p-4 rounded border"
-                    style={{
-                      background: 'var(--bg-primary)',
-                      borderColor: 'var(--border-primary)',
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="flex-1 h-10 rounded-lg px-4 flex items-center"
-                        style={{
-                          background: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-primary)',
-                        }}
-                      >
-                        <svg
-                          className="w-5 h-5 mr-2"
-                          style={{ color: 'var(--text-secondary)' }}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
-                        <span
-                          className="text-sm"
-                          style={{ color: 'var(--text-secondary)' }}
-                        >
-                          Search or ask a question...
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-
-                {/* Chat Bubble Option */}
-                <button
-                  onClick={() => handleWidgetStyleSelect('bubble')}
-                  className={`p-6 rounded-lg border-2 transition-all text-left ${
-                    widgetStyle === 'bubble'
-                      ? 'border-current'
-                      : 'border-transparent hover:border-[var(--border-primary)]'
-                  }`}
-                  style={{
-                    background: 'var(--bg-tertiary)',
-                    borderColor:
-                      widgetStyle === 'bubble'
-                        ? 'var(--accent-primary)'
-                        : 'transparent',
-                  }}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h4
-                        className="text-base font-semibold mb-1"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        Chat Bubble
-                      </h4>
-                      <p
-                        className="text-xs"
-                        style={{ color: 'var(--text-secondary)' }}
-                      >
-                        Floating bubble icon on bottom-right
-                      </p>
-                    </div>
-                    {widgetStyle === 'bubble' && (
-                      <div
-                        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--button-bg)' }}
-                      >
-                        <svg
-                          className="w-4 h-4 text-[var(--text-button)]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Visual Preview */}
-                  <div
-                    className="mt-4 p-4 rounded border relative"
-                    style={{
-                      background: 'var(--bg-primary)',
-                      borderColor: 'var(--border-primary)',
-                      minHeight: '80px',
-                    }}
-                  >
-                    <div className="absolute bottom-2 right-2">
-                      <div
-                        className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ background: 'var(--button-bg)' }}
-                      >
-                        <svg
-                          className="w-7 h-7 text-[var(--text-button)]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {/* Saved Notification */}
-            {widgetStyleSaved && (
-              <div
-                className="mt-4 p-3 rounded-lg text-sm text-center"
-                style={{
-                  background: 'var(--accent-subtle)',
-                  color: 'var(--accent-primary)',
-                }}
-              >
-                Widget style saved successfully!
-              </div>
-            )}
-
-            {/* Error Notification */}
-            {widgetStyleError && (
-              <div
-                className="mt-4 p-3 rounded-lg text-sm text-center"
-                style={{
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  color: '#ef4444',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                }}
-              >
-                {widgetStyleError}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Preview Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Preview
-          </h2>
-          
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            <div className="flex flex-wrap gap-4">
-              {/* Button Preview */}
-              <button
-                className="px-4 py-2 rounded-lg font-medium text-[var(--text-button)]"
-                style={{ background: 'var(--button-bg)' }}
-              >
-                Primary Button
-              </button>
-              
-              {/* Secondary Button Preview */}
-              <button
-                className="px-4 py-2 rounded-lg font-medium border"
-                style={{ 
-                  borderColor: 'var(--accent-primary)', 
-                  color: 'var(--accent-primary)',
-                  background: 'transparent'
-                }}
-              >
-                Secondary Button
-              </button>
-              
-              {/* Badge Preview */}
-              <span
-                className="px-3 py-1 rounded-full text-sm font-medium"
-                style={{ 
-                  background: 'var(--accent-subtle)', 
-                  color: 'var(--accent-primary)' 
-                }}
-              >
-                Badge
-              </span>
-              
-              {/* Link Preview */}
-              <a
-                href="#"
-                className="font-medium hover:underline"
-                style={{ color: 'var(--accent-primary)' }}
-              >
-                Link Text
-              </a>
-            </div>
-            
-            {/* Card Preview */}
-            <div 
-              className="mt-4 p-4 rounded-lg border-l-4"
-              style={{ 
-                background: 'var(--bg-tertiary)', 
-                borderColor: 'var(--accent-primary)' 
-              }}
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+          {CARDS.filter((c) => !c.gated).map((c) => (
+            <a
+              key={c.href}
+              href={c.href}
+              className="cfg-card block p-5 rounded-xl border"
+              style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', textDecoration: 'none' }}
             >
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                This is how accent colors appear in cards and highlights.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Notifications & Sounds Section */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Notifications &amp; Sounds
-          </h2>
-
-          <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
-            {/* Master mute */}
-            <div className="flex items-center justify-between pb-4 mb-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <div>
-                <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  All notification sounds
-                </h3>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  {soundMuted ? 'Muted — no sounds will play' : 'On — events below play their sound'}
-                </p>
-              </div>
-              <button
-                onClick={toggleMuted}
-                role="switch"
-                aria-checked={!soundMuted}
-                aria-label="Toggle all notification sounds"
-                className="relative w-12 h-7 rounded-full transition-colors flex-shrink-0"
-                style={{ background: soundMuted ? 'var(--bg-tertiary)' : 'var(--accent-primary)' }}
-              >
+              <div className="flex items-start justify-between gap-3">
                 <span
-                  className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all"
-                  style={{ left: soundMuted ? '4px' : '24px' }}
-                />
-              </button>
-            </div>
-
-            {/* Per-event toggles + preview */}
-            <div className="flex flex-col gap-3">
-              {SOUND_EVENTS.map(({ ev, hint }) => {
-                const on = soundEnabled[ev] && !soundMuted;
-                return (
-                  <div
-                    key={ev}
-                    className="flex items-center justify-between p-3 rounded-lg"
-                    style={{ background: 'var(--bg-tertiary)', opacity: soundMuted ? 0.5 : 1 }}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                        {SOUND_LABELS[ev]}
-                      </p>
-                      <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
-                        {hint}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                      {/* Preview — always playable so you can audition while muted */}
-                      <button
-                        onClick={() => previewSound(ev)}
-                        className="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors hover:border-[var(--accent-primary)]"
-                        style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
-                        title={`Preview ${SOUND_LABELS[ev]} sound`}
-                      >
-                        ▶ Preview
-                      </button>
-                      {/* Per-event toggle */}
-                      <button
-                        onClick={() => toggleEvent(ev)}
-                        disabled={soundMuted}
-                        role="switch"
-                        aria-checked={soundEnabled[ev]}
-                        aria-label={`Toggle ${SOUND_LABELS[ev]} sound`}
-                        className="relative w-11 h-6 rounded-full transition-colors disabled:cursor-not-allowed"
-                        style={{ background: on ? 'var(--accent-primary)' : 'var(--bg-secondary)' }}
-                      >
-                        <span
-                          className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
-                          style={{ left: soundEnabled[ev] ? '22px' : '2px' }}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Token usage */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            Token usage
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>Test</span>
-          </h2>
-          <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-            See roughly how much Claude spend goes to agent chat, scoring, and notes/summaries.
-          </p>
-          <a
-            href="/tokens"
-            className="block p-5 rounded-xl border transition-colors hover:bg-[var(--bg-hover)]"
-            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Open token usage</div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Spend by area · experimental</div>
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{ width: 42, height: 42, borderRadius: 12, background: `${c.color}1c`, color: c.color }}
+                >
+                  {c.icon}
+                </span>
+                <span className="cfg-arrow text-lg" style={{ color: 'var(--accent-primary)', opacity: 0, transform: 'translateX(-4px)', transition: 'all .15s ease' }}>→</span>
               </div>
-              <span className="text-lg" style={{ color: 'var(--accent-primary)' }}>→</span>
-            </div>
-          </a>
+              <h3 className="text-sm font-semibold mt-4 mb-1" style={{ color: 'var(--text-primary)' }}>{c.title}</h3>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)', minHeight: 32 }}>{c.desc}</p>
+              {c.chips && c.chips.length > 0 && (
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  {c.chips.map((ch) => (
+                    <span
+                      key={ch.label}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: `${ch.tone || '#64748b'}22`, color: ch.tone || 'var(--text-secondary)' }}
+                    >
+                      {ch.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </a>
+          ))}
         </div>
       </div>
     </DashboardLayout>
