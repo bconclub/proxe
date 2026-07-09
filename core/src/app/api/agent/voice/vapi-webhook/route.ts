@@ -16,17 +16,6 @@ function deterministicId(seed: string): string {
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 
-// Vapi retries end-of-call-report, so this handler runs concurrently for the
-// same call more than once. A select-then-insert idempotency check has a
-// race — both deliveries can pass the SELECT before either INSERT lands,
-// doubling every transcript row (confirmed in prod: one call had 32 rows for
-// what should've been ~16 turns). Deterministic per-message ids + upsert
-// closes the race at the DB level instead of a check-then-act.
-function deterministicId(seed: string): string {
-  const hash = createHash('sha256').update(seed).digest('hex');
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-}
-
 export const dynamic = 'force-dynamic';
 
 // The dashboard reads English. Grievance text extracted from a Punjabi/Hindi call
