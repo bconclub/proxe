@@ -10,6 +10,16 @@ import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } fro
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
+import { getBrandConfig } from '@/configs'
+
+// The BRAND's real accent colour (Lokazen orange, etc.) — NOT --accent-primary,
+// which is monochrome white/black in the default dark/light themes. Used for the
+// property card's accent bits (View all, map link, Push-to-Lokazen) so they show
+// the brand colour instead of grey.
+const BRAND_ACCENT: string = (() => {
+  try { const c = getBrandConfig().colors; return c.primary || c.primaryVibrant || 'var(--accent-primary)' }
+  catch { return 'var(--accent-primary)' }
+})()
 import LogCallDecisionHub from './LogCallDecisionHub'
 import { getCurrentBrandId, brandLabel } from '@/configs'
 import { LeadStage } from '@/types'
@@ -2155,7 +2165,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         title="View all property details"
                       >
                         <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Property details</span>
-                        <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                        <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color: BRAND_ACCENT }}>
                           {hasMore ? 'View all' : 'View'} <MdChevronRight size={13} />
                         </span>
                       </button>
@@ -2189,7 +2199,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               ))}
                             </div>
                             {maps && (
-                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: 'var(--accent-primary)' }}>
+                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: BRAND_ACCENT }}>
                                 📍 View on Google Maps →
                               </a>
                             )}
@@ -2232,7 +2242,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 } catch { setPushingListing('error'); }
                               }}
                               className="w-full mt-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                              style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : 'var(--accent-primary)', color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
+                              style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : BRAND_ACCENT, color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
                             >
                               {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
                                 : pushingListing === 'done' ? '✓ Listed on Lokazen'
