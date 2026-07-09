@@ -24,7 +24,7 @@ type Props = {
   activeNo: number | null;
   onSelect: (no: number) => void;
   onOpenProgram: () => void;
-  onOpenJourney: () => void;
+  onOpenFeed: () => void;
   onBell: () => void;
 };
 
@@ -35,7 +35,7 @@ export default function DesktopLayout({
   activeNo,
   onSelect,
   onOpenProgram,
-  onOpenJourney,
+  onOpenFeed,
   onBell,
 }: Props) {
   return (
@@ -82,10 +82,10 @@ export default function DesktopLayout({
               Program
             </Txt>
           </Pressable>
-          <Pressable style={styles.navBtn} onPress={onOpenJourney}>
-            <Feather name="smartphone" size={15} color={colors.accent} />
+          <Pressable style={styles.navBtn} onPress={onOpenFeed}>
+            <Feather name="rss" size={15} color={colors.accent} />
             <Txt size={12.5} weight="semibold">
-              Journey
+              Feed
             </Txt>
           </Pressable>
         </View>

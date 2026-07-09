@@ -10,6 +10,27 @@ import { BRAND_ID } from '@/configs';
 export const dynamic = 'force-dynamic';
 export const OPTIONS = leaderOptions;
 
+// GET — the leader's live Feed: every directive pushed to the team (his own
+// pushes + AI suggestions) with its current status (new → acked → actioned).
+export async function GET(req: NextRequest) {
+  const denied = leaderAuthGate(req);
+  if (denied) return denied;
+  const sb: any = getServiceClient();
+  if (!sb) return corsJson({ error: 'database unavailable' }, { status: 500 });
+  try {
+    const { data, error } = await sb.from('campaign_recommendations')
+      .select('id, title, body, source, constituency, status, created_by, created_at')
+      .eq('brand', BRAND_ID)
+      .order('created_at', { ascending: false })
+      .limit(60);
+    if (error) throw error;
+    return corsJson({ items: data || [] });
+  } catch (e) {
+    console.error('[leader/recommendations GET]', (e as Error).message);
+    return corsJson({ error: 'query failed' }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const denied = leaderAuthGate(req);
   if (denied) return denied;

@@ -321,6 +321,32 @@ export const api = {
       return { ok: false };
     }
   },
+
+  /**
+   * The leader's live Feed — every directive pushed to the team (his own pushes
+   * + AI suggestions) with its current status (new → acked → actioned). Polled
+   * by the Feed screen so status changes surface as the team works.
+   */
+  async getFeed(): Promise<FeedItem[]> {
+    if (USE_LOCAL) return [];
+    try {
+      const data = await request<{ items: FeedItem[] }>('/api/leader/recommendations');
+      return data.items || [];
+    } catch {
+      return [];
+    }
+  },
+};
+
+export type FeedItem = {
+  id: string;
+  title: string;
+  body: string | null;
+  source: 'leader' | 'ai';
+  constituency: string | null;
+  status: 'new' | 'acked' | 'actioned';
+  created_by: string | null;
+  created_at: string;
 };
 
 export type Api = typeof api;

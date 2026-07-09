@@ -1,6 +1,6 @@
 /** Pulse of Punjab - app root.
  *  Desktop (>=960px): 3-pane dashboard (DesktopLayout).
- *  Mobile: brand header + tab nav (Map / Seats / Program / Journey) + detail sheet. */
+ *  Mobile: brand header + tab nav (Map / Seats / Program / Feed) + detail sheet. */
 import React, { useEffect, useState } from 'react';
 import { View, Pressable, StyleSheet, ActivityIndicator, Modal, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -27,7 +27,7 @@ import SeatList from './src/components/SeatList';
 import DetailSheet from './src/components/DetailSheet';
 import DesktopLayout from './src/components/DesktopLayout';
 import ProgramScreen from './src/screens/ProgramScreen';
-import JourneyScreen from './src/screens/JourneyScreen';
+import FeedScreen from './src/screens/FeedScreen';
 
 import { api } from './src/lib/api';
 import { registerForPush, sendLocal } from './src/lib/notifications';
@@ -36,12 +36,12 @@ import type { ColorMode } from './src/lib/geo';
 import { constituencies, districts } from './src/data';
 import { colors, radius } from './src/theme';
 
-type Tab = 'map' | 'seats' | 'program' | 'journey';
+type Tab = 'map' | 'seats' | 'program' | 'feed';
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: 'map', label: 'Map', icon: 'map' },
   { id: 'seats', label: 'Seats', icon: 'list' },
   { id: 'program', label: 'Program', icon: 'layers' },
-  { id: 'journey', label: 'Journey', icon: 'smartphone' },
+  { id: 'feed', label: 'Feed', icon: 'rss' },
 ];
 
 const bell = () => sendLocal('Pulse of Punjab', 'Notifications are live on this device. ✓');
@@ -83,7 +83,7 @@ function AppInner() {
   const [colorMode, setColorMode] = useState<ColorMode>('grievances');
   const [pulse, setPulse] = useState<Record<number, Pulse>>({});
   const [activeNo, setActiveNo] = useState<number | null>(null);
-  const [overlay, setOverlay] = useState<null | 'program' | 'journey'>(null);
+  const [overlay, setOverlay] = useState<null | 'program' | 'feed'>(null);
 
   // State-wide intensity headline — sums the live per-seat pulse.
   const totals = React.useMemo(() => {
@@ -115,15 +115,15 @@ function AppInner() {
             activeNo={activeNo}
             onSelect={select}
             onOpenProgram={() => setOverlay('program')}
-            onOpenJourney={() => setOverlay('journey')}
+            onOpenFeed={() => setOverlay('feed')}
             onBell={bell}
           />
         </SafeAreaView>
         <OverlayModal visible={overlay != null} onClose={() => setOverlay(null)}>
           {overlay === 'program' ? (
             <ProgramScreen />
-          ) : overlay === 'journey' ? (
-            <JourneyScreen activeNo={activeNo} />
+          ) : overlay === 'feed' ? (
+            <FeedScreen />
           ) : null}
         </OverlayModal>
       </SafeAreaProvider>
@@ -186,7 +186,7 @@ function AppInner() {
           )}
           {tab === 'seats' && <SeatList onSelect={select} activeNo={activeNo} />}
           {tab === 'program' && <ProgramScreen />}
-          {tab === 'journey' && <JourneyScreen activeNo={activeNo} />}
+          {tab === 'feed' && <FeedScreen />}
         </View>
 
         {/* Bottom tab bar */}
