@@ -106,10 +106,18 @@ export async function GET() {
     }
 
     // ── Leads: distributions, temps, in-flight, bookings, notes ─────────────
+    // Scouts/connectors are GIG WORKERS, not sales leads — they spot vacant
+    // shops and get paid, they don't convert through a funnel. They must NEVER
+    // be counted in the lead totals, stages, or hot/warm/cold (that's exactly
+    // what inflated "total leads"). Split them out here so the Brain reports
+    // leads (owners/brands) and gigs (scouts) as two different populations.
+    const GIG_TYPES = ['scout', 'connector']
+    const isGig = (l: any) => GIG_TYPES.includes(l?.unified_context?.[brand]?.user_type)
     const channels: Record<string, number> = {}
     const stages: Record<string, number> = {}
     let hot = 0, warm = 0, cold = 0, inFlight = 0, bookingsUpcoming = 0
     let notesTotal = 0, notesToday = 0, leadsToday = 0
+    let leadsTotal = 0, gigsTotal = 0, gigsToday = 0
     const noteEvents: Event[] = []
     // Property-listing area tally (real-estate brands only — property_zone lives
     // in unified_context.<channel> for OWNER leads; brands without that field
@@ -117,6 +125,13 @@ export async function GET() {
     const areaCounts: Record<string, number> = {}
 
     for (const l of leads as any[]) {
+      // Gigs (scouts) are tallied separately and excluded from every lead metric.
+      if (isGig(l)) {
+        gigsTotal++
+        if (l.created_at && l.created_at >= istMidnightIso) gigsToday++
+        continue
+      }
+      leadsTotal++
       const src = l.first_touchpoint || l.last_touchpoint || 'unknown'
       channels[src] = (channels[src] || 0) + 1
       const stage = String(l.lead_stage || 'New')
@@ -199,8 +214,11 @@ export async function GET() {
       generated_at: new Date().toISOString(),
       taken_in: {
         kb_items: kbRes.count ?? 0,
-        leads_total: leads.length,
+        // leads = owners/brands only (gigs/scouts excluded). Reported separately.
+        leads_total: leadsTotal,
         leads_today: leadsToday,
+        gigs_total: gigsTotal,
+        gigs_today: gigsToday,
         notes_total: notesTotal,
         notes_today: notesToday,
         channels,
