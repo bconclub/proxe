@@ -406,6 +406,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showPropertyModal, setShowPropertyModal] = useState(false)
+  const [pushingListing, setPushingListing] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle')
   const [showAttribution, setShowAttribution] = useState(false)
   const [showPATResult, setShowPATResult] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -2188,16 +2189,19 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               ))}
                             </div>
                             {maps && (
-                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: 'var(--accent-primary, #10b981)' }}>
-                                View on Google Maps →
+                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: 'var(--accent-primary)' }}>
+                                📍 View on Google Maps →
                               </a>
                             )}
-                            {lkz.property_id && <LokazenPropertyGallery propertyId={String(lkz.property_id)} />}
-                            {/* Photos the customer sent over WhatsApp (captured to
-                                Supabase Storage). Direct URLs — click to open full. */}
-                            {Array.isArray(lkz.property_images) && lkz.property_images.length > 0 && (
-                              <div className="mt-3">
-                                <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Photos shared ({lkz.property_images.length})</span>
+
+                            {/* ── Photos — a dedicated gallery slot, always present so
+                                the modal has a clean designated place for images
+                                (customer-sent photos land here; empty state otherwise). */}
+                            <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                              <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                                Photos{Array.isArray(lkz.property_images) && lkz.property_images.length ? ` (${lkz.property_images.length})` : ''}
+                              </span>
+                              {Array.isArray(lkz.property_images) && lkz.property_images.length > 0 ? (
                                 <div className="flex flex-wrap gap-2 mt-1.5">
                                   {lkz.property_images.map((img: any, i: number) => (
                                     <a key={i} href={typeof img === 'string' ? img : img?.url} target="_blank" rel="noopener noreferrer"
@@ -2207,8 +2211,34 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </a>
                                   ))}
                                 </div>
-                              </div>
-                            )}
+                              ) : lkz.property_id ? (
+                                <LokazenPropertyGallery propertyId={String(lkz.property_id)} />
+                              ) : (
+                                <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>No photos shared yet.</p>
+                              )}
+                            </div>
+
+                            {/* ── Push to Lokazen — list this captured property on the
+                                Lokazen site so it becomes a live listing. */}
+                            <button
+                              type="button"
+                              disabled={pushingListing === 'pushing'}
+                              onClick={async () => {
+                                setPushingListing('pushing');
+                                try {
+                                  const r = await fetch(`/api/dashboard/leads/${currentLead.id}/push-to-lokazen`, { method: 'POST' });
+                                  const j = await r.json();
+                                  setPushingListing(r.ok && j?.success ? 'done' : 'error');
+                                } catch { setPushingListing('error'); }
+                              }}
+                              className="w-full mt-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                              style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : 'var(--accent-primary)', color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
+                            >
+                              {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
+                                : pushingListing === 'done' ? '✓ Listed on Lokazen'
+                                : pushingListing === 'error' ? 'Failed — tap to retry'
+                                : 'Push to Lokazen (list property)'}
+                            </button>
                           </div>
                         </div>
                       )}

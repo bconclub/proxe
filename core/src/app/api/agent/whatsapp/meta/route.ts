@@ -200,6 +200,7 @@ export async function POST(request: NextRequest) {
       // created (see below), downloaded from Meta and stored so it shows on the
       // lead. Previously image messages hit the `else` and were dropped whole.
       let mediaToCapture: { id?: string; mime?: string; kind: 'image' | 'document' } | null = null;
+      let locationToCapture: string | null = null;
 
       if (msg.type === 'text') {
         messageText = msg.text?.body;
@@ -223,6 +224,15 @@ export async function POST(request: NextRequest) {
         mediaToCapture = { id: media?.id, mime: media?.mime_type, kind: msg.type };
         messageText = (media?.caption && String(media.caption).trim())
           || (msg.type === 'image' ? '[shared a photo]' : '[shared a document]');
+      } else if (msg.type === 'location') {
+        // WhatsApp location pin — owners drop these instead of a Maps URL. Turn
+        // lat/lng into a Google Maps link and stash it so it's captured onto the
+        // lead below (previously dropped, so the "map link" never arrived).
+        const loc = msg.location || {};
+        if (loc.latitude != null && loc.longitude != null) {
+          locationToCapture = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+        }
+        messageText = [loc.name, loc.address].filter(Boolean).join(', ') || '[shared a location]';
       } else {
         console.log(`[meta/webhook] Skipping unsupported message type: ${msg.type}`);
         continue;
@@ -266,6 +276,12 @@ export async function POST(request: NextRequest) {
       if (mediaToCapture?.id) {
         captureWhatsAppMedia(mediaToCapture.id, customerPhone, mediaToCapture.mime, mediaToCapture.kind, brand)
           .catch((e) => console.error('[meta/media] capture failed:', e?.message || e));
+      }
+      // A shared location pin → save the Maps link onto the lead (google_maps_url)
+      // so the property card / listing has the map, same as a typed link would.
+      if (locationToCapture) {
+        captureWhatsAppLocation(locationToCapture, customerPhone, brand)
+          .catch((e) => console.error('[meta/location] capture failed:', e?.message || e));
       }
     }
 
@@ -331,6 +347,23 @@ async function captureWhatsAppMedia(
   ctx[brand] = { ...bctx, property_images: imgs.slice(-10) };
   await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', lead.id);
   console.log(`[meta/media] captured ${kind} for lead ${lead.id} → ${publicUrl}`);
+}
+
+// Save a shared-location Maps link onto the lead's google_maps_url (only if one
+// isn't already set), so a dropped location pin becomes a real, clickable map.
+async function captureWhatsAppLocation(mapsUrl: string, customerPhone: string, brand: string): Promise<void> {
+  const supabase = getServiceClient();
+  if (!supabase) return;
+  const normalizedPhone = normalizePhone(customerPhone);
+  const { data: lead } = await supabase
+    .from('all_leads').select('id, unified_context').eq('customer_phone_normalized', normalizedPhone).maybeSingle();
+  if (!lead) return;
+  const ctx = lead.unified_context || {};
+  const bctx = ctx[brand] || {};
+  if (bctx.google_maps_url) return; // keep the first/explicit one
+  ctx[brand] = { ...bctx, google_maps_url: mapsUrl };
+  await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', lead.id);
+  console.log(`[meta/location] saved map link for lead ${lead.id}`);
 }
 
 // ─── Channel Performance Tracking ─────────────────────────────────────────────
