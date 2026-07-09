@@ -1,3 +1,8 @@
+## 2026-07-09 09:45 IST · fix: commit the Configure sub-route pages (appearance / notifications / widget)
+
+- The Configure card launcher links to /dashboard/settings/{appearance,notifications,widget}, but those three route pages were untracked - so those cards 404'd on prod. Committed the three page.tsx files (each self-contained, importing only already-committed shared modules) so the links resolve. No other threads' in-flight work touched.
+- (pending-sha)
+
 ## 2026-07-09 09:30 IST · fix(pop): dedupe People TYPE column, full-width Configure, drop sales "buying signal" in person modal
 
 - People table: the TYPE column carried an engagement_type sub-label (INFO / VOLUNTEER) that duplicated the INTENT column - the same intent shown in two places. Removed the sub-label; TYPE is just the intensity tier now, INTENT is the single home for intent.
