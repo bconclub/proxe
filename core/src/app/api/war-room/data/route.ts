@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/services/supabase';
+import { BRAND_ID } from '@/configs';
 
 // READ-ONLY war-room aggregation. Reads vw_war_room_base (privacy-projected:
 // no phone/email) with optional filters, aggregates server-side, returns the
@@ -105,15 +106,22 @@ export async function GET(req: NextRequest) {
     const d28 = now - 28 * 86400000;
     const pctChg = (cur: number, prev: number) => (prev > 0 ? Math.round((100 * (cur - prev)) / prev) : cur > 0 ? 100 : 0);
     const momentum = { reach7dPct: 0, reach14dPct: 0 };
+    // Switchable-window KPIs — reach (touchpoints) + resolved per today/7d/14d/28d,
+    // so the REACH and RESPONSE LOOP cards can flip between windows.
+    const reachWindows = { today: 0, d7: 0, d14: 0, d28: 0 };
+    const loopWindows = { today: 0, d7: 0, d14: 0, d28: 0 }; // resolved count per window
     if (noFilter) {
       try {
-        const cSince = async (ms: number) => {
-          const { count } = await sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).gte('created_at', new Date(ms).toISOString());
+        const cSince = async (ms: number, resolved = false) => {
+          let query = sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).gte('created_at', new Date(ms).toISOString());
+          if (resolved) query = query.eq('loop_status', 'resolved');
+          const { count } = await query;
           return count || 0;
         };
-        const [c7, c14, c28, cToday, resCount] = await Promise.all([
+        const [c7, c14, c28, cToday, resCount, rToday, res7, res14, res28] = await Promise.all([
           cSince(d7), cSince(d14), cSince(d28), cSince(todayStart),
           sb.from('vw_war_room_base').select('*', { count: 'exact', head: true }).eq('loop_status', 'resolved').then((r) => r.count || 0),
+          cSince(todayStart, true), cSince(d7, true), cSince(d14, true), cSince(d28, true),
         ]);
         momentum.reach7dPct = pctChg(c7, c14 - c7);
         momentum.reach14dPct = pctChg(c14, c28 - c14);
@@ -123,11 +131,17 @@ export async function GET(req: NextRequest) {
         kpis.resolved = resCount;
         kpis.raised = baseTotal;
         kpis.loopHealthPct = baseTotal ? Math.round((100 * resCount) / baseTotal) : 0;
+        reachWindows.today = cToday; reachWindows.d7 = c7; reachWindows.d14 = c14; reachWindows.d28 = c28;
+        loopWindows.today = rToday; loopWindows.d7 = res7; loopWindows.d14 = res14; loopWindows.d28 = res28;
       } catch (e) { console.error('[war-room/data] momentum:', (e as Error).message); }
     } else {
       const inWin = (a: number, b: number) => R.filter((r) => { const t = new Date(r.created_at).getTime(); return t >= a && t < b; }).length;
       momentum.reach7dPct = pctChg(inWin(d7, now + 1), inWin(d14, d7));
       momentum.reach14dPct = pctChg(inWin(d14, now + 1), inWin(d28, d14));
+      const reachIn = (ms: number) => R.filter((r) => new Date(r.created_at).getTime() >= ms).length;
+      const resIn = (ms: number) => R.filter((r) => r.loop_status === 'resolved' && new Date(r.created_at).getTime() >= ms).length;
+      reachWindows.today = reachIn(todayStart); reachWindows.d7 = reachIn(d7); reachWindows.d14 = reachIn(d14); reachWindows.d28 = reachIn(d28);
+      loopWindows.today = resIn(todayStart); loopWindows.d7 = resIn(d7); loopWindows.d14 = resIn(d14); loopWindows.d28 = resIn(d28);
     }
 
     // ── byCategory (+ salience-weighted + 7d trend) ──
@@ -414,6 +428,7 @@ export async function GET(req: NextRequest) {
       const { data: recos, error: rErr } = await sb
         .from('campaign_recommendations')
         .select('id, created_at, title, body, source, constituency, status, created_by')
+        .eq('brand', BRAND_ID)
         .order('created_at', { ascending: false })
         .limit(20);
       if (rErr) throw rErr;
@@ -460,7 +475,7 @@ export async function GET(req: NextRequest) {
       }
     } catch (e) { console.error('[war-room/data] listen failed:', (e as Error).message); }
 
-    return NextResponse.json({ kpis, momentum, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d, intensity, volunteers, events, targets, recommendations, listen });
+    return NextResponse.json({ kpis, momentum, reachWindows, loopWindows, byCategory, leanOverall, swing, byConstituency, seatDetails, matrix, mobilization, channelMix, liveFeed, series, sentiment, d2d, intensity, volunteers, events, targets, recommendations, listen });
   } catch (e) {
     console.error('[war-room/data]', (e as Error).message);
     return NextResponse.json({ error: 'aggregation failed', message: (e as Error).message }, { status: 500 });

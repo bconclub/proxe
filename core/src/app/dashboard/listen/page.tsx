@@ -186,7 +186,7 @@ const smoothPath = (pts: [number, number][]) => {
 // Stacked smooth sentiment areas (red base, gray, green on top) with
 // tap-to-hide legend, per the reference design.
 function StackedSentiment({ series, hidden }: { series: Digest['dailySeries']; hidden: Set<string> }) {
-  const W = 620; const H = 300; const padL = 30; const padR = 6; const padB = 20; const padT = 8
+  const W = 620; const H = 200; const padL = 30; const padR = 6; const padB = 20; const padT = 8
   const on = (k: string) => !hidden.has(k)
   const stackOf = (dd: Digest['dailySeries'][number]) => {
     const neg = on('neg') ? dd.neg : 0
@@ -605,29 +605,31 @@ export default function ListenPage() {
                   const cm = catMeta(k.category)
                   const rc = RANK_COLORS[i % RANK_COLORS.length]
                   return (
-                    <div key={k.word} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 11, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 800, color: rc }}>{i + 1}</span>
-                        <span style={{ width: 20, height: 20, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${cm.color}1f`, color: cm.color }}>{cm.icon}</span>
+                    <div key={k.word} style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 11, padding: '8px 11px', display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'center' }}>
+                      {/* Row 1: rank · category icon · word · platform chips (single compact line) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: rc, flexShrink: 0 }}>{i + 1}</span>
+                        <span style={{ width: 22, height: 22, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${cm.color}1f`, color: cm.color, flexShrink: 0 }}>{cm.icon}</span>
+                        <span style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.15 }}>{k.word}</div>
+                          <div style={{ fontSize: 9.5, color: 'var(--text-muted)', lineHeight: 1.1 }}>{cm.label}</div>
+                        </span>
                         {/* the platforms this phrase is actually being said on */}
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 'auto' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                           {(k.sources || []).slice(0, 3).map((sc) => {
                             const sm = srcMeta(sc.source)
-                            return <span key={sc.source} title={`${sm.label} · ${sc.count}`} style={{ width: 17, height: 17, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${sm.color}22`, color: sm.color }}>{sm.icon}</span>
+                            return <span key={sc.source} title={`${sm.label} · ${sc.count}`} style={{ width: 18, height: 18, borderRadius: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${sm.color}22`, color: sm.color }}>{sm.icon}</span>
                           })}
                         </span>
                       </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.word}</div>
-                        <div style={{ fontSize: 9.5, color: 'var(--text-muted)' }}>{cm.label}</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 4 }}>
+                      {/* Row 2: big signal count + trend */}
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 4 }}>
                         <span>
-                          <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{k.count}</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}> signals</span>
+                          <span style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1 }}>{k.count}</span>
+                          <span style={{ fontSize: 9.5, color: 'var(--text-muted)' }}> signals</span>
                         </span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 9.5, fontWeight: 700, color: pctT >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
-                          {pctT >= 0 ? '▲' : '▼'} {pctT >= 0 ? '+' : ''}{pctT}%<span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> vs last 7d</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 10, fontWeight: 700, color: pctT >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
+                          {pctT >= 0 ? '▲' : '▼'} {pctT >= 0 ? '+' : ''}{pctT}%<span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> vs 7d</span>
                         </span>
                       </div>
                     </div>
@@ -780,7 +782,7 @@ export default function ListenPage() {
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{outlet}</span>
                           <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{ago(s.created_at)}</span>
                         </div>
-                        <p style={{ fontSize: 11.5, lineHeight: 1.4, color: media ? 'var(--text-secondary)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: media ? 2 : 5, WebkitBoxOrient: 'vertical', flex: 1 }}>{s.source === 'news' ? s.content.replace(/\s[-–|]\s[^-–|]{2,60}$/, '') : s.content}</p>
+                        <p style={{ fontSize: 12, lineHeight: 1.45, color: media ? 'var(--text-secondary)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: media ? 3 : 6, WebkitBoxOrient: 'vertical', flex: 1 }}>{s.source === 'news' ? s.content.replace(/\s[-–|]\s[^-–|]{2,60}$/, '') : s.content}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                           {!media && s.is_crisis && badge('#ef4444', 'Crisis')}
                           {s.constituency && chip(s.constituency)}

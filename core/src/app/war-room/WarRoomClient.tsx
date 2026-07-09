@@ -72,6 +72,9 @@ const MOB_META: [string, string, React.ReactNode][] = [
 export interface WarRoomData {
   kpis: { total: number; today: number; activeConstituencies: number; raised: number; resolved: number; loopHealthPct: number };
   momentum?: { reach7dPct: number; reach14dPct: number };
+  // Switchable-window KPIs for the REACH + RESPONSE LOOP cards (today/7d/14d/28d).
+  reachWindows?: { today: number; d7: number; d14: number; d28: number };
+  loopWindows?: { today: number; d7: number; d14: number; d28: number };
   byCategory: { category: string; count: number; salienceWeighted: number; trend7d: number }[];
   leanOverall: Record<string, number>;
   swing: { constituency: string; total: number; undecided: number; undecidedPct: number }[];
@@ -144,14 +147,21 @@ export default function WarRoomClient() {
   const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
   // Live Feed panel tab: citizen feed vs leader directives
   const [feedTab, setFeedTab] = useState<'feed' | 'directives'>('feed');
+  // Shared window for the REACH + RESPONSE LOOP cards (today/7d/14d/28d switch).
+  const [kpiWin, setKpiWin] = useState<'today' | 'd7' | 'd14' | 'd28'>('d7');
   const ackReco = async (id: string, status: 'acked' | 'actioned') => {
     try { await fetch('/api/dashboard/recommendations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }); } catch {}
     fetchData();
   };
 
+  // Track in-flight syncs so the header can tell the director the room is
+  // *working*, not frozen — this dataset aggregates tens of thousands of rows.
+  const [busy, setBusy] = useState(false);
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams(); Object.entries(filters).forEach(([k, v]) => v && v !== 'all' && qs.set(k, v));
+    setBusy(true);
     try { const r = await fetch(`/api/war-room/data?${qs}`, { cache: 'no-store' }); if (r.ok) setData(await r.json()); } catch {}
+    finally { setBusy(false); }
   }, [filters]);
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => {
@@ -182,7 +192,7 @@ export default function WarRoomClient() {
         <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 8 : 12, padding: mobile ? '10px 12px' : '12px 18px', flexWrap: 'wrap', borderBottom: `1px solid ${LINE}` }}>
           <div>
             <div style={{ fontSize: mobile ? 16 : 19, fontWeight: 800, letterSpacing: '-0.02em' }}>War Room</div>
-            <div style={{ fontSize: 11, color: MUT, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: GREEN, animation: 'wr-pulse 2s infinite' }} />Real-time political intelligence across Punjab</div>
+            <div style={{ fontSize: 11, color: MUT, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 7, height: 7, borderRadius: 9, background: busy ? AMBER : GREEN, animation: 'wr-pulse 2s infinite' }} />{!d ? 'Syncing live intelligence across Punjab…' : busy ? 'Refreshing…' : 'Real-time political intelligence across Punjab'}</div>
           </div>
           <div style={{ flex: 1 }} />
           <Sel v={filters.district} on={(v) => setFilters({ ...filters, district: v })} opts={['', ...DISTRICTS]} fmt={(o) => o || 'All Districts'} />
@@ -209,6 +219,13 @@ export default function WarRoomClient() {
             const net = d?.sentiment.net ?? 0;
             const dir = (v: number): 'up' | 'down' | 'flat' => (v > 0 ? 'up' : v < 0 ? 'down' : 'flat');
             const sgn = (v: number) => (v >= 0 ? '+' : '');
+            // Windowed REACH + RESPONSE LOOP driven by the shared switcher.
+            const WIN_LABEL = { today: 'Today', d7: '7D', d14: '14D', d28: '28D' } as const;
+            const rw = d?.reachWindows, lw = d?.loopWindows;
+            const reachVal = rw ? rw[kpiWin] : (d?.kpis.total ?? 0);
+            const loopResolved = lw ? lw[kpiWin] : (d?.kpis.resolved ?? 0);
+            const loopRaised = rw ? rw[kpiWin] : (d?.kpis.raised ?? 0);
+            const loopPct = loopRaised ? Math.round((100 * loopResolved) / loopRaised) : 0;
             return (
               <>
                 {d && (
@@ -224,22 +241,30 @@ export default function WarRoomClient() {
                     </div>
                   </div>
                 )}
+                {/* Shared window switcher — drives REACH + RESPONSE LOOP cards. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: -2 }}>
+                  <span style={{ fontSize: 10.5, color: MUT, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Window</span>
+                  {(['today', 'd7', 'd14', 'd28'] as const).map((w) => (
+                    <Chip key={w} on={kpiWin === w} onClick={() => setKpiWin(w)}>{WIN_LABEL[w]}</Chip>
+                  ))}
+                  <div style={{ flex: 1 }} />
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: mobile ? 8 : 12 }}>
-                  <Kpi label="Reach" value={fmtN(d?.kpis.total ?? 0)} sub={`${fmtN(d?.kpis.today ?? 0)} today · ${TOTAL_SEATS} seats`} accent={SAFFRON} spark={d?.series.total}
+                  <Kpi label="Reach" value={fmtN(reachVal)} sub={`${WIN_LABEL[kpiWin]} · voter touchpoints`} accent={SAFFRON} spark={d?.series.total}
                     badges={[{ t: `7d ${sgn(r7)}${r7}%`, dir: dir(r7) }, { t: `14d ${sgn(r14)}${r14}%`, dir: dir(r14) }]} />
                   <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={d?.series.total}
                     badges={[{ t: `7d ${sgn(s7)}${s7}pp`, dir: dir(s7) }, { t: `14d ${sgn(s14)}${s14}pp`, dir: dir(s14) }]} />
-                  <Kpi label="Battlegrounds" value={`${d?.kpis.activeConstituencies ?? 0}`} sub={`of ${TOTAL_SEATS} seats live`} accent={BLUE} spark={d?.series.total}
-                    badges={[{ t: `${swingCount} swing`, dir: 'flat' }]} />
-                  <Kpi label="Response Loop" value={`${d?.kpis.loopHealthPct ?? 0}%`} sub={`${fmtN(d?.kpis.resolved ?? 0)} of ${fmtN(d?.kpis.raised ?? 0)} resolved`} accent={AMBER} spark={d?.series.resolved}
-                    badges={[{ t: `${fmtN(d?.kpis.resolved ?? 0)} closed`, dir: 'flat' }]} />
+                  <Kpi label="Battlegrounds" value={`${d?.kpis.activeConstituencies ?? 0}`} sub={swingCount > 0 ? `of ${TOTAL_SEATS} live · ${swingCount} at risk` : `of ${TOTAL_SEATS} seats live`} accent={BLUE} spark={d?.series.total}
+                    badges={[]} />
+                  <Kpi label="Response Loop" value={`${loopPct}%`} sub={`${fmtN(loopResolved)} of ${fmtN(loopRaised)} resolved · ${WIN_LABEL[kpiWin]}`} accent={AMBER} spark={d?.series.resolved}
+                    badges={[{ t: `${fmtN(loopResolved)} closed`, dir: 'flat' }]} />
                 </div>
               </>
             );
           })()}
 
           {/* MAIN GRID: map | center | feed (stacks on mobile) */}
-          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.35fr) minmax(0,1.15fr) 270px', gap: 12, minHeight: mobile ? undefined : 620 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'minmax(0,1.3fr) minmax(0,1.05fr) 340px', gap: 12, minHeight: mobile ? undefined : 620 }}>
             {/* MAP */}
             <Panel title="Constituency Heat Map" sub="Intensity by volume and salience" h={mobile ? 360 : undefined} right={
               <div style={{ display: 'flex', gap: 5 }}>{(['heat', 'lean', 'issue', 'turnout'] as ColorMode[]).map((m) => <Chip key={m} on={mode === m} onClick={() => setMode(m)}>{m === 'heat' ? 'Heat' : m === 'lean' ? 'Lean' : m === 'issue' ? 'Issue' : 'Turnout'}</Chip>)}</div>
@@ -341,8 +366,11 @@ export default function WarRoomClient() {
                     // the title even registers.
                     const isAi = r.source === 'ai';
                     const acc = isAi ? PURPLE : SAFFRON;
+                    // Leader directives outrank AI suggestions - give them a tinted
+                    // card, a fatter accent rail and a soft glow so they read as the
+                    // "orders from the top" they are.
                     return (
-                      <div key={r.id} style={{ padding: '9px 12px', borderBottom: `1px solid ${LINE}`, borderLeft: `3px solid ${acc}` }}>
+                      <div key={r.id} style={{ padding: isAi ? '9px 12px' : '11px 12px', borderBottom: `1px solid ${LINE}`, borderLeft: `${isAi ? 3 : 4}px solid ${acc}`, background: isAi ? 'transparent' : `linear-gradient(90deg, ${SAFFRON}14, ${SAFFRON}05 60%, transparent)`, boxShadow: isAi ? 'none' : `inset 0 0 0 1px ${SAFFRON}22` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em', color: acc, background: `${acc}1c`, borderRadius: 5, padding: '1px 5px' }}>
                             {isAi ? <><MdSparkIcon size={10} /> AI suggests</> : <><MdCampaignIcon size={10} /> Leader directive</>}
