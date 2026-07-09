@@ -1,3 +1,8 @@
+## 2026-07-09 13:30 IST · fix(pop): person-modal summary reads campaign, not sales ("Qualified stage")
+
+- The person detail Summary said "X is currently in the Qualified stage" — sales language on a voter. Two causes: (1) the AI summary path hardcoded a RETIRED model (claude-sonnet-4-20250514) so it 404'd and always fell back to the crude sales-stage line; (2) the summary prompt had no POP domain. Fixed both: the model now resolves via resolveModel(CLAUDE_MODEL) — so the AI summary actually runs (helps every brand, they were all 404ing) — and POP gets a campaign domain (voter/supporter/volunteer/cadre + grievance, no sales words). The non-AI fallbacks now describe a person by their frontline tier + grievance instead of a sales stage. Other brands' wording unchanged.
+- (pending-sha)
+
 ## 2026-07-09 13:15 IST · feat(pop): lock the map to Punjab (mask + bounds) — War Room + leader app
 
 - Both slippy maps (War Room PunjabLeafletMap + the Pulse leader app MapCanvas) showed the whole region — Haryana, HP, Rajasthan, Chandigarh — because the CartoDB tiles fill the bounding box and you could pan/zoom out into them. Now focused on Punjab only, like the old map:

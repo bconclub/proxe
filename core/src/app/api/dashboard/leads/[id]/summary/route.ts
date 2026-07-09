@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 import { BRAND_ID } from '@/configs'
+import { resolveModel } from '@/lib/agent-core'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,16 @@ export const dynamic = 'force-dynamic'
 // line. This makes the framing brand-aware so the summary reflects what the lead
 // actually said.
 function summaryDomain(brand: string): { who: string; s1: string; s2: string; dont: string; ex1: string; ex2: string } {
+  if (brand === 'pop') {
+    return {
+      who: 'a political campaign (Pulse of Punjab). Every lead is a PERSON in the constituency — a voter, supporter, volunteer, or cadre — not a customer.',
+      s1: 'Sentence 1: Who they are, where they stand on the frontline ladder (voter / supporter / volunteer / cadre) and their constituency if known.',
+      s2: 'Sentence 2: The grievance or issue they raised (water, jobs, drugs, farm debt, power, roads, education, health) and any specifics they gave.',
+      dont: 'This is a voter / constituent, NOT a sales lead. Never use sales words — no "customer", "deal", "pipeline", "booking", "purchase", or sales stages like "Qualified" / "In Sequence".',
+      ex1: 'Sachin is a supporter in Jalalabad (Firozpur) who raised unemployment as the biggest issue. Engaged over a voice call; next: log the jobs grievance and route it to the team.',
+      ex2: 'Manjit is a volunteer in Talwandi Sabo raising farm debt and MSP concerns, active on WhatsApp. Next: connect them to the local cadre for follow-up.',
+    }
+  }
   if (brand === 'lokazen') {
     return {
       who: 'Lokazen — a commercial real-estate marketplace in Bangalore. Every lead is one of three: an OWNER listing a commercial property, a BRAND looking for retail/commercial space, or a SCOUT (a gig worker who spots empty "to-let" shops).',
@@ -109,9 +120,11 @@ export async function GET(
     // Fetch lead data
     const { data: lead, error: leadError } = await supabase
       .from('all_leads')
-      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, sub_stage, unified_context')
+      // POP campaign columns (intensity ladder + grievance) appended only for pop.
+      .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, sub_stage, unified_context'
+        + (BRAND_ID === 'pop' ? ', intensity, grievance_category, lean' : ''))
       .eq('id', leadId)
-      .single()
+      .single() as { data: any; error: any }
 
     if (leadError) {
       console.error('Error fetching lead:', leadError)
@@ -125,6 +138,21 @@ export async function GET(
     // Extract booking_date and booking_time from unified_context
     const bookingDate = lead.unified_context?.web?.booking_date || lead.unified_context?.web?.booking?.date || null
     const bookingTime = lead.unified_context?.web?.booking_time || lead.unified_context?.web?.booking?.time || null
+
+    // POP is a campaign, not a sales pipeline: describe a person by their frontline
+    // TIER + grievance, never a sales stage like "Qualified". Other brands keep the
+    // lead_stage wording. `stageLabel` feeds the AI prompt; `standingPhrase` is the
+    // natural-language "currently ..." bit used by the non-AI fallbacks.
+    const isPopBrand = BRAND_ID === 'pop'
+    const POP_TIERS = ['Contact', 'Voter', 'Supporter', 'Volunteer', 'Cadre']
+    const popTier = isPopBrand ? POP_TIERS[Math.max(0, Math.min(4, (lead as any).intensity ?? 0))] : ''
+    const popGrievance = isPopBrand ? String((lead as any).grievance_category || '').replace(/_/g, ' ') : ''
+    const stageLabel = isPopBrand
+      ? `${popTier}${popGrievance ? ` · ${popGrievance} grievance` : ''}`
+      : `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
+    const standingPhrase = isPopBrand
+      ? `a ${popTier}${popGrievance ? ` raising a ${popGrievance} grievance` : ''}`
+      : `in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
 
     // ============================================
     // STEP 0: Hallucination guard — refuse to summarize with no real signal
@@ -173,8 +201,7 @@ export async function GET(
     const hasEnoughContext = guardInbound > 0 || guardHasProfile || guardHasKeyInfo || guardHasBooking
 
     if (!hasEnoughContext) {
-      const stageLabel = `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
-      const honestSummary = `Not enough context yet to summarize ${lead.customer_name || 'this lead'} — no reply or details captured so far${guardTotal > 0 ? ' (only outreach sent)' : ''}. Currently in the ${stageLabel} stage.`
+      const honestSummary = `Not enough context yet to summarize ${lead.customer_name || 'this lead'} — no reply or details captured so far${guardTotal > 0 ? ' (only outreach sent)' : ''}. Currently ${standingPhrase}.`
 
       const lastInteraction = lead.last_interaction_at || lead.created_at
       const daysInactive = lastInteraction
@@ -470,7 +497,7 @@ export async function GET(
             : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`
           const prompt = buildLeadSummaryPrompt({
             leadName: lead.customer_name || 'Customer',
-            stageLabel: `${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}`,
+            stageLabel,
             profileInfo: profileInfo.join(' | '),
             activitiesContext,
             conversationBlock,
@@ -490,7 +517,7 @@ export async function GET(
                 'anthropic-version': '2023-06-01',
               },
               body: JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
+                model: resolveModel(process.env.CLAUDE_MODEL),
                 max_tokens: 200,
                 messages: [
                   {
@@ -600,16 +627,16 @@ export async function GET(
         fallbackSummary = `${lead.customer_name || 'Customer'} has engaged through both web and WhatsApp channels. `
         fallbackSummary += `Web interaction: ${webSummary} `
         fallbackSummary += `WhatsApp interaction: ${whatsappSummary} `
-        fallbackSummary += `Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+        fallbackSummary += `Currently ${standingPhrase}.`
       } else if (webSummary) {
-        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via web channel. ${webSummary} Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via web channel. ${webSummary} Currently ${standingPhrase}.`
       } else if (whatsappSummary) {
-        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via WhatsApp. ${whatsappSummary} Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via WhatsApp. ${whatsappSummary} Currently ${standingPhrase}.`
       }
 
       // Safety check: ensure we always have a summary
       if (!fallbackSummary || fallbackSummary.trim() === '') {
-        fallbackSummary = `${lead.customer_name || 'Customer'} is currently in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+        fallbackSummary = `${lead.customer_name || 'Customer'} is currently ${standingPhrase}.`
       }
 
       // Build attribution
@@ -946,11 +973,7 @@ export async function GET(
     }
 
     // Fallback: Generate basic summary without AI
-    let fallbackSummary = `${summaryData.leadName} is currently in the ${lead.lead_stage || 'Unknown'} stage`
-    if (lead.sub_stage) {
-      fallbackSummary += ` (${lead.sub_stage})`
-    }
-    fallbackSummary += `. `
+    let fallbackSummary = `${summaryData.leadName} is currently ${standingPhrase}. `
 
     // Add lead-specific info
     const brandDetails = []
