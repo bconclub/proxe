@@ -2134,8 +2134,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   ] as Array<[string, string | null | undefined]>).filter((r) => !!r[1]);
                   const maps = lkz.google_maps_url;
                   if (allRows.length === 0 && !maps && !lkz.property_id && !(Array.isArray(lkz.property_images) && lkz.property_images.length)) return null;
-                  const previewRows = allRows.slice(0, 4);
-                  const hasMore = allRows.length > previewRows.length || !!maps || !!lkz.property_id;
+                  // Inline preview shows ONLY the compact structured fields — the
+                  // long free-text "Other details" is modal-only, so it can never
+                  // stretch the card wider (which squished the quick-stats beside
+                  // it). Everything is still in the modal's allRows.
+                  const previewRows = allRows.filter(([label]) => label !== 'Other details').slice(0, 4);
+                  const hasMore = allRows.length > previewRows.length || !!maps || !!lkz.property_id || (Array.isArray(lkz.property_images) && lkz.property_images.length > 0);
                   return (
                     <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
                       {/* Clickable header — opens the full property modal. */}

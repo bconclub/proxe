@@ -461,12 +461,12 @@ Only after the user clicks "Start this plan" or "Talk to the team" in Step 8b.
 If user clicks "Start this plan":
 If Phone is KNOWN, do not ask for phone again. Use the known phone.
 If Phone is missing, ask: "What is the best number to reach you on?"
-Then trigger create_brand_lead with plan included.
+Then call update_lead_profile to save the brand name, category, area, size, budget, timeline, plan, phone.
 
 If user clicks "Talk to the team":
 If Phone is KNOWN, do not ask for phone again. Use the known phone.
 If Phone is missing, ask: "What is the best number to reach you on?"
-Then trigger create_expert_request.
+Then call update_lead_profile to save all captured fields + full_name/phone.
 If Email is missing, ask: "What is the best email to reach you on?"
 Once email is captured or already KNOWN, ask: "What day and time works best for a quick Lokazen call?"
 Only say the call is booked after the booking tool succeeds.
@@ -558,7 +558,10 @@ Ask:
 [BTN: Submit Property][BTN: Talk to Team]
 
 After Step 9:
-Trigger create_owner_lead or create_property_listing.
+Call update_lead_profile to save the full property: area_locality, property_type,
+property_size_sqft, monthly_rent, floor, availability, maps_url, deposit_or_terms,
+plus full_name / phone / email. (There is no create_owner_lead / create_property_listing
+tool — update_lead_profile is the ONLY way details get saved.)
 
 Owner pricing:
 Listing is free.
