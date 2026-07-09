@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,11 +25,85 @@ export type NotificationEvent = {
   id: string
   leadId: string
   leadName: string
-  type: 'stage_change' | 'new_lead_scored' | 'score_change'
+  type: 'stage_change' | 'new_lead_scored' | 'score_change' | 'directive' | 'signal' | 'event'
   content: string
   channel: string
   timestamp: string
   metadata?: Record<string, any>
+}
+
+/**
+ * POP feed — campaign-level SIGNALS, not per-lead stage churn. At thousands of
+ * leads/day the "X entered Qualified" stream is noise; a war room wants the
+ * relevant stuff coming in: new directives, external Listen signals (crisis /
+ * opposition / positive), and upcoming events. Only POP takes this branch.
+ */
+async function popSignalEvents(supabase: any): Promise<NotificationEvent[]> {
+  const events: NotificationEvent[] = []
+  const since = new Date(Date.now() - 3 * 86400000).toISOString()
+
+  // Directives from the leader app / AI — the "what to do now" feed.
+  try {
+    const { data: recos } = await supabase
+      .from('campaign_recommendations')
+      .select('id, title, source, constituency, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(12)
+    for (const r of recos || []) {
+      const ai = r.source === 'ai'
+      events.push({
+        id: `dir-${r.id}`, leadId: '', leadName: '',
+        type: 'directive',
+        content: `${ai ? 'AI suggests' : 'Leader directive'}: ${r.title}${r.constituency ? ` · ${r.constituency}` : ''}`,
+        channel: 'directive', timestamp: r.created_at,
+        metadata: { kind: ai ? 'ai' : 'leader', status: r.status },
+      })
+    }
+  } catch (e) { console.error('[notifications:pop] directives:', (e as Error).message) }
+
+  // External signals (Listen): crises, opposition attacks, positive coverage.
+  try {
+    const { data: sigs } = await supabase
+      .from('listen_signals')
+      .select('id, content, source, issue_category, constituency, is_crisis, is_opposition, is_positive, created_at')
+      .gte('created_at', since)
+      .or('is_crisis.eq.true,is_opposition.eq.true,is_positive.eq.true')
+      .order('created_at', { ascending: false })
+      .limit(20)
+    for (const s of sigs || []) {
+      const kind = s.is_crisis ? 'crisis' : s.is_opposition ? 'opposition' : 'positive'
+      const lead = kind === 'crisis' ? 'Crisis' : kind === 'opposition' ? 'Opposition' : 'Positive'
+      events.push({
+        id: `sig-${s.id}`, leadId: '', leadName: '',
+        type: 'signal',
+        content: `${lead}: ${(s.content || '').slice(0, 90)}${s.constituency ? ` · ${s.constituency}` : ''}`,
+        channel: s.source || 'listen', timestamp: s.created_at,
+        metadata: { kind, category: s.issue_category, source: s.source },
+      })
+    }
+  } catch (e) { console.error('[notifications:pop] signals:', (e as Error).message) }
+
+  // Upcoming / live campaign events.
+  try {
+    const { data: evs } = await supabase
+      .from('campaign_events')
+      .select('id, title, constituency, event_date, status')
+      .in('status', ['planned', 'live'])
+      .order('event_date', { ascending: false })
+      .limit(6)
+    for (const e of evs || []) {
+      events.push({
+        id: `evt-${e.id}`, leadId: '', leadName: '',
+        type: 'event',
+        content: `Event: ${e.title}${e.constituency ? ` · ${e.constituency}` : ''}`,
+        channel: 'event', timestamp: e.event_date || new Date().toISOString(),
+        metadata: { kind: 'event', status: e.status },
+      })
+    }
+  } catch (e) { console.error('[notifications:pop] events:', (e as Error).message) }
+
+  events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  return events.slice(0, 30)
 }
 
 export async function GET(_request: NextRequest) {
@@ -40,6 +115,11 @@ export async function GET(_request: NextRequest) {
     }
 
     const supabase = getServiceClient() || authClient
+
+    // POP: campaign signals, not lead-stage churn.
+    if (BRAND_ID === 'pop') {
+      return NextResponse.json({ events: await popSignalEvents(supabase) })
+    }
 
     // Most recent stage transitions (desc — newest first).
     const { data: changes, error: changesErr } = await supabase

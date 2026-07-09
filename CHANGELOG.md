@@ -1,3 +1,9 @@
+## 2026-07-09 07:45 IST · feat(pop): Recent Activity shows campaign signals, not lead-stage churn
+
+- The notification bell / Recent Activity drawer used to stream every lead stage move ("X entered Qualified stage") - noise at thousands of leads/day. For POP it now surfaces the relevant stuff coming in: new directives (AI suggests / Leader directive), external Listen signals (Crisis / Opposition / Positive coverage), and upcoming campaign events - each with its own icon + label. Other brands keep their lead-activity feed unchanged (scoped by BRAND_ID in the notifications API).
+- POP clicks route to the War Room (these signals have no lead behind them); footer reads "Open War Room".
+- (pending-sha)
+
 ## 2026-07-09 07:20 IST · feat(pop): War Room reframed to the 4 things that matter + real 7d/14d momentum
 
 - The KPI strip is now the 4 pillars a war room actually answers: Reach (are we growing contact?), Standing (are people with us, which way moving?), Battlegrounds (which seats decided now?), Response Loop (are we acting?). Was 5 cards with a redundant "Touchpoints Today".

@@ -37,6 +37,9 @@ import {
   MdLocalFireDepartment,
   MdPersonAdd,
   MdRocketLaunch,
+  MdAutoAwesome,
+  MdCampaign,
+  MdWarningAmber,
 } from 'react-icons/md'
 
 const POLL_MS = 30_000
@@ -54,7 +57,7 @@ type NotificationEvent = {
   id: string
   leadId: string
   leadName: string
-  type: 'stage_change' | 'new_lead_scored' | 'score_change' | 'product_update'
+  type: 'stage_change' | 'new_lead_scored' | 'score_change' | 'product_update' | 'directive' | 'signal' | 'event'
   content: string
   channel: string
   timestamp: string
@@ -115,6 +118,20 @@ function pendingUpdate(): NotificationEvent | null {
 function eventVisual(ev: { type: string; content: string; metadata?: any }): Visual {
   if (ev.type === 'product_update') {
     return { Icon: MdRocketLaunch, color: '#6366F1', kind: 'new', label: 'UPDATE' }
+  }
+  // POP campaign signals — relevant war-room events, not lead-stage churn.
+  if (ev.type === 'directive') {
+    const ai = ev.metadata?.kind === 'ai'
+    return { Icon: ai ? MdAutoAwesome : MdCampaign, color: ai ? '#A78BFA' : '#F06C18', kind: 'new', label: ai ? 'AI SUGGESTS' : 'DIRECTIVE' }
+  }
+  if (ev.type === 'signal') {
+    const k = ev.metadata?.kind
+    if (k === 'crisis') return { Icon: MdLocalFireDepartment, color: '#EF4444', kind: 'new', label: 'CRISIS' }
+    if (k === 'opposition') return { Icon: MdWarningAmber, color: '#F59E0B', kind: 'new', label: 'OPPOSITION' }
+    return { Icon: MdTrendingUp, color: '#22C55E', kind: 'new', label: 'POSITIVE' }
+  }
+  if (ev.type === 'event') {
+    return { Icon: MdEvent, color: '#3B82F6', kind: 'new', label: 'EVENT' }
   }
   if (ev.type === 'new_lead_scored') {
     return { Icon: MdPersonAdd, color: '#22C55E', kind: 'new', label: 'NEW LEAD' }
@@ -268,7 +285,10 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
     })
   }, [])
 
-  const goToLead = useCallback(() => { setOpen(false); router.push('/dashboard/leads') }, [router])
+  // POP's feed is campaign signals (no lead behind them) → send the click to the
+  // War Room; every other brand goes to the Leads table as before.
+  const isPop = getCurrentBrandId() === 'pop'
+  const goToLead = useCallback(() => { setOpen(false); router.push(isPop ? '/war-room' : '/dashboard/leads') }, [router, isPop])
 
   // Product-update cards show once — dismissing (X, click, or "Got it") records
   // the id so it never re-appears for this viewer.
@@ -411,7 +431,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
 
             <div className="px-4 py-2.5 border-t flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
               <button onClick={goToLead} className="text-xs font-medium hover:underline" style={{ color: 'var(--accent-primary)' }}>
-                View all leads →
+                {isPop ? 'Open War Room →' : 'View all leads →'}
               </button>
             </div>
           </div>
