@@ -8,7 +8,7 @@ import MetricGrid from './MetricGrid';
 import AgeBars from './AgeBars';
 import DistrictIntel from './DistrictIntel';
 import GrievanceList from './GrievanceList';
-import { byNo, framework } from '../data';
+import { byNo } from '../data';
 import { winnerOf } from '../lib/geo';
 import { party as PARTY, colors, radius, space, phase } from '../theme';
 import type { Pulse } from '../lib/pulse';
@@ -145,24 +145,6 @@ export default function DetailContent({
             </Pressable>
           );
         })}
-      </View>
-
-      <Txt size={11} weight="bold" dim style={styles.section}>
-        GRIEVANCE PIPELINE
-      </Txt>
-      <View style={styles.flow}>
-        {framework.grievancePipeline.stages.map((s: any, i: number) => (
-          <React.Fragment key={s.id}>
-            <View style={styles.node}>
-              <Txt size={11} dim>
-                {s.label}
-              </Txt>
-            </View>
-            {i < framework.grievancePipeline.stages.length - 1 && (
-              <Feather name="chevron-right" size={13} color={colors.faint} />
-            )}
-          </React.Fragment>
-        ))}
       </View>
 
       <Pressable

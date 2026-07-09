@@ -68,9 +68,12 @@ export async function GET(req: NextRequest) {
         // Pulse-shaped block — the leader app maps this straight into its
         // Record<no, Pulse> (it keeps its own bundled age model).
         pulse: {
-          voters: tiers.t1,
-          supporters: tiers.t2,
-          volunteers: tiers.t3,
+          // The intensity ladder is CUMULATIVE (nested): every cadre is a
+          // volunteer is a supporter is a voter. Count tier ≥ N, not exactly N —
+          // otherwise a seat with volunteers can show 0 supporters.
+          voters: tiers.t1 + tiers.t2 + tiers.t3 + tiers.t4,
+          supporters: tiers.t2 + tiers.t3 + tiers.t4,
+          volunteers: tiers.t3 + tiers.t4,
           cadre: tiers.t4,
           grievances,
           resolved,

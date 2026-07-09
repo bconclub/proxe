@@ -21,7 +21,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!code.trim() || busy) return;
     setBusy(true);
     setErr(false);
-    const ok = await api.authenticate(code.trim());
+    // Normalise: the passcode is upper-case, but autoCapitalize does nothing on
+    // desktop web, so accept it typed in any case.
+    const ok = await api.authenticate(code.trim().toUpperCase());
     setBusy(false);
     if (ok) setAuthed(true);
     else setErr(true);
