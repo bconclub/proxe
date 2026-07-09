@@ -1,3 +1,8 @@
+## 2026-07-09 09:00 IST · feat(pop): seed campaign-playbook knowledge base (20 entries)
+
+- Loaded a starter POP knowledge base (brand='pop') so Ask PROXe / the agent draw on real campaign context: issue positions (water, drugs, jobs, farm debt, power, roads, education, health), grievance-handling scripts (doorstep water/jobs/drugs, how to log a knock), event FAQs (RSVP, booth meetings, booth assignment), and playbook entries (one-line message, the intensity ladder, channels, what POP is, what PROXe does). Q&A + FTS chunks, no embeddings needed. Migration 032 committed; the 20 rows are already inserted in the POP DB. Placeholder content - refine with the campaign's own positions.
+- (pending-sha)
+
 ## 2026-07-09 08:45 IST · feat(pop): Ask PROXe /commands + @mentions, On Ground → D2D
 
 - Ask PROXe now takes shortcuts. Type a /command to pull an artifact's live summary into the chat: /warroom (active seats, top constituencies, lean split, loop), /d2d (knocks, met, top workers, top booths), /listener (7d signals, crisis/opposition/positive, trending), /directives (what the leader/AI pushed). Tap-chips in the empty state make them discoverable.
