@@ -61,7 +61,7 @@ export const popConfig: BrandConfig = {
     },
     {
       id: 'd2d',
-      name: 'On Ground',
+      name: 'D2D',
       description: 'Volunteer cadre activation - backend + monitoring on PROXe',
       status: 'wip',
       href: '/dashboard/d2d',

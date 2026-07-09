@@ -47,6 +47,87 @@ function bookingFromCtx(uc: any): { date: string | null; time: string | null } {
   return { date: null, time: null }
 }
 
+const TIERS = ['Contact', 'Voter', 'Supporter', 'Volunteer', 'Cadre']
+const tierOf = (n: any) => TIERS[Math.max(0, Math.min(4, typeof n === 'number' ? n : 0))]
+
+/**
+ * Chat shortcuts (POP): a leading /command pulls that artifact's live slice;
+ * @mentions look up a person/worker and what they've done. Everything is fetched
+ * from the brand's own tables, so the answer stays guardrailed to real data.
+ * Returns null when there's nothing to add (no command, no mentions, or non-pop).
+ */
+async function gatherCommandContext(sb: any, command: string | null, mentions: string[], istMidnight: number): Promise<any> {
+  const ctx: any = {}
+  const now = Date.now()
+  const d7 = now - 7 * 86400000
+
+  // ── /command → artifact summary ──
+  if (command === 'warroom' || command === 'war' || command === 'wr') {
+    const { data: rows } = await sb.from('vw_war_room_base').select('constituency, lean, loop_status, created_at').order('created_at', { ascending: false }).limit(4000)
+    const R = rows || []
+    const bySeat: Record<string, number> = {}; const lean: Record<string, number> = { supporter: 0, leaning: 0, undecided: 0, opposed: 0 }; let resolved = 0
+    R.forEach((r: any) => { if (r.constituency) bySeat[r.constituency] = (bySeat[r.constituency] || 0) + 1; if (r.lean && lean[r.lean] !== undefined) lean[r.lean]++; if (r.loop_status === 'resolved') resolved++ })
+    ctx.command = 'war_room'
+    ctx.war_room = {
+      active_seats: Object.keys(bySeat).length,
+      top_constituencies: Object.entries(bySeat).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([constituency, count]) => ({ constituency, count })),
+      lean_split: lean, loop_resolved: resolved, sampled: R.length,
+    }
+  } else if (['d2d', 'doortodoor', 'onground', 'ground', 'door'].includes(command || '')) {
+    const { data: V } = await sb.from('d2d_visits').select('worker_name, constituency, outcome, created_at').order('created_at', { ascending: false }).limit(4000)
+    const rows = V || []; const workers: Record<string, { visits: number; met: number }> = {}; const seats: Record<string, number> = {}; let met = 0, today = 0
+    rows.forEach((v: any) => { if (v.outcome === 'met') met++; if (new Date(v.created_at).getTime() >= istMidnight) today++; if (v.worker_name) { const w = (workers[v.worker_name] ||= { visits: 0, met: 0 }); w.visits++; if (v.outcome === 'met') w.met++ } if (v.constituency) seats[v.constituency] = (seats[v.constituency] || 0) + 1 })
+    ctx.command = 'd2d'
+    ctx.d2d = {
+      total_knocks: rows.length, met, today,
+      top_workers: Object.entries(workers).sort((a, b) => b[1].visits - a[1].visits).slice(0, 5).map(([name, w]) => ({ name, visits: w.visits, met: w.met })),
+      top_constituencies: Object.entries(seats).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([constituency, visits]) => ({ constituency, visits })),
+    }
+  } else if (command === 'listener' || command === 'listen') {
+    const { data: S } = await sb.from('listen_signals').select('issue_category, is_crisis, is_opposition, is_positive, created_at').gte('created_at', new Date(d7).toISOString()).limit(2000)
+    const rows = S || []; const cat: Record<string, number> = {}; let crisis = 0, opp = 0, pos = 0
+    rows.forEach((s: any) => { if (s.issue_category) cat[s.issue_category] = (cat[s.issue_category] || 0) + 1; if (s.is_crisis) crisis++; if (s.is_opposition) opp++; if (s.is_positive) pos++ })
+    ctx.command = 'listener'
+    ctx.listener = { signals_7d: rows.length, crisis, opposition: opp, positive: pos, trending: Object.entries(cat).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([category, count]) => ({ category, count })) }
+  } else if (['pulse', 'directives', 'feed'].includes(command || '')) {
+    const { data: recos } = await sb.from('campaign_recommendations').select('title, source, constituency, status, created_at').order('created_at', { ascending: false }).limit(10)
+    ctx.command = 'directives'
+    ctx.directives = (recos || []).map((r: any) => ({ title: r.title, source: r.source, constituency: r.constituency, status: r.status }))
+  } else if (command) {
+    // Unknown command — tell the model so it can list the valid ones.
+    ctx.command = 'unknown'
+    ctx.unknown_command = command
+    ctx.available_commands = ['/warroom', '/d2d', '/listener', '/directives']
+  }
+
+  // ── @mention → person / worker activity ──
+  if (mentions.length) {
+    ctx.mentions = []
+    for (const name of mentions.slice(0, 4)) {
+      const entry: any = { query: name }
+      try {
+        const { data: wv } = await sb.from('d2d_visits').select('worker_name, outcome, constituency, created_at').ilike('worker_name', `%${name}%`).order('created_at', { ascending: false }).limit(500)
+        if (wv && wv.length) {
+          entry.worker = {
+            name: wv[0].worker_name, visits: wv.length,
+            met: wv.filter((v: any) => v.outcome === 'met').length,
+            constituencies: Array.from(new Set(wv.map((v: any) => v.constituency).filter(Boolean))).slice(0, 5),
+            last_active: wv[0].created_at,
+          }
+        }
+      } catch { /* d2d absent */ }
+      try {
+        const { data: lr } = await sb.from('all_leads').select('customer_name, intensity, grievance_category, lean, magnet, last_interaction_at').ilike('customer_name', `%${name}%`).limit(5)
+        if (lr && lr.length) entry.people = lr.map((l: any) => ({ name: l.customer_name, tier: tierOf(l.intensity), grievance: l.grievance_category || null, lean: l.lean || null, channel: l.magnet || null }))
+      } catch { /* pop columns absent */ }
+      if (!entry.worker && !entry.people) entry.not_found = true
+      ctx.mentions.push(entry)
+    }
+  }
+
+  return (ctx.command || ctx.mentions) ? ctx : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authClient = await createClient()
@@ -161,6 +242,21 @@ export async function POST(request: NextRequest) {
     const intensity_ladder: Record<string, number> = {}
     TIER_LABELS.forEach((lbl, i) => { intensity_ladder[lbl] = tierCounts[i] })
 
+    // Chat shortcuts: a leading /command and/or @mentions. POP-only for now (the
+    // commands map to POP artifacts + tables).
+    const cmdMatch = question.match(/^\s*\/([a-zA-Z]+)/)
+    const command = cmdMatch ? cmdMatch[1].toLowerCase() : null
+    // Single token after @ (no spaces) so we don't swallow trailing sentence
+    // words; an ilike '%token%' still matches full names by their first word.
+    const mentions = (question.match(/@[A-Za-z][A-Za-z'’-]{0,30}/g) || [])
+      .map((s: string) => s.slice(1).replace(/[.'’-]+$/, '').trim())
+      .filter(Boolean)
+    let command_context: any = null
+    if (isPop && (command || mentions.length)) {
+      try { command_context = await gatherCommandContext(supabase, command, mentions, istMidnight) }
+      catch (e) { console.error('[brain] command context:', (e as Error).message) }
+    }
+
     // POP gets a campaign-shaped snapshot (ladder + grievances + channels); every
     // other brand keeps the sales-shaped one (pipeline stages + sources). The
     // model can only speak from what's in DATA, so the shape IS the guardrail.
@@ -175,6 +271,7 @@ export async function POST(request: NextRequest) {
       conversations_today: convToday ?? 0,
       todays_new_people: todayLeads,
       upcoming_events: upcomingTop,
+      ...(command_context ? { command_context } : {}),
     } : {
       brand,
       today_ist: istDate,
@@ -196,6 +293,8 @@ FORMAT (built for a phone-sized panel, ~360px wide):
 - For ANY numeric breakdown (counts by stage / source / score bucket, all-time splits) use a COMPACT markdown table: a header row + 2-3 columns max (e.g. "| Stage | Count |"). It renders as a clean table — always prefer this over listing numbers in prose.
 - Keep prose to 1-2 short lines around each table. Use **bold** for standout numbers/names. Use "- " bullets only for non-numeric lists (e.g. lead names).
 - No "---" divider lines, no "###" headings, no long paragraphs. Skimmable, not a report.
+
+SHORTCUTS: if DATA has a "command_context", the operator used a shortcut. A leading /command (command_context.command = war_room / d2d / listener / directives) means "summarize that artifact" — answer from command_context.<that> and lead with the headline number. If command_context.command = "unknown", tell them the command isn't recognized and list command_context.available_commands. @mentions (command_context.mentions[]) ask about specific people/workers: for each, report what they've done from .worker (visits/met/constituencies/last_active) and/or .people (tier/grievance/lean/channel); if .not_found is true, say you couldn't find anyone by that name. Show names and times exactly as given.
 
 This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: ${isPop ? '"Breakdown by constituency | Frontline today | Top grievances"' : '"Breakdown by source | Lead quality today | Show hot leads"'}. Put FOLLOWUPS only on that last line, nowhere else.
 

@@ -298,6 +298,25 @@ export default function DashboardBrain({ inline = false, label }: { inline?: boo
                       </button>
                     ))}
                   </div>
+                  {/* POP shortcuts: /command for an artifact, @name for a worker/person. */}
+                  {IS_POP && (
+                    <div className="mt-4">
+                      <p className="text-[10px] uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Shortcuts</p>
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {['/warroom', '/d2d', '/listener', '/directives'].map((c) => (
+                          <button
+                            key={c}
+                            onClick={() => ask(c)}
+                            className="text-[11px] px-2.5 py-1 rounded-full border transition-colors"
+                            style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)', color: 'var(--accent-primary)', background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)' }}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>Type <b>/</b> for an artifact summary or <b>@name</b> to see what a worker has done.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -351,7 +370,7 @@ export default function DashboardBrain({ inline = false, label }: { inline?: boo
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input) } }}
-                placeholder="Ask about your dashboard…"
+                placeholder={IS_POP ? 'Ask, or /warroom · /d2d · @name…' : 'Ask about your dashboard…'}
                 disabled={loading}
                 className="flex-1 px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] disabled:opacity-50"
                 style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)', background: 'color-mix(in srgb, var(--bg-tertiary) 55%, transparent)', color: 'var(--text-primary)' }}

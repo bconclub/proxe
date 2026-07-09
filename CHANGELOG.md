@@ -1,3 +1,10 @@
+## 2026-07-09 08:45 IST · feat(pop): Ask PROXe /commands + @mentions, On Ground → D2D
+
+- Ask PROXe now takes shortcuts. Type a /command to pull an artifact's live summary into the chat: /warroom (active seats, top constituencies, lean split, loop), /d2d (knocks, met, top workers, top booths), /listener (7d signals, crisis/opposition/positive, trending), /directives (what the leader/AI pushed). Tap-chips in the empty state make them discoverable.
+- @mention anyone to see what they've done: @Name looks the person/worker up in the campaign's own data - a worker's visits/met/constituencies/last-active, or a person's tier/grievance/lean/channel. Says "couldn't find" when there's no match. All fetched from brand tables and injected into the model's DATA, so it stays guardrailed - it can't invent activity.
+- Artifact/nav renamed On Ground → D2D.
+- (pending-sha)
+
 ## 2026-07-09 08:15 IST · fix(pop): Ask PROXe in campaign context, sidebar split into two groups, drop Brain map caption
 
 - Ask PROXe (the dashboard chat) was answering POP in aviation/sales terms - a table of New / Qualified / High Intent / Booking Made / In Sequence stages - because the data it received was built from lead_stage. It now gets a campaign-shaped snapshot: intensity_ladder (Contact→Voter→Supporter→Volunteer→Cadre), top_grievances by issue, by_channel, engagement_heat, upcoming_events. The model can only speak from what's in the data, so the shape IS the guardrail - it can no longer show random sales stages. System prompt hardened to campaign-only vocabulary.
