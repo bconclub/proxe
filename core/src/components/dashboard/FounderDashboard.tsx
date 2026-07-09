@@ -1459,7 +1459,7 @@ export default function FounderDashboard() {
           return (
             <section {...cardDrag('sources')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
               {cardGrip('sources')}
-              {/* reference layout: title → stat strip → ranked bars + top-source panel */}
+              {/* reference layout: title → stat strip → ranked bars + the ring */}
               <div className="shrink-0">
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
                 <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Where touchpoints came from · last 30 days</p>
@@ -1498,15 +1498,10 @@ export default function FounderDashboard() {
                     </div>
                   ))}
                 </div>
-                {top && (
-                  <div className="hidden sm:flex flex-col items-center justify-center gap-1.5 rounded-lg border text-center px-2" style={{ borderColor: `${magnetMeta(top.magnet).color}55`, background: `${magnetMeta(top.magnet).color}0d` }}>
-                    <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: `${magnetMeta(top.magnet).color}22`, color: magnetMeta(top.magnet).color }}>★ Top source</span>
-                    {iconTile(top.magnet, 40)}
-                    <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{magnetMeta(top.magnet).label}</span>
-                    <span className="text-xl font-extrabold leading-none" style={{ color: magnetMeta(top.magnet).color }}>{top.share}%</span>
-                    <span className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>of all touchpoints</span>
-                  </div>
-                )}
+                {/* the ring — source-mix donut with the total in the middle */}
+                <div className="hidden sm:flex items-center justify-center min-h-0">
+                  <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
+                </div>
               </div>
             </section>
           )

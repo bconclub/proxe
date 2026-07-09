@@ -1,3 +1,8 @@
+## 2026-07-10 06:10 IST · polish(home): Activity Sources — ring back, Top-source tile out
+
+- The source-mix ring (donut with the 30d total in the middle) returns to the right side of Activity Sources; the big "★ Top source" tile is removed. Stat strip + ranked bars unchanged.
+- `(pending-sha)`
+
 ## 2026-07-10 05:40 IST · feat(core): Activity Sources on every brand + movable home cards; orb polish; brain quick-actions
 
 - Activity Sources card on EVERY brand's overview (was POP-only): touchpoints by channel · last 30 days, in the reference layout — stat strip (total / vs prior 7d / daily avg), ranked channel rows with bars + counts + trend arrows, and a "★ Top source" highlight panel. Fed by a new brand-generic channel aggregation in founder-metrics (zero extra queries). Conversations Trend remains only as a zero-data fallback.
