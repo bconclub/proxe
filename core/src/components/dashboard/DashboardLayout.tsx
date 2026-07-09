@@ -9,6 +9,7 @@ import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
 import { getBrandConfig } from '@/configs'
 import ArtifactSwitcher from '@/components/dashboard/ArtifactSwitcher'
+import DashboardBrain from '@/components/dashboard/DashboardBrain'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
@@ -1070,6 +1071,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         )}
       </div>
+
+      {/* Persistent Brain (PiP) — mounted at the LAYOUT level so it survives page
+          changes: open it, navigate anywhere, and it stays docked bottom-right
+          with your conversation intact. Gated on the brand's brain feature. */}
+      {brandFeatures.brain && <DashboardBrain dock />}
     </div>
   )
 }

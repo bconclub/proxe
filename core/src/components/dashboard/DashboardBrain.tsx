@@ -147,7 +147,7 @@ const LOADING_MSGS = IS_POP
       'Crunching the data…',
     ]
 
-export default function DashboardBrain({ inline = false, label }: { inline?: boolean; label?: string }) {
+export default function DashboardBrain({ inline = false, label, dock = false }: { inline?: boolean; label?: string; dock?: boolean }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
   const [input, setInput] = useState('')
@@ -205,9 +205,13 @@ export default function DashboardBrain({ inline = false, label }: { inline?: boo
         style={{
           ...(inline
             ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
-            : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
-          height: '36px',
-          ...(inline && label ? { padding: '0 12px' } : { width: '36px' }),
+            : dock
+              // Persistent PiP dock — bottom-right, always available and surviving
+              // page changes (mounted in the dashboard layout, not the page).
+              ? { bottom: '24px', right: '24px', backgroundColor: 'var(--accent-primary)', border: 'none', color: '#fff', width: '52px', height: '52px', boxShadow: '0 6px 24px rgba(0,0,0,0.35)' }
+              : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
+          ...(dock ? {} : { height: '36px' }),
+          ...(inline && label ? { padding: '0 12px' } : (dock ? {} : { width: '36px' })),
         }}
         aria-label="Ask PROXe"
         title="Ask PROXe"
