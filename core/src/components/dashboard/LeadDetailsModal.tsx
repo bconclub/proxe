@@ -2189,12 +2189,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             const pt = String(lkz.property_type || 'Property')
                             const category = /commercial|office|retail|warehouse|restaurant|shop|showroom|kiosk/i.test(pt) ? 'Commercial' : (pt.length <= 16 ? pt : null)
                             const avail = lkz.availability_date || null
+                            // The 4 headline tiles across the top (one row, so the
+                            // modal stays short). Deposit/extras live in Other details.
                             const tiles = ([
                               { icon: MdSquareFoot, label: 'Size', value: lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null },
                               { icon: MdStairs, label: 'Floor', value: lkz.floor },
                               { icon: MdCurrencyRupee, label: 'Rent', value: lkz.asking_rent_monthly },
                               { icon: MdPlace, label: 'Area', value: lkz.property_zone || lkz.city },
-                              { icon: MdPayments, label: 'Deposit', value: lkz.deposit },
                             ] as Array<{ icon: any; label: string; value: any }>).filter((t) => !!t.value)
                             const imgs = Array.isArray(lkz.property_images) ? lkz.property_images : []
                             return (
@@ -2233,43 +2234,44 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                             </div>
 
-                            {/* Stat tiles grid */}
+                            {/* Stat tiles — 4 across one row (keeps the modal short) */}
                             {tiles.length > 0 && (
-                              <div className="grid grid-cols-2 gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                              <div className="grid gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)', gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
                                 {tiles.map(({ icon: Icon, label, value }) => (
-                                  <div key={label} className="rounded-xl p-3" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                      <Icon size={15} style={{ color: BRAND_ACCENT }} />
-                                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                                  <div key={label} className="rounded-xl p-2.5" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <Icon size={14} style={{ color: BRAND_ACCENT }} />
+                                      <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
                                     </div>
-                                    <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+                                    <p className="text-[12.5px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{value}</p>
                                   </div>
                                 ))}
                               </div>
                             )}
 
-                            {/* Availability + map row */}
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              {avail && (
-                                <div className="rounded-xl p-3" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
-                                  <div className="flex items-center gap-1.5 mb-1">
-                                    <MdEventAvailable size={15} style={{ color: BRAND_ACCENT }} />
-                                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Availability</span>
+                            {/* Availability (wider) + map button beside it */}
+                            {(avail || maps) && (
+                              <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: avail && maps ? '3fr 2fr' : '1fr' }}>
+                                {avail && (
+                                  <div className="rounded-xl p-2.5" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <MdEventAvailable size={14} style={{ color: BRAND_ACCENT }} />
+                                      <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Availability</span>
+                                    </div>
+                                    <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{avail}</p>
                                   </div>
-                                  <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{avail}</p>
-                                </div>
-                              )}
-                              {maps && (
-                                <a href={String(maps)} target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center justify-between gap-2 rounded-xl p-3 transition-all hover:opacity-90"
-                                  style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
-                                  <span className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                    <MdOpenInNew size={15} style={{ color: BRAND_ACCENT }} /> View on Google Maps
-                                  </span>
-                                  <MdChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
-                                </a>
-                              )}
-                            </div>
+                                )}
+                                {maps && (
+                                  <a href={String(maps)} target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
+                                    style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                    <MdOpenInNew size={14} style={{ color: BRAND_ACCENT }} />
+                                    <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>View on Google Maps</span>
+                                    <MdChevronRight size={15} style={{ color: 'var(--text-muted)' }} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
 
                             {/* Other details */}
                             {otherDetails && (
