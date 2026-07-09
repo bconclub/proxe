@@ -1937,7 +1937,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           id="lead-modal-title"
                           className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight min-w-0 truncate"
                         >
-                          {displayName(currentLead.name) || 'Unknown Lead'}
+                          {displayName(currentLead.name) || `Unknown ${brandLabel('Lead')}`}
                         </h2>
                         <button
                           onClick={() => {
@@ -4116,7 +4116,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             setPendingStageChange(null)
           }}
           onSave={handleActivitySave}
-          leadName={currentLead.name || 'Lead'}
+          leadName={currentLead.name || brandLabel('Lead')}
           stageChange={{
             oldStage: pendingStageChange.oldStage,
             newStage: pendingStageChange.newStage

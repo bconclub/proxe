@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { MdClose, MdImage, MdAutoAwesome, MdPersonAdd, MdArrowBack, MdArrowForward } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, brandLabel } from '@/configs'
 
 interface AddLeadModalProps {
   isOpen: boolean
@@ -254,7 +254,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-[#262626]">
             <div className="flex items-center gap-2">
               <MdPersonAdd size={22} style={{ color: 'var(--accent-primary)' }} />
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add Lead</h2>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add {brandLabel('Lead')}</h2>
             </div>
             <button
               onClick={handleClose}
@@ -482,7 +482,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                     className="flex-1 px-4 py-2 rounded-md text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                     style={{ backgroundColor: 'var(--button-bg, #2563eb)' }}
                   >
-                    {saving ? 'Adding…' : 'Add Lead'}
+                    {saving ? 'Adding…' : `Add ${brandLabel('Lead')}`}
                   </button>
                 </>
               )}
