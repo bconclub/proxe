@@ -1,3 +1,9 @@
+## 2026-07-10 06:30 IST · polish(brain): docked orb clipped to a circle; "Type instead…" quick action
+
+- Docked voice orb is now clipped to a CIRCLE — the canvas glow no longer shows a faint square edge. Full-screen unclipped; same element across the toggle so the voice keeps playing.
+- New dock quick action "Type instead…" opens the typed Ask PROXe panel (also where Call-button dial consent lives).
+- `(pending-sha)`
+
 ## 2026-07-10 06:10 IST · polish(home): Activity Sources — ring back, Top-source tile out
 
 - The source-mix ring (donut with the 30d total in the middle) returns to the right side of Activity Sources; the big "★ Top source" tile is removed. Stat strip + ranked bars unchanged.

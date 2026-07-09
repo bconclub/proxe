@@ -22,11 +22,14 @@ import { PAGE_ROUTES, type BrainAction } from '@/lib/brain/actions'
 const VoiceOrb = dynamic(() => import('@/app/dashboard/settings/brain/VoiceOrb'), { ssr: false })
 
 // Quick actions revealed when the dock wakes on hover.
-const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean }[] = [
+const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean; chat?: boolean }[] = [
   // Catch me up = just the latest/most-recent activity, not the full briefing.
   { label: 'Catch me up', q: "Catch me up — what's happened most recently? Just the latest updates, kept short.", auto: true },
   { label: 'Anything urgent?', q: 'What most needs my attention right now?', auto: true },
   { label: 'Ask something…', auto: false, listen: true },          // opens the orb, mic first
+  // The typed surface — the slide-out chat panel. Also where dial consent
+  // lives (Call buttons); the voice orb never dials.
+  { label: 'Type instead…', auto: false, chat: true },
 ]
 
 const IS_POP = BRAND_ID === 'pop'
@@ -206,9 +209,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     if (on) setWaking(true)
     else wakeTimer.current = setTimeout(() => setWaking(false), 180) // small grace so moving to a pill doesn't close it
   }, [])
-  const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean }, view: 'docked' | 'full' = 'docked') => {
+  const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean; chat?: boolean }, view: 'docked' | 'full' = 'docked') => {
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null }
     setWaking(false)
+    if (pill.chat) { setOpen(true); return } // typed surface — the slide-out panel
     setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen, view })
   }, [])
   // The orb renderers size their canvas from clientWidth on WINDOW resize only —
@@ -512,7 +516,12 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
         >
-          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction} />
+          {/* Docked = clipped to a CIRCLE so the canvas glow never shows a square
+              edge; full = unclipped. Same wrapper element both ways, so toggling
+              view never remounts the orb (voice keeps playing). */}
+          <div style={{ position: 'absolute', inset: 0, borderRadius: orb.view === 'docked' ? 999 : 0, overflow: orb.view === 'docked' ? 'hidden' : 'visible' }}>
+            <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction} />
+          </div>
           {/* controls: full → big collapse arrow; docked → tiny × + ⤢, only on hover */}
           {orb.view === 'full' ? (
             <button
