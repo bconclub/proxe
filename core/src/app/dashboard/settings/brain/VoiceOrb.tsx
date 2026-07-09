@@ -70,15 +70,18 @@ function chunkWords(text: string): string[] {
 //                     spoken reply, then answer it — a back-and-forth voice loop
 //   listenFirst     — skip the opening briefing; go straight to listening
 //   onClose         — show a close button; the overlay unmounts the orb
+//   compact         — tiny embed (dock-sized): just the glowing orb, no caption,
+//                     no close button, no language switcher — it IS the light
 export type VoiceOrbProps = {
   autoStart?: boolean
   initialQuestion?: string
   conversational?: boolean
   listenFirst?: boolean
   onClose?: () => void
+  compact?: boolean
 }
 
-export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose }: VoiceOrbProps = {}) {
+export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false }: VoiceOrbProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mode, setMode] = useState<Mode>('idle')
   const [caption, setCaption] = useState('')
@@ -453,7 +456,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 
       {/* Close (overlay embed only) — collapse the brain back to the dock */}
-      {onClose && (
+      {onClose && !compact && (
         <button
           onClick={(e) => { e.stopPropagation(); stop(); stopListening(); onClose() }}
           onPointerMove={(e) => e.stopPropagation()}
@@ -471,8 +474,8 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       )}
 
       {/* ONE line under the orb — short karaoke words while speaking (blob-wide),
-          hint/steps otherwise (wider) */}
-      <div style={{
+          hint/steps otherwise (wider). Hidden in compact (the light says it all). */}
+      {!compact && <div style={{
         position: 'absolute', left: '50%', bottom: '8%', transform: 'translateX(-50%)',
         width: bigLine ? 'min(340px, 66%)' : 'min(720px, 90%)',
         textAlign: 'center', pointerEvents: 'none',
@@ -486,10 +489,10 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       }}>
         {line}
         {mode === 'thinking' && <span style={{ display: 'inline-block', marginLeft: 6, animation: 'voPulse 1.1s ease infinite' }}>●</span>}
-      </div>
+      </div>}
 
       {/* language switcher (bottom right) — only when the brand speaks >1 language */}
-      {LANGS.length > 1 && <div
+      {LANGS.length > 1 && !compact && <div
         onClick={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
         style={{ position: 'absolute', right: 26, bottom: 22, display: 'flex', gap: 4, padding: 4, borderRadius: 999, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', zIndex: 3 }}

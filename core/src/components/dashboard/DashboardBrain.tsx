@@ -176,6 +176,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // `dock` mode — the inline "Ask PROXe" button is unaffected.
   const DOCK_SIZE = 52
   const DOCK_MARGIN = 16
+  const MINI = 72 // docked orb ≈ the dock bubble — a small expressive light
   const dockRef = useRef<HTMLButtonElement | null>(null)
   const [dockPos, setDockPos] = useState<{ x: number; y: number } | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -195,6 +196,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // that animates + talks in place; 'full' = full-screen. Single click → docked,
   // double click → full.
   const [orb, setOrb] = useState<null | { q?: string; auto: boolean; listen?: boolean; view: 'docked' | 'full' }>(null)
+  const [orbHover, setOrbHover] = useState(false)
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
@@ -426,38 +428,58 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         </div>
       )}
 
+      {/* Voice aura — while the brain is interacting (docked), the WHOLE
+          dashboard lights up with a Google-Lens-style ambient glow hugging the
+          viewport edges: a blurred multi-color rim whose hues drift and
+          breathe. Pure decoration: pointer-events-none, sits under the orb. */}
+      {orb && orb.view === 'docked' && (
+        <div className="proxe-voice-aura fixed inset-0 z-[79]" aria-hidden="true" style={{ pointerEvents: 'none' }} />
+      )}
+
       {/* The dock, become the brain. ONE VoiceOrb instance whose container
-          resizes between the docked corner panel and full screen, so toggling
-          view never remounts it (the voice keeps talking across the resize). */}
+          resizes between a tiny corner light and full screen, so toggling view
+          never remounts it (the voice keeps talking across the resize).
+          Docked = roughly the dock-bubble size: just the glowing orb, chrome
+          only on hover. */}
       {orb && (
         <div
           className="fixed z-[80]"
+          onMouseEnter={() => setOrbHover(true)}
+          onMouseLeave={() => setOrbHover(false)}
           style={orb.view === 'full'
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
-                // Docked = just the small orb, floating in the corner. No box:
-                // transparent, no border/shadow, glow bleeds onto the page.
-                right: 8, bottom: 8, width: 'min(240px, 72vw)', height: 'min(300px, 60vh)',
-                background: 'transparent', overflow: 'visible',
-                animation: 'wc-orb-pop 240ms cubic-bezier(0.2,0,0,1)',
+                // tiny floating orb, centered on where the dock sits
+                left: dockPos ? dockPos.x + DOCK_SIZE / 2 - MINI / 2 : undefined,
+                top: dockPos ? dockPos.y + DOCK_SIZE / 2 - MINI / 2 : undefined,
+                right: dockPos ? undefined : 10, bottom: dockPos ? undefined : 10,
+                width: MINI, height: MINI, background: 'transparent', overflow: 'visible',
+                animation: 'wc-orb-pop 220ms cubic-bezier(0.2,0,0,1)',
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
         >
-          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational onClose={() => setOrb(null)} />
-          {/* expand ⇆ collapse between corner and full screen */}
-          <button
-            onClick={() => setOrb((o) => (o ? { ...o, view: o.view === 'full' ? 'docked' : 'full' } : o))}
-            aria-label={orb.view === 'full' ? 'Collapse' : 'Full screen'}
-            title={orb.view === 'full' ? 'Collapse to corner' : 'Full screen'}
-            style={{
-              position: 'absolute', top: 14, right: 14, zIndex: 6,
-              width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1,
-              background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
-              border: '1px solid var(--border-primary)',
-            }}
-          >
-            {orb.view === 'full' ? '⤡' : '⤢'}
-          </button>
+          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} />
+          {/* controls: full → big collapse arrow; docked → tiny × + ⤢, only on hover */}
+          {orb.view === 'full' ? (
+            <button
+              onClick={() => setOrb((o) => (o ? { ...o, view: 'docked' } : o))}
+              aria-label="Collapse" title="Collapse to corner"
+              style={{ position: 'absolute', top: 14, right: 14, zIndex: 6, width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+            >⤡</button>
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: orbHover ? 1 : 0, transition: 'opacity .15s ease' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setOrb(null) }}
+                aria-label="Close" title="Close"
+                style={{ position: 'absolute', top: -4, left: -4, pointerEvents: 'auto', width: 18, height: 18, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+              >×</button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
+                aria-label="Full screen" title="Full screen"
+                style={{ position: 'absolute', top: -4, right: -4, pointerEvents: 'auto', width: 18, height: 18, borderRadius: 999, cursor: 'pointer', fontSize: 10, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+              >⤢</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -650,6 +672,49 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         @keyframes wc-orb-pop {
           from { opacity: 0; transform: translateY(12px) scale(0.9); transform-origin: bottom right; }
           to   { opacity: 1; transform: translateY(0) scale(1); transform-origin: bottom right; }
+        }
+        /* Lens-style viewport aura: a blurred gradient RIM (mask keeps the
+           middle clear) whose colors drift (hue-rotate) and breathe. */
+        .proxe-voice-aura::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          padding: 10px; /* rim thickness before blur */
+          background: linear-gradient(115deg, #4285F4, #9B72CB 30%, #D96570 55%, #F2A60C 80%, #4285F4);
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask-composite: exclude;
+          filter: blur(18px) saturate(160%);
+          animation: proxe-aura-drift-a 7s linear infinite, proxe-aura-breathe 2.6s ease-in-out infinite;
+        }
+        /* second, wider + softer pass so the glow bleeds into the page */
+        .proxe-voice-aura::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          padding: 26px;
+          background: linear-gradient(245deg, #4285F4, #9B72CB 35%, #D96570 60%, #F2A60C 85%, #4285F4);
+          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask-composite: exclude;
+          filter: blur(46px) saturate(140%);
+          opacity: 0.55;
+          animation: proxe-aura-drift-b 9s linear infinite reverse, proxe-aura-breathe 2.6s ease-in-out infinite;
+        }
+        /* hue-rotate rides inside filter, so each layer keeps its own blur */
+        @keyframes proxe-aura-drift-a {
+          from { filter: blur(18px) saturate(160%) hue-rotate(0deg); }
+          to   { filter: blur(18px) saturate(160%) hue-rotate(360deg); }
+        }
+        @keyframes proxe-aura-drift-b {
+          from { filter: blur(46px) saturate(140%) hue-rotate(0deg); }
+          to   { filter: blur(46px) saturate(140%) hue-rotate(360deg); }
+        }
+        @keyframes proxe-aura-breathe {
+          0%, 100% { opacity: 0.75; }
+          50%      { opacity: 1; }
         }
       `}</style>
     </>

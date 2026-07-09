@@ -1,3 +1,13 @@
+## 2026-07-10 03:10 IST · feat(core): v0.2 — mini voice orb + Lens aura; bell = what's-new only; top bar decluttered
+
+- Docked brain shrunk to a ~72px floating light (compact orb: no caption/close/lang; tiny × and ⤢ appear on hover). Full screen unchanged.
+- NEW: Google-Lens-style viewport aura — while the docked orb is interacting, the whole dashboard edge glows with a blurred drifting multi-color rim (pure decoration, pointer-events-none).
+- Top bar decluttered: Snapshot and Ask PROXe buttons removed from the overview — the Brain dock covers asking; the bell is the only icon left.
+- NotificationCenter repurposed: bell now shows ONLY product updates ("What's new") with version chips + dates; lead-activity feed/toasts/sounds removed. Footer shows the running app version.
+- Version bumped 0.1 → 0.2 (root + core package.json) — sidebar badge reflects on every brand; "The Brain talks now" update entry added for all brands.
+- User-facing: cleaner top bar; corner orb is subtle until you talk to it, then the whole dashboard lights up.
+- `(pending-sha)`
+
 ## 2026-07-10 02:10 IST · polish(brain): drop the "What's the update?" caption, soften the hover ring
 
 - Removed the "What's the update?" label above the dock quick-action fan — the pills (Catch me up / Anything urgent? / Ask something…) say it already.

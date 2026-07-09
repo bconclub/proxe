@@ -9,9 +9,7 @@ import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
-import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
-import DashboardBrain from './DashboardBrain'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import { getBrandConfig, brandLabel } from '@/configs'
 import type { Lead } from '@/types'
@@ -711,10 +709,8 @@ export default function FounderDashboard() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
-              icon on the right next to the profile. */}
-          <TodaySnapshotButton inline label="Snapshot" />
-          {features.brain && <DashboardBrain inline label="Ask PROXe" />}
+          {/* Top bar keeps ONLY the bell (product updates + version). Snapshot and
+              Ask PROXe were dropped — the Brain dock covers asking by voice. */}
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
