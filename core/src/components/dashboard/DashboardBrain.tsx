@@ -357,19 +357,19 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
                   backdropFilter: 'blur(16px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-                  // Hover: a neon accent ring lights up around the circle (border
-                  // + layered outer glow); idle is a hairline.
+                  // Hover: just a clean accent ring around the circle — subtle,
+                  // no glow halo. Idle is a hairline.
                   border: waking
-                    ? '1.5px solid var(--accent-primary)'
+                    ? '1.5px solid color-mix(in srgb, var(--accent-primary) 70%, transparent)'
                     : '1px solid color-mix(in srgb, var(--text-primary) 14%, transparent)',
                   boxShadow: dragging
                     ? '0 14px 40px rgba(0,0,0,0.4)'
                     : waking
-                      ? '0 0 0 1px color-mix(in srgb, var(--accent-primary) 80%, transparent), 0 0 14px 2px color-mix(in srgb, var(--accent-primary) 55%, transparent), 0 0 32px 8px color-mix(in srgb, var(--accent-primary) 28%, transparent), 0 8px 30px rgba(0,0,0,0.3)'
+                      ? '0 0 0 1px color-mix(in srgb, var(--accent-primary) 40%, transparent), 0 6px 18px rgba(0,0,0,0.22)'
                       : '0 8px 30px rgba(0,0,0,0.28)',
                   cursor: dragging ? 'grabbing' : 'grab',
                   touchAction: 'none',
-                  transform: dragging ? 'scale(1.06)' : waking ? 'scale(1.04)' : 'scale(1)',
+                  transform: dragging ? 'scale(1.06)' : waking ? 'scale(1.03)' : 'scale(1)',
                   // While dragging, position tracks the pointer 1:1 (no left/top
                   // easing). On release, ease left/top so the snap-home-to-left
                   // slides smoothly.
@@ -405,10 +405,6 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
             zIndex: 61,
           }}
         >
-          {/* wake caption */}
-          <span style={{ fontSize: 11, letterSpacing: 0.3, color: 'var(--text-muted)', marginBottom: 2 }}>
-            What&rsquo;s the update?
-          </span>
           {DOCK_QUICK.map((pill, i) => (
             <button
               key={pill.label}

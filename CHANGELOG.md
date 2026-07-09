@@ -1,3 +1,9 @@
+## 2026-07-10 02:10 IST · polish(brain): drop the "What's the update?" caption, soften the hover ring
+
+- Removed the "What's the update?" label above the dock quick-action fan — the pills (Catch me up / Anything urgent? / Ask something…) say it already.
+- Hover ring toned right down: a single thin accent ring around the circle, no wide glow halo, minimal shadow, gentler scale.
+- `(pending-sha)`
+
 ## 2026-07-10 01:30 IST · feat(brain): floating docked orb, "Catch me up" quick action, hover neon ring, no double-greet
 
 - Docked view is now just the small orb floating in the corner (~240×300, transparent — no box/border/shadow), instead of a large panel. Full-screen unchanged.
