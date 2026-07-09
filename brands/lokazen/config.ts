@@ -32,7 +32,7 @@ export const lokazenConfig: BrandConfig = {
       'Which area is getting the most listings?',
       'Anything at risk right now?',
     ],
-    voiceId: 'VzpSvJsTu0BvRUgOoMMU',
+    voiceId: '2zRM7PkgwBPiau2jvVXc',
   },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
