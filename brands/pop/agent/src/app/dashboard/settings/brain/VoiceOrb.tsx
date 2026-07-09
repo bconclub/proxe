@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { getCurrentBrandId } from '@/configs'
 
 type Mode = 'idle' | 'thinking' | 'speaking' | 'error'
 type Lang = 'en' | 'pa' | 'hi'
@@ -124,8 +125,21 @@ export default function VoiceOrb() {
     let raf = 0
     let t = 0
 
-    const ac = accentColor()
+    // POP = campaign tricolor (deep blue dominant, green + a touch of saffron —
+    // NOT saffron-led; orange alone is the opposition's color). Other brands
+    // keep the accent-derived palette.
+    const isPop = getCurrentBrandId() === 'pop'
+    const ac = isPop
+      ? { h: 215, s: 78, rgb: [37, 89, 196] as [number, number, number] } // campaign blue
+      : accentColor()
     const [ar, ag, ab] = ac.rgb
+    // per-particle hue: pop mixes blue (60%) / green (25%) / saffron (15%)
+    const popHue = () => {
+      const r = Math.random()
+      if (r < 0.60) return 215 + Math.random() * 20 - 10 // blue
+      if (r < 0.85) return 145 + Math.random() * 16 - 8  // green
+      return 25 + Math.random() * 12 - 6                 // saffron
+    }
     const isLight = cssLuma('--bg-primary') > 0.5
     // On white, glowing whites read as a smudge — swap to accent-weighted inks.
     const pLightBase = isLight ? 34 : 56          // particle lightness base
@@ -140,7 +154,7 @@ export default function VoiceOrb() {
         phi: Math.acos(u),
         r: 0.72 + Math.random() * 0.28,
         speed: 0.0006 + Math.random() * 0.0016,
-        hue: ac.h + (Math.random() * 36 - 18) - (Math.random() < 0.2 ? 40 : 0),
+        hue: isPop ? popHue() : ac.h + (Math.random() * 36 - 18) - (Math.random() < 0.2 ? 40 : 0),
         size: 0.8 + Math.random() * 1.6,
         wob: Math.random() * Math.PI * 2,
       }
@@ -232,11 +246,13 @@ export default function VoiceOrb() {
         ctx.lineCap = 'butt'
       }
 
-      // radar sweep along the spine — one slow arm
+      // radar sweep along the spine — one slow arm (green for pop: the second
+      // tricolor note; blue body + green sweep + saffron flecks in the cloud)
+      const [sr, sg2, sb] = isPop ? [34, 160, 92] : [ar, ag, ab]
       const sweepA = t * 0.0035
       const sg = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9)
-      sg.addColorStop(0, `rgba(${ar},${ag},${ab},0)`)
-      sg.addColorStop(1, `rgba(${ar},${ag},${ab},${0.10 * (isLight ? 1.4 : 1)})`)
+      sg.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`)
+      sg.addColorStop(1, `rgba(${sr},${sg2},${sb},${0.12 * (isLight ? 1.4 : 1)})`)
       ctx.strokeStyle = sg
       ctx.lineWidth = dpr2
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9); ctx.stroke()

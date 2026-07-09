@@ -5,6 +5,7 @@
 
 import { generateResponse } from './claudeClient';
 import { HistoryEntry } from './types';
+import { BRAND_ID, getBrandConfig } from '@/configs';
 
 /**
  * Generate or update a conversation summary
@@ -40,7 +41,16 @@ export async function generateSummary(
     .map(entry => `${entry.role === 'user' ? 'User' : 'Assistant'}: ${entry.content}`)
     .join('\n');
 
-  const systemPrompt = `You are summarizing a sales conversation for the BCON team. Generate a brief but complete summary that includes:
+  // POP is a campaign grievance/engagement portal — a sales-shaped prompt made
+  // the model refuse ("NO SUMMARY TO PROVIDE... not a BCON sales conversation").
+  const systemPrompt = BRAND_ID === 'pop'
+    ? `You are summarizing a citizen conversation for the ${getBrandConfig().name} campaign team. Write 2-3 SHORT plain sentences:
+1. Who they are and how they reached us (web / WhatsApp / call), and their constituency or place if mentioned.
+2. What they raised — grievance, question, support, volunteering — with the specific issue in their own words.
+3. Where it stands and the next step for the team, if any.
+
+Rules: plain prose only — NO markdown, NO asterisks, NO headings, NO meta-commentary. NEVER say there is nothing to summarize; summarize whatever happened, even a single click ("Raised a grievance about X via the web portal"). Never use sales words (lead, pipeline, booking, qualification).`
+    : `You are summarizing a sales conversation for the ${getBrandConfig().name} team. Generate a brief but complete summary that includes:
 1. BUSINESS: What does this lead's business do? (from what THEY said, not form data)
 2. PROBLEM: What challenges or needs did they mention?
 3. DISCUSSION: What solutions or services were discussed?

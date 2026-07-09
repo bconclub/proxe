@@ -157,8 +157,11 @@ export default function ArtifactSwitcher({ artifacts, activeId, open, onClose }:
               style={{
                 width: '30px',
                 height: '30px',
+                // bg-primary/text-primary invert correctly in every theme —
+                // the bw themes set --accent-primary to pure white/black, which
+                // made the active icon white-on-white.
                 backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-hover)',
-                color: isActive ? 'var(--white, #fff)' : 'var(--accent-primary)',
+                color: isActive ? 'var(--bg-primary)' : 'var(--text-primary)',
               }}
             >
               <Icon size={16} />

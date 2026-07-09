@@ -316,7 +316,7 @@ export default function VoiceAgentTab() {
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '14px', borderRadius: 12, marginTop: 4,
                 fontSize: 15, fontWeight: 800, border: 'none', width: '100%',
-                background: 'var(--button-bg)', color: 'var(--text-button)',
+                background: 'var(--accent-primary)', color: 'var(--bg-primary)',
                 cursor: (calling || !canCall) ? 'not-allowed' : 'pointer', opacity: (calling || !canCall) ? 0.5 : 1,
               }}>
               <MdPhone size={19} /> {calling ? 'Calling…' : 'Start Test Call'}

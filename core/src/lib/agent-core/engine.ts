@@ -2069,16 +2069,20 @@ async function scheduleFlowTasks(
       ? `${temperature} lead: nudge in ${Math.round(nudgeDelayMs / (60 * 60 * 1000))}h (adjusted from 2h)`
       : 'Initial 2h nudge timer, will adjust based on read receipts';
 
+    // A web visitor who closed the tab can't be nudged "on web" — when we have
+    // their phone, the nudge goes out on WhatsApp instead.
+    const nudgeChannel = input.channel === 'web' && leadPhone ? 'whatsapp' : input.channel;
+
     await createFlowTask(supabase, {
       taskType: 'nudge_waiting',
       leadId,
       leadPhone,
       leadName,
       scheduledAt: new Date(Date.now() + nudgeDelayMs).toISOString(),
-      taskDescription: `Nudge: waiting for reply on ${input.channel} - "${lastQuestion.substring(0, 80)}..."`,
+      taskDescription: `Nudge: waiting for reply on ${nudgeChannel} - "${lastQuestion.substring(0, 80)}..."`,
       metadata: {
         last_question: lastQuestionTrimmed,
-        channel: input.channel,
+        channel: nudgeChannel,
         session_id: input.sessionId,
         created_by: 'engine',
         lead_temperature: temperature,

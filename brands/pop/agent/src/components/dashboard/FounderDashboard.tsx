@@ -1,22 +1,28 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall } from 'react-icons/md'
+import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import TodaySnapshotButton from './TodaySnapshotButton'
 import NotificationCenter from './NotificationCenter'
+import DashboardBrain from './DashboardBrain'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
+import { getBrandConfig, brandLabel } from '@/configs'
 import type { Lead } from '@/types'
-import { getBrandConfig } from '@/configs'
 import {
   Sparkline,
   ActivityArea,
   ConversationsTrendChart,
+  ActivityHeatmap,
+  activityPeaks,
+  WeekHourHeatmap,
+  peaksFromWeekHour,
   RadialProgress,
 } from './MicroCharts'
 
@@ -29,6 +35,7 @@ interface FounderMetrics {
   engagedLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   warmLeads: { count: number; count1D?: number; count7D: number; count14D: number; count30D: number; leads: Array<{ id: string; name: string; score: number }> }
   leadsRecovered?: { count: number }
+  // POP-only: cohort funnel for the Engine Overview toggle (ported from the pop fork).
   funnel?: Record<'Today' | '7D' | '14D' | 'All', { total: number; engaged: number; warm: number; followUpDue: number; booked: number }>
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{
@@ -44,6 +51,10 @@ interface FounderMetrics {
     id: string
     name: string
     title?: string | null
+    courseInterest?: string | null
+    userType?: string | null
+    painPoint?: string | null
+    timeline?: string | null
     date: string
     time: string
     datetime: string
@@ -51,11 +62,12 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
-  channelPerformance: {
-    web: { total: number; booked: number }
-    whatsapp: { total: number; booked: number }
-    voice: { total: number; booked: number }
-  }
+  // Gigs tab only - scout lifecycle stage breakdown (all zero otherwise). Same
+  // stage derivation as the Gigs table's STATUS column, so they never disagree.
+  gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
+  // Gigs tab only - scouts reaching KYC-started in the last 7 days (0 otherwise).
+  kycStarted7D?: number
+  // POP-only: inbound/outbound voice volume for the Calls KPI card (ported from the pop fork).
   calls?: {
     total: number
     inbound: number
@@ -67,12 +79,18 @@ interface FounderMetrics {
     trend7D: number
     trend: { data: Array<{ value: number }>; change: number }
   }
+  channelPerformance: {
+    web: { total: number; booked: number }
+    whatsapp: { total: number; booked: number }
+    voice: { total: number; booked: number }
+  }
   scoreDistribution: { hot: number; warm: number; cold: number }
   recentActivity: Array<{ id: string; channel: string; type: string; timestamp: string; content: string; metadata?: any }>
   quickStats: { bestChannel: string; busiestHour: string; topPainPoint: string }
   trends?: {
     leads: { data: Array<{ value: number }>; change: number }
     bookings: { data: Array<{ value: number }>; change: number }
+    kycStarted?: { data: Array<{ value: number }>; change: number }
     conversations: { data: Array<{ value: number }>; change: number }
     hotLeads: { data: Array<{ value: number }>; change: number }
     responseTime: { data: Array<{ value: number }>; change: number }
@@ -92,6 +110,28 @@ interface FounderMetrics {
     avgResponseTime: Array<{ value: number }>
   }
   trendSeries?: { conversations: Record<TimeFilter, Array<{ value: number }>> }
+  // POP-only: the three home cards reworked for the campaign (see route).
+  campaignHome?: {
+    events: Array<{
+      id: string; title: string; topic?: string | null
+      constituency?: string | null; district?: string | null; venue?: string | null
+      event_date?: string | null; status: string
+      going: number; interested: number; seatVolunteers: number; seatSupporters: number
+    }>
+    attentionSeats: Array<{
+      constituency: string; district?: string | null; total: number
+      grievances: number; unresolved: number; loopHealthPct: number
+      topCategory?: string | null; mood: number; supporters: number; volunteers: number; attention: number
+      series?: number[]; deltaPct?: number
+    }>
+    sources: {
+      total7d: number; byMagnet: Array<{ magnet: string; count: number; share: number }>
+      total30d?: number; mix?: Array<{ magnet: string; count: number; share: number; delta7: number }>
+    }
+    dailyActivity?: Array<{ date: string; count: number }>
+    weekHour?: number[][]
+    ladder?: { voters: number; supporters: number; volunteers: number; cadre: number; grievances: number }
+  }
 }
 
 // "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
@@ -109,7 +149,7 @@ function formatBookingWhen(iso: string): string {
 
 // Human-readable duration from milliseconds (agent reply latency).
 function fmtMs(ms: number): string {
-  if (!ms || ms <= 0) return '—'
+  if (!ms || ms <= 0) return '-'
   if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`
   const h = Math.floor(ms / 3_600_000)
@@ -117,12 +157,96 @@ function fmtMs(ms: number): string {
   return `${h}h ${m}m`
 }
 
+// ── POP/BCON dashboard-home divergence (ported from those forks, brand-gated) ──
+// One brand per build, so these resolve statically at module load.
+const brandCfg = getBrandConfig()
+const isPop = brandCfg.brand === 'pop'
+const isBcon = brandCfg.brand === 'bcon'
+// BCON + POP share the newer dashboard-home look (bcon is the origin fork,
+// pop is its clone): subtler tints, cohort funnel with a Today window,
+// reply-rate-driven Follow-up Health, compact Upcoming Events rows.
+const hasNewHomeLook = isPop || isBcon
+// BCON/POP use subtler KPI-card tints (4% bg / 14% border); other brands keep core's 7%/22%.
+const TINT_BG = hasNewHomeLook ? '4%' : '7%'
+const TINT_BORDER = hasNewHomeLook ? '14%' : '22%'
+// lokazen-only Leads/Gigs tab: same dashboard, same components, wired to
+// scout/connector leads instead of business leads when the Gigs tab is active.
+// Gated on the brand's scouts feature so no other brand ever sees the toggle.
+const showGigsTab = brandCfg.features?.scouts === true
+
 // Thousands separator for the full KPI numbers (8,832 / 1,284). Indian grouping.
 const fmtComma = (n: number | string): string => (typeof n === 'number' ? n.toLocaleString('en-IN') : String(n))
+// POP formats headline KPI numbers with separators; other brands render raw.
+const fmt = (n: number | string): number | string => (isPop ? fmtComma(n) : n)
 // Compact K abbreviation for the tight Engine Overview nodes (10.5K, 2.9K, 760).
 const abbrevK = (n: number): string => (n < 1000 ? String(n) : `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`)
 
-// Deterministic gentle daily climb from `start`→`end` with a small wave — for
+// POP entry-channel (magnet) labels + colors for the "where it came from" strip.
+const MAGNET_META: Record<string, { label: string; color: string }> = {
+  whatsapp: { label: 'WhatsApp', color: '#22c55e' },
+  voice: { label: 'Voice', color: '#3b82f6' },
+  pulse_app: { label: 'My Voice', color: '#a78bfa' },
+  qr: { label: 'QR', color: '#f06c18' },
+  missed_call: { label: 'Missed call', color: '#f59e0b' },
+  d2d: { label: 'Door to Door', color: '#fb7185' },
+  event: { label: 'Event', color: '#2ec4b6' },
+  landing: { label: 'Landing', color: '#6ea5d4' },
+  web: { label: 'Web', color: '#38bdf8' },
+  other: { label: 'Other', color: '#7a8aa0' },
+}
+const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
+
+// Channel glyphs for the Activity Sources panel (reference-design tiles).
+const MAGNET_ICON: Record<string, ReactNode> = {
+  whatsapp: <MdWhatsapp size={15} />,
+  voice: <MdMic size={15} />,
+  pulse_app: <MdSmartphone size={15} />,
+  qr: <MdQrCode2 size={15} />,
+  missed_call: <MdPhoneMissed size={15} />,
+  d2d: <MdDoorFront size={15} />,
+  event: <MdEvent size={15} />,
+  landing: <MdLanguage size={15} />,
+  web: <MdLanguage size={15} />,
+}
+const magnetIcon = (m: string) => MAGNET_ICON[m] || <MdFlashOn size={15} />
+
+// Donut (Source mix) for the Activity Sources panel - SVG arcs with the share
+// % labelled at each segment's mid-angle (segments >= 7% only).
+function SourceDonut({ mix, total }: { mix: Array<{ magnet: string; share: number; count: number }>; total: number }) {
+  const size = 210; const c = size / 2; const rOut = 96; const rIn = 60; const rLbl = 78
+  let angle = -90
+  const segs = mix.filter((s) => s.count > 0).map((s) => {
+    const sweep = (s.count / Math.max(mix.reduce((a, b) => a + b.count, 0), 1)) * 360
+    const seg = { ...s, from: angle, to: angle + sweep }
+    angle += sweep
+    return seg
+  })
+  const pt = (r: number, deg: number): [number, number] => {
+    const rad = (deg * Math.PI) / 180
+    return [c + r * Math.cos(rad), c + r * Math.sin(rad)]
+  }
+  const arcPath = (from: number, to: number) => {
+    const large = to - from > 180 ? 1 : 0
+    const [x1, y1] = pt(rOut, from); const [x2, y2] = pt(rOut, to)
+    const [x3, y3] = pt(rIn, to); const [x4, y4] = pt(rIn, from)
+    return `M ${x1} ${y1} A ${rOut} ${rOut} 0 ${large} 1 ${x2} ${y2} L ${x3} ${y3} A ${rIn} ${rIn} 0 ${large} 0 ${x4} ${y4} Z`
+  }
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 230, height: 'auto', display: 'block', margin: '0 auto' }}>
+      {segs.map((s) => (
+        <path key={s.magnet} d={arcPath(s.from, Math.max(s.to - 1.2, s.from + 0.4))} fill={magnetMeta(s.magnet).color} />
+      ))}
+      {segs.filter((s) => s.share >= 7).map((s) => {
+        const [lx, ly] = pt(rLbl, (s.from + s.to) / 2)
+        return <text key={s.magnet} x={lx} y={ly + 3} fontSize={11} fontWeight={700} fill="#fff" textAnchor="middle">{s.share}%</text>
+      })}
+      <text x={c} y={c - 2} fontSize={22} fontWeight={800} fill="var(--text-primary)" textAnchor="middle">{fmtComma(total)}</text>
+      <text x={c} y={c + 16} fontSize={9.5} fill="var(--text-secondary)" textAnchor="middle">Total touchpoints</text>
+    </svg>
+  )
+}
+
+// Deterministic gentle daily climb from `start`→`end` with a small wave - for
 // the mock trend/sparkline series (no Math.random so renders are stable).
 function popDailySeries(n: number, end: number, start: number): Array<{ value: number }> {
   const out: Array<{ value: number }> = []
@@ -137,7 +261,7 @@ function popDailySeries(n: number, end: number, start: number): Array<{ value: n
 
 // POP pitch dashboard: overlay campaign-scale ENGINE/KPI aggregates onto the real
 // metrics so the overview reads like a live statewide operation. Lists (lead
-// queues, bookings) stay real — only the headline numbers are mocked. Pop only.
+// queues, bookings) stay real - only the headline numbers are mocked. Pop only.
 function popMockMetrics(real: FounderMetrics): FounderMetrics {
   const conv7D = popDailySeries(7, 8832, 6100)
   const conv14D = popDailySeries(14, 8832, 4200)
@@ -172,20 +296,22 @@ function popMockMetrics(real: FounderMetrics): FounderMetrics {
 
 export default function FounderDashboard() {
   const router = useRouter()
-  const brandCfg = getBrandConfig()
-  const brandLogo = brandCfg.chatStructure?.avatar?.source || '/favicon.ico'
+  // Runtime feature flags (Settings → Features) gate the Brain button.
+  const features = useFeatureFlags()
   const [metrics, setMetrics] = useState<FounderMetrics | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [showLeadModal, setShowLeadModal] = useState(false)
+  // Leads/Gigs tab (lokazen only, see showGigsTab) - identical dashboard,
+  // wired to a different slice of the same founder-metrics endpoint.
+  const [view, setView] = useState<'leads' | 'gigs'>('leads')
 
   // Per-card date ranges (founder: "put the toggle inside the cards, as we used
-  // to have"). Active Conversations defaults to Today (24h); the trend to 30D.
+  // to have"). Active Conversations defaults to Today (24h); the trend to 7D.
   const [acRange, setAcRange] = useState<'Today' | '7D' | '14D'>('Today')
-  // POP founder prefers the Conversations Trend on 7 days by default; other
-  // brands keep 30D. (Brand-gated so this pop preference never reverse-syncs.)
-  const [range, setRange] = useState<'7D' | '14D' | '30D'>(brandCfg.brand === 'pop' ? '7D' : '30D')
-  // Engine Overview funnel — All-time snapshot by default, with 7d/14d windows.
+  const [range, setRange] = useState<'7D' | '14D' | '30D'>('7D')
+  // Engine Overview funnel - All-time snapshot by default, with 7d/14d windows.
+  // POP adds a Today (24h) window (cohort funnel ported from the pop fork).
   const [engineRange, setEngineRange] = useState<'Today' | '7D' | '14D' | 'All'>('All')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
@@ -200,10 +326,24 @@ export default function FounderDashboard() {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (cancelled) return
-        const meta = (user?.user_metadata || {}) as Record<string, unknown>
-        const name = (meta.full_name as string) || (meta.name as string) || ''
+        // Prefer the name set in User Management (dashboard_users.full_name) -
+        // that's the field the admin edits. Fall back to auth metadata, then to
+        // the email prefix. Editing the name in User Management must reflect here.
+        let name = ''
+        if (user?.id) {
+          const { data: du } = await supabase
+            .from('dashboard_users')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle()
+          if (du?.full_name) name = du.full_name as string
+        }
+        if (!name) {
+          const meta = (user?.user_metadata || {}) as Record<string, unknown>
+          name = (meta.full_name as string) || (meta.name as string) || ''
+        }
         setUser({ name, email: user?.email || '' })
-      } catch { /* soft-fail — greeting falls back to "Founder" */ }
+      } catch { /* soft-fail - greeting falls back to "Founder" */ }
     })()
     return () => { cancelled = true }
   }, [])
@@ -240,13 +380,14 @@ export default function FounderDashboard() {
 
   const loadMetrics = useCallback(async () => {
     try {
-      const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}`)
+      const scopeParam = showGigsTab ? `&scope=${view}` : ''
+      const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}${scopeParam}`)
       if (response.ok) {
         const data = await response.json()
         // POP pitch dashboard: the People table stays real (125), but the
         // ENGINE/KPI aggregates show campaign-scale mock numbers so the overview
         // reads like a live statewide operation. Dashboard-only, pop-only.
-        setMetrics(brandCfg.brand === 'pop' ? popMockMetrics(data) : data)
+        setMetrics(isPop ? popMockMetrics(data) : data)
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         console.error('Error loading metrics:', response.status, errorData)
@@ -262,7 +403,7 @@ export default function FounderDashboard() {
         playSound('ready') // once per mount; gated by the Configure toggle + mute
       }
     }
-  }, [hotLeadThreshold])
+  }, [hotLeadThreshold, view])
 
   useEffect(() => {
     loadMetrics()
@@ -362,10 +503,27 @@ export default function FounderDashboard() {
   const getInitials = (name: string) =>
     name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || 'L'
 
+  // Program category chip. Prefers the structured course interest the agent
+  // already captured for the lead (unified_context[BRAND_ID].course_interest),
+  // and falls back to keyword-matching the free-text booking title. Accepts
+  // multiple signals so the strongest available wins. Null when nothing matches.
+  const eventCategory = (...signals: Array<string | null | undefined>): { label: string; color: string; bg: string } | null => {
+    const t = signals.filter(Boolean).join(' ').toLowerCase()
+    if (!t) return null
+    if (t.includes('cabin')) return { label: 'Cabin Crew', color: '#a855f7', bg: 'rgba(168,85,247,0.14)' }
+    if (t.includes('helicopter')) return { label: 'Helicopter', color: '#f472b6', bg: 'rgba(244,114,182,0.14)' }
+    if (t.includes('drone')) return { label: 'Drone', color: '#2dd4bf', bg: 'rgba(45,212,191,0.14)' }
+    if (t.includes('flight training')) return { label: 'Flight Training', color: '#10b981', bg: 'rgba(16,185,129,0.14)' }
+    if (t.includes('cpl')) return { label: 'CPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
+    if (t.includes('ppl')) return { label: 'PPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
+    if (t.includes('pilot')) return { label: 'Pilot Training', color: '#60a5fa', bg: 'rgba(59,130,246,0.16)' }
+    return null
+  }
+
   // Intent label from score (mockup: High Intent / Comparing / Ready to Book style).
   const intentFor = (score: number): { label: string; color: string; bg: string } => {
-    if (score >= hotLeadThreshold) return { label: 'High Intent', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
-    if (score >= 50) return { label: 'Comparing', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
+    if (score >= hotLeadThreshold) return { label: brandLabel('High Intent'), color: '#ef4444', bg: 'rgba(239,68,68,0.12)' }
+    if (score >= 50) return { label: brandLabel('Comparing'), color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' }
     return { label: 'Needs follow-up', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' }
   }
 
@@ -374,10 +532,10 @@ export default function FounderDashboard() {
   const nextStepFor = (stage: string): string => {
     const s = (stage || '').toLowerCase()
     if (s.includes('booking')) return 'Confirm the slot'
-    if (s.includes('high')) return 'Push to book a call'
-    if (s.includes('qualified')) return 'Share pricing + offers'
-    if (s.includes('engaged')) return 'Share program details'
-    if (s.includes('converted')) return 'Onboard / next steps'
+    if (s.includes('high')) return brandLabel('Push to book a call')
+    if (s.includes('qualified')) return brandLabel('Share pricing + offers')
+    if (s.includes('engaged')) return brandLabel('Share program details')
+    if (s.includes('converted')) return brandLabel('Onboard / next steps')
     if (s.includes('lost') || s.includes('cold')) return 'Re-engage'
     return 'First outreach'
   }
@@ -392,12 +550,12 @@ export default function FounderDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
+            <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ backgroundColor: brandCfg.colors?.primary || 'var(--accent-primary)', width: '100px', height: '100px', margin: '-10px' }} />
             <div className="relative animate-pulse">
-              <Image src={brandLogo} alt={brandCfg.name} width={80} height={80} className="drop-shadow-lg" priority />
+              <Image src={isBcon ? '/bcon-icon.png' : isPop ? (brandCfg.chatStructure?.avatar?.source || '/favicon.ico') : (brandCfg.markPath || brandCfg.iconPath || '/logo.png')} alt={brandCfg.name} width={80} height={80} className="drop-shadow-lg" priority />
             </div>
           </div>
           <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
@@ -422,28 +580,34 @@ export default function FounderDashboard() {
   const flow = metrics.leadFlow || { new: 0, engaged: 0, qualified: 0, booked: 0 }
   const total = metrics.totalLeads?.count || 0
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}% of total` : '')
-  // Engine Overview — the lead-funnel nodes (Total/Engaged/Warm) follow its
+  // Engine Overview - the lead-funnel nodes (Total/Engaged/Warm) follow its
   // All/7d/14d toggle; Follow-up Due + Booked stay current-state (no historical
   // range in the metrics yet).
-  // Cohort funnel for the selected window — all five nodes scale together (leads
-  // acquired in the window → how far each got). Falls back to the old per-metric
-  // counts if the backend hasn't shipped `funnel` yet.
-  const fn = metrics.funnel?.[engineRange]
+  // BCON/POP: cohort funnel for the selected window - all five nodes scale together
+  // (leads acquired in the window → how far each got). Falls back to the old
+  // per-metric counts (identical to core's expressions) when `funnel` is absent.
+  const fn = hasNewHomeLook ? metrics.funnel?.[engineRange] : undefined
   const engTotal = fn ? fn.total : engineRange === 'Today' ? (metrics.totalLeads?.count1D ?? 0) : engineRange === '7D' ? (metrics.totalLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.totalLeads?.count14D ?? 0) : (metrics.totalLeads?.count ?? 0)
   const engEngaged = fn ? fn.engaged : engineRange === '7D' ? (metrics.engagedLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.engagedLeads?.count14D ?? 0) : (metrics.engagedLeads?.count ?? flow.engaged)
   const engWarm = fn ? fn.warm : engineRange === '7D' ? (metrics.warmLeads?.count7D ?? 0) : engineRange === '14D' ? (metrics.warmLeads?.count14D ?? 0) : (metrics.warmLeads?.count ?? 0)
   const engDue = fn ? fn.followUpDue : (metrics.staleLeads?.count ?? 0)
   const engBooked = fn ? fn.booked : (flow.booked || 0)
+  // Gigs tab: Engaged/Warm/Follow-up Due/Booked don't mean anything for
+  // scouts - the funnel that matters is their onboarding lifecycle (same
+  // stage derivation the Gigs table's STATUS column uses), so all 4 middle+
+  // last nodes swap to it. Slot 1 (Total Leads) stays as-is either way.
+  const isGigsView = showGigsTab && view === 'gigs'
+  const gigStages = metrics.gigStageCounts || { loggedIn: 0, kycStarted: 0, kycDone: 0, live: 0, active: 0 }
   const engPct = (n: number) => (engTotal > 0 ? `${Math.round((n / engTotal) * 100)}% of total` : '0% of total')
   // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
-  const engK = (n: number): number | string => (brandCfg.brand === 'pop' ? abbrevK(n) : n)
+  const engK = (n: number): number | string => (isPop ? abbrevK(n) : n)
   const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
-  // Active Conversations card — its OWN toggle (24h / 7d / 14d), distinct leads
+  // Active Conversations card - its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
   const tc = metrics.totalConversations
   const acValue = acRange === '7D' ? tc.count7D : acRange === '14D' ? tc.count14D : (tc.count1D ?? 0)
   const acLabel = acRange === 'Today' ? 'in the last 24 hours' : acRange === '7D' ? 'in the last 7 days' : 'in the last 14 days'
-  // Conversations Trend — its own toggle (7d / 14d / 30d). Real per-day series
+  // Conversations Trend - its own toggle (7d / 14d / 30d). Real per-day series
   // (distinct leads messaged/day); old trends.conversations.data came back ~flat.
   const rangeDays = range === '14D' ? 14 : range === '30D' ? 30 : 7
   const rangeLabel = `last ${rangeDays} days`
@@ -457,17 +621,34 @@ export default function FounderDashboard() {
     : range === '30D'
       ? metrics.totalConversations.trend30D
       : metrics.totalConversations.trend7D
-  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Founder')
-  const firstName = displayName.split(' ')[0] || 'Founder'
+  // POP home → weekday×hour activity heatmap instead of the line trend. Totals
+  // come from the 30-day daily series; the grid + peaks come from the weekHour
+  // matrix (touchpoints by weekday & hour).
+  const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
+  const weekHour = isPop ? metrics.campaignHome?.weekHour : undefined
+  // POP home: full-width "Activity Sources" panel (reference design) replaces
+  // the heatmap card when the 30d source mix is available.
+  const popMix = isPop && metrics.campaignHome?.sources?.mix?.length ? metrics.campaignHome.sources.mix : undefined
+  const heatTotal = popHeat ? popHeat.reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatAvg = popHeat && popHeat.length ? Math.round((heatTotal / popHeat.length) * 10) / 10 : 0
+  const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatPrev7 = popHeat ? popHeat.slice(-14, -7).reduce((a, b) => a + (b.count || 0), 0) : 0
+  const heatChange = heatPrev7 ? Math.round(((heatLast7 - heatPrev7) / heatPrev7) * 100) : 0
+  const heatPeaks = weekHour ? peaksFromWeekHour(weekHour) : null
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : brandLabel('Founder'))
+  const firstName = displayName.split(' ')[0] || brandLabel('Founder')
   const profileInitials = getInitials(displayName)
   // Time-of-day greeting in IST (shifts morning/afternoon/evening/night).
   const istHour = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }))
   const greeting = istHour < 12 ? 'Good morning' : istHour < 17 ? 'Good afternoon' : istHour < 21 ? 'Good evening' : 'Good night'
-  // Follow-up Health follows the REPLY RATE shown on the card (not the
-  // response-time bucket) — so a 100% reply rate never reads as "Fair".
-  // >=90% green/Good, >=70% amber/Fair, else red/Needs work. Matches Windchasers.
+  // Follow-up Health colour follows the status (good=green, fair=amber, needs work=red).
+  // BCON/POP: health follows the REPLY RATE shown on the card (not the
+  // response-time bucket) - so a 100% reply rate never reads as "Fair" (ported
+  // from those forks). Other brands keep core's responseHealth.status verbatim.
   const replyRate = Math.round(rm?.responseRate ?? 0)
-  const healthLevel: 'good' | 'warning' | 'critical' = replyRate >= 90 ? 'good' : replyRate >= 70 ? 'warning' : 'critical'
+  const healthLevel: 'good' | 'warning' | 'critical' = hasNewHomeLook
+    ? (replyRate >= 90 ? 'good' : replyRate >= 70 ? 'warning' : 'critical')
+    : metrics.responseHealth.status
   const healthColor = healthLevel === 'good' ? '#22c55e' : healthLevel === 'warning' ? '#f59e0b' : '#ef4444'
   const healthLabel = healthLevel === 'good' ? 'Good' : healthLevel === 'warning' ? 'Fair' : 'Needs work'
   // Booked calls + what share of total leads that represents (founder conversion view).
@@ -476,7 +657,7 @@ export default function FounderDashboard() {
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-4 h-full overflow-y-auto xl:overflow-hidden">
-      {/* Subtle bento entrance — cards fade + rise in, lightly staggered. Plays
+      {/* Subtle bento entrance - cards fade + rise in, lightly staggered. Plays
           once on mount (DOM persists across the 60s metric refresh, so it doesn't
           replay). Respects reduced-motion. */}
       <style>{`
@@ -489,19 +670,51 @@ export default function FounderDashboard() {
           .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
         }
       `}</style>
-      {/* ── ROW 0 · Top bar — greeting + range toggle + controls + profile ── */}
+      {/* ── ROW 0 · Top bar - greeting + range toggle + controls + profile ── */}
       <header className="flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-bold leading-tight truncate" style={{ color: 'var(--text-primary)' }}>
             {greeting}, {firstName} <span aria-hidden>👋</span>
           </h1>
+          {/* lokazen only: Leads (business leads) / Gigs (scouts + connectors) -
+              same dashboard below, wired to a different slice of the same data. */}
+          {showGigsTab && (
+            <div
+              className="inline-flex items-center gap-0.5 mt-1.5 p-0.5 rounded-lg border"
+              style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+              role="tablist"
+              aria-label="Leads or Gigs"
+            >
+              {(['leads', 'gigs'] as const).map((v) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => {
+                    if (v === view) return
+                    // Show the loader immediately on tab switch - otherwise the
+                    // PREVIOUS tab's numbers stay on screen (now mislabeled
+                    // under the new tab) for however long the new-scope fetch
+                    // takes. loadMetrics's finally clears this once it resolves.
+                    setLoading(true)
+                    setView(v)
+                  }}
+                  className="px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors"
+                  style={view === v
+                    ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' }
+                    : { color: 'var(--text-secondary)' }}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* War Room entry lives on the sidebar brand mark (Pulse of Punjab logo
-              + name → /war-room), per founder — no separate launcher button. */}
           {/* Labelled buttons make Snapshot + Ask PROXe discoverable; bell stays an
               icon on the right next to the profile. */}
           <TodaySnapshotButton inline label="Snapshot" />
+          {features.brain && <DashboardBrain inline label="Ask PROXe" />}
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
@@ -526,7 +739,7 @@ export default function FounderDashboard() {
                   {user?.email && <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{user.email}</div>}
                 </div>
                 <div style={{ height: 1, backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
-                {brandCfg.brand === 'pop' && (
+                {isPop && (
                   <button
                     onClick={() => { setProfileOpen(false); router.push('/war-room') }}
                     className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-bold transition-colors"
@@ -562,9 +775,9 @@ export default function FounderDashboard() {
       </header>
 
       {/* ── ROW 1 · KPI cards ─────────────────────────────────────────────── */}
-      <div className="wc-bento grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 shrink-0">
-        {/* Card 1 — Active Conversations: own toggle (24h / 7d / 14d). */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: 'color-mix(in srgb, #3B82F6 4%, var(--bg-primary))', borderColor: 'color-mix(in srgb, #3B82F6 14%, var(--border-primary))', minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+      <div className={`wc-bento grid grid-cols-2 md:grid-cols-3 ${features.voice ? 'xl:grid-cols-6' : 'xl:grid-cols-5'} gap-3 sm:gap-4 shrink-0`}>
+        {/* Card 1 - Active Conversations: own toggle (24h / 7d / 14d). */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, #3B82F6 ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, #3B82F6 ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: '#3B82F61f', color: '#3B82F6' }}><MdChatBubble size={15} /></span>
@@ -583,7 +796,7 @@ export default function FounderDashboard() {
             </div>
           </div>
           <div className="flex items-end gap-2 mt-2 cursor-pointer" onClick={() => router.push('/dashboard/inbox')}>
-            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{fmtComma(acValue)}</span>
+            <span className="text-2xl sm:text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{fmt(acValue)}</span>
           </div>
           {(() => {
             // Sparkline tracks the selected window (Today shows the 7-day context).
@@ -598,20 +811,34 @@ export default function FounderDashboard() {
           })()}
           <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{acLabel}</span>
         </div>
-        {/* Card 2 — High Intent Leads: the hot, sales-ready leads PROXe scored. */}
-        <KpiCard
-          icon={<MdLocalFireDepartment size={15} />} iconColor="#22c55e"
-          label="High Intent Leads"
-          value={fmtComma(metrics.hotLeads?.count ?? 0)}
-          sparkData={metrics.trends?.hotLeads?.data} sparkColor="#22c55e"
-          sub="flagged high-intent by PROXe"
-          onClick={() => router.push('/dashboard/leads?filter=hot')}
-        />
-        {/* Follow-up Health — status + ring; whole card follows the status colour. */}
-        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        {/* Card 2 - Leads: hot/sales-ready leads PROXe scored. Gigs: engaged
+            scouts (active conversation on WhatsApp or social, last 7 days) -
+            lead_score doesn't apply to scouts, so "High Intent" always read 0. */}
+        {isGigsView ? (
+          <KpiCard
+            icon={<MdMessage size={15} />} iconColor="#22c55e"
+            label="Engaged Scouts"
+            value={fmt(metrics.totalConversations?.count7D ?? 0)}
+            delta={<KpiDelta change={metrics.totalConversations?.trend7D} />}
+            sparkData={metrics.trends?.conversations?.data} sparkColor="#22c55e"
+            sub="active on WhatsApp or social, last 7 days"
+            onClick={() => router.push('/dashboard/leads')}
+          />
+        ) : (
+          <KpiCard
+            icon={<MdLocalFireDepartment size={15} />} iconColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
+            label={brandLabel('High Intent Leads')}
+            value={fmt(metrics.hotLeads?.count ?? 0)}
+            sparkData={metrics.trends?.hotLeads?.data} sparkColor={hasNewHomeLook ? '#22c55e' : '#ef4444'}
+            sub={brandLabel('flagged high-intent by PROXe')}
+            onClick={() => router.push('/dashboard/leads?filter=hot')}
+          />
+        )}
+        {/* Follow-up Health - status + ring; whole card follows the status colour. */}
+        <div className="rounded-xl p-4 border flex flex-col justify-between" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${healthColor} ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${healthColor} 16%, transparent)`, color: healthColor }}>{healthLevel === 'good' ? <MdFavorite size={15} /> : <MdWarning size={15} />}</span>
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Follow-up Health</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{brandLabel('Follow-up Health')}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <div>
@@ -621,17 +848,29 @@ export default function FounderDashboard() {
             </div>
             <RadialProgress value={replyRate} size={48} color={healthColor} showPercentage={false} label="" />
           </div>
-          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention'}</span>
+          <span className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{replyRate}% reply rate · {hasNewHomeLook ? (healthLevel === 'good' ? 'on track' : healthLevel === 'warning' ? 'room to improve' : 'needs attention') : 'on track'}</span>
         </div>
-        <KpiCard
-          icon={<MdEvent size={15} />} iconColor="#a855f7"
-          label="Booked Calls / Events"
-          value={fmtComma(bookedVal)}
-          delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
-          sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
-          sub="vs last 7 days"
-          onClick={() => router.push('/dashboard/bookings')}
-        />
+        {isGigsView ? (
+          <KpiCard
+            icon={<MdAssignment size={15} />} iconColor="#a855f7"
+            label="KYC Started"
+            value={fmt(metrics.kycStarted7D ?? 0)}
+            delta={<KpiDelta change={metrics.trends?.kycStarted?.change} />}
+            sparkData={metrics.trends?.kycStarted?.data} sparkColor="#a855f7"
+            sub="vs last 7 days"
+            onClick={() => router.push('/dashboard/leads')}
+          />
+        ) : (
+          <KpiCard
+            icon={<MdEvent size={15} />} iconColor="#a855f7"
+            label={brandLabel('Booked Calls / Events')}
+            value={fmt(bookedVal)}
+            delta={<KpiDelta change={metrics.trends?.bookings?.change} />}
+            sparkData={metrics.trends?.bookings?.data} sparkColor="#a855f7"
+            sub="vs last 7 days"
+            onClick={() => router.push('/dashboard/bookings')}
+          />
+        )}
         <KpiCard
           icon={<MdSpeed size={15} />} iconColor="#3B82F6"
           label="Avg Response Time"
@@ -639,26 +878,31 @@ export default function FounderDashboard() {
           delta={<KpiDelta change={metrics.trends?.responseTime?.change} goodWhenUp={false} suffix="" />}
           sparkData={metrics.trends?.responseTime?.data} sparkColor="#3B82F6"
         />
-        {/* Calls — inbound + outbound voice volume (links to the Calls view). */}
-        <KpiCard
-          icon={<MdCall size={15} />} iconColor="#06b6d4"
-          label="Calls"
-          value={fmtComma(metrics.calls?.total ?? 0)}
-          delta={<KpiDelta change={metrics.calls?.trend?.change} />}
-          sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
-          sub={`${fmtComma(metrics.calls?.inbound ?? 0)} in · ${fmtComma(metrics.calls?.outbound ?? 0)} out`}
-          onClick={() => router.push('/dashboard/calls')}
-        />
+        {/* Calls - inbound + outbound voice volume (links to the Calls view).
+            Only shown when the Voice/Calls feature is enabled for this brand. */}
+        {features.voice && (
+          <KpiCard
+            icon={<MdCall size={15} />} iconColor="#06b6d4"
+            label="Calls"
+            value={fmtComma(metrics.calls?.total ?? 0)}
+            delta={<KpiDelta change={metrics.calls?.trend?.change} />}
+            sparkData={metrics.calls?.trend?.data} sparkColor="#06b6d4"
+            sub={`${fmtComma(metrics.calls?.inbound ?? 0)} in · ${fmtComma(metrics.calls?.outbound ?? 0)} out`}
+            onClick={() => router.push('/dashboard/calls')}
+          />
+        )}
       </div>
 
       {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
-        {/* Engine Overview funnel */}
-        <section className="xl:col-span-8 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
+            Volunteers → Cadre → Grievances), narrower so Events breathes. */}
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-2 shrink-0">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Engine Overview</h3>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
+            {!(isPop && metrics.campaignHome?.ladder) && (
             <div className="flex items-center gap-0.5 shrink-0">
-              {(['Today', '7D', '14D', 'All'] as const).map((p) => (
+              {(hasNewHomeLook ? (['Today', '7D', '14D', 'All'] as const) : (['All', '7D', '14D'] as const)).map((p) => (
                 <button
                   key={p} type="button" onClick={() => setEngineRange(p)}
                   className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
@@ -668,23 +912,57 @@ export default function FounderDashboard() {
                 </button>
               ))}
             </div>
+            )}
           </div>
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
+          {isPop && metrics.campaignHome?.ladder ? (() => {
+            const lad = metrics.campaignHome.ladder!
+            const pctOf = (n: number) => (lad.voters ? `${Math.round((100 * n) / lad.voters)}% of voters` : '')
+            return (
+              <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+                <EngineNode icon={<MdPeople size={26} />} color="#3B82F6" count={engK(lad.voters)} label="Voters" sub="reached" />
+                <EngineNode icon={<MdFavorite size={26} />} color="#22c55e" count={engK(lad.supporters)} label="Supporters" sub={pctOf(lad.supporters)} />
+                <EngineNode icon={<MdLocalFireDepartment size={26} />} color="#f59e0b" count={engK(lad.volunteers)} label="Volunteers" sub={pctOf(lad.volunteers)} />
+                <EngineNode icon={<MdVerified size={26} />} color="#a855f7" count={engK(lad.cadre)} label="Cadre" sub="badge holders" />
+                <EngineNode icon={<MdAssignment size={26} />} color="#10b981" count={engK(lad.grievances)} label="Grievances Logged" sub="all time" last />
+              </div>
+            )
+          })() : (
           <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
-            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label="Total Leads" sub={engTopSub} />
-            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label="Engaged" sub={engPct(engEngaged)} />
-            <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label="Warm" sub={engPct(engWarm)} />
-            <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
-            <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={engK(engBooked)} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label={brandLabel('Total Leads')} sub={engTopSub} />
+            {isGigsView ? (
+              <EngineNode icon={<MdAssignment size={28} />} color="#22c55e" count={engK(gigStages.kycStarted)} label="KYC Started" sub={engPct(gigStages.kycStarted)} />
+            ) : (
+              <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={engK(engEngaged)} label={brandLabel('Engaged')} sub={engPct(engEngaged)} />
+            )}
+            {isGigsView ? (
+              <EngineNode icon={<MdVerified size={28} />} color="#f59e0b" count={engK(gigStages.kycDone)} label="KYC Done" sub={engPct(gigStages.kycDone)} />
+            ) : (
+              <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={engK(engWarm)} label={brandLabel('Warm')} sub={engPct(engWarm)} />
+            )}
+            {isGigsView ? (
+              <EngineNode icon={<MdAccountBalanceWallet size={28} />} color="#a855f7" count={engK(gigStages.live)} label="Live" sub="UPI added" />
+            ) : (
+              <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={engK(engDue)} label="Follow-up Due" sub={engDue > 0 ? 'Needs attention' : 'All clear'} />
+            )}
+            <EngineNode
+              icon={isGigsView ? <MdCheckCircle size={28} /> : <MdCalendarToday size={28} />}
+              color="#10b981"
+              count={engK(isGigsView ? gigStages.active : engBooked)}
+              label={isGigsView ? 'Active' : brandLabel('Booked')}
+              sub={isGigsView ? 'Submitting properties' : (hasNewHomeLook ? (engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`) : 'This week')}
+              last
+            />
           </div>
+          )}
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
-            <span className="inline-block w-2 h-2 rounded-full" style={{ background: healthColor }} />
-            {healthLevel === 'good' ? 'Your follow-up engine is performing well. Keep it going!' : 'Some leads need attention — check the Follow-up Due column.'}
+            <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
+            {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention - check the Follow-up Due column.`}
           </div>
         </section>
 
-        {/* Upcoming Events — owner-aware (narrower so Engine Overview is more prominent) */}
-        <section className="xl:col-span-4 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Upcoming Events - POP splits the row 50-50 with the engine; compact cards (going/interested inline) fit 2-3 at a glance */}
+        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -692,7 +970,87 @@ export default function FounderDashboard() {
             </button>
           </div>
           <div className="flex-1 space-y-1.5 overflow-y-auto min-h-0 pr-1.5">
-            {metrics.upcomingBookings.length > 0 ? (
+            {isPop && metrics.campaignHome ? (
+              metrics.campaignHome.events.length > 0 ? (
+                <div className="relative pl-5">
+                  {/* timeline rail (reference design): orange line + a dot per event */}
+                  <span className="absolute left-[5px] top-2 bottom-2 w-px" style={{ background: 'rgba(249,115,22,0.45)' }} />
+                  <div className="space-y-2">
+                  {metrics.campaignHome.events.map((ev) => {
+                    const d = ev.event_date ? new Date(ev.event_date) : null
+                    const dowIST = d ? d.toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const dayIST = d ? d.toLocaleDateString('en-IN', { day: '2-digit', timeZone: 'Asia/Kolkata' }) : ''
+                    const monIST = d ? d.toLocaleDateString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const timeIST = d ? d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
+                    const kind = /sabha/i.test(ev.title) ? { label: 'Sabha', c: '#a78bfa' }
+                      : /yatra|march/i.test(ev.title) ? { label: 'March', c: '#3b82f6' }
+                      : /cultural|night|awaaz/i.test(ev.title) ? { label: 'Cultural', c: '#c084fc' }
+                      : /rally/i.test(ev.title) ? { label: 'Rally', c: '#f97316' }
+                      : { label: 'Event', c: '#2ec4b6' }
+                    return (
+                      <button
+                        key={ev.id} type="button" onClick={() => router.push('/dashboard/bookings')}
+                        className="relative w-full text-left rounded-xl transition-all border block p-2.5"
+                        style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f97316' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                      >
+                        <span className="absolute -left-[19px] top-6 w-2.5 h-2.5 rounded-full border-2" style={{ background: '#f97316', borderColor: 'rgba(249,115,22,0.35)' }} />
+                        <div className="flex items-start gap-3">
+                          {/* date tile */}
+                          {d && (
+                            <span className="flex flex-col items-center rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: 'rgba(249,115,22,0.4)', minWidth: 42 }}>
+                              <span className="w-full text-center text-[9px] font-extrabold py-0.5" style={{ background: 'rgba(249,115,22,0.9)', color: '#0b0d12' }}>{dowIST}</span>
+                              <span className="text-[17px] font-extrabold leading-tight pt-0.5" style={{ color: 'var(--text-primary)' }}>{dayIST}</span>
+                              <span className="text-[9px] font-bold pb-1" style={{ color: '#f97316' }}>{monIST}</span>
+                            </span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            {/* Line 1 — title + kind, with Going / Interested INLINE on the right */}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
+                              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: `${kind.c}1f`, color: kind.c, border: `1px solid ${kind.c}45` }}>{kind.label}</span>
+                              <span className="flex-1" />
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }} title={`${ev.going} going`}>
+                                <MdGroups size={12} /> {ev.going}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }} title={`${ev.interested} interested`}>
+                                <MdStarBorder size={12} /> {ev.interested}
+                              </span>
+                            </div>
+                            {/* Line 2 — location · time on one line */}
+                            <p className="text-[10.5px] truncate mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                              <MdPlace size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                              <span className="truncate">{[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}</span>
+                              {timeIST && (<><span style={{ opacity: 0.4 }}>·</span><MdAccessTime size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /><span className="whitespace-nowrap">{timeIST}</span></>)}
+                            </p>
+                            {/* Line 3 — mobilizable base (compact, muted) */}
+                            <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatVolunteers} volunteers</span>
+                              <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatSupporters} supporters</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end justify-between self-stretch shrink-0 gap-2">
+                            {ev.event_date && (
+                              <span className="inline-flex items-center gap-1 text-[9.5px] px-2 py-1 rounded-full font-bold whitespace-nowrap border" style={{ background: 'rgba(249,115,22,0.1)', color: '#f97316', borderColor: 'rgba(249,115,22,0.45)' }}>
+                                <MdSchedule size={11} /> {formatCountdown(ev.event_date)}
+                              </span>
+                            )}
+                            <MdChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  </div>
+                  <p className="text-[10px] text-center mt-2.5 flex items-center justify-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                    <MdCalendarToday size={11} /> All times shown in local time
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet - create one from Events, and RSVPs will show here.</p>
+              )
+            ) : metrics.upcomingBookings.length > 0 ? (
               metrics.upcomingBookings.map((booking) => (
                 <button
                   key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
@@ -703,27 +1061,57 @@ export default function FounderDashboard() {
                 >
                   <InitialsAvatar name={booking.name} size={24} />
                   <div className="flex-1 min-w-0">
-                    {/* Line 1 — name · date · owner, with the recency-coloured
+                    {/* Line 1 - name · date · owner, with the recency-coloured
                         countdown chip on the right (only thing that's coloured). */}
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-2.5 min-w-0">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                        <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                          <span>{formatBookingWhen(booking.datetime)}</span>
-                          <span style={{ opacity: 0.4 }}>·</span>
-                          <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
-                        </span>
-                      </div>
+                      {hasNewHomeLook ? (
+                        /* BCON/POP layout (fork parity): name · when · owner, no category chip. */
+                        <div className="flex items-baseline gap-2.5 min-w-0">
+                          <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                          <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
+                            <span>{formatBookingWhen(booking.datetime)}</span>
+                            <span style={{ opacity: 0.4 }}>·</span>
+                            <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <p className="text-[13px] font-semibold truncate shrink-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                          {(() => { const c = eventCategory(booking.courseInterest, booking.title); return c && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0" style={{ background: c.bg, color: c.color }}>
+                              {c.label}
+                            </span>
+                          ) })()}
+                          <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
+                          <span className="text-[9px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>· {booking.owner?.name || 'Unassigned'}</span>
+                        </div>
+                      )}
                       {(() => { const t = countdownTint(booking.datetime); return (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
                           {formatCountdown(booking.datetime)}
                         </span>
                       ) })()}
                     </div>
-                    {/* Line 2 — event title (only when present). No third line. */}
-                    {booking.title && (
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
-                    )}
+                    {/* Line 2 - free-text booking title when present; otherwise a
+                        detail composed from the structured intent we already captured
+                        (program · who · timeline) so the row is never bare. No third line.
+                        POP (fork parity): event title only, nothing composed. */}
+                    {(() => {
+                      if (booking.title) return (
+                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
+                      )
+                      if (hasNewHomeLook) return null
+                      const cat = eventCategory(booking.courseInterest, booking.title)
+                      const bits = [
+                        cat?.label || booking.courseInterest || null,
+                        booking.userType,
+                        booking.timeline,
+                      ].filter(Boolean)
+                      if (!bits.length) return null
+                      return (
+                        <p className="text-[11px] truncate mt-0.5 capitalize" style={{ color: 'var(--text-secondary)' }}>{bits.join(' · ')}</p>
+                      )
+                    })()}
                   </div>
                 </button>
               ))
@@ -736,23 +1124,88 @@ export default function FounderDashboard() {
 
       {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
-        {/* Priority Lead Queue */}
-        <section className="xl:col-span-7 rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Priority Lead Queue. POP: narrower (it's a compact list) so Activity Sources gets the width */}
+        <section className={`${popMix ? 'xl:col-span-6' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Priority Lead Queue</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Leads that need your attention now</p>
+            <div className="flex items-center gap-3 min-w-0">
+              {isPop && metrics.campaignHome && (
+                <span className="flex items-center justify-center rounded-xl shrink-0" style={{ width: 36, height: 36, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>
+                  <MdMyLocation size={18} />
+                </span>
+              )}
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : brandLabel('Leads that need your attention now')}</p>
+              </div>
             </div>
-            <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
-              View Leads <MdArrowForward size={13} />
+            <button onClick={() => router.push(isPop && metrics.campaignHome ? '/war-room' : '/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              {isPop && metrics.campaignHome ? 'War Room' : `View ${brandLabel('Lead') === 'Person' ? 'People' : 'Leads'}`} <MdArrowForward size={13} />
             </button>
           </div>
-          {metrics.leadsNeedingAttention.length > 0 ? (
+          {isPop && metrics.campaignHome ? (
+            metrics.campaignHome.attentionSeats.length > 0 ? (
+              <div className="overflow-auto flex-1 min-h-0 flex flex-col gap-2 p-3">
+                {metrics.campaignHome.attentionSeats.map((s) => {
+                  const health = s.loopHealthPct >= 70 ? '#22c55e' : s.loopHealthPct >= 40 ? '#f59e0b' : '#ef4444'
+                  const moodColor = s.mood > 0.1 ? '#22c55e' : s.mood < -0.1 ? '#ef4444' : 'var(--text-muted)'
+                  const moodLabel = s.mood > 0.1 ? 'positive' : s.mood < -0.1 ? 'negative' : 'neutral'
+                  const catColors: Record<string, string> = { jobs: '#a78bfa', drugs: '#60a5fa', health: '#2ec4b6', water: '#38bdf8', power: '#f59e0b', roads: '#8b7bff', farm_debt: '#22c55e', education: '#c084fc', other: '#7a8aa0' }
+                  const catC = catColors[s.topCategory || 'other'] || '#7a8aa0'
+                  const up = (s.deltaPct ?? 0) >= 0
+                  const sparkC = up ? '#22c55e' : '#ef4444'
+                  const seatChip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 9, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }
+                  return (
+                    <button key={s.constituency} type="button" onClick={() => router.push('/war-room')}
+                      className="w-full text-left rounded-xl border flex items-center gap-3 px-3 py-2.5 transition-colors"
+                      style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(239,68,68,0.45)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                    >
+                      {/* glowing OPEN tile - the headline attention number */}
+                      <div className="shrink-0 flex flex-col items-center justify-center rounded-xl" style={{ width: 52, height: 52, background: 'rgba(239,68,68,0.08)', border: '1.5px solid rgba(239,68,68,0.55)', boxShadow: '0 0 12px rgba(239,68,68,0.25)' }}>
+                        <span className="text-[19px] font-extrabold leading-none" style={{ color: '#ef4444' }}>{s.unresolved}</span>
+                        <span className="text-[8px] uppercase tracking-widest mt-0.5" style={{ color: '#ef4444', opacity: 0.85 }}>open</span>
+                      </div>
+                      <div className="min-w-0" style={{ width: 148 }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <p className="text-[14.5px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{s.constituency}</p>
+                          {s.topCategory && (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0 capitalize" style={{ background: `${catC}1f`, color: catC, border: `1px solid ${catC}45` }}>
+                              {s.topCategory.replace('_', ' ')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] truncate mt-0.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                          <MdPlace size={11} style={{ color: 'var(--text-muted)' }} />{s.district || 'Punjab'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                        <span style={seatChip}><MdRefresh size={12} /> loop <b style={{ color: health }}>{s.loopHealthPct}%</b></span>
+                        <span style={seatChip}><MdMood size={12} style={{ color: moodColor }} /> mood <b style={{ color: moodColor }}>{moodLabel}</b></span>
+                        <span style={seatChip}><MdPeople size={12} /> <b style={{ color: 'var(--text-primary)' }}>{s.supporters}</b> supporters</span>
+                      </div>
+                      {s.series && s.series.some((v) => v > 0) && (
+                        <span className="hidden lg:flex items-center gap-1.5 shrink-0">
+                          <span style={{ width: 92 }}><Sparkline data={s.series.map((v) => ({ value: v }))} color={sparkC} height={26} showGradient /></span>
+                          <span className="text-[10.5px] font-bold" style={{ color: sparkC }}>{up ? '+' : ''}{s.deltaPct}% {up ? '↗' : '↘'}</span>
+                        </span>
+                      )}
+                      <span className="hidden sm:flex items-center gap-1 shrink-0 text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                        View details <MdArrowForward size={13} />
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-8 text-sm" style={{ color: 'var(--text-secondary)' }}>No seats need attention - grievance loops are healthy.</div>
+            )
+          ) : metrics.leadsNeedingAttention.length > 0 ? (
             <div className="overflow-auto flex-1 min-h-0">
               <table className="min-w-full text-left">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                    <th className="px-4 py-2 font-medium">Lead</th>
+                    <th className="px-4 py-2 font-medium">{brandLabel('Lead')}</th>
                     <th className="px-3 py-2 font-medium">Intent</th>
                     <th className="px-3 py-2 font-medium hidden md:table-cell">Recommended Next Step</th>
                     <th className="px-3 py-2 font-medium hidden lg:table-cell">Due</th>
@@ -800,47 +1253,178 @@ export default function FounderDashboard() {
           )}
         </section>
 
-        {/* Conversations Trend */}
+        {/* Conversations Trend (non-POP; POP gets the Activity Sources panel below) */}
+        {!popMix && (
         <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Conversations Trend</h3>
-              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Conversations initiated per day</p>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{popHeat ? 'Activity Heatmap' : 'Conversations Trend'}</h3>
+              <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{popHeat ? 'Voter touchpoints by day & hour · last 30 days' : 'Conversations initiated per day'}</p>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              {(['7D', '14D', '30D'] as const).map((p) => (
-                <button
-                  key={p} type="button" onClick={() => setRange(p)}
-                  className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
-                  style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
+            {popHeat && (heatPeaks?.peakDay || heatPeaks?.peakHour) && (
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                {heatPeaks.peakDay && (
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    <MdTrendingUp size={13} style={{ color: '#22c55e' }} /> Peak day <b style={{ color: 'var(--text-primary)' }}>{heatPeaks.peakDay}</b>
+                  </span>
+                )}
+                {heatPeaks.peakHour && (
+                  <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-medium" style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
+                    <MdSchedule size={13} style={{ color: '#a78bfa' }} /> Peak hour <b style={{ color: 'var(--text-primary)' }}>{heatPeaks.peakHour}</b>
+                  </span>
+                )}
+              </div>
+            )}
+            {!popHeat && (
+              <div className="flex items-center gap-0.5 shrink-0">
+                {(['7D', '14D', '30D'] as const).map((p) => (
+                  <button
+                    key={p} type="button" onClick={() => setRange(p)}
+                    className="text-[10px] font-semibold rounded px-1.5 py-0.5 transition-colors"
+                    style={{ color: range === p ? 'var(--accent-primary)' : 'var(--text-muted)', backgroundColor: range === p ? 'var(--accent-subtle)' : 'transparent' }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-h-0">
-            {convSeries.length > 1 ? (
-              <ConversationsTrendChart data={convSeries} days={rangeDays} color="var(--accent-primary)" />
+          <div className="flex-1 min-h-0 flex flex-col justify-center">
+            {popHeat && popHeat.length ? (
+              <>
+                {weekHour ? <WeekHourHeatmap weekHour={weekHour} /> : <ActivityHeatmap data={popHeat} color="var(--accent-primary)" />}
+                <div className="flex items-center justify-end gap-1.5 mt-2 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  <span>Less</span>
+                  {['#312e81', '#a21caf', '#f43f5e', '#fbbf24'].map((c) => (
+                    <span key={c} style={{ width: 10, height: 10, borderRadius: 2, background: c, border: '1px solid var(--border-primary)' }} />
+                  ))}
+                  <span>More</span>
+                </div>
+              </>
+            ) : convSeries.length > 1 ? (
+              <ConversationsTrendChart data={convSeries} days={rangeDays} color={hasNewHomeLook ? 'var(--accent-primary)' : '#afd510'} />
             ) : (
               <div className="flex items-center justify-center h-full text-xs" style={{ color: 'var(--text-muted)' }}>Not enough data yet</div>
             )}
           </div>
           <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-lg border shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
             <div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{convTotal}</div>
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Total</div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{popHeat ? fmtComma(heatTotal) : convTotal}</div>
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{popHeat ? 'Touchpoints · 30d' : 'Total'}</div>
             </div>
             <div>
-              <KpiDelta change={convChange} />
-              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {rangeDays}d</div>
+              <KpiDelta change={popHeat ? heatChange : convChange} />
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>vs prior {popHeat ? 7 : rangeDays}d</div>
             </div>
             <div>
-              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{dailyAvg}</div>
+              <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{popHeat ? heatAvg : dailyAvg}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Daily avg</div>
             </div>
           </div>
+          {/* POP - WHERE IT CAME FROM: entry-channel mix, last 7 days. Turns the
+              trend from "how many" into "how many + from where" at a glance. */}
+          {isPop && metrics.campaignHome && metrics.campaignHome.sources.byMagnet.length > 0 && (
+            <div className="mt-2.5 shrink-0">
+              <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Where it came from · 7d</div>
+              <div className="flex h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-tertiary)' }}>
+                {metrics.campaignHome.sources.byMagnet.map((s) => (
+                  <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }} />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                {metrics.campaignHome.sources.byMagnet.slice(0, 5).map((s) => (
+                  <span key={s.magnet} className="flex items-center gap-1.5 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: magnetMeta(s.magnet).color, display: 'inline-block' }} />
+                    {magnetMeta(s.magnet).label} <b style={{ color: 'var(--text-primary)' }}>{s.share}%</b>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
+        )}
+
+        {/* Activity Sources (POP) - compact card, lives in the trend slot */}
+        {popMix && (() => {
+          const mixTotal = metrics.campaignHome?.sources?.total30d || popMix.reduce((a, b) => a + b.count, 0)
+          const top = popMix[0]
+          const offline = popMix.find((s) => ['d2d', 'qr', 'event', 'missed_call'].includes(s.magnet))
+          const voiceShare = popMix.filter((s) => ['voice', 'missed_call'].includes(s.magnet)).reduce((a, b) => a + b.share, 0)
+          const iconTile = (m: string, size = 24) => (
+            <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
+          )
+          return (
+            <section className="xl:col-span-6 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+              <div className="flex items-center justify-between gap-3 shrink-0">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.16)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>PROXe</span>
+                  </div>
+                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Unified source mix · last 30 days</p>
+                </div>
+                <div className="flex items-center gap-3 text-right shrink-0">
+                  <div>
+                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmtComma(mixTotal)}</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>touchpoints</div>
+                  </div>
+                  <div>
+                    <div className="text-base font-extrabold leading-tight flex items-center gap-0.5 justify-end" style={{ color: heatChange >= 0 ? '#22c55e' : '#ef4444' }}><MdTrendingUp size={13} />{heatChange >= 0 ? '+' : ''}{heatChange}%</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>vs prior 7d</div>
+                  </div>
+                  <div>
+                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{heatAvg}</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>daily avg</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* one card, no scroll, nothing overlapping: SMALL donut + insight lines
+                  left, compact table right, slim share bar pinned at the bottom.
+                  Everything is sized to fit the fixed home-row height. */}
+              <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
+                <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[168px,1fr] gap-3 items-center overflow-hidden">
+                  <div className="flex flex-col items-center gap-1 min-h-0">
+                    <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
+                    <div className="flex flex-col gap-0.5 self-stretch">
+                      {top && (
+                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Most active: <b style={{ color: magnetMeta(top.magnet).color }}>{magnetMeta(top.magnet).label}</b></span>
+                      )}
+                      {offline && (
+                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Strong offline: <b style={{ color: magnetMeta(offline.magnet).color }}>{magnetMeta(offline.magnet).label}</b></span>
+                      )}
+                      <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Voice led: <b style={{ color: '#a78bfa' }}>{voiceShare}%</b></span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border overflow-hidden self-center" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                    {popMix.slice(0, 6).map((s) => (
+                      <div key={s.magnet} className="grid items-center px-2.5 py-1 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.5fr) 0.5fr 0.7fr 0.7fr', borderColor: 'var(--border-primary)' }}>
+                        <span className="flex items-center gap-2 min-w-0">
+                          {iconTile(s.magnet, 18)}
+                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
+                        </span>
+                        <span className="text-right text-[11px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
+                        <span className="text-right text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
+                        <span className="text-right text-[10.5px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {s.delta7 >= 0 ? <MdArrowUpward size={11} /> : <MdTrendingDown size={11} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* share-of-total bar (labels live inside it - no legend row) */}
+                <div className="shrink-0 flex h-4 rounded-full overflow-hidden">
+                  {popMix.map((s) => (
+                    <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
+                      {s.share >= 8 && <span className="text-[9px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )
+        })()}
       </div>
 
       {/* Lead Details Modal */}
@@ -886,7 +1470,7 @@ function KpiCard({ icon, iconColor, label, value, sub, delta, sparkData, sparkCo
     <div
       onClick={onClick}
       className={`rounded-xl p-4 border flex flex-col justify-between ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`}
-      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} 4%, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} 14%, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
+      style={{ backgroundColor: `color-mix(in srgb, ${iconColor} ${TINT_BG}, var(--bg-primary))`, borderColor: `color-mix(in srgb, ${iconColor} ${TINT_BORDER}, var(--border-primary))`, minHeight: 132, boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}
     >
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${iconColor}1f`, color: iconColor }}>{icon}</span>

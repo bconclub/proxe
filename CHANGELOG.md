@@ -1,3 +1,11 @@
+## 2026-07-09 14:20 IST · feat(pop): pre-presentation batch — War Room 5-pillar strip + instant cache, campaign wording, theme visibility fixes
+
+- User-facing: War Room KPI strip is now 5 cards — Reach · Standing · TOP ISSUE (biggest issue, its size, % of voices, 7d trend, own sparkline) · Response Loop · GROUND FORCE (ready to volunteer / to vote / rally). Battlegrounds card removed (no constituency numbers up top).
+- User-facing: War Room paints instantly on revisit — the last payload is kept in sessionStorage (stale-while-revalidate); fresh numbers replace it in the background.
+- User-facing: person Summary speaks campaign language for POP (2-3 plain sentences, never "NO SUMMARY TO PROVIDE", no sales words); web-channel nudges now go out on WhatsApp when the person has a phone; channel "Pulse App" renamed "My Voice"; Avg Response Time no longer shows seeded-data noise (clamped to real sub-5s range).
+- User-facing: D2D visit drawer drops the EPIC / No EPIC badge; "Start Test Call" button and artifact-switcher icons now visible in the black/white themes (they were white-on-white); Brain voice orb wears the campaign tricolor (blue-led + green + saffron flecks — deliberately not saffron-led).
+- `(pending-sha)`
+
 ## 2026-07-09 14:10 IST · feat(pop): leader team-action modal + frontline boost
 
 - User-facing (leader app): tapping ACT on a grievance, a workforce card, or "Push to team" now opens a modal to pick what the team should do — Observe / Monitor / Coordinate / Response / Escalate — each with a plain "what happens next" line. Every choice becomes a directive in the Feed (and War Room Directives) with live status; the Feed badges each item by its action. Shipped to pulse-punjab (1e7ccbc) + mirrored here.

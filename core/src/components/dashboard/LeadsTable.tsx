@@ -159,7 +159,7 @@ const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
 const POP_MAGNET: Record<string, { label: string; color: string }> = {
   whatsapp:    { label: 'WhatsApp',   color: '#22C55E' },
   voice:       { label: 'Voice',      color: '#8B5CF6' },
-  pulse_app:   { label: 'Pulse App',  color: '#A78BFA' },
+  pulse_app:   { label: 'My Voice',   color: '#A78BFA' },
   qr:          { label: 'QR Scan',    color: '#F06C18' },
   missed_call: { label: 'Missed Call',color: '#F59E0B' },
   d2d:         { label: 'Door to Door', color: '#FB7185' },

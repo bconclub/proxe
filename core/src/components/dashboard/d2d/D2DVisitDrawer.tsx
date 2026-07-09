@@ -4,7 +4,7 @@
 // household roster, grievance + loop status, and the visit timeline.
 
 import { useState } from 'react'
-import { MdClose, MdLocationOn, MdPhone, MdPerson, MdVerified } from 'react-icons/md'
+import { MdClose, MdLocationOn, MdPhone, MdPerson } from 'react-icons/md'
 import {
   D2D_OUTCOME, D2D_LEAN, D2D_GRIEVANCE, D2D_LOOP, districtColor, timeAgo,
   type D2DVisit, type D2DPhoto,
@@ -135,13 +135,6 @@ export default function D2DVisitDrawer({ visit, onClose }: { visit: D2DVisit | n
                       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{mem.name}</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{mem.age} · {mem.gender} · {mem.relation}</span>
                     </div>
-                    {mem.voterIdMatched ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#22C55E' }}>
-                        <MdVerified size={14} /> EPIC
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No EPIC</span>
-                    )}
                   </div>
                 ))}
               </div>

@@ -9,7 +9,7 @@ import LeadDetailsModal from './LeadDetailsModal'
 import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, brandConfig, brandLabel } from '@/configs'
 import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
@@ -69,6 +69,40 @@ const getStageColor = (stage: string | null) => {
   return stageColors[stage || 'New'] || stageColors['New']
 }
 
+// Scouts have their OWN lifecycle - they don't run brand/owner follow-up
+// sequences, so the STAGE column shows the scout's actual progress derived from
+// the latest scout_event PROXe received (logged in -> KYC -> submitting -> active),
+// not a generic lead stage.
+const SCOUT_STAGE_BY_EVENT: Record<string, string> = {
+  signup: 'Logged in',
+  kyc_submitted: 'KYC started',
+  kyc_verified: 'KYC done',
+  upi_added: 'UPI added',
+  // A scout who is submitting shops IS an active scout - no separate "submitting"
+  // stage. Each photo submission still fires its own message (scout_submission_
+  // received); it just doesn't create a new stage. Payout keeps them Active too.
+  submission: 'Active',
+  payout: 'Active',
+}
+const scoutStageLabel = (lkz: any): string => {
+  const ev = String(lkz?.scout_event || '').toLowerCase()
+  if (SCOUT_STAGE_BY_EVENT[ev]) return SCOUT_STAGE_BY_EVENT[ev]
+  if (String(lkz?.kyc_status || '').toLowerCase() === 'verified') return 'KYC done'
+  return 'Logged in'
+}
+// Colour by progression so the funnel is glanceable: grey (just in) -> amber
+// (KYC in progress) -> green (KYC done) -> teal (payout-ready) -> blue
+// (submitting) -> emerald (fully active).
+const SCOUT_STAGE_STYLE: Record<string, CSSProperties> = {
+  'Logged in': { backgroundColor: 'rgba(107,114,128,0.18)', color: '#9ca3af' },
+  'KYC started': { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+  'KYC done': { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+  'UPI added': { backgroundColor: 'rgba(20,184,166,0.15)', color: '#14b8a6' },
+  'Active': { backgroundColor: 'rgba(16,185,129,0.2)', color: '#10b981' },
+}
+const scoutStageStyleFor = (stage: string): CSSProperties =>
+  SCOUT_STAGE_STYLE[stage] || SCOUT_STAGE_STYLE['Logged in']
+
 const getScoreColor = (score: number | null | undefined): string => {
   if (score === null || score === undefined) return 'var(--text-secondary)'
   if (score >= 70) return '#22C55E'
@@ -86,28 +120,59 @@ const POP_LEAN: Record<string, { label: string; color: string }> = {
   undecided: { label: 'Undecided', color: '#F59E0B' },
   opposed:   { label: 'Opposed',   color: '#EF4444' },
 }
-const POP_GRIEVANCE: Record<string, { label: string; icon: string; color: string }> = {
-  jobs:      { label: 'Jobs',       icon: '💼', color: '#3B82F6' },
-  water:     { label: 'Water',      icon: '💧', color: '#06B6D4' },
-  power:     { label: 'Power',      icon: '⚡', color: '#F59E0B' },
-  roads:     { label: 'Roads',      icon: '🛣️', color: '#A78BFA' },
-  drugs:     { label: 'Drugs',      icon: '💊', color: '#EC4899' },
-  farm_debt: { label: 'Farm Debt',  icon: '🌾', color: '#F97316' },
-  health:    { label: 'Health',     icon: '🏥', color: '#EF4444' },
-  education: { label: 'Education',  icon: '📚', color: '#8B5CF6' },
-  other:     { label: 'Other',      icon: '📌', color: '#6B7280' },
+// Clean minimal category pills - a colored dot + label, no emoji glyphs.
+const POP_GRIEVANCE: Record<string, { label: string; color: string }> = {
+  jobs:      { label: 'Jobs',      color: '#3B82F6' },
+  water:     { label: 'Water',     color: '#06B6D4' },
+  power:     { label: 'Power',     color: '#F59E0B' },
+  roads:     { label: 'Roads',     color: '#A78BFA' },
+  drugs:     { label: 'Drugs',     color: '#EC4899' },
+  farm_debt: { label: 'Farm Debt', color: '#F97316' },
+  health:    { label: 'Health',    color: '#EF4444' },
+  education: { label: 'Education', color: '#8B5CF6' },
+  other:     { label: 'Other',     color: '#6B7280' },
 }
 const POP_INTENT: Record<string, { label: string; color: string }> = {
   vote:      { label: 'Vote',      color: '#22C55E' },
   volunteer: { label: 'Volunteer', color: '#3B82F6' },
   rally:     { label: 'Rally',     color: '#F97316' },
   share:     { label: 'Share',     color: '#A78BFA' },
-  none:      { label: '—',         color: '#6B7280' },
+  none:      { label: '-',         color: '#6B7280' },
 }
 const POP_LOOP: Record<string, { label: string; color: string }> = {
   raised:   { label: 'Raised',   color: '#F59E0B' },
   routed:   { label: 'Routed',   color: '#3B82F6' },
   resolved: { label: 'Resolved', color: '#22C55E' },
+}
+// WHY the person engaged (migration 023). Grievance is the column default so
+// it only gets a badge when a real grievance exists - the others always show.
+const POP_ENGAGEMENT: Record<string, { label: string; color: string }> = {
+  grievance: { label: 'Grievance', color: '#F59E0B' },
+  support:   { label: 'Support',   color: '#22C55E' },
+  volunteer: { label: 'Volunteer', color: '#3B82F6' },
+  event:     { label: 'Event',     color: '#A855F7' },
+  info:      { label: 'Info',      color: '#06B6D4' },
+  outreach:  { label: 'Outreach',  color: '#F97316' },
+}
+// HOW they came in - the real acquisition channel (magnet, migration 022/023),
+// far more meaningful for a campaign than generic marketing "source" (Direct).
+const POP_MAGNET: Record<string, { label: string; color: string }> = {
+  whatsapp:    { label: 'WhatsApp',   color: '#22C55E' },
+  voice:       { label: 'Voice',      color: '#8B5CF6' },
+  pulse_app:   { label: 'My Voice',   color: '#A78BFA' },
+  qr:          { label: 'QR Scan',    color: '#F06C18' },
+  missed_call: { label: 'Missed Call',color: '#F59E0B' },
+  d2d:         { label: 'Door to Door', color: '#FB7185' },
+  event:       { label: 'Event',      color: '#2EC4B6' },
+  landing:     { label: 'Landing',    color: '#6EA5D4' },
+}
+// WHO they are on the intensity ladder - the "type" a director scans for.
+const POP_TIER: Record<number, { label: string; color: string }> = {
+  0: { label: 'Contact',   color: '#7A8AA0' },
+  1: { label: 'Voter',     color: '#3B82F6' },
+  2: { label: 'Supporter', color: '#22C55E' },
+  3: { label: 'Volunteer', color: '#F59E0B' },
+  4: { label: 'Cadre',     color: '#F06C18' },
 }
 // AC number lookup (numbered constituency chip) + a stable per-district color so
 // every row from the same district reads the same hue. Built from the war-room
@@ -136,6 +201,33 @@ function timeAgo(dateStr: string | null | undefined): string {
   return `${diffMonths}mo ago`
 }
 
+/**
+ * Format a stored booking time to a 12-hour display string. Bookings are stored
+ * in TWO formats - 24h "HH:MM" (web flow, e.g. "17:00") and 12h "H:MM AM/PM"
+ * (WhatsApp flow, e.g. "3:00 PM"). The old inline parser split on ":" and read
+ * the hour as 24h, so "3:00 PM" → hour 3 → "3:00 AM" (PM silently dropped).
+ * This handles both: keep an explicit AM/PM, otherwise convert from 24h.
+ */
+function formatBookingTime(raw: unknown): string {
+  if (raw == null) return ''
+  const s = String(raw).trim()
+  if (!s) return ''
+  // Already 12-hour with an explicit period - normalise and keep it.
+  const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i)
+  if (ampm) {
+    const h = parseInt(ampm[1], 10)
+    const mins = ampm[2] || '00'
+    return `${h % 12 || 12}:${mins} ${ampm[3].toUpperCase()}M`
+  }
+  // 24-hour "HH:MM".
+  const tp = s.split(':')
+  if (tp.length < 2) return s
+  const h = parseInt(tp[0], 10)
+  const m = parseInt(tp[1], 10)
+  if (isNaN(h) || isNaN(m)) return s
+  return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+}
+
 // Using Lead type from @/types to match LeadDetailsModal expectations
 type ExtendedLead = Lead & {
   first_touchpoint?: string | null
@@ -157,6 +249,35 @@ interface LeadsTableProps {
   hideFilters?: boolean
   showLimitSelector?: boolean
   showViewAll?: boolean
+  /** Scouts feature only: lock the user-type filter (e.g. 'scout') and hide the dropdown that would otherwise let it be changed. */
+  initialUserTypeFilter?: string
+  hideUserTypeFilter?: boolean
+  /** Overrides the header label (defaults to "Leads" / "Engaged Leads" / "Warm Leads"). */
+  title?: string
+}
+
+// Synthetic account ids / placeholder emails the owner & scout apps stamp before
+// a real name/email exists - e.g. "owner_9341333999_1783481293327@noemail.lokazen.in".
+// These are internal ids, never a person's contact, so they must never render as
+// the lead's name OR email. Mirrors cleanName() in api/agent/leads/inbound.
+function isSyntheticContact(v?: string | null): boolean {
+  const t = (v || '').trim()
+  if (!t) return false
+  return /@noemail\.|noreply|no-reply|placeholder/i.test(t) ||
+    /^(owner|brand|scout|connector|lead|user|customer)_\d/i.test(t)
+}
+const NAME_PLACEHOLDER_TOKENS = new Set([
+  'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
+  'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
+])
+function realName(v?: string | null): string {
+  const t = (v || '').trim()
+  if (!t || isSyntheticContact(t)) return ''
+  return t.toLowerCase().split(/\s+/).every((w) => NAME_PLACEHOLDER_TOKENS.has(w)) ? '' : t
+}
+function realEmail(v?: string | null): string {
+  const t = (v || '').trim()
+  return !t || isSyntheticContact(t) ? '' : t
 }
 
 export default function LeadsTable({
@@ -165,9 +286,20 @@ export default function LeadsTable({
   hideFilters = false,
   showLimitSelector = false,
   showViewAll = false,
+  initialUserTypeFilter,
+  hideUserTypeFilter = false,
+  title,
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
+  const showAviationColumns = brandId === 'windchasers'
+  // Gigs = lokazen's non-lead worker segment. Scout + Connector are its types;
+  // both are kept out of the sales Leads view and counts. The Gigs page filters
+  // to the 'gig' umbrella (scout OR connector).
+  const GIG_TYPES = ['scout', 'connector']
+  // Scout segment - gated by the brand's features.scouts toggle (lokazen) so
+  // scout UI never leaks into brands that don't run scouts.
+  const showScouts = Boolean(brandConfig.features?.scouts)
   const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
@@ -180,12 +312,19 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [userTypeFilter, setUserTypeFilter] = useState<string>(initialUserTypeFilter || 'all')
+  const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [limit, setLimit] = useState<number>(initialLimit || 50)
+  const [limit, setLimit] = useState<number>(initialLimit || 100)
+
+  // Scout VIEW = the scouts feature is on AND the table is filtered to scouts
+  // (either via the dropdown or the locked initialUserTypeFilter on /dashboard/scouts).
+  // Swaps the brand/owner columns for scout-specific ones.
+  const scoutView = showScouts && (userTypeFilter === 'scout' || userTypeFilter === 'gig')
 
   useEffect(() => {
     if (initialLimit) {
@@ -250,6 +389,35 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => lead.status === statusFilter)
     }
 
+    if (userTypeFilter !== 'all') {
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        if (showScouts) {
+          const normalizedUserType = brandData.user_type === 'property_owner'
+            ? 'owner'
+            : (brandData.user_type || brandData.business_type)
+          // 'gig' = the Gigs umbrella (scout OR connector).
+          if (userTypeFilter === 'gig') return GIG_TYPES.includes(normalizedUserType)
+          return normalizedUserType === userTypeFilter
+        }
+        return (brandData.user_type || brandData.business_type) === userTypeFilter
+      })
+    } else if (showScouts) {
+      // Gig workers (scout/connector) have their own page - keep them out of
+      // the general Leads view, which is brand + property-owner only.
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        return !GIG_TYPES.includes(brandData.user_type)
+      })
+    }
+
+    if (courseInterestFilter !== 'all') {
+      filtered = filtered.filter((lead) => {
+        const brandData = lead.unified_context?.[brandId] || {}
+        return brandData.course_interest === courseInterestFilter
+      })
+    }
+
     // Score filter (use calculated scores when available, fallback to DB score)
     if (scoreFilter !== 'all') {
       const minScore = scoreFilter === '50' ? 50 : scoreFilter === '70' ? 70 : scoreFilter === 'hot' ? 80 : 0
@@ -286,7 +454,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -294,7 +462,7 @@ export default function LeadsTable({
     const fetchTrends = async () => {
       try {
         const supabase = createClient()
-        const leadIds = filteredLeads.slice(0, 50).map(l => l.id)
+        const leadIds = filteredLeads.slice(0, 250).map(l => l.id)
 
         const { data: changes } = await supabase
           .from('lead_stage_changes')
@@ -404,7 +572,9 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+    const headers = showAviationColumns
+      ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
+      : ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
       const bookingDate = lead.booking_date ||
         lead.unified_context?.web?.booking_date ||
@@ -425,25 +595,31 @@ export default function LeadsTable({
         lead.unified_context?.social?.booking_time ||
         lead.unified_context?.social?.booking?.time;
       const keyEvent = bookingDate && bookingTime
-        ? `${formatDateTime(bookingDate).split(',')[0]}, ${(() => {
-          const timeParts = bookingTime.toString().split(':');
-          if (timeParts.length < 2) return bookingTime.toString();
-          const hours = parseInt(timeParts[0], 10);
-          const minutes = parseInt(timeParts[1], 10);
-          if (isNaN(hours) || isNaN(minutes)) return bookingTime.toString();
-          const period = hours >= 12 ? 'PM' : 'AM';
-          const hours12 = hours % 12 || 12;
-          const minutesStr = minutes.toString().padStart(2, '0');
-          return `${hours12}:${minutesStr} ${period}`;
-        })()}`
+        ? `${formatDateTime(bookingDate).split(',')[0]}, ${formatBookingTime(bookingTime)}`
         : bookingDate
           ? formatDateTime(bookingDate).split(',')[0]
           : bookingTime || '';
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
       const brandData = lead.unified_context?.[brandId] || {}
+      const userType = brandData.user_type || brandData.business_type || ''
+      const courseInterest = brandData.course_interest || ''
       const timeline = brandData.plan_to_fly || brandData.timeline || ''
       const interest = brandData.pain_point || brandData.course_interest || ''
+      if (showAviationColumns) {
+        return [
+          lead.name || '',
+          lead.email || '',
+          lead.phone || '',
+          lead.first_touchpoint || lead.source || '',
+          userType,
+          courseInterest,
+          timeline,
+          score !== null && score !== undefined ? score.toString() : '',
+          stage || '',
+          keyEvent || '',
+        ]
+      }
       return [
         lead.name || '',
         lead.email || '',
@@ -501,7 +677,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {(() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+            {title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -560,6 +736,17 @@ export default function LeadsTable({
 
           {!hideFilters && (
             <>
+              {/* Scouts feature: Brand vs Property Owner vs Scout is the primary filter - show it first. */}
+              {showScouts && !hideUserTypeFilter && (
+                <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All leads</option>
+                  <option value="brand">Brands</option>
+                  <option value="owner">Property owners</option>
+                  <option value="scout">Scouts</option>
+                  <option value="connector">Connectors</option>
+                </select>
+              )}
+
               <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All time</option>
                 <option value="today">Today</option>
@@ -574,8 +761,32 @@ export default function LeadsTable({
                   <option value="whatsapp">WhatsApp</option>
                   <option value="voice">Voice</option>
                   <option value="social">Social</option>
+                  {brandId === 'pop' && (
+                    <>
+                      <option value="d2d">D2D (door-to-door)</option>
+                      <option value="event">Event</option>
+                      <option value="landing">Landing page</option>
+                    </>
+                  )}
                 </select>
               )}
+              {/* D2D coverage count - how many People arrived via the field campaign */}
+              {brandId === 'pop' && (() => {
+                const d2dCount = leads.filter((l) => (l.first_touchpoint || l.source) === 'd2d').length
+                return d2dCount > 0 ? (
+                  <button
+                    onClick={() => setSourceFilter(sourceFilter === 'd2d' ? 'all' : 'd2d')}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap"
+                    style={{
+                      border: `1px solid ${sourceFilter === 'd2d' ? '#F97316' : 'var(--border-primary)'}`,
+                      color: '#F97316', backgroundColor: sourceFilter === 'd2d' ? '#F9731622' : 'transparent',
+                    }}
+                    title="People logged through the door-to-door campaign"
+                  >
+                    D2D · {d2dCount}
+                  </button>
+                ) : null
+              })()}
 
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All statuses</option>
@@ -584,6 +795,25 @@ export default function LeadsTable({
                 ))}
               </select>
 
+              {showAviationColumns && (
+                <select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All types</option>
+                  <option value="student">Student</option>
+                  <option value="parent">Parent</option>
+                  <option value="professional">Professional</option>
+                </select>
+              )}
+
+              {showAviationColumns && (
+                <select value={courseInterestFilter} onChange={(e) => setCourseInterestFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                  <option value="all">All courses</option>
+                  <option value="DGCA">DGCA</option>
+                  <option value="Flight">Flight</option>
+                  <option value="Heli">Heli</option>
+                  <option value="Cabin">Cabin</option>
+                  <option value="Drone">Drone</option>
+                </select>
+              )}
             </>
           )}
 
@@ -592,6 +822,9 @@ export default function LeadsTable({
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={0}>All</option>
             </select>
           )}
 
@@ -609,17 +842,6 @@ export default function LeadsTable({
             Export
           </button>
 
-          {/* Add Lead — opens the manual / screenshot-import modal */}
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 pl-2 pr-3 py-1 text-xs font-semibold rounded-md shadow-sm transition-transform hover:scale-[1.04]"
-            style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
-            title={brandId === 'pop' ? 'Add a person' : 'Add a new lead'}
-          >
-            <MdAdd size={16} />
-            {brandId === 'pop' ? 'Add Person' : 'Add Lead'}
-          </button>
-
           {showViewAll && (
             <Link
               href="/dashboard/leads"
@@ -629,50 +851,69 @@ export default function LeadsTable({
               View All
             </Link>
           )}
+
+          {/* Add Lead - prominent + button, sits at the far right of the header */}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-1.5 pl-2 pr-3 py-1.5 text-xs font-semibold rounded-md text-[var(--text-button)] shadow-sm transition-transform hover:scale-[1.04]"
+            style={{ backgroundColor: 'var(--button-bg)' }}
+            title={brandId === 'pop' ? 'Add a person' : 'Add a new lead'}
+          >
+            <MdAdd size={18} />
+            {brandId === 'pop' ? 'Add Person' : 'Add Lead'}
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto flex-1 pb-6">
+      {/* Table - min-h-0 lets this flex child shrink so it scrolls INTERNALLY
+          (instead of the page scrolling), which is what makes the sticky <thead>
+          actually stay put. Without min-h-0 the child grows to content height,
+          the page scrolls, and the "sticky" header rides away with it. */}
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           {brandId === 'pop' ? (
             <colgroup>
-              {/* POP constituent view — widths sum to 100% */}
-              <col style={{ width: '14%' }} />  {/* Constituent (name + captured) */}
-              <col style={{ width: '11%' }} />  {/* Contact (phone) */}
-              <col style={{ width: '12%' }} />  {/* Source (origin + entry point) */}
-              <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
+              {/* POP constituent view - widths sum to 100% */}
+              <col style={{ width: '13%' }} />  {/* Constituent (name + captured) */}
+              <col style={{ width: '8%' }} />   {/* Type (intensity tier) */}
+              <col style={{ width: '10%' }} />  {/* Contact (phone) */}
+              <col style={{ width: '9%' }} />   {/* Came in via (magnet) */}
+              <col style={{ width: '9%' }} />   {/* Last Touch (channel + actor) */}
               <col style={{ width: '12%' }} />  {/* Constituency (+ district·booth) */}
-              <col style={{ width: '18%' }} />  {/* Grievance (category + salience + text) */}
-              <col style={{ width: '9%' }} />   {/* Lean */}
-              <col style={{ width: '7%' }} />   {/* Intent */}
+              <col style={{ width: '17%' }} />  {/* Grievance (category + salience + text) */}
+              <col style={{ width: '8%' }} />   {/* Lean */}
+              <col style={{ width: '8%' }} />   {/* Intent */}
               <col style={{ width: '6%' }} />   {/* Loop */}
             </colgroup>
           ) : (
-            <colgroup>
-              {/* Column widths sum to exactly 100% (table-layout: fixed, so these
-                  are authoritative regardless of cell content; email/phone truncate).
-                  Contact is kept narrow (14%, matching Windchasers) — the freed
-                  width from the removed aviation columns goes to the content-heavy
-                  columns (Lead, Source, Stage), NOT Contact. */}
-              <col style={{ width: '20%' }} />  {/* Lead (name + company·city + date) */}
-              <col style={{ width: '14%' }} />  {/* Contact (phone + email, truncated) */}
-              <col style={{ width: '13%' }} />  {/* Source (marketing source + entry point) */}
-              <col style={{ width: '11%' }} />  {/* Last Touch (channel + actor) */}
-              <col style={{ width: '7%' }} />   {/* Score */}
-              <col style={{ width: '13%' }} />  {/* Stage */}
-              <col style={{ width: '10%' }} />  {/* Active */}
-              <col style={{ width: '12%' }} />  {/* Booking (chip) */}
-              <col style={{ width: '9%' }} />   {/* Owner */}
-            </colgroup>
+          <colgroup>
+            {/* Tightened column widths: Lead/Contact were oversized,
+                Booking was a wide text column (now a compact chip),
+                Type/Course are narrow chip columns. */}
+            <col style={{ width: '14%' }} />  {/* Lead */}
+            <col style={{ width: '14%' }} />  {/* Contact */}
+            <col style={{ width: '8%' }} />   {/* Source (origin, immutable) */}
+            <col style={{ width: '7%' }} />   {/* Last Touch */}
+            <col style={{ width: '6%' }} />   {/* Score */}
+            <col style={{ width: '10%' }} />  {/* Stage */}
+            <col style={{ width: '7%' }} />   {/* Active */}
+            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
+            {showAviationColumns && <col style={{ width: '7%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            {showAviationColumns && <col style={{ width: '8%' }} />}
+            {scoutView && <col style={{ width: '9%' }} />}  {/* Area Covered */}
+            {scoutView && <col style={{ width: '8%' }} />}  {/* Knows Properties */}
+            <col style={{ width: '9%' }} />   {/* Owner */}
+          </colgroup>
           )}
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {(brandId === 'pop'
                 ? [
                     { label: 'Constituent',  align: 'left'   as const },
+                    { label: 'Type',         align: 'center' as const },
                     { label: 'Contact',      align: 'left'   as const },
-                    { label: 'Source',       align: 'center' as const },
+                    { label: 'Came in via',  align: 'center' as const },
                     { label: 'Last Touch',   align: 'center' as const },
                     { label: 'Constituency', align: 'left'   as const },
                     { label: 'Grievance',    align: 'left'   as const },
@@ -681,17 +922,25 @@ export default function LeadsTable({
                     { label: 'Loop',         align: 'center' as const },
                   ]
                 : [
-                    { label: 'Lead',       align: 'left'   as const },
-                    { label: 'Contact',    align: 'left'   as const },
-                    { label: 'Source',     align: 'center' as const },
-                    { label: 'Last Touch', align: 'center' as const },
-                    { label: 'Score',      align: 'center' as const },
-                    { label: 'Stage',      align: 'center' as const },
-                    { label: 'Active',     align: 'center' as const },
-                    { label: 'Booking',    align: 'center' as const },
-                    { label: 'Owner',      align: 'left'   as const },
-                  ]
-              ).map(({ label, align }) => (
+                { label: 'Lead',       align: 'left'   as const },
+                { label: 'Contact',    align: 'left'   as const },
+                { label: 'Source',     align: 'center' as const },
+                { label: 'Last Touch', align: 'center' as const },
+                { label: 'Score',      align: 'center' as const },
+                { label: 'Stage',      align: 'center' as const },
+                { label: 'Active',     align: 'left'   as const },
+                { label: scoutView ? 'Properties' : 'Booking', align: 'center' as const },
+                ...(showAviationColumns ? [
+                  { label: 'Type',   align: 'center' as const },
+                  { label: 'Course', align: 'center' as const },
+                  { label: 'PAT',    align: 'center' as const },
+                ] : []),
+                ...(scoutView ? [
+                  { label: 'Area Covered',     align: 'center' as const },
+                  { label: 'Knows Properties', align: 'center' as const },
+                ] : []),
+                { label: 'Owner',  align: 'left' as const },
+              ]).map(({ label, align }) => (
                 <th
                   key={label}
                   className={`px-3 py-2.5 text-${align} text-[10px] font-semibold uppercase tracking-wider`}
@@ -706,7 +955,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={showAviationColumns ? 12 : scoutView ? 11 : 9}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -718,40 +967,64 @@ export default function LeadsTable({
                 const calculatedScore = calculatedScores[lead.id]
                 const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
-                const displayStage = stage || 'New'
-                const stageColor = getStageColor(displayStage)
+                // brandLabel: voter brands (pop) rename sales stages for display
+                // only - filtering/storage still use the raw lead_stage value.
+                const displayStage = brandLabel(stage || 'New')
+                const stageColor = getStageColor(stage || 'New')
                 // SOURCE = the lead's ORIGIN (immutable). Read first_touchpoint
-                // first — never last_touchpoint, since that gets overwritten by
-                // any later interaction (e.g. a logged call flips to 'voice').
+                // first - never the last_touchpoint, since that gets overwritten
+                // by any later interaction (e.g. a logged call flips to 'voice').
                 const source = (lead.first_touchpoint || lead.source || lead.last_touchpoint || 'unknown').toLowerCase()
                 const lastTouch = (lead.last_touchpoint || '').toLowerCase()
                 const lastActivity = lead.last_interaction_at || lead.timestamp
 
                 const uc = lead.unified_context || {}
                 const resolvedName =
-                  uc?.whatsapp?.profile?.full_name ||
-                  uc?.web?.profile?.full_name ||
-                  lead.name || ''
+                  realName(uc?.whatsapp?.profile?.full_name) ||
+                  realName(uc?.web?.profile?.full_name) ||
+                  realName(lead.name)
                 const brandName =
                   uc?.web?.what_is_your_brand_name ||
                   uc?.whatsapp?.what_is_your_brand_name ||
                   uc?.whatsapp?.profile?.company ||
                   uc?.web?.profile?.company || ''
-                // City — check every known location: brand-namespaced (set by
-                // the inbound endpoint), channel profile blocks, raw form fields,
-                // landing-page, and the top-level uc.city that /api/agent/leads/inbound writes.
+                // City - check every known location:
+                //   brand-namespaced (set by inbound endpoint + AI extractor)
+                //   channel profile blocks (legacy)
+                //   raw_form_fields (from website form submissions)
+                //   landing_page.city (from /api/integrations/landing-pages)
                 const city =
                   uc?.[brandId]?.city ||
+                  uc?.windchasers?.city ||
+                  uc?.bcon?.city ||
                   uc?.whatsapp?.profile?.city ||
                   uc?.web?.profile?.city ||
                   uc?.raw_form_fields?.city ||
                   uc?.landing_page?.city ||
-                  uc?.city ||
+                  uc?.city ||                       // top-level (set by /api/agent/leads/inbound)
                   ''
 
-                // If no name, use email as primary identifier
-                const displayName = resolvedName || lead.email || lead.phone || '-'
-                const isEmailAsName = !resolvedName && !!lead.email
+                // If no real name, fall back to a REAL email, then phone - never a
+                // synthetic @noemail id (that used to surface as the lead's "name").
+                const cleanEmail = realEmail(lead.email)
+                const displayName = resolvedName || cleanEmail || lead.phone || '-'
+                const isEmailAsName = !resolvedName && !!cleanEmail
+
+                // Scouts feature (lokazen): lead-type badge + scout lifecycle stage.
+                const lkz = showScouts ? (uc?.[brandId] || {}) : {}
+                const lkzUserType = lkz.user_type === 'property_owner' ? 'owner' : lkz.user_type
+                const lkzType = showScouts
+                  ? (lkzUserType === 'brand' ? 'Brand' : lkzUserType === 'owner' ? 'Owner' : lkzUserType === 'scout' ? 'Scout' : lkzUserType === 'connector' ? 'Connector' : '')
+                  : ''
+                // Scouts show their lifecycle stage (from scout_event), not a lead stage.
+                const isScoutRow = showScouts && lkzUserType === 'scout'
+                const rowStage = isScoutRow ? scoutStageLabel(lkz) : displayStage
+                const rowStageStyle: CSSProperties = isScoutRow ? scoutStageStyleFor(rowStage) : (stageColor.style || {})
+                // Scout's "area covered" is their single most useful field - dedupe
+                // repeated zones ("Indiranagar, Indiranagar" -> "Indiranagar").
+                const scoutLocation = isScoutRow
+                  ? Array.from(new Set(String(lkz.scout_area_covered || '').split(',').map((z) => z.trim()).filter(Boolean))).join(', ')
+                  : ''
 
                 const bookingDate = lead.booking_date ||
                   uc?.web?.booking_date || uc?.web?.booking?.date ||
@@ -764,120 +1037,269 @@ export default function LeadsTable({
                   uc?.voice?.booking_time || uc?.voice?.booking?.time ||
                   uc?.social?.booking_time || uc?.social?.booking?.time
 
-                // Channel → badge. Mirrors Windchasers' channelConfig so the SOURCE
-                // column reads the same: a Meta-Forms / Facebook / Google lead shows
-                // its channel badge on top, not "-". (BCON was missing meta_forms etc.,
-                // so direct-attribution form leads fell through to unknown "-".)
-                const sourceConfig: Record<string, { label: string; color: string }> = {
-                  web: { label: 'Web', color: '#3B82F6' },
-                  form: { label: 'Web', color: '#3B82F6' },
-                  whatsapp: { label: 'WA', color: '#22C55E' },
-                  voice: { label: 'Voice', color: '#8B5CF6' },
-                  social: { label: 'Social', color: '#EC4899' },
-                  meta_forms: { label: 'Meta', color: '#1877F2' },
-                  facebook: { label: 'Facebook', color: '#1877F2' },
-                  google: { label: 'Google', color: '#EA4335' },
-                  ads: { label: 'Ads', color: '#F97316' },
-                  pabbly: { label: 'Pabbly', color: '#F59E0B' },
-                  referral: { label: 'Referral', color: '#10B981' },
-                  organic: { label: 'Organic', color: '#84CC16' },
-                  manual: { label: 'Manual', color: '#6B7280' },
-                  unknown: { label: '-', color: '#6B7280' },
-                }
+                // SOURCE column = where the lead actually came from.
+                //
+                // TOP badge: prefer utm_source (Google / Meta / Instagram /
+                //   YouTube / etc. - the ad platform that drove the visit)
+                //   so a "Google ad → Web → PAT" lead reads as Google, not
+                //   Web. Falls back to the channel medium (Web/WhatsApp/etc.)
+                //   when no UTM is present (direct traffic, organic, etc.).
+                //
+                // SUB line: the specific entry point - usually form_type
+                //   (PAT, Demo Booked, …). If form_type is missing we fall
+                //   back to utm_medium (cpc, social, organic) so the line
+                //   still tells you HOW they got here.
 
-                // Prefer utm_source over channel medium so an Instagram ad
-                // shows "Coaching PROXe" instead of generic "Web". Custom
-                // labels for bcon's owned channels.
-                const utmSourceRaw = String(
-                  uc?.raw_form_fields?.utm_source ||
+                // ── ATTRIBUTION (canonical) ────────────────────────────────
+                // SOURCE column = the MARKETING SOURCE that drove the lead to us.
+                // WhatsApp and Web are PLATFORMS (the surface they used to reach
+                // out), not marketing sources, so they are explicitly rejected
+                // from this column. A WA-Popup lead with channel='whatsapp' but
+                // utm_source='ig' should show as Instagram, not WhatsApp.
+                //
+                // Priority chain (matches the server-side deriveSource logic):
+                //   1. utm_source (explicit marketing tracking - gold signal)
+                //   2. raw_form_fields.channel IF it's a marketing channel
+                //      (ig / fb / facebook_ads / google_ads / etc.)
+                //   3. attribution.source IF it's a marketing channel
+                //   4. 'direct'
+                //
+                // Channels considered MARKETING (acceptable as source). Platform
+                // values like 'whatsapp', 'web', 'voice' are NOT here.
+                const MARKETING_CHANNELS = new Set([
+                  'ig', 'instagram',
+                  'fb', 'facebook', 'facebook_ads', 'fb_ads',
+                  'meta', 'meta_ads', 'meta_forms_clickthrough',
+                  'google', 'google_ads', 'googleads',
+                  'bing', 'bing_ads',
+                  'youtube', 'yt',
+                  'linkedin', 'linkedin_ads',
+                  'tiktok', 'tiktok_ads',
+                  'twitter', 'x',
+                  'snapchat', 'pinterest',
+                  'email', 'newsletter',
+                  'referral', 'organic',
+                ])
+
+                const attribution = uc?.attribution || null
+                const rffChannel = String(uc?.raw_form_fields?.channel || '').toLowerCase().trim()
+                const rffUtmSource = String(uc?.raw_form_fields?.utm_source || '').toLowerCase().trim()
+                const attrSourceStored = String(attribution?.source || '').toLowerCase().trim()
+                const attrSourceLabelStored = String(attribution?.source_label || '').trim()
+                const attrFirstTouchKey = String(attribution?.first_touch || '').toLowerCase().trim()
+                const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
+
+                // attrSource = the EFFECTIVE source we'll surface on the SOURCE column.
+                //   1) utm_source (gold), 2) marketing-channel value, 3) 'direct'
+                const attrSource = (rffUtmSource && rffUtmSource !== 'direct')
+                  ? rffUtmSource
+                  : (rffChannel && MARKETING_CHANNELS.has(rffChannel))
+                    ? rffChannel
+                    : (attrSourceStored && MARKETING_CHANNELS.has(attrSourceStored))
+                      ? attrSourceStored
+                      : 'direct'
+                // attrSourceLabel: only honour a STORED label when its STORED
+                // source is also a marketing channel. Legacy rows from the
+                // May-19→May-20 window have attribution.source='whatsapp' +
+                // source_label='WhatsApp' baked in by the old deriveSource;
+                // surfacing that label here would re-leak "WhatsApp" into the
+                // SOURCE column even after we already filtered the platform
+                // out of attrSource above.
+                const attrSourceLabel =
+                  attrSource === 'direct' &&
+                  attrSourceStored &&
+                  MARKETING_CHANNELS.has(attrSourceStored)
+                    ? attrSourceLabelStored
+                    : ''
+
+                // Platform values that arrive as first_touchpoint but should
+                // NEVER render as a source - they describe the surface the
+                // lead used to message us, not the marketing source. When the
+                // resolver falls all the way through to channelConfig[source]
+                // and the source is one of these, show 'Direct' instead so
+                // the SOURCE column stays accurate.
+                const NON_MARKETING_PLATFORMS = new Set([
+                  'whatsapp', 'web', 'form', 'voice', 'social',
+                ])
+
+                // utmSourceRaw drives the SOURCE pill - same priority chain.
+                const utmSourceRaw = attrSource !== 'direct' ? attrSource : String(
                   uc?.web?.utm?.source ||
                   uc?.landing_page?.utm_source ||
                   ''
                 ).trim().toLowerCase()
-                const utmSourceConfig: Record<string, { label: string; color: string }> = {
-                  instagram:     { label: 'Instagram', color: '#E4405F' },
-                  ig:            { label: 'Instagram', color: '#E4405F' },
-                  google:        { label: 'Google', color: '#EA4335' },
-                  facebook:      { label: 'Facebook', color: '#1877F2' },
-                  meta:          { label: 'Meta', color: '#1877F2' },
-                  youtube:       { label: 'YouTube', color: '#FF0000' },
-                  linkedin:      { label: 'LinkedIn', color: '#0A66C2' },
-                }
-                // Attribution (resolved marketing source) takes precedence — it
-                // turns the raw channel into the real PLACE (Meta Forms / Google
-                // Ads / Instagram / ...). Falls back to utm/channel for legacy
-                // leads that predate attribution.
-                const attribution = uc?.attribution || null
-                const attrSource = String(attribution?.source || '').toLowerCase().trim()
-                const attrSourceLabel = String(attribution?.source_label || '').trim()
-                let srcCfg = (utmSourceRaw && utmSourceConfig[utmSourceRaw])
-                  || sourceConfig[source]
-                  || sourceConfig.unknown
-                if (attrSourceLabel && attrSource && attrSource !== 'direct') {
-                  const SOURCE_COLORS: Record<string, string> = {
-                    meta: '#1877F2', meta_ads: '#1877F2', meta_forms: '#1877F2',
-                    meta_forms_clickthrough: '#1877F2',
-                    facebook: '#1877F2', facebook_ads: '#1877F2', fb: '#1877F2',
-                    instagram: '#E4405F', ig: '#E4405F',
-                    google: '#EA4335', google_ads: '#A855F7', googleads: '#A855F7',
-                    youtube: '#FF0000', yt: '#FF0000',
-                    linkedin: '#0A66C2', linkedin_ads: '#0A66C2',
-                    referral: '#10B981', organic: '#84CC16',
-                    email: '#0EA5E9', newsletter: '#0EA5E9',
-                  }
-                  srcCfg = { label: attrSourceLabel, color: SOURCE_COLORS[attrSource] || '#6366F1' }
-                }
-
-                // SOURCE sub-line — the specific entry point ("which page/form"),
-                // shown under the source badge so SOURCE reads as two layers like
-                // Windchasers: marketing source (top) + how-they-came-in (sub).
-                const formType = String(
-                  uc?.raw_form_fields?.form_type ||
-                  uc?.raw_form_fields?.event_name ||
-                  uc?.web?.form_submission?.form_type ||
-                  uc?.landing_page?.form_name ||
-                  ''
-                ).toLowerCase().trim()
                 const utmMediumRaw = String(
                   uc?.raw_form_fields?.utm_medium ||
                   uc?.web?.utm?.medium ||
                   uc?.landing_page?.utm_medium ||
                   ''
                 ).trim().toLowerCase()
+
+                // Channel-medium fallback (when no utm_source).
+                const channelConfig: Record<string, { label: string; color: string }> = {
+                  web: { label: 'Web', color: '#3B82F6' },
+                  form: { label: 'Web', color: '#3B82F6' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                  voice: { label: 'Voice', color: '#8B5CF6' },
+                  social: { label: 'Social', color: '#EC4899' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  meta_forms: { label: 'Meta', color: '#1877F2' },
+                  google: { label: 'Google', color: '#EA4335' },
+                  ads: { label: 'Ads', color: '#F97316' },
+                  pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  manual: { label: 'Manual', color: '#6B7280' },
+                  d2d: { label: 'D2D', color: '#F97316' },
+                  event: { label: 'Event', color: '#A855F7' },
+                  landing: { label: 'Landing', color: '#3B82F6' },
+                  unknown: { label: '-', color: '#6B7280' },
+                }
+
+                // Friendly label + color per known utm_source / channel.
+                const utmSourceConfig: Record<string, { label: string; color: string }> = {
+                  google: { label: 'Google Organic', color: '#EA4335' },
+                  google_organic: { label: 'Google Organic', color: '#EA4335' },
+                  google_ads: { label: 'Google Ads', color: '#A855F7' },
+                  googleads: { label: 'Google Ads', color: '#A855F7' },
+                  bing: { label: 'Bing', color: '#008373' },
+                  bing_ads: { label: 'Bing Ads', color: '#008373' },
+                  youtube: { label: 'YouTube', color: '#FF0000' },
+                  yt: { label: 'YouTube', color: '#FF0000' },
+                  meta: { label: 'Meta', color: '#1877F2' },
+                  meta_ads: { label: 'Meta Ads', color: '#1877F2' },
+                  meta_forms_clickthrough: { label: 'Meta Forms', color: '#1877F2' },
+                  facebook: { label: 'Facebook', color: '#1877F2' },
+                  facebook_ads: { label: 'Facebook Ads', color: '#1877F2' },
+                  fb: { label: 'Facebook', color: '#1877F2' },
+                  fb_ads: { label: 'Facebook Ads', color: '#1877F2' },
+                  instagram: { label: 'Instagram', color: '#E4405F' },
+                  ig: { label: 'Instagram', color: '#E4405F' },
+                  linkedin: { label: 'LinkedIn', color: '#0A66C2' },
+                  linkedin_ads: { label: 'LinkedIn Ads', color: '#0A66C2' },
+                  twitter: { label: 'X', color: '#000000' },
+                  x: { label: 'X', color: '#000000' },
+                  tiktok: { label: 'TikTok', color: '#000000' },
+                  tiktok_ads: { label: 'TikTok Ads', color: '#000000' },
+                  whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                  email: { label: 'Email', color: '#0EA5E9' },
+                  newsletter: { label: 'Newsletter', color: '#0EA5E9' },
+                  direct: { label: 'Direct', color: '#6B7280' },
+                  organic: { label: 'Organic', color: '#84CC16' },
+                  referral: { label: 'Referral', color: '#10B981' },
+                }
+
+                // Resolve the top badge:
+                //   1. attribution.source_label (canonical, new leads)
+                //   2. utm_source from raw_form_fields (legacy)
+                //   3. Channel fallback
+                let srcCfg: { label: string; color: string }
+                if (utmSourceRaw && utmSourceConfig[utmSourceRaw]) {
+                  srcCfg = utmSourceConfig[utmSourceRaw]
+                  // Override label with the prettier server-side label if present
+                  if (attrSourceLabel) srcCfg = { ...srcCfg, label: attrSourceLabel }
+                } else if (attrSourceLabel) {
+                  // Attribution present with an unmapped source - use the label as-is
+                  srcCfg = { label: attrSourceLabel, color: '#6366F1' }
+                } else if (utmSourceRaw) {
+                  srcCfg = {
+                    label: utmSourceRaw
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase()),
+                    color: '#6366F1',
+                  }
+                } else if (source && NON_MARKETING_PLATFORMS.has(source)) {
+                  // Final fallback fired with a platform source (whatsapp/
+                  // web/voice/etc.) - don't render it as a marketing pill.
+                  // These leads simply have no marketing attribution.
+                  srcCfg = { label: 'Direct', color: '#6B7280' }
+                } else {
+                  srcCfg = channelConfig[source] || channelConfig.unknown
+                }
+
+                // Google Ads → distinct PURPLE so it never reads as Meta's blue.
+                // Applied after resolution so it wins regardless of which branch
+                // set the color (map hit, generic attr-label fallback, etc.).
+                // Google Organic stays red, so paid vs organic Google is clear too.
+                if (/google\s*ads/i.test(srcCfg.label)) {
+                  srcCfg = { ...srcCfg, color: '#A855F7' }
+                }
+
+                // Derive sub-source from form_type first, then utm_medium,
+                // then per-channel default.
+                const formTypeRaw =
+                  uc?.raw_form_fields?.form_type ||
+                  uc?.web?.form_submission?.form_type ||
+                  uc?.landing_page?.form_name ||
+                  uc?.raw_form_fields?.event_name ||
+                  ''
+                const formType = String(formTypeRaw).toLowerCase().trim()
                 const subSourceLabels: Record<string, string> = {
+                  pilot_aptitude_test: 'PAT',
+                  pat_assessment: 'PAT',
+                  pat: 'PAT',
+                  pilot_assessment: 'PAT',
                   demo_booked: 'Demo Form',
                   demo_form: 'Demo Form',
                   demo: 'Demo',
-                  meta_lead_form: 'Meta Lead Form',
-                  facebook_lead: 'Meta Lead Form',
-                  whatsapp_clickthrough: 'WA Click Through',
                   whatsapp_button: 'WA Popup',
+                  whatsapp_prelaunch: 'WA Popup',
                   whatsapp: 'WhatsApp',
                   web: 'Web Chat',
                   web_chat: 'Web Chat',
                   chat_widget: 'Web Chat',
+                  meta_lead_form: 'Meta Lead Form',
+                  facebook_lead: 'Meta Lead Form',
+                  whatsapp_clickthrough: 'WA Click Through',
                   voice_call: 'Voice Call',
                   voice: 'Voice Call',
                   manual: 'Manual Entry',
                   landing_page: 'Landing Page',
+                  visit_booked: 'Visit Booked',
+                  visit: 'Visit',
+                  eligibility: 'Eligibility',
+                  guide_download: 'Guide Download',
+                  guide: 'Guide',
                   contact: 'Contact Form',
                   newsletter: 'Newsletter',
                   page: 'Web Form',
                   event: 'Event',
                 }
                 const utmMediumLabels: Record<string, string> = {
-                  cpc: 'Ads', ppc: 'Ads', paid: 'Ads', ad: 'Ads', ads: 'Ads',
-                  paid_social: 'Paid Social', social: 'Social', organic: 'Organic',
-                  email: 'Email', referral: 'Referral', affiliate: 'Affiliate',
+                  cpc: 'Ads',
+                  ppc: 'Ads',
+                  paid: 'Ads',
+                  ad: 'Ads',
+                  ads: 'Ads',
+                  paid_social: 'Paid Social',
+                  social: 'Social',
+                  organic: 'Organic',
+                  email: 'Email',
+                  referral: 'Referral',
+                  affiliate: 'Affiliate',
                 }
                 let subSource = ''
-                const attrFirstTouchLabel = String(attribution?.first_touch_label || '').trim()
-                if (attrFirstTouchLabel) {
+                // Priority order:
+                //   1. attribution.first_touch (key) → fresh label from subSourceLabels
+                //      so renames take effect without re-backfill
+                //   2. attribution.first_touch_label (stored, may be stale)
+                //   3. raw_form_fields.form_type fallback
+                if (attrFirstTouchKey && subSourceLabels[attrFirstTouchKey]) {
+                  subSource = subSourceLabels[attrFirstTouchKey]
+                } else if (attrFirstTouchLabel) {
                   subSource = attrFirstTouchLabel
                 } else if (formType) {
-                  subSource = subSourceLabels[formType] || formType.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                  subSource =
+                    subSourceLabels[formType] ||
+                    formType
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
                 } else if (utmMediumRaw) {
-                  subSource = utmMediumLabels[utmMediumRaw] || utmMediumRaw.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                  subSource =
+                    utmMediumLabels[utmMediumRaw] ||
+                    utmMediumRaw
+                      .replace(/[_-]+/g, ' ')
+                      .replace(/\b\w/g, (c) => c.toUpperCase())
                 } else if (source === 'meta_forms') {
                   subSource = 'Lead Form'
                 } else if (source === 'facebook') {
@@ -904,8 +1326,16 @@ export default function LeadsTable({
                   const capturedAt = pl.created_at || lead.timestamp
                   const leanCfg = pl.lean ? POP_LEAN[pl.lean] : null
                   const grvCfg = pl.grievance_category ? POP_GRIEVANCE[pl.grievance_category] : null
+                  // Engagement badge fills the grievance cell when there's no
+                  // grievance - a supporter/volunteer/event arrival is a complete
+                  // person, not a missing grievance. 'grievance' itself is the
+                  // column default, so it never shows as a standalone badge.
+                  const engCfg = pl.engagement_type && pl.engagement_type !== 'grievance' ? POP_ENGAGEMENT[pl.engagement_type] : null
                   const intentCfg = pl.action_intent && pl.action_intent !== 'none' ? POP_INTENT[pl.action_intent] : null
                   const loopCfg = pl.loop_status ? POP_LOOP[pl.loop_status] : null
+                  // TYPE = intensity tier (who they are); magnet = how they came in.
+                  const tierCfg = POP_TIER[typeof pl.intensity === 'number' ? pl.intensity : 0] || POP_TIER[0]
+                  const magnetCfg = pl.magnet ? POP_MAGNET[pl.magnet] : null
                   const salience: number = typeof pl.salience === 'number' ? pl.salience : 0
                   const seatRef = pl.constituency ? POP_AC_BY_NAME.get(normSeat(pl.constituency)) : undefined
                   const acNo = seatRef?.no
@@ -919,7 +1349,7 @@ export default function LeadsTable({
                       style={{ borderBottom: '1px solid var(--border-primary)', height: '62px' }}
                       onClick={() => handleRowClick(lead)}
                     >
-                      {/* CONSTITUENT — name + captured date */}
+                      {/* CONSTITUENT - name + captured date */}
                       <td className="px-3 py-2">
                         <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                           {displayName}
@@ -931,39 +1361,54 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* CONTACT — phone + email (when provided) */}
+                      {/* TYPE - intensity tier: who this person is (Voter→Cadre) */}
+                      <td className="px-3 py-2 text-center">
+                        {/* TYPE is just the intensity tier now. The engagement_type
+                            sub-label duplicated the INTENT column (both read
+                            "Volunteer" etc.) and confused more than it helped —
+                            intent lives in its own column. */}
+                        <span
+                          className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                          style={{ backgroundColor: `${tierCfg.color}22`, color: tierCfg.color, border: `1px solid ${tierCfg.color}44` }}
+                          title={`Intensity tier ${typeof pl.intensity === 'number' ? pl.intensity : 0} - ${tierCfg.label}`}
+                        >
+                          {tierCfg.label}
+                        </span>
+                      </td>
+
+                      {/* CONTACT - phone + email (when provided) */}
                       <td className="px-3 py-2">
                         {lead.phone && (
                           <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
                             {lead.phone}
                           </a>
                         )}
-                        {lead.email && (
-                          <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
-                            {lead.email}
+                        {cleanEmail && (
+                          <a href={`mailto:${cleanEmail}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={cleanEmail}>
+                            {cleanEmail}
                           </a>
                         )}
-                        {!lead.phone && !lead.email && <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                        {!lead.phone && !cleanEmail && <span style={{ color: 'var(--text-muted)' }}>-</span>}
                       </td>
 
-                      {/* SOURCE — origin marketing source + entry point (real attribution) */}
+                      {/* CAME IN VIA - the real acquisition channel (magnet), not
+                          generic marketing "source". Falls back to the touchpoint. */}
                       <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
-                        <div className="flex flex-col items-center gap-0.5">
+                        {magnetCfg ? (
                           <span
-                            className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase whitespace-nowrap"
-                            style={{ backgroundColor: `${srcCfg.color}15`, color: srcCfg.color }}
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ backgroundColor: `${magnetCfg.color}22`, color: magnetCfg.color }}
                           >
-                            {srcCfg.label}
+                            {magnetCfg.label}
                           </span>
-                          {subSource && (
-                            <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
-                              {subSource}
-                            </span>
-                          )}
-                        </div>
+                        ) : (
+                          <span className="text-[10px] whitespace-nowrap capitalize" style={{ color: 'var(--text-muted)' }}>
+                            {(pl.magnet || subSource || '-').replace(/_/g, ' ')}
+                          </span>
+                        )}
                       </td>
 
-                      {/* LAST TOUCH — last channel + actor (real attribution) */}
+                      {/* LAST TOUCH - last channel + actor (real attribution) */}
                       <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                         {(() => {
                           const actor = (lead.unified_context as any)?.last_actor || null
@@ -987,7 +1432,7 @@ export default function LeadsTable({
                           } else if (actor?.type === 'proxe') {
                             actorBadge = { label: 'PROXe', tooltip: `PROXe AI handled last${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}` }
                           }
-                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          if (!actorBadge && !channelCfg) return <span style={{ color: 'var(--text-muted)' }}>-</span>
                           return (
                             <div className="flex flex-col items-center gap-0.5">
                               {channelCfg && (
@@ -1005,7 +1450,7 @@ export default function LeadsTable({
                         })()}
                       </td>
 
-                      {/* CONSTITUENCY — numbered AC chip + seat + district color pill */}
+                      {/* CONSTITUENCY - numbered AC chip + seat + district color pill */}
                       <td className="px-3 py-2">
                         {pl.constituency ? (
                           <>
@@ -1036,19 +1481,20 @@ export default function LeadsTable({
                             )}
                           </>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* GRIEVANCE — category badge + salience + text */}
+                      {/* GRIEVANCE - category badge + salience + text */}
                       <td className="px-3 py-2">
                         {grvCfg ? (
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
-                              style={{ backgroundColor: `${grvCfg.color}1f`, color: grvCfg.color }}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                              style={{ backgroundColor: `${grvCfg.color}14`, color: grvCfg.color, border: `1px solid ${grvCfg.color}33` }}
                             >
-                              <span aria-hidden="true">{grvCfg.icon}</span>{grvCfg.label}
+                              <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: grvCfg.color }} />
+                              {grvCfg.label}
                             </span>
                             {salience > 0 && (
                               <span className="text-[10px] tracking-tighter" title={`Salience ${salience}/3`} style={{ color: '#F59E0B' }}>
@@ -1056,8 +1502,16 @@ export default function LeadsTable({
                               </span>
                             )}
                           </div>
+                        ) : engCfg ? (
+                          <span
+                            className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                            style={{ backgroundColor: `${engCfg.color}1f`, color: engCfg.color }}
+                            title={`Came in via ${engCfg.label.toLowerCase()} - no grievance raised`}
+                          >
+                            {engCfg.label}
+                          </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                         {pl.grievance_text && (
                           <div className="text-[11px] mt-1 truncate" style={{ color: 'var(--text-secondary)' }} title={pl.grievance_text}>
@@ -1066,7 +1520,7 @@ export default function LeadsTable({
                         )}
                       </td>
 
-                      {/* LEAN — pill */}
+                      {/* LEAN - pill */}
                       <td className="px-3 py-2 text-center">
                         {leanCfg ? (
                           <span
@@ -1076,11 +1530,11 @@ export default function LeadsTable({
                             {leanCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* INTENT — action badge */}
+                      {/* INTENT - action badge */}
                       <td className="px-3 py-2 text-center">
                         {intentCfg ? (
                           <span
@@ -1090,11 +1544,11 @@ export default function LeadsTable({
                             {intentCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
 
-                      {/* LOOP — status badge */}
+                      {/* LOOP - status badge */}
                       <td className="px-3 py-2 text-center">
                         {loopCfg ? (
                           <span
@@ -1104,7 +1558,7 @@ export default function LeadsTable({
                             {loopCfg.label}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -1120,25 +1574,29 @@ export default function LeadsTable({
                   >
                     {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
-                      <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                        {displayName}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
+                          {displayName}
+                        </span>
+                        {lkzType && (
+                          <span
+                            className="px-1.5 py-px rounded text-[9px] font-semibold tracking-wide flex-shrink-0 whitespace-nowrap"
+                            style={lkzType === 'Brand'
+                              ? { backgroundColor: 'rgba(255,82,0,0.14)', color: '#FF7A33' }
+                              : lkzType === 'Scout'
+                              ? { backgroundColor: 'rgba(139,92,246,0.16)', color: '#A78BFA' }
+                              : lkzType === 'Connector'
+                              ? { backgroundColor: 'rgba(16,185,129,0.16)', color: '#34D399' }
+                              : { backgroundColor: 'rgba(37,99,235,0.16)', color: '#60A5FA' }}
+                          >
+                            {lkzType === 'Brand' ? 'Brand' : lkzType === 'Scout' ? 'Scout' : lkzType === 'Connector' ? 'Connector' : 'Owner'}
+                          </span>
+                        )}
                       </div>
-                      {/* POP: show constituent/grievance fields instead of brand/city */}
-                      {brandId === 'pop' ? (
-                        ((lead as any).constituency || (lead as any).grievance_category || (lead as any).lean) && (
-                          <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
-                            {[(lead as any).constituency, ((lead as any).grievance_category || '').replace(/_/g, ' ')].filter(Boolean).join(' \u00b7 ')}
-                            {(lead as any).lean && (
-                              <span style={{ color: (lead as any).lean === 'supporter' ? '#4EB457' : (lead as any).lean === 'opposed' ? '#F06C18' : (lead as any).lean === 'undecided' ? '#F0B429' : '#9BD3A4', textTransform: 'capitalize' }}> {' \u00b7 '}{(lead as any).lean}</span>
-                            )}
-                          </div>
-                        )
-                      ) : (
-                        (brandName || city) && !isEmailAsName && (
-                          <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
-                            {[brandName, city].filter(Boolean).join(' \u00b7 ')}
-                          </div>
-                        )
+                      {(isScoutRow ? !!scoutLocation : !!(brandName || city)) && !isEmailAsName && (
+                        <div className="text-xs mt-0.5 truncate" style={{ color: '#9ca3af' }}>
+                          {isScoutRow ? scoutLocation : [brandName, city].filter(Boolean).join(' \u00b7 ')}
+                        </div>
                       )}
                       {/* Date the lead came in */}
                       {((lead as any).created_at || lead.timestamp) && (
@@ -1155,14 +1613,14 @@ export default function LeadsTable({
                           {lead.phone}
                         </a>
                       )}
-                      {lead.email && !isEmailAsName && (
-                        <a href={`mailto:${lead.email}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={lead.email}>
-                          {lead.email}
+                      {cleanEmail && !isEmailAsName && (
+                        <a href={`mailto:${cleanEmail}`} className="text-xs block truncate hover:underline mt-0.5" style={{ color: '#9ca3af' }} onClick={(e) => e.stopPropagation()} title={cleanEmail}>
+                          {cleanEmail}
                         </a>
                       )}
                     </td>
 
-                    {/* SOURCE - 3 lines: marketing source · entry point · landing page */}
+                    {/* SOURCE - 3 lines: channel · first touch · landing page */}
                     <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       <div className="flex flex-col items-center gap-0.5">
                         <span
@@ -1172,25 +1630,29 @@ export default function LeadsTable({
                           {srcCfg.label}
                         </span>
                         {subSource && (
-                          <span className="text-[10px] whitespace-nowrap" style={{ color: '#9ca3af' }}>
+                          <span
+                            className="text-[10px] whitespace-nowrap"
+                            style={{ color: '#9ca3af' }}
+                            title={subSource}
+                          >
                             {subSource}
                           </span>
                         )}
                         {(() => {
                           const pageUrl = String(
-                            (uc as any)?.attribution?.page_url ||
-                            (uc as any)?.raw_form_fields?.page_url ||
-                            (uc as any)?.web?.form_submission?.page_url ||
+                            uc?.attribution?.page_url ||
+                            uc?.raw_form_fields?.page_url ||
+                            uc?.web?.form_submission?.page_url ||
                             ''
                           ).trim()
                           if (!pageUrl) return null
-                          // Show only the path — strip any query string (utm_*, etc.)
+                          // Show only the path - strip any query string (utm_*, etc.)
                           // regardless of whether the URL is absolute or relative.
                           let pathOnly = pageUrl.split('?')[0].split('#')[0]
                           try {
                             const u = new URL(pageUrl)
                             // Click redirectors (fb.me, wa.me, m.me, l.facebook.com) carry a
-                            // meaningless short-link id as their path — e.g. a WhatsApp
+                            // meaningless short-link id as their path - e.g. a WhatsApp
                             // Clickthrough lead's "/9qqSZr45W". Don't show it.
                             const REDIRECTOR_HOSTS = ['fb.me', 'wa.me', 'm.me', 'l.facebook.com', 'lm.facebook.com']
                             if (REDIRECTOR_HOSTS.includes(u.hostname.replace(/^www\./, ''))) return null
@@ -1216,27 +1678,27 @@ export default function LeadsTable({
                       </div>
                     </td>
 
-                    {/* LAST TOUCH - channel pill (primary) + @actor sub */}
+                    {/* LAST TOUCH - actor (top) + channel (bottom) */}
                     <td className="px-3 py-2 text-center" style={{ verticalAlign: 'middle' }}>
                       {(() => {
-                        const actor = (lead.unified_context as any)?.last_actor || null
+                        const actor = uc?.last_actor || null
                         const lastTouchConfig: Record<string, { label: string; color: string }> = {
-                          web:           { label: 'Web',      color: '#3B82F6' },
-                          form:          { label: 'Form',     color: '#3B82F6' },
-                          whatsapp:      { label: 'WhatsApp', color: '#22C55E' },
-                          voice:         { label: 'Voice',    color: '#8B5CF6' },
-                          social:        { label: 'Social',   color: '#EC4899' },
-                          facebook:      { label: 'Facebook', color: '#1877F2' },
+                          web: { label: 'Web', color: '#3B82F6' },
+                          form: { label: 'Form', color: '#3B82F6' },
+                          whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+                          voice: { label: 'Voice', color: '#8B5CF6' },
+                          social: { label: 'Social', color: '#EC4899' },
+                          facebook: { label: 'Facebook', color: '#1877F2' },
                           facebook_lead: { label: 'Facebook', color: '#1877F2' },
-                          meta_forms:    { label: 'Meta',     color: '#1877F2' },
-                          google:        { label: 'Google',   color: '#EA4335' },
-                          ads:           { label: 'Ads',      color: '#F97316' },
-                          pabbly:        { label: 'Pabbly',   color: '#F59E0B' },
-                          referral:      { label: 'Referral', color: '#10B981' },
-                          organic:       { label: 'Organic',  color: '#84CC16' },
-                          manual:        { label: 'Manual',   color: '#6B7280' },
-                          landing_page:  { label: 'Landing',  color: '#3B82F6' },
-                          email:         { label: 'Email',    color: '#0EA5E9' },
+                          meta_forms: { label: 'Meta', color: '#1877F2' },
+                          google: { label: 'Google', color: '#EA4335' },
+                          ads: { label: 'Ads', color: '#F97316' },
+                          pabbly: { label: 'Pabbly', color: '#F59E0B' },
+                          referral: { label: 'Referral', color: '#10B981' },
+                          organic: { label: 'Organic', color: '#84CC16' },
+                          manual: { label: 'Manual', color: '#6B7280' },
+                          landing_page: { label: 'Landing', color: '#3B82F6' },
+                          email: { label: 'Email', color: '#0EA5E9' },
                         }
                         const channelCfg = lastTouch
                           ? (lastTouchConfig[lastTouch] || {
@@ -1245,14 +1707,15 @@ export default function LeadsTable({
                             })
                           : null
 
+                        // Resolve actor badge config
                         let actorBadge: { label: string; color: string; bg: string; tooltip: string } | null = null
                         if (actor?.type === 'user' && (actor.name || actor.email)) {
-                          const aname = String(actor.name || actor.email.split('@')[0] || 'User').trim()
+                          const name = String(actor.name || actor.email.split('@')[0] || 'User').trim()
                           actorBadge = {
-                            label: aname,
+                            label: name,
                             color: '#F59E0B',
                             bg: 'rgba(245,158,11,0.15)',
-                            tooltip: `Last touched by ${actor.email || aname}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
+                            tooltip: `Last touched by ${actor.email || name}${actor.at ? ` · ${new Date(actor.at).toLocaleString()}` : ''}`,
                           }
                         } else if (actor?.type === 'proxe') {
                           actorBadge = {
@@ -1264,9 +1727,12 @@ export default function LeadsTable({
                         }
 
                         if (!actorBadge && !channelCfg) {
-                          return <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          return <span style={{ color: 'var(--text-muted)' }}>-</span>
                         }
 
+                        // Channel is the primary signal (which surface the
+                        // last touch landed on); the actor - if any - is a
+                        // sub-line "@username" beneath it.
                         return (
                           <div className="flex flex-col items-center gap-0.5">
                             {channelCfg && (
@@ -1305,44 +1771,171 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* STAGE - badge */}
+                    {/* STAGE - badge (scouts show their lifecycle stage) */}
                     <td className="px-3 py-2 text-center">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
-                        style={stageColor.style || {}}
+                        style={rowStageStyle}
                       >
-                        {displayStage}
+                        {rowStage}
                       </span>
                     </td>
 
                     {/* ACTIVE */}
-                    <td className="px-3 py-2 text-xs text-center tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                    <td className="px-3 py-2 text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING - compact chip with calendar icon, "—" when none */}
+                    {/* BOOKING (brand/owner) OR PROPERTIES SUBMITTED (scout) */}
                     <td className="px-3 py-2 text-xs text-center">
-                      {bookingDate ? (
-                        <Link
-                          href="/dashboard/bookings"
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
-                          style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
-                        >
-                          <span aria-hidden="true">📅</span>
-                          {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {bookingTime ? (() => {
-                            const tp = bookingTime.toString().split(':');
-                            if (tp.length < 2) return `, ${bookingTime}`;
-                            const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
-                            if (isNaN(h) || isNaN(m)) return `, ${bookingTime}`;
-                            return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                          })() : ''}
-                        </Link>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      {isScoutRow ? (() => {
+                        const n = Number(lkz.scout_submissions_count ?? (lkz.last_submission_area ? 1 : 0)) || 0
+                        return (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold tabular-nums"
+                            style={n > 0 ? { background: 'rgba(16,185,129,0.15)', color: '#10b981' } : { color: 'var(--text-muted)' }}
+                          >
+                            {n > 0 ? `${n} submitted` : '0'}
+                          </span>
+                        )
+                      })() : bookingDate ? (() => {
+                        // Resolve session type: explicit field wins, else infer from meet link presence.
+                        const brandCtx = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
+                        const explicit = String(brandCtx.session_type || brandCtx.demo_type || uc?.raw_form_fields?.demo_type || '').toLowerCase()
+                        const meetLink = uc?.web?.booking?.meetLink || uc?.web?.booking?.meet_link || null
+                        let sessionType: 'online' | 'offline' | null = null
+                        if (explicit === 'online' || explicit === 'offline') sessionType = explicit as 'online' | 'offline'
+                        else if (meetLink) sessionType = 'online'
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Link
+                              href="/dashboard/bookings"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap hover:opacity-90"
+                              style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}
+                            >
+                              <span aria-hidden="true">📅</span>
+                              {new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {bookingTime ? `, ${formatBookingTime(bookingTime)}` : ''}
+                            </Link>
+                            {sessionType && (
+                              <span
+                                className="text-[9px] font-semibold uppercase tracking-wide whitespace-nowrap"
+                                style={{ color: sessionType === 'online' ? '#3B82F6' : '#F59E0B' }}
+                              >
+                                {sessionType === 'online' ? 'Online' : 'Offline'}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })() : (
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                       )}
                     </td>
+
+                    {/* Aviation columns - chip styling so the row reads as a
+                        scannable set of tags rather than mixed text + chips */}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs text-center">
+                        {lead.unified_context?.[brandId]?.user_type ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].user_type}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        )}
+                      </td>
+                    )}
+                    {showAviationColumns && (
+                      <td className="px-3 py-2 text-xs text-center">
+                        {lead.unified_context?.[brandId]?.course_interest ? (
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            style={{ background: 'rgba(14,165,233,0.15)', color: '#7dd3fc', border: '1px solid rgba(14,165,233,0.3)' }}
+                          >
+                            {lead.unified_context[brandId].course_interest}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        )}
+                      </td>
+                    )}
+                    {showAviationColumns && (() => {
+                      const uc = lead.unified_context || {}
+                      const wc = uc[brandId] || uc.windchasers || {}
+                      const rawScore = wc.pat_score ?? uc.raw_form_fields?.total_score ?? null
+                      const patRaw = rawScore != null ? Number(rawScore) : null
+                      // Display as /100 - see docs/pat-scoring.md
+                      const patScore100 = patRaw != null && !isNaN(patRaw)
+                        ? (wc.pat_score_100 ?? Math.round((patRaw * 100) / 150))
+                        : null
+                      // Tier - derive from raw if not stored (e.g. legacy raw_form_fields)
+                      const storedTier = String(
+                        wc.pat_tier || uc.raw_form_fields?.tier || ''
+                      ).toLowerCase().trim()
+                      const derivedTier = patRaw == null || isNaN(patRaw) ? ''
+                        : patRaw >= 140 ? 'premium'
+                        : patRaw >= 120 ? 'strong'
+                        : patRaw >= 90  ? 'moderate'
+                        : 'not-ready'
+                      const tier = storedTier || derivedTier
+                      const tierColors: Record<string, string> = {
+                        premium:     '#EAB308', // gold
+                        strong:      '#22C55E', // green
+                        moderate:    '#F59E0B', // yellow / amber
+                        'not-ready': '#EF4444', // red
+                      }
+                      const tierLabels: Record<string, string> = {
+                        premium: 'Premium',
+                        strong: 'Strong',
+                        moderate: 'Moderate',
+                        'not-ready': 'Early Stage',
+                      }
+                      const patColor = tierColors[tier] || 'var(--text-muted)'
+                      return (
+                        <td className="px-3 py-2 text-xs text-center">
+                          {patScore100 !== null ? (
+                            <span
+                              className="inline-flex items-baseline gap-0.5 px-2 py-0.5 rounded text-[11px] font-bold tabular-nums"
+                              style={{ color: patColor, background: `${patColor}18` }}
+                              title={tier ? `Tier: ${tierLabels[tier] || tier} (raw ${patRaw}/150)` : undefined}
+                            >
+                              {patScore100}
+                              <span className="text-[9px] opacity-70">/100</span>
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      )
+                    })()}
+
+                    {/* SCOUTS: Area Covered + Knows Properties (scout view only) */}
+                    {scoutView && (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_area_covered ? (
+                            <span className="inline-block px-2 py-0.5 rounded-2xl text-[10px] font-semibold capitalize whitespace-normal break-words leading-snug max-w-[180px] align-middle" style={{ backgroundColor: 'rgba(124,58,237,0.15)', color: '#7c3aed' }}>
+                              {lkz.scout_area_covered}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {lkz.scout_knows_properties ? (
+                            <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>
+                              {lkz.scout_knows_properties === 'yes' ? 'Yes' : lkz.scout_knows_properties === 'not_yet' ? 'Not yet' : lkz.scout_knows_properties}
+                            </span>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      </>
+                    )}
 
                     {/* OWNER */}
                     <td className="px-3 py-2 text-xs">
@@ -1355,10 +1948,9 @@ export default function LeadsTable({
                           {lead.unified_context.owner.name}
                         </span>
                       ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        <span style={{ color: 'var(--text-muted)' }}>-</span>
                       )}
                     </td>
-
                   </tr>
                 )
               })
@@ -1375,8 +1967,7 @@ export default function LeadsTable({
         onStatusUpdate={updateLeadStatus}
       />
 
-      {/* Add Lead — manual entry + screenshot OCR. Realtime subscription
-          (useRealtimeLeads) refreshes the list when the new lead lands. */}
+      {/* Add Lead Modal - realtime subscription refreshes the list on insert */}
       <AddLeadModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

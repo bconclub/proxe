@@ -38,7 +38,7 @@ const CHAN_GRAD: [string, string][] = [['#4ADE80', '#16A34A'], ['#60A5FA', '#256
 // Channel Mix ranked-bar meta (reference design): icon + color per magnet.
 const MAG_META: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   whatsapp: { label: 'WhatsApp', color: '#22c55e', icon: <MdWhatsapp size={13} /> },
-  pulse_app: { label: 'Pulse App', color: '#3b82f6', icon: <MdSmartphone size={13} /> },
+  pulse_app: { label: 'My Voice', color: '#3b82f6', icon: <MdSmartphone size={13} /> },
   voice: { label: 'Voice', color: '#a78bfa', icon: <MdMic size={13} /> },
   qr: { label: 'QR', color: '#f59e0b', icon: <MdQrCode2 size={13} /> },
   missed_call: { label: 'Missed Call', color: '#8b5cf6', icon: <MdPhoneMissed size={13} /> },
@@ -159,11 +159,30 @@ export default function WarRoomClient() {
   const [busy, setBusy] = useState(false);
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams(); Object.entries(filters).forEach(([k, v]) => v && v !== 'all' && qs.set(k, v));
+    const cacheKey = `warroom:data:${qs.toString()}`;
     setBusy(true);
-    try { const r = await fetch(`/api/war-room/data?${qs}`, { cache: 'no-store' }); if (r.ok) setData(await r.json()); } catch {}
+    try {
+      const r = await fetch(`/api/war-room/data?${qs}`, { cache: 'no-store' });
+      if (r.ok) {
+        const json = await r.json();
+        setData(json);
+        // Stale-while-revalidate: keep the latest payload in the browser so the
+        // next open paints instantly instead of waiting ~seconds on the aggregate.
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(json)); } catch { /* quota — skip */ }
+      }
+    } catch {}
     finally { setBusy(false); }
   }, [filters]);
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Instant paint from the browser cache (if we've loaded this view before),
+  // then fetchData replaces it with fresh numbers in the background.
+  useEffect(() => {
+    const qs = new URLSearchParams(); Object.entries(filters).forEach(([k, v]) => v && v !== 'all' && qs.set(k, v));
+    try {
+      const cached = sessionStorage.getItem(`warroom:data:${qs.toString()}`);
+      if (cached) setData(JSON.parse(cached));
+    } catch { /* corrupt cache — fresh fetch will replace it */ }
+    fetchData();
+  }, [fetchData, filters]);
   useEffect(() => {
     if (!sbRef.current) sbRef.current = createClient();
     const sb = sbRef.current;
@@ -249,16 +268,31 @@ export default function WarRoomClient() {
                   ))}
                   <div style={{ flex: 1 }} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: mobile ? 8 : 12 }}>
-                  <Kpi label="Reach" value={fmtN(reachVal)} sub={`${WIN_LABEL[kpiWin]} · voter touchpoints`} accent={SAFFRON} spark={d?.series.total}
-                    badges={[{ t: `7d ${sgn(r7)}${r7}%`, dir: dir(r7) }, { t: `14d ${sgn(r14)}${r14}%`, dir: dir(r14) }]} />
-                  <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={d?.series.total}
-                    badges={[{ t: `7d ${sgn(s7)}${s7}pp`, dir: dir(s7) }, { t: `14d ${sgn(s14)}${s14}pp`, dir: dir(s14) }]} />
-                  <Kpi label="Battlegrounds" value={`${d?.kpis.activeConstituencies ?? 0}`} sub={swingCount > 0 ? `of ${TOTAL_SEATS} live · ${swingCount} at risk` : `of ${TOTAL_SEATS} seats live`} accent={BLUE} spark={d?.series.total}
-                    badges={[]} />
-                  <Kpi label="Response Loop" value={`${loopPct}%`} sub={`${fmtN(loopResolved)} of ${fmtN(loopRaised)} resolved · ${WIN_LABEL[kpiWin]}`} accent={AMBER} spark={d?.series.resolved}
-                    badges={[{ t: `${fmtN(loopResolved)} closed`, dir: 'flat' }]} />
-                </div>
+                {(() => {
+                  // Top Issue — the biggest thing people are raising + its size + which way it's moving.
+                  const ti = (d?.byCategory || []).find((c) => c.category !== 'other') || null;
+                  const tiTotal = (d?.byCategory || []).reduce((s, c) => s + c.count, 0) || 1;
+                  const tiShare = ti ? Math.round((100 * ti.count) / tiTotal) : 0;
+                  const tiName = ti ? ti.category.replace(/_/g, ' ') : '—';
+                  const tiSpark = ti ? d?.series.byCategory?.[ti.category] : undefined;
+                  // Ground Force — who's ready to act (volunteer / vote / rally intent).
+                  const mob = d?.mobilization || ({} as Record<string, number>);
+                  const mobSpark = d?.series.mobilization?.volunteer;
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: mobile ? 8 : 12 }}>
+                      <Kpi label="Reach" value={fmtN(reachVal)} sub={`${WIN_LABEL[kpiWin]} · voter touchpoints`} accent={SAFFRON} spark={d?.series.total}
+                        badges={[{ t: `7d ${sgn(r7)}${r7}%`, dir: dir(r7) }, { t: `14d ${sgn(r14)}${r14}%`, dir: dir(r14) }]} />
+                      <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={d?.series.total}
+                        badges={[{ t: `7d ${sgn(s7)}${s7}pp`, dir: dir(s7) }, { t: `14d ${sgn(s14)}${s14}pp`, dir: dir(s14) }]} />
+                      <Kpi label="Top Issue" value={fmtN(ti?.count ?? 0)} sub={<span style={{ textTransform: 'capitalize' }}>{tiName} · {tiShare}% of voices</span>} accent={BLUE} spark={tiSpark}
+                        badges={ti ? [{ t: `7d ${sgn(ti.trend7d)}${ti.trend7d}`, dir: dir(ti.trend7d) }] : []} />
+                      <Kpi label="Response Loop" value={`${loopPct}%`} sub={`${fmtN(loopResolved)} of ${fmtN(loopRaised)} resolved · ${WIN_LABEL[kpiWin]}`} accent={AMBER} spark={d?.series.resolved}
+                        badges={[{ t: `${fmtN(loopResolved)} closed`, dir: 'flat' }]} />
+                      <Kpi label="Ground Force" value={fmtN(mob.volunteer || 0)} sub={`ready to volunteer · ${fmtN(mob.vote || 0)} to vote`} accent={GREEN} spark={mobSpark}
+                        badges={mob.rally ? [{ t: `${fmtN(mob.rally)} for rallies`, dir: 'flat' }] : []} />
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
@@ -800,7 +834,7 @@ const InfoDot = () => <MdInfoOutline size={14} color={'var(--text-muted)' as str
 // grouping to match the campaign's audience.
 function fmtN(n: number): string { return (n || 0).toLocaleString('en-IN'); }
 type KpiBadge = { t: string; dir: 'up' | 'down' | 'flat' };
-function Kpi({ label, value, sub, badges, accent, spark }: { label: string; value: number | string; sub: string; badges: KpiBadge[]; accent: string; spark?: number[] }) {
+function Kpi({ label, value, sub, badges, accent, spark }: { label: string; value: number | string; sub: React.ReactNode; badges: KpiBadge[]; accent: string; spark?: number[] }) {
   const bc = (dir: KpiBadge['dir']) => (dir === 'up' ? GREEN : dir === 'down' ? SAFFRON : MUT);
   const ba = (dir: KpiBadge['dir']) => (dir === 'up' ? '↑' : dir === 'down' ? '↓' : '·');
   return (

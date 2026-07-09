@@ -185,7 +185,7 @@ const abbrevK = (n: number): string => (n < 1000 ? String(n) : `${(n / 1000).toF
 const MAGNET_META: Record<string, { label: string; color: string }> = {
   whatsapp: { label: 'WhatsApp', color: '#22c55e' },
   voice: { label: 'Voice', color: '#3b82f6' },
-  pulse_app: { label: 'Pulse App', color: '#a78bfa' },
+  pulse_app: { label: 'My Voice', color: '#a78bfa' },
   qr: { label: 'QR', color: '#f06c18' },
   missed_call: { label: 'Missed call', color: '#f59e0b' },
   d2d: { label: 'Door to Door', color: '#fb7185' },
