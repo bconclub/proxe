@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose, MdContentCopy, MdExpandMore } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose, MdContentCopy, MdExpandMore, MdApartment, MdBusinessCenter, MdSquareFoot, MdStairs, MdCurrencyRupee, MdPlace, MdEventAvailable, MdDescription, MdImage, MdFileUpload } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
@@ -2182,54 +2182,136 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           onClick={() => setShowPropertyModal(false)}
                           style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
                         >
+                          {(() => {
+                            const accentSoft = `color-mix(in srgb, ${BRAND_ACCENT} 14%, transparent)`
+                            const accentBorder = `color-mix(in srgb, ${BRAND_ACCENT} 40%, transparent)`
+                            const tileBg = 'color-mix(in srgb, var(--text-primary) 4%, transparent)'
+                            const pt = String(lkz.property_type || 'Property')
+                            const category = /commercial|office|retail|warehouse|restaurant|shop|showroom|kiosk/i.test(pt) ? 'Commercial' : (pt.length <= 16 ? pt : null)
+                            const avail = lkz.availability_date || null
+                            const tiles = ([
+                              { icon: MdSquareFoot, label: 'Size', value: lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null },
+                              { icon: MdStairs, label: 'Floor', value: lkz.floor },
+                              { icon: MdCurrencyRupee, label: 'Rent', value: lkz.asking_rent_monthly },
+                              { icon: MdPlace, label: 'Area', value: lkz.property_zone || lkz.city },
+                              { icon: MdPayments, label: 'Deposit', value: lkz.deposit },
+                            ] as Array<{ icon: any; label: string; value: any }>).filter((t) => !!t.value)
+                            const imgs = Array.isArray(lkz.property_images) ? lkz.property_images : []
+                            return (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            style={{ width: 'min(440px, 92vw)', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary, #111)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 18 }}
+                            style={{ width: 'min(500px, 94vw)', maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg-secondary, #0f1116)', border: '1px solid var(--border-primary)', borderRadius: 18, padding: 20 }}
                           >
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Property details</h3>
-                              <button type="button" onClick={() => setShowPropertyModal(false)} style={{ color: 'var(--text-muted)' }}><MdClose size={18} /></button>
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Property details</h3>
+                              <button type="button" onClick={() => setShowPropertyModal(false)}
+                                className="flex items-center justify-center rounded-lg" style={{ width: 30, height: 30, background: tileBg, color: 'var(--text-secondary)' }}>
+                                <MdClose size={18} />
+                              </button>
                             </div>
-                            <div className="flex flex-col gap-y-2">
-                              {allRows.map(([label, value]) => (
-                                <div key={label} className="flex items-start justify-between gap-3 text-xs">
-                                  <span className="flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
-                                  <span className="text-right" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }} title={String(value)}>{value}</span>
+
+                            {/* Type + badges */}
+                            <div className="flex items-start gap-3 mb-4">
+                              <span className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 46, height: 46, background: accentSoft, border: `1px solid ${accentBorder}` }}>
+                                <MdApartment size={24} style={{ color: BRAND_ACCENT }} />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{pt}</p>
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  {category && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: accentSoft, color: BRAND_ACCENT }}>
+                                      <MdBusinessCenter size={13} /> {category}
+                                    </span>
+                                  )}
+                                  {avail && (
+                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}>
+                                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} /> {avail}
+                                    </span>
+                                  )}
                                 </div>
-                              ))}
+                              </div>
                             </div>
-                            {maps && (
-                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: BRAND_ACCENT }}>
-                                📍 View on Google Maps →
-                              </a>
+
+                            {/* Stat tiles grid */}
+                            {tiles.length > 0 && (
+                              <div className="grid grid-cols-2 gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                                {tiles.map(({ icon: Icon, label, value }) => (
+                                  <div key={label} className="rounded-xl p-3" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                      <Icon size={15} style={{ color: BRAND_ACCENT }} />
+                                      <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                                    </div>
+                                    <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+                                  </div>
+                                ))}
+                              </div>
                             )}
 
-                            {/* ── Photos — a dedicated gallery slot, always present so
-                                the modal has a clean designated place for images
-                                (customer-sent photos land here; empty state otherwise). */}
-                            <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                              <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                                Photos{Array.isArray(lkz.property_images) && lkz.property_images.length ? ` (${lkz.property_images.length})` : ''}
-                              </span>
-                              {Array.isArray(lkz.property_images) && lkz.property_images.length > 0 ? (
-                                <div className="flex flex-wrap gap-2 mt-1.5">
-                                  {lkz.property_images.map((img: any, i: number) => (
-                                    <a key={i} href={typeof img === 'string' ? img : img?.url} target="_blank" rel="noopener noreferrer"
-                                      style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-primary)', display: 'block', flexShrink: 0, background: '#000' }}>
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={typeof img === 'string' ? img : img?.url} alt="Shared photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    </a>
-                                  ))}
+                            {/* Availability + map row */}
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {avail && (
+                                <div className="rounded-xl p-3" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <MdEventAvailable size={15} style={{ color: BRAND_ACCENT }} />
+                                    <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Availability</span>
+                                  </div>
+                                  <p className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>{avail}</p>
                                 </div>
-                              ) : lkz.property_id ? (
-                                <LokazenPropertyGallery propertyId={String(lkz.property_id)} />
-                              ) : (
-                                <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>No photos shared yet.</p>
+                              )}
+                              {maps && (
+                                <a href={String(maps)} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center justify-between gap-2 rounded-xl p-3 transition-all hover:opacity-90"
+                                  style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                  <span className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                    <MdOpenInNew size={15} style={{ color: BRAND_ACCENT }} /> View on Google Maps
+                                  </span>
+                                  <MdChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                                </a>
                               )}
                             </div>
 
-                            {/* ── Push to Lokazen — list this captured property on the
-                                Lokazen site so it becomes a live listing. */}
+                            {/* Other details */}
+                            {otherDetails && (
+                              <div className="flex items-start gap-3 rounded-xl p-3 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                <span className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 34, height: 34, background: accentSoft }}>
+                                  <MdDescription size={17} style={{ color: BRAND_ACCENT }} />
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="text-[12px] font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Other details</p>
+                                  <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{otherDetails}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Photos */}
+                            <div className="flex items-start gap-3 rounded-xl p-3 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                              <span className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 34, height: 34, background: accentSoft }}>
+                                <MdImage size={17} style={{ color: BRAND_ACCENT }} />
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+                                  Photos{imgs.length ? ` (${imgs.length})` : ''}
+                                </p>
+                                {imgs.length > 0 ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {imgs.map((img: any, i: number) => (
+                                      <a key={i} href={typeof img === 'string' ? img : img?.url} target="_blank" rel="noopener noreferrer"
+                                        style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border-primary)', display: 'block', flexShrink: 0, background: '#000' }}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={typeof img === 'string' ? img : img?.url} alt="Shared photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : lkz.property_id ? (
+                                  <LokazenPropertyGallery propertyId={String(lkz.property_id)} />
+                                ) : (
+                                  <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>No photos shared yet</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Push to Lokazen */}
                             <button
                               type="button"
                               disabled={pushingListing === 'pushing'}
@@ -2241,15 +2323,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   setPushingListing(r.ok && j?.success ? 'done' : 'error');
                                 } catch { setPushingListing('error'); }
                               }}
-                              className="w-full mt-4 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                              className="w-full mt-4 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                               style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : BRAND_ACCENT, color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
                             >
+                              {pushingListing !== 'done' && pushingListing !== 'pushing' && <MdFileUpload size={18} />}
                               {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
                                 : pushingListing === 'done' ? '✓ Listed on Lokazen'
                                 : pushingListing === 'error' ? 'Failed — tap to retry'
                                 : 'Push to Lokazen (list property)'}
                             </button>
                           </div>
+                            )
+                          })()}
                         </div>
                       )}
                     </div>
