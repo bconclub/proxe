@@ -243,6 +243,18 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
+      // Capture a Google Maps link the customer PASTES as text (owners often send
+      // a share link instead of dropping a pin). Deterministic — doesn't rely on
+      // the agent calling a tool. A pin already set locationToCapture; don't
+      // overwrite it. Stored to google_maps_url below, so "View on Google Maps"
+      // is the exact link they shared.
+      if (!locationToCapture) {
+        const mapMatch = messageText.match(
+          /https?:\/\/(?:maps\.google\.[^\s]+|(?:www\.)?google\.[a-z.]+\/maps[^\s]+|goo\.gl\/maps\/[^\s]+|maps\.app\.goo\.gl\/[^\s]+|share\.google\/[^\s]+)/i
+        );
+        if (mapMatch) locationToCapture = mapMatch[0];
+      }
+
       // Pull profile name from WhatsApp contact metadata. Only trust it if
       // it looks like a real person name — otherwise leave blank so we
       // don't store "WhatsApp User" or other placeholders on the lead.
