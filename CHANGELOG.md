@@ -1,3 +1,8 @@
+## 2026-07-10 00:30 IST · feat(brain): dock click → brain in place (docked corner), double-click → full screen
+
+- User-facing: single-clicking the Brain dock now makes the widget BECOME the brain right there — a compact corner panel pops in, animates, and talks — instead of taking over the whole screen. Double-click (or the ⤢ button inside) goes full screen; ⤡ collapses back to the corner. One orb instance across the resize, so it keeps talking without restarting. The dock bubble hides while open and returns on close.
+- `(pending-sha)`
+
 ## 2026-07-09 23:30 IST · feat(brain): dock → talking voice brain + two-way mic; single orb; inbox WhatsApp look; layout dedupe
 
 - User-facing: the Brain dock now wakes on hover (Update me / Anything urgent? / Ask something…) and CLICK expands into the full-screen talking orb that speaks today's briefing; after it speaks it opens the mic (Web Speech API) and listens for a spoken reply — a two-way voice loop. ("Ask something…" goes straight to listening.)

@@ -190,17 +190,29 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
 
   // Hover-wake fan + the full-screen orb the dock expands into.
   const [waking, setWaking] = useState(false)
-  const [orb, setOrb] = useState<null | { q?: string; auto: boolean; listen?: boolean }>(null)
+  // The dock expands into the brain orb: 'docked' = a small panel in the corner
+  // that animates + talks in place; 'full' = full-screen. Single click → docked,
+  // double click → full.
+  const [orb, setOrb] = useState<null | { q?: string; auto: boolean; listen?: boolean; view: 'docked' | 'full' }>(null)
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
     if (wakeTimer.current) { clearTimeout(wakeTimer.current); wakeTimer.current = null }
     if (on) setWaking(true)
     else wakeTimer.current = setTimeout(() => setWaking(false), 180) // small grace so moving to a pill doesn't close it
   }, [])
-  const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean }) => {
+  const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean }, view: 'docked' | 'full' = 'docked') => {
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null }
     setWaking(false)
-    setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen })
+    setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen, view })
   }, [])
+  // Single click → brain in place (docked). Double click → full screen. The
+  // short timer disambiguates: a second click inside the window means double.
+  const onDockClick = useCallback(() => {
+    if (drag.current.moved) return
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; openOrb({ auto: true }, 'full'); return }
+    clickTimer.current = setTimeout(() => { clickTimer.current = null; openOrb({ auto: true }, 'docked') }, 240)
+  }, [openOrb])
   useEffect(() => {
     if (!dock) return
     const w = window as any
@@ -311,11 +323,12 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
 
   return (
     <>
-      {/* Brain button — stacked under the eye (14) + bell (54). */}
-      <button
+      {/* Brain button — stacked under the eye (14) + bell (54). Hidden while the
+          orb is open (the widget has "become" the brain). */}
+      {!(dock && orb) && <button
         ref={dockRef}
         onClick={() => {
-          if (dock) { if (drag.current.moved) return; openOrb({ auto: true }); return } // click → brain wakes + speaks the update
+          if (dock) { onDockClick(); return } // 1 click → brain in place · 2 → full screen
           setOpen(true)
         }}
         onMouseEnter={dock ? () => wake(true) : undefined}
@@ -363,7 +376,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
       >
         <ProxeMark size={dock ? 40 : 18} />
         {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
-      </button>
+      </button>}
 
       {/* Hover-wake fan — quick actions that slide up-left from the dock. Anchored
           to the dock's top-right corner; a plain click on the bubble runs the
@@ -407,10 +420,38 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         </div>
       )}
 
-      {/* The dock expanded into the full talking brain (spiral orb). */}
+      {/* The dock, become the brain. ONE VoiceOrb instance whose container
+          resizes between the docked corner panel and full screen, so toggling
+          view never remounts it (the voice keeps talking across the resize). */}
       {orb && (
-        <div className="fixed inset-0 z-[80]" style={{ background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }} aria-modal="true" role="dialog">
+        <div
+          className="fixed z-[80]"
+          style={orb.view === 'full'
+            ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
+            : {
+                right: 16, bottom: 16, width: 'min(360px, calc(100vw - 32px))', height: 'min(460px, calc(100vh - 32px))',
+                borderRadius: 22, overflow: 'hidden', background: 'var(--bg-primary)',
+                border: '1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.45)',
+                animation: 'wc-orb-pop 240ms cubic-bezier(0.2,0,0,1)',
+              }}
+          aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
+        >
           <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational onClose={() => setOrb(null)} />
+          {/* expand ⇆ collapse between corner and full screen */}
+          <button
+            onClick={() => setOrb((o) => (o ? { ...o, view: o.view === 'full' ? 'docked' : 'full' } : o))}
+            aria-label={orb.view === 'full' ? 'Collapse' : 'Full screen'}
+            title={orb.view === 'full' ? 'Collapse to corner' : 'Full screen'}
+            style={{
+              position: 'absolute', top: 14, right: 14, zIndex: 6,
+              width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1,
+              background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+              border: '1px solid var(--border-primary)',
+            }}
+          >
+            {orb.view === 'full' ? '⤡' : '⤢'}
+          </button>
         </div>
       )}
 
@@ -599,6 +640,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         @keyframes wc-fan-in {
           from { opacity: 0; transform: translateY(8px) scale(0.96); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes wc-orb-pop {
+          from { opacity: 0; transform: translateY(12px) scale(0.9); transform-origin: bottom right; }
+          to   { opacity: 1; transform: translateY(0) scale(1); transform-origin: bottom right; }
         }
       `}</style>
     </>
