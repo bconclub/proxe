@@ -608,19 +608,26 @@ export async function GET(request: NextRequest) {
       return isNaN(d.getTime()) ? null : d
     }
 
-    // "Upcoming" = from the START of today (IST), not from `now` — a call booked
-    // for earlier today is still today's agenda and must show, otherwise the list
-    // reads "No upcoming events" while the Booked Calls KPI counts those same
-    // same-day bookings (the exact 2-booked-but-nothing-shown mismatch).
-    const istTodayStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
-    const startOfTodayIST = new Date(`${istTodayStr}T00:00:00+05:30`)
+    // The Upcoming Events list must agree with the "Booked Calls / Events" KPI,
+    // which counts bookings across THIS WEEK (past + upcoming). A future-only
+    // list reads "No upcoming events" while the KPI shows 2 — the mismatch the
+    // user kept hitting when the booked calls were earlier today / earlier this
+    // week. So include the last 7 days AND everything future, then order it
+    // upcoming-first (soonest ahead), then most-recent past — an agenda, not a
+    // strict future feed. Past rows still render (the countdown chip shows "ago").
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 3600_000)
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
         return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }
       })
-      .filter(({ dt }) => dt !== null && dt >= startOfTodayIST)
-      .sort((a, b) => a.dt!.getTime() - b.dt!.getTime())
+      .filter(({ dt }) => dt !== null && dt >= weekAgo)
+      .sort((a, b) => {
+        const ta = a.dt!.getTime(), tb = b.dt!.getTime(), n = now.getTime()
+        const aFuture = ta >= n, bFuture = tb >= n
+        if (aFuture !== bFuture) return aFuture ? -1 : 1   // future block first
+        return aFuture ? ta - tb : tb - ta                 // future: soonest; past: most recent
+      })
       .slice(0, 10)
       .map(({ lead, bookingDate, bookingTime, dt }) => {
         const uc = lead.unified_context || {}
