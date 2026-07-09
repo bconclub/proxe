@@ -10,36 +10,28 @@
 //
 // Voice: staged for speed. 1) mode:"text" writes the words (Groq-fast),
 // 2) the FIRST sentence and the REST are voiced in parallel (mode:"tts",
-// Monika Sogam / eleven_v3), 3) the first clip plays the moment it lands and
+// brand voice / eleven_v3), 3) the first clip plays the moment it lands and
 // the rest chains seamlessly. Latency metadata for every run is logged
 // (mode:"log") as the "brain voice" eval data.
 //
-// Bottom-right: language switcher — English / ਪੰਜਾਬੀ / हिंदी.
+// Bottom-right: language switcher (only when the brand speaks >1 language).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getCurrentBrandId } from '@/configs'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 
 type Mode = 'idle' | 'thinking' | 'speaking' | 'error'
-type Lang = 'en' | 'pa' | 'hi'
 
 const N = 900
 
 type P = { theta: number; phi: number; r: number; speed: number; hue: number; size: number; wob: number }
 type Ripple = { x: number; y: number; born: number }
 
-const QUICK_QUESTIONS = [
-  'How are the constituencies doing?',
-  'What are the latest leader actions?',
-  'What news is buzzing right now?',
-  'What needs my attention today?',
-]
-
-const LANGS: Array<{ id: Lang; label: string }> = [
-  { id: 'en', label: 'EN' },
-  { id: 'pa', label: 'ਪੰਜਾਬੀ' },
-  { id: 'hi', label: 'हिंदी' },
-]
+// Per-brand content: questions, languages, thinking-step captions, palette.
+// Resolved once at module scope — the brand is fixed for the build.
+const BRAIN = getBrainConfig()
+const QUICK_QUESTIONS = BRAIN.quickQuestions
+const LANGS = BRAIN.languages
 
 function cssLuma(varName: string): number {
   try {
@@ -84,8 +76,8 @@ export default function VoiceOrb() {
   const [caption, setCaption] = useState('')
   const [subtitle, setSubtitle] = useState('')
   const [askOpen, setAskOpen] = useState(false)
-  const [lang, setLang] = useState<Lang>('en')
-  const langRef = useRef<Lang>('en')
+  const [lang, setLang] = useState<string>(LANGS[0]?.id || 'en')
+  const langRef = useRef<string>(LANGS[0]?.id || 'en')
   const modeRef = useRef<Mode>('idle')
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const queueRef = useRef<HTMLAudioElement[]>([])
@@ -125,20 +117,36 @@ export default function VoiceOrb() {
     let raf = 0
     let t = 0
 
-    // POP = campaign tricolor (deep blue dominant, green + a touch of saffron —
-    // NOT saffron-led; orange alone is the opposition's color). Other brands
-    // keep the accent-derived palette.
-    const isPop = getCurrentBrandId() === 'pop'
-    const ac = isPop
-      ? { h: 215, s: 78, rgb: [37, 89, 196] as [number, number, number] } // campaign blue
+    // Palette: a brand may supply brain.orbPalette (chrome rgb + weighted
+    // particle-hue mix + sweep color); without it the orb derives everything
+    // from the theme accent — the generic look every brand starts with.
+    const pal = BRAIN.orbPalette
+    const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number } => {
+      const r1 = r / 255, g1 = g / 255, b1 = b / 255
+      const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1), d = max - min
+      let h = 0
+      if (d) {
+        if (max === r1) h = ((g1 - b1) / d) % 6
+        else if (max === g1) h = (b1 - r1) / d + 2
+        else h = (r1 - g1) / d + 4
+        h = (h * 60 + 360) % 360
+      }
+      const l = (max + min) / 2
+      const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0
+      return { h, s: Math.max(45, Math.round(s * 100)) }
+    }
+    const ac = pal
+      ? { ...rgbToHsl(...pal.chromeRgb), rgb: pal.chromeRgb }
       : accentColor()
     const [ar, ag, ab] = ac.rgb
-    // per-particle hue: pop mixes blue (60%) / green (25%) / saffron (15%)
-    const popHue = () => {
-      const r = Math.random()
-      if (r < 0.60) return 215 + Math.random() * 20 - 10 // blue
-      if (r < 0.85) return 145 + Math.random() * 16 - 8  // green
-      return 25 + Math.random() * 12 - 6                 // saffron
+    // per-particle hue: weighted mix from the palette, else accent-spread
+    const paletteHue = (): number => {
+      const hues = pal?.particleHues
+      if (!hues?.length) return ac.h + (Math.random() * 36 - 18) - (Math.random() < 0.2 ? 40 : 0)
+      const total = hues.reduce((s, x) => s + x.weight, 0) || 1
+      let r = Math.random() * total
+      for (const x of hues) { if ((r -= x.weight) <= 0) return x.hue + Math.random() * x.spread * 2 - x.spread }
+      return hues[0].hue
     }
     const isLight = cssLuma('--bg-primary') > 0.5
     // On white, glowing whites read as a smudge — swap to accent-weighted inks.
@@ -154,7 +162,7 @@ export default function VoiceOrb() {
         phi: Math.acos(u),
         r: 0.72 + Math.random() * 0.28,
         speed: 0.0006 + Math.random() * 0.0016,
-        hue: isPop ? popHue() : ac.h + (Math.random() * 36 - 18) - (Math.random() < 0.2 ? 40 : 0),
+        hue: paletteHue(),
         size: 0.8 + Math.random() * 1.6,
         wob: Math.random() * Math.PI * 2,
       }
@@ -248,7 +256,7 @@ export default function VoiceOrb() {
 
       // radar sweep along the spine — one slow arm (green for pop: the second
       // tricolor note; blue body + green sweep + saffron flecks in the cloud)
-      const [sr, sg2, sb] = isPop ? [34, 160, 92] : [ar, ag, ab]
+      const [sr, sg2, sb] = pal?.sweepRgb || [ar, ag, ab]
       const sweepA = t * 0.0035
       const sg = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9)
       sg.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`)
@@ -381,12 +389,7 @@ export default function VoiceOrb() {
     thinkStartRef.current = performance.now()
     ringDoneFrameRef.current = null
     setModeBoth('thinking')
-    const steps = question ? [
-      'listening…', 'checking the war room…', 'reading the latest signals…', 'putting it into words…',
-    ] : [
-      'reading today…', 'checking the war room…', 'checking recent pushes from leaders…',
-      'reading new voices by constituency…', 'checking what people are responding to…', 'putting it into words…',
-    ]
+    const steps = question ? BRAIN.thinkingSteps.question : BRAIN.thinkingSteps.briefing
     let stepIdx = 0
     setCaption(steps[0])
     const stepTimer = setInterval(() => {
@@ -587,8 +590,8 @@ export default function VoiceOrb() {
         </button>
       </div>
 
-      {/* language switcher (bottom right) — the voice speaks this language */}
-      <div
+      {/* language switcher (bottom right) — only when the brand speaks >1 language */}
+      {LANGS.length > 1 && <div
         onClick={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}
         style={{ position: 'absolute', right: 26, bottom: 22, display: 'flex', gap: 4, padding: 4, borderRadius: 999, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', zIndex: 3 }}
@@ -607,7 +610,7 @@ export default function VoiceOrb() {
             {l.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       <style>{`
         @keyframes voPulse { 0%,100% { opacity: .25 } 50% { opacity: 1 } }

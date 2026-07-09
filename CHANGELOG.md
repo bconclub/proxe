@@ -1,3 +1,14 @@
+## 2026-07-09 16:20 IST · feat: Brain + Configure ported to ALL brands — functionality shared, content per-brand
+
+- User-facing: every brand now has the Brain (voice orb + Learning) and the Configure card grid. Non-POP brands get neutral business behavior: generic persona built from the brand name, generic quick questions, English-only (no language switcher), accent-colored orb — POP's campaign prompts/vocabulary/tricolor/3 languages did NOT leak anywhere.
+- New: BrandConfig gains an optional `brain{}` block (persona, vocabularyRule, quickQuestions, thinkingSteps, languages, voiceId, orbPalette, summaryPrompt, reflectionPersona, evalJourneys, voiceAgent) + `core/src/lib/brain/brainConfig.ts` resolves it over generic fallbacks. POP's campaign content and BCON's sales prompts moved byte-identical from core hardcodes into their brand configs.
+- Converted hardcodes: briefing route (isPop → features.warRoom gates; persona/vocab/languages/voice from config), VoiceOrb (questions/langs/steps/palette from config), summarizer (brand ternary → config), VoiceAgentTab (bcon prefill/number + engine/lang pickers + prompts editor all config-gated), Brain page tabs (Map only for warRoom brands; Eval per evalJourneys — hidden where content doesn't exist), Configure/notifications wording via brandLabel.
+- Bug fixes found on the way: brain/decisions read BCON's rows for every brand (`['bcon','default']` → `[BRAND_ID,'default']`); learning-summary reflected as a "sales agent" for every brand; brands/proxe/config.ts re-declared a stale inline BrandConfig (now imports the canonical type).
+- Build fix: `@brand/prompts/voice-langs` only existed in the pop pack, so ANY non-pop production build of this branch failed (webpack module-not-found). Every brand pack now ships a generic English voice-prompt module with the same exported surface.
+- Voice: default TTS voice everywhere = Monika Sogam (env ELEVENLABS_VOICE_ID > brain.voiceId > default); brands without an ElevenLabs key degrade to "voice is not configured for this brand yet".
+- features.brain flipped ON for lokazen, windchasers, proxe.
+- `(pending-sha)`
+
 ## 2026-07-09 15:10 IST · fix: responsive pass — dashboard stops breaking on small screens
 
 - Audited every POP surface for small-screen breakage. Two real breakers fixed:

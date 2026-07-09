@@ -16,9 +16,10 @@ import {
   preview as previewSound,
 } from '@/lib/sound-prefs';
 import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
+import { brandLabel } from '@/configs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
-  { ev: 'new', hint: 'Pop cue when a fresh lead is scored' },
+  { ev: 'new', hint: `Pop cue when a fresh ${brandLabel('Lead').toLowerCase()} is scored` },
   { ev: 'update', hint: 'Pop on a stage or score change' },
   { ev: 'ready', hint: 'Cue when the home page finishes loading' },
 ];

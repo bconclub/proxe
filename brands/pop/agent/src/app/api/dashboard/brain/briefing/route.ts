@@ -4,6 +4,7 @@ import { getServiceClient } from '@/lib/services'
 import { generateResponse } from '@/lib/agent-core/claudeClient'
 import { getJson, setJsonWithTtl } from '@/lib/server/redis'
 import { getBrandConfig, BRAND_ID } from '@/configs'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -16,7 +17,7 @@ export const maxDuration = 60
  *   mode "text"  { question?, language? }  → gather context + write the words
  *                                            (Groq if configured — fast — else
  *                                            Claude). Returns { text, llmMs }.
- *   mode "tts"   { text }                  → ElevenLabs Monika Sogam on
+ *   mode "tts"   { text }                  → ElevenLabs (brand voice) on
  *                                            eleven_v3 (multilingual_v2
  *                                            fallback, SAME voice). The client
  *                                            splits the text and requests the
@@ -29,18 +30,13 @@ export const maxDuration = 60
  * GET → the recent run records.
  */
 
-// ONE voice, deterministic: Monika Sogam. Env ELEVENLABS_VOICE_ID overrides.
-const MONIKA_SOGAM_VOICE_ID = '2zRM7PkgwBPiau2jvVXc'
+// Voice + persona + vocabulary + languages come from the brand's brain config
+// (brands/<id>/config.ts brain block, generic fallbacks in brainConfig.ts).
+// Voice precedence: env ELEVENLABS_VOICE_ID > brand brain.voiceId > default.
 const RUNS_KEY = `brain:voice:runs:${BRAND_ID}`
 const RUNS_TTL = 60 * 60 * 24 * 14 // keep two weeks
 const CTX_KEY = `brain:voice:ctx:${BRAND_ID}`
 const CTX_TTL = 90 // seconds — quick-question clicks reuse the gathered context
-
-const LANG_RULES: Record<string, string> = {
-  en: 'Speak in natural conversational English.',
-  hi: 'Speak ENTIRELY in natural conversational Hindi (Devanagari script). Spell numbers out in Hindi words.',
-  pa: 'Speak ENTIRELY in natural conversational Punjabi (Gurmukhi script). Spell numbers out in Punjabi words.',
-}
 
 async function internalJson(origin: string, path: string, cookie: string): Promise<any> {
   try {
@@ -104,13 +100,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // ── mode: tts — voice a chunk of text, Monika Sogam only ─────────────────
+    // ── mode: tts — voice a chunk of text (brand voice, ONE voice per brand) ──
     if (mode === 'tts') {
       const text = String(body?.text || '').slice(0, 2000)
       if (!text) return NextResponse.json({ error: 'no text' }, { status: 400 })
       const key = process.env.ELEVENLABS_API_KEY
-      if (!key) return NextResponse.json({ error: 'ElevenLabs not configured' }, { status: 500 })
-      const voiceId = process.env.ELEVENLABS_VOICE_ID || MONIKA_SOGAM_VOICE_ID
+      if (!key) return NextResponse.json({ error: 'voice is not configured for this brand yet' }, { status: 500 })
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || getBrainConfig().voiceId
       const t0 = Date.now()
       const speak = (model: string) =>
         fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
@@ -132,13 +128,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ── mode: text — gather today's context and write the words ──────────────
+    const brain = getBrainConfig()
     const question: string | null = typeof body?.question === 'string' && body.question.trim() ? body.question.trim().slice(0, 300) : null
-    const language: string = ['en', 'hi', 'pa'].includes(body?.language) ? body.language : 'en'
+    const lang = brain.languages.find((l) => l.id === body?.language) || brain.languages[0]
 
     const cookie = req.headers.get('cookie') || ''
     const origin = req.nextUrl.origin
     const brand = getBrandConfig()
-    const isPop = BRAND_ID === 'pop'
+    // Campaign-shaped data sources ride on the warRoom feature, not the brand id.
+    const hasWarRoom = !!brand.features?.warRoom
     const svc = getServiceClient()
     const t0 = Date.now()
 
@@ -151,7 +149,7 @@ export async function POST(req: NextRequest) {
       const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString()
       const [overview, warRoom, leaderPushes, news] = await Promise.all([
         internalJson(origin, '/api/dashboard/brain/overview', cookie),
-        isPop ? internalJson(origin, '/api/war-room/data?days=1', cookie) : Promise.resolve(null),
+        hasWarRoom ? internalJson(origin, '/api/war-room/data?days=1', cookie) : Promise.resolve(null),
         svc
           ? svc.from('campaign_recommendations')
               .select('title, body, source, constituency, status, created_at')
@@ -161,7 +159,7 @@ export async function POST(req: NextRequest) {
               .then((r: any) => (r.data || []).map((x: any) => ({ ...x, body: String(x.body || '').slice(0, 160) })))
           : Promise.resolve([]),
         // news / social buzz — what people are seeing and reacting to
-        svc && isPop
+        svc && hasWarRoom
           ? svc.from('listen_signals')
               .select('source, content, sentiment, issue_category, constituency, is_crisis, is_opposition, created_at')
               .gte('created_at', dayAgo)
@@ -204,17 +202,15 @@ export async function POST(req: NextRequest) {
     const firstName = fullName.split(/\s+/)[0] || 'there'
 
     const system = [
-      `You are the living Brain of ${brand.name}${isPop ? ' — the intelligence behind a political campaign operation in Punjab' : ''}. You are about to SPEAK out loud to ${firstName}, the person running this.`,
-      LANG_RULES[language],
+      `You are the living Brain of ${brand.name}${brain.persona}. You are about to SPEAK out loud to ${firstName}, the person running this.`,
+      lang.promptRule,
       question
         ? `${firstName} asked: "${question}". Answer THAT question directly from the live data — no daily-briefing preamble. Open with the answer, not a greeting.`
         : `START with a greeting equivalent to: "Hi ${firstName}, this is how today looks." (in the speaking language).`,
       `Style: spoken word, warm, confident, first person. No markdown, no bullets, no emojis — natural sentences read aloud. The FIRST sentence must be short (under 12 words) — it plays first.`,
       question ? `Length: 3 to 6 sentences, under 100 words total.` : `Length: 5 to 8 sentences, under 130 words total.`,
       `You ARE PROXe — the system itself. NEVER say "AI", "the AI", "artificial intelligence" or "AI suggests". When a suggestion came from the system, say "PROXe suggests" or simply "I suggest" (you are PROXe speaking).`,
-      isPop
-        ? `Vocabulary: this is a CAMPAIGN, not a sales pipeline. NEVER say "lead", "leads", "pipeline", "hot/warm/cold", "bookings" or CRM words. Say: people, voices, citizens, constituencies, grievances, intent, momentum. Talk about WHERE things are happening — which constituencies people are speaking up from, what issues they're raising, whether they're leaning toward us, who's ready to volunteer or vote. "leader_pushes" in the data are directives the leader pushed to the war-room team plus PROXe's own suggestions, with their status. "news_buzz" is what's moving in news and social media in the last 24 hours — topics, negativity, crisis and opposition signals; use it when talking about what's buzzing or what people are seeing.`
-        : `Vocabulary: speak in the language of this business, not generic CRM jargon.`,
+      brain.vocabularyRule,
       question
         ? `If the data genuinely doesn't cover the question, say so in one sentence and give the nearest useful signal instead.`
         : `Cover: what came in today and from where, what people are raising and responding to, what you're handling right now, and end with the single thing that most needs ${firstName}'s attention — or a calm all-quiet close. Skip zeros and missing data gracefully; never apologize for quiet days.`,
@@ -234,7 +230,7 @@ export async function POST(req: NextRequest) {
     let context = JSON.stringify(slim)
     if (context.length > 9000) context = context.slice(0, 9000)
     const { text, engine } = await writeWords(system, `Today's live data:\n${context}`)
-    return NextResponse.json({ text, llmMs: Date.now() - t0, engine, language })
+    return NextResponse.json({ text, llmMs: Date.now() - t0, engine, language: lang.id })
   } catch (e: any) {
     console.error('[brain/briefing] error:', e?.message)
     return NextResponse.json({ error: e?.message || 'briefing failed' }, { status: 500 })

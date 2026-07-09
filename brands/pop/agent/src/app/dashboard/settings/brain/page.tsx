@@ -14,16 +14,19 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { MdPsychology, MdArrowBack } from 'react-icons/md'
 import { getBrandConfig } from '@/configs'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 import VoiceOrb from './VoiceOrb'
 import MapView from './MapView'
 import EvalTabs from './EvalTabs'
 import LearningView from './LearningView'
 
 type Tab = 'brain' | 'map' | 'eval' | 'learning'
+// Per-brand tabs: Map draws the campaign engine topology (warRoom brands only);
+// Eval content is brand-specific (brain.evalJourneys, 'none' hides the tab).
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'brain', label: 'Brain' },
-  { id: 'map', label: 'Map' },
-  { id: 'eval', label: 'Eval' },
+  ...(getBrandConfig().features?.warRoom ? ([{ id: 'map', label: 'Map' }] as Array<{ id: Tab; label: string }>) : []),
+  ...(getBrainConfig().evalJourneys !== 'none' ? ([{ id: 'eval', label: 'Eval' }] as Array<{ id: Tab; label: string }>) : []),
   { id: 'learning', label: 'Learning' },
 ]
 

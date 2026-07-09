@@ -19,6 +19,38 @@ export const bconConfig: BrandConfig = {
     pipelineFunnel: true,
     followUpSequence: false, // gated until the re-engagement template is approved
   },
+  // The Brain's sales CONTENT for BCON — the persona/prompts the Brain uses on
+  // this brand (functionality is shared across brands; content lives here).
+  brain: {
+    persona: " — the intelligence behind BCON's marketing and AI growth operation",
+    summaryPrompt: `You are summarizing a sales conversation for the BCON team. Generate a brief but complete summary that includes:
+1. BUSINESS: What does this lead's business do? (from what THEY said, not form data)
+2. PROBLEM: What challenges or needs did they mention?
+3. DISCUSSION: What solutions or services were discussed?
+4. BOOKING: Was a call booked? What date/time? Did booking succeed or fail?
+5. STATUS: Are they engaged, cold, frustrated, or lost?
+6. RED FLAGS: Did they ask for a human? Get upset? Hit any errors?
+7. NEXT STEP: What should the team do next?
+
+FORM FIELD INTERPRETATION - get these right:
+- VOLUME means how many leads they WANT to handle, NOT how many they currently get. "Upto 100" = wants to scale to 100 leads.
+- URGENCY means how ready they are to start, NOT how urgent their problem is.
+- "No, I am setting up" for AI SYSTEMS = they have no AI yet, they are exploring.
+- WEBSITE "Yes, I have" = they have a website. "No" = they don't.
+Do NOT misrepresent these fields. "Upto 100 leads" does NOT mean "handles 100 leads."
+
+Keep it to 3-5 sentences max. Be specific - use actual details from the conversation, not generic phrases like "high intent" or "shows interest".
+
+BAD: "Lead shows high intent with 50% response rate. Re-engage with follow-up."
+GOOD: "Wasi runs Design Lyf Realty & Interiors in Bangalore - interior design focus. Getting Meta ad leads but quality is poor. Tried to book Monday 3pm but booking tool looped. Got frustrated and asked for a human. Needs manual outreach to recover - call him directly."`,
+    reflectionPersona: 'the BCON sales agent',
+    evalJourneys: 'business',
+    voiceAgent: {
+      testDefaults: { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' },
+      voiceNumber: '+918046733388',
+      showBusinessFields: true,
+    },
+  },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
     path: '@/api/prompts/bcon-prompt',

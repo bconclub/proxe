@@ -5,7 +5,7 @@
 
 import { generateResponse } from './claudeClient';
 import { HistoryEntry } from './types';
-import { BRAND_ID, getBrandConfig } from '@/configs';
+import { getBrainConfig } from '@/lib/brain/brainConfig';
 
 /**
  * Generate or update a conversation summary
@@ -41,35 +41,10 @@ export async function generateSummary(
     .map(entry => `${entry.role === 'user' ? 'User' : 'Assistant'}: ${entry.content}`)
     .join('\n');
 
-  // POP is a campaign grievance/engagement portal — a sales-shaped prompt made
-  // the model refuse ("NO SUMMARY TO PROVIDE... not a BCON sales conversation").
-  const systemPrompt = BRAND_ID === 'pop'
-    ? `You are summarizing a citizen conversation for the ${getBrandConfig().name} campaign team. Write 2-3 SHORT plain sentences:
-1. Who they are and how they reached us (web / WhatsApp / call), and their constituency or place if mentioned.
-2. What they raised — grievance, question, support, volunteering — with the specific issue in their own words.
-3. Where it stands and the next step for the team, if any.
-
-Rules: plain prose only — NO markdown, NO asterisks, NO headings, NO meta-commentary. NEVER say there is nothing to summarize; summarize whatever happened, even a single click ("Raised a grievance about X via the web portal"). Never use sales words (lead, pipeline, booking, qualification).`
-    : `You are summarizing a sales conversation for the ${getBrandConfig().name} team. Generate a brief but complete summary that includes:
-1. BUSINESS: What does this lead's business do? (from what THEY said, not form data)
-2. PROBLEM: What challenges or needs did they mention?
-3. DISCUSSION: What solutions or services were discussed?
-4. BOOKING: Was a call booked? What date/time? Did booking succeed or fail?
-5. STATUS: Are they engaged, cold, frustrated, or lost?
-6. RED FLAGS: Did they ask for a human? Get upset? Hit any errors?
-7. NEXT STEP: What should the team do next?
-
-FORM FIELD INTERPRETATION - get these right:
-- VOLUME means how many leads they WANT to handle, NOT how many they currently get. "Upto 100" = wants to scale to 100 leads.
-- URGENCY means how ready they are to start, NOT how urgent their problem is.
-- "No, I am setting up" for AI SYSTEMS = they have no AI yet, they are exploring.
-- WEBSITE "Yes, I have" = they have a website. "No" = they don't.
-Do NOT misrepresent these fields. "Upto 100 leads" does NOT mean "handles 100 leads."
-
-Keep it to 3-5 sentences max. Be specific - use actual details from the conversation, not generic phrases like "high intent" or "shows interest".
-
-BAD: "Lead shows high intent with 50% response rate. Re-engage with follow-up."
-GOOD: "Wasi runs Design Lyf Realty & Interiors in Bangalore - interior design focus. Getting Meta ad leads but quality is poor. Tried to book Monday 3pm but booking tool looped. Got frustrated and asked for a human. Needs manual outreach to recover - call him directly."`;
+  // The summary voice is brand CONTENT: each brand supplies brain.summaryPrompt
+  // in its config (pop = campaign grievance framing, bcon = sales framing);
+  // brands without one get the neutral business prompt from brainConfig.
+  const systemPrompt = getBrainConfig().summaryPrompt;
 
   const userPrompt = `Previous summary:
 ${cleanedPrevious || '(none)'}

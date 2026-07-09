@@ -18,7 +18,7 @@ export const lokazenConfig: BrandConfig = {
   // Sensible defaults for a fresh brand — flip on as Lokazen adopts each feature.
   features: {
     voice: false,
-    brain: false, // Brain UI is BCON-only for now — flip to true to enable
+    brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
     pipelineFunnel: true,
     followUpSequence: false,
     scouts: true, // Scout segment: /dashboard/scouts + scout widget mode + scout KB scope

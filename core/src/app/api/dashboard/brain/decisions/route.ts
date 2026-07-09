@@ -9,6 +9,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export async function GET() {
     const { data: leads, error } = await supabase
       .from('all_leads')
       .select('id, customer_name, unified_context')
-      .in('brand', ['bcon', 'default'])
+      .in('brand', [BRAND_ID, 'default'])
       .limit(2000)
     if (error) throw error
 

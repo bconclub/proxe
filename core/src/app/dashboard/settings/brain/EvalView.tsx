@@ -14,11 +14,12 @@ import { useState, Fragment } from 'react'
 import { MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdShield, MdExpandMore, MdExpandLess } from 'react-icons/md'
 import { JOURNEYS as BCON_JOURNEYS, GATES as BCON_GATES, TEMPLATE_BUTTONS as BCON_BUTTONS, bodyFor as bconBodyFor, type Journey, type JourneyStep } from '@/configs/journeys'
 import { POP_JOURNEYS, POP_GATES, POP_TEMPLATE_BUTTONS, popBodyFor, POP_SAMPLE, POP_VAR_LABEL, POP_OUTCOMES } from '@/configs/journeys.pop'
-import { getCurrentBrandId } from '@/configs'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 
-// POP is voter outreach (grievance loop), everything else is the business
-// lead-gen ladder. One brand per build, so this resolves once at module load.
-const IS_POP = getCurrentBrandId() === 'pop'
+// Which journey set this brand evaluates: 'pop' = voter outreach (grievance
+// loop), 'business' = the lead-gen ladder. Brands with evalJourneys 'none'
+// never mount this view (the Eval tab is hidden on the Brain page).
+const IS_POP = getBrainConfig().evalJourneys === 'pop'
 const JOURNEYS = IS_POP ? POP_JOURNEYS : BCON_JOURNEYS
 const GATES = IS_POP ? POP_GATES : BCON_GATES
 const TEMPLATE_BUTTONS = IS_POP ? POP_TEMPLATE_BUTTONS : BCON_BUTTONS

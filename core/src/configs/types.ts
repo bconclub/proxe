@@ -48,6 +48,35 @@ export interface BrandConfig {
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)
     scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
   };
+  // The Brain (voice orb + insights) — per-brand CONTENT for a shared
+  // functionality. Every field is optional; core/src/lib/brain/brainConfig.ts
+  // fills generic business defaults, so a brand can enable features.brain with
+  // no block at all and still get a working, neutral Brain. POP moves its
+  // campaign persona/vocabulary/languages/palette here instead of hardcoding.
+  brain?: {
+    persona?: string;            // appended to "You are the living Brain of <name>" (e.g. ' — the intelligence behind a political campaign operation in Punjab')
+    vocabularyRule?: string;     // full "Vocabulary:" prompt paragraph
+    quickQuestions?: string[];   // the ?-button fan-out
+    thinkingSteps?: { briefing: string[]; question: string[] }; // orb captions while gathering
+    languages?: Array<{ id: string; label: string; promptRule: string }>; // speaking languages (first = default)
+    voiceId?: string;            // ElevenLabs voice (env ELEVENLABS_VOICE_ID still wins)
+    orbPalette?: {
+      chromeRgb: [number, number, number];              // rings/glow/links
+      sweepRgb?: [number, number, number];              // radar sweep arm
+      particleHues?: Array<{ hue: number; spread: number; weight: number }>; // weighted hue mix
+    };
+    summaryPrompt?: string;      // person-summary system prompt (summarizer.ts)
+    reflectionPersona?: string;  // learning-summary persona (replaces "sales agent")
+    evalJourneys?: 'pop' | 'business' | 'none'; // Eval tab content ('none' hides the tab)
+    voiceAgent?: {
+      testDefaults?: { name?: string; business?: string; industry?: string; phone?: string };
+      voiceNumber?: string;      // display number on the voice tab
+      engines?: Array<'vapi' | 'elevenlabs' | 'sarvam'>; // show engine picker when >1
+      languages?: Array<'pa' | 'hi' | 'en'>;             // show starting-language picker when >1
+      showBusinessFields?: boolean;
+      promptsEditor?: boolean;   // show the per-language voice-prompts editor
+    };
+  };
   // Dashboard vocabulary overrides. The dashboard shell was written in
   // business-CRM English (Leads, High Intent, Booked Calls, Priority Lead
   // Queue…) — a brand whose audience isn't "sales leads" (e.g. pop = voters/

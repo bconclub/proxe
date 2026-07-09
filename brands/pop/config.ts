@@ -117,6 +117,56 @@ export const popConfig: BrandConfig = {
       ],
     },
   ],
+  // The Brain's campaign CONTENT — persona, vocabulary, questions, languages,
+  // voice, palette. The Brain FUNCTIONALITY ships to every brand; this block is
+  // what makes POP's brain talk like a campaign (moved from core hardcodes).
+  brain: {
+    persona: ' — the intelligence behind a political campaign operation in Punjab',
+    vocabularyRule: `Vocabulary: this is a CAMPAIGN, not a sales pipeline. NEVER say "lead", "leads", "pipeline", "hot/warm/cold", "bookings" or CRM words. Say: people, voices, citizens, constituencies, grievances, intent, momentum. Talk about WHERE things are happening — which constituencies people are speaking up from, what issues they're raising, whether they're leaning toward us, who's ready to volunteer or vote. "leader_pushes" in the data are directives the leader pushed to the war-room team plus PROXe's own suggestions, with their status. "news_buzz" is what's moving in news and social media in the last 24 hours — topics, negativity, crisis and opposition signals; use it when talking about what's buzzing or what people are seeing.`,
+    quickQuestions: [
+      'How are the constituencies doing?',
+      'What are the latest leader actions?',
+      'What news is buzzing right now?',
+      'What needs my attention today?',
+    ],
+    thinkingSteps: {
+      briefing: [
+        'reading today…', 'checking the war room…', 'checking recent pushes from leaders…',
+        'reading new voices by constituency…', 'checking what people are responding to…', 'putting it into words…',
+      ],
+      question: ['listening…', 'checking the war room…', 'reading the latest signals…', 'putting it into words…'],
+    },
+    languages: [
+      { id: 'en', label: 'EN', promptRule: 'Speak in natural conversational English.' },
+      { id: 'pa', label: 'ਪੰਜਾਬੀ', promptRule: 'Speak ENTIRELY in natural conversational Punjabi (Gurmukhi script). Spell numbers out in Punjabi words.' },
+      { id: 'hi', label: 'हिंदी', promptRule: 'Speak ENTIRELY in natural conversational Hindi (Devanagari script). Spell numbers out in Hindi words.' },
+    ],
+    voiceId: '2zRM7PkgwBPiau2jvVXc', // Monika Sogam
+    orbPalette: {
+      // Campaign tricolor — blue-led (deep campaign blue), green + a touch of
+      // saffron. Deliberately NOT saffron-led; orange alone is the opposition.
+      chromeRgb: [37, 89, 196],
+      sweepRgb: [34, 160, 92],
+      particleHues: [
+        { hue: 215, spread: 10, weight: 60 }, // campaign blue
+        { hue: 145, spread: 8, weight: 25 },  // green
+        { hue: 25, spread: 6, weight: 15 },   // saffron flecks
+      ],
+    },
+    summaryPrompt: `You are summarizing a citizen conversation for the Pulse of Punjab campaign team. Write 2-3 SHORT plain sentences:
+1. Who they are and how they reached us (web / WhatsApp / call), and their constituency or place if mentioned.
+2. What they raised — grievance, question, support, volunteering — with the specific issue in their own words.
+3. Where it stands and the next step for the team, if any.
+
+Rules: plain prose only — NO markdown, NO asterisks, NO headings, NO meta-commentary. NEVER say there is nothing to summarize; summarize whatever happened, even a single click ("Raised a grievance about X via the web portal"). Never use sales words (lead, pipeline, booking, qualification).`,
+    reflectionPersona: 'the Pulse of Punjab campaign brain',
+    evalJourneys: 'pop',
+    voiceAgent: {
+      engines: ['vapi', 'elevenlabs', 'sarvam'],
+      languages: ['pa', 'hi', 'en'],
+      promptsEditor: true,
+    },
+  },
   // Voter-native dashboard vocabulary. POP's audience is citizens/voters, not
   // sales leads - the dashboard shell's business-CRM words are remapped here
   // (key = default English string used in core components, via brandLabel()).

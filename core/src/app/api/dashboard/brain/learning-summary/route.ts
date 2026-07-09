@@ -4,6 +4,7 @@ import { getServiceClient } from '@/lib/services'
 import { generateResponse } from '@/lib/agent-core'
 import { getTokenUsage, type TokenUsageDoc, type UsageBucket } from '@/lib/token-usage'
 import { BRAND_ID } from '@/configs'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -179,7 +180,7 @@ export async function POST() {
 
     const before = usageWindows(await getTokenUsage())
 
-    const systemPrompt = `You are PROXe Brain, reflecting on today's live activity for the ${BRAND_ID} sales agent.
+    const systemPrompt = `You are PROXe Brain, reflecting on today's live activity for ${getBrainConfig().reflectionPersona}.
 From the chats, human decisions and team notes below, extract what the brain should LEARN — go beyond sequence timing. Look for: shifts in what leads actually want, recurring objections and what answered them, tone that landed, questions that stalled, where the AI proposal diverged from the human and why, and anything the team's notes reveal that the chats don't.
 
 Return STRICT JSON only, no prose around it, in this exact shape:

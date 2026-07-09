@@ -11,7 +11,7 @@ import {
   MdPsychology, MdGroup, MdGridView, MdOutlineForum, MdHub,
   MdNotificationsActive, MdPalette, MdChatBubbleOutline, MdToken,
 } from 'react-icons/md';
-import { getBrandConfig } from '@/configs';
+import { getBrandConfig, brandLabel } from '@/configs';
 
 type Card = {
   href: string;
@@ -35,7 +35,7 @@ export default function SettingsPage() {
     },
     {
       href: '/dashboard/settings/users', title: 'Team & Access',
-      desc: 'Invite teammates, set roles, revoke access. Every lead action is logged by name.',
+      desc: `Invite teammates, set roles, revoke access. Every ${brandLabel('Lead').toLowerCase()} action is logged by name.`,
       icon: <MdGroup size={22} />, color: '#3b82f6',
     },
     {
@@ -78,7 +78,7 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6" style={{ maxWidth: 1120 }}>
+      <div className="p-6">
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Configure</h1>
         <p className="text-xs mb-6" style={{ color: 'var(--text-secondary)' }}>Everything that shapes how PROXe runs, in one place.</p>
 

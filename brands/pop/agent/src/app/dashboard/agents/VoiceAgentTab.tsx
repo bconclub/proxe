@@ -1,21 +1,31 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MdContentCopy, MdCheckCircle, MdPhone, MdGraphicEq, MdSignalCellularAlt,
-  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward,
+  MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd, MdEdit,
+  MdExpandMore, MdExpandLess, MdRecordVoiceOver,
 } from 'react-icons/md';
-import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { getBrandConfig } from '@/configs';
+import { getBrainConfig } from '@/lib/brain/brainConfig';
+import VoicePromptsEditor from '@/components/dashboard/VoicePromptsEditor';
 
 export default function VoiceAgentTab() {
-  const isBcon = getCurrentBrandId() === 'bcon';
-  const isPop = getCurrentBrandId() === 'pop';
-  // Default "call myself" details — prefilled so one click dials without re-typing.
-  // bcon keeps its live founder prefill; other brands get neutral placeholders.
-  // Non-bcon brands (pop grievance) send NO business/industry — leaving the brand
-  // name in `business` leaked it into the greeting and named the lead after the brand.
-  const DEFAULT_ME = isBcon
-    ? { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' }
-    : { name: '', business: '', industry: '', phone: '' };
+  // All brand-specific behavior on this tab (test-call prefill, display number,
+  // engine/language pickers, business fields, prompts editor) comes from the
+  // brand's brain.voiceAgent config block — no brand ids in the component.
+  const VA = getBrainConfig().voiceAgent;
+  const hasEnginePicker = (VA.engines?.length || 0) > 1;
+  const hasLangPicker = (VA.languages?.length || 0) > 1;
+  // Default "call myself" details — prefilled so one click dials without
+  // re-typing (bcon supplies its founder prefill via config). Brands without a
+  // prefill send NO business/industry — leaving the brand name in `business`
+  // leaked it into the greeting and named the lead after the brand.
+  const DEFAULT_ME = {
+    name: VA.testDefaults?.name || '',
+    business: VA.testDefaults?.business || '',
+    industry: VA.testDefaults?.industry || '',
+    phone: VA.testDefaults?.phone || '',
+  };
 
   const [phone, setPhone] = useState(DEFAULT_ME.phone);
   const [personName, setPersonName] = useState(DEFAULT_ME.name);
@@ -25,10 +35,26 @@ export default function VoiceAgentTab() {
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
-  // POP-only A/B: which engine dials — V1 (Vapi orchestration + 11labs voice) or
-  // V2 (ElevenLabs end-to-end: its own STT+LLM+TTS). Same number either way.
-  const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>('vapi');
+  // Engine A/B (config-gated): which engine dials — V1 (Vapi orchestration +
+  // 11labs voice), V2 (ElevenLabs end-to-end), V3 (Sarvam). Same number.
+  const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>(VA.engines?.[0] || 'vapi');
+  // Starting language (config-gated): the agent begins here and switches to
+  // whatever language the caller speaks. Only the prompt + opening change.
+  const [lang, setLang] = useState<'pa' | 'hi' | 'en'>(VA.languages?.[0] || 'en');
+  const [showPrompts, setShowPrompts] = useState(false);
+  const LANGS: Record<'pa' | 'hi' | 'en', { label: string; native: string }> = {
+    pa: { label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+    hi: { label: 'Hindi', native: 'हिंदी' },
+    en: { label: 'English', native: 'English' },
+  };
   const [elapsed, setElapsed] = useState(0);
+  // Manual-hangup flag: set by End Call so the status poll stops and never
+  // re-shows "Talking" after the user has ended it. A ref (not state) so the
+  // running poll loop reads the latest value without a re-subscribe.
+  const endedRef = useRef(false);
+  // The live call id being polled — needed so End Call can tell the backend
+  // which call to hang up.
+  const callIdRef = useRef<string | null>(null);
   const callActive = !!live && live.status !== 'ended';
   useEffect(() => {
     if (!callActive) return;
@@ -37,18 +63,16 @@ export default function VoiceAgentTab() {
   }, [callActive]);
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
-  const voiceNumber = isBcon
-    ? '+918046733388'
-    : (process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending');
-  const showBusinessFields = isBcon;
+  const voiceNumber = VA.voiceNumber || process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending';
+  const showBusinessFields = !!VA.showBusinessFields;
   const canCall = !!phone.trim() && (!showBusinessFields || !!(businessName.trim() && industry.trim()));
   // V1/V2 labels + the stack each runs, so it's clear what the flow is.
   const ENGINES: Record<'vapi' | 'elevenlabs' | 'sarvam', { label: string; stack: string; flow: string }> = {
-    vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: isPop ? 'POP Grievance Outbound' : getBrandConfig().name },
+    vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: hasEnginePicker ? 'POP Grievance Outbound' : getBrandConfig().name },
     elevenlabs: { label: 'V2', stack: 'ElevenLabs end-to-end · ASR + LLM + TTS', flow: 'Grievance PUNJAB' },
     sarvam: { label: 'V3', stack: 'Sarvam end-to-end · STT + LLM + TTS (over Vobiz stream)', flow: 'Sarvam Grievance' },
   };
-  const activeFlow = isPop ? ENGINES[engine].flow : getBrandConfig().name;
+  const activeFlow = hasEnginePicker ? ENGINES[engine].flow : getBrandConfig().name;
 
   type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
 
@@ -64,15 +88,18 @@ export default function VoiceAgentTab() {
     setStatus('');
     setElapsed(0);
     setLive(null);
+    endedRef.current = false;
+    callIdRef.current = null;
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...vals, direction: 'cold_intro', engine }),
+        body: JSON.stringify({ ...vals, direction: 'cold_intro', engine, language: lang }),
       });
       const data = await res.json();
       if (data.success && data.callId) {
         setStatus('');
+        callIdRef.current = String(data.callId);
         if (engine === 'vapi') {
           // Vapi exposes live status via our call-status proxy.
           setLive({ status: 'queued' });
@@ -83,7 +110,6 @@ export default function VoiceAgentTab() {
           pollStatus(String(data.callId), 'sarvam');
         } else {
           setLive({ status: 'placed' });
-          pollStatus(String(data.callId), 'elevenlabs');
         }
       } else {
         setStatus(`Failed: ${typeof data.error === 'object' ? JSON.stringify(data.error) : data.error}`);
@@ -100,16 +126,35 @@ export default function VoiceAgentTab() {
   async function pollStatus(id: string, eng?: string) {
     for (let i = 0; i < 80; i++) {
       await new Promise((r) => setTimeout(r, 3000));
+      if (endedRef.current) return; // ended from the dashboard — stop polling
       try {
         const q = `id=${encodeURIComponent(id)}${eng ? `&engine=${eng}` : ''}`;
         const r = await fetch(`/api/agent/voice/call-status?${q}`);
         const d = await r.json();
+        if (endedRef.current) return;
         if (d && d.status) {
           setLive({ status: d.status, reasonText: d.reasonText, durationSeconds: d.durationSeconds });
           if (d.ended) break;
         }
       } catch { /* transient — keep polling */ }
     }
+  }
+
+  // End the live call from the dashboard. Clears the UI immediately (so it can
+  // never stay stuck on "Talking"), then best-effort tells the backend to hang
+  // up the actual phone call.
+  async function hangUp() {
+    endedRef.current = true;
+    const id = callIdRef.current;
+    setLive({ status: 'ended', reasonText: 'Ended from dashboard' });
+    if (!id) return;
+    try {
+      await fetch('/api/agent/voice/end-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, engine }),
+      });
+    } catch { /* UI already cleared; backend end is best-effort */ }
   }
 
   function callState(l: NonNullable<typeof live>) {
@@ -208,12 +253,12 @@ export default function VoiceAgentTab() {
               </div>
             </div>
 
-            {/* V1 / V2 provider (pop A/B) */}
-            {isPop && (
+            {/* Outbound provider A/B (config-gated: brain.voiceAgent.engines) */}
+            {hasEnginePicker && (
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Outbound provider</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {(['vapi', 'elevenlabs', 'sarvam'] as const).map((val) => {
+                  {(VA.engines || ['vapi']).map((val) => {
                     const on = engine === val;
                     const c = val === 'sarvam' ? '#8b5cf6' : 'var(--accent-primary)';
                     return (
@@ -231,6 +276,37 @@ export default function VoiceAgentTab() {
                   })}
                 </div>
                 <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>{ENGINES[engine].stack}</p>
+              </div>
+            )}
+
+            {/* Starting language (config-gated: brain.voiceAgent.languages) */}
+            {hasLangPicker && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Starting language</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(VA.languages || ['en']).map((val) => {
+                    const on = lang === val;
+                    return (
+                      <button key={val} onClick={() => setLang(val)} disabled={calling}
+                        style={{
+                          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '9px 12px', borderRadius: 10,
+                          fontSize: 13, fontWeight: 800, cursor: calling ? 'not-allowed' : 'pointer',
+                          background: on ? 'var(--accent-subtle)' : 'var(--bg-primary)',
+                          color: on ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                          border: `1px solid ${on ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+                        }}>
+                        <span style={{ fontSize: 15 }}>{LANGS[val].native}</span>
+                        <span style={{ fontSize: 10.5, fontWeight: 600, opacity: 0.8 }}>{LANGS[val].label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ margin: '7px 0 0', fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>Agent opens in {LANGS[lang].label}, then follows the caller&apos;s language.</span>
+                  <button onClick={() => setShowPrompts(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 700, color: 'var(--accent-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 11 }}>
+                    <MdEdit size={12} /> Edit prompts
+                  </button>
+                </p>
               </div>
             )}
 
@@ -274,6 +350,16 @@ export default function VoiceAgentTab() {
                   </div>
                   {live.status !== 'placed' && (s.active || live.durationSeconds != null) && (
                     <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{mmss(secs)}</span>
+                  )}
+                  {s.active && (
+                    <button onClick={hangUp} title="End call"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 999,
+                        border: '1px solid #ef444455', background: '#ef44441a', color: '#ef4444',
+                        fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flex: 'none',
+                      }}>
+                      <MdCallEnd size={16} /> End Call
+                    </button>
                   )}
                 </div>
               );
@@ -320,6 +406,28 @@ export default function VoiceAgentTab() {
           </button>
         </div>
       </div>
+
+      {/* Voice Prompts — editable right here, per language (config-gated) */}
+      {VA.promptsEditor && (
+        <div style={{ marginTop: 20, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, overflow: 'hidden' }}>
+          <button onClick={() => setShowPrompts((v) => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '16px 20px',
+            background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+          }}>
+            <MdRecordVoiceOver size={19} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--text-primary)' }}>Voice Prompts — English · Hindi · Punjabi</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 1 }}>The one place the call reads from — edits apply to V1, V2 and V3 on the next call. Not hardcoded, not Vapi.</div>
+            </div>
+            {showPrompts ? <MdExpandLess size={20} style={{ color: 'var(--text-muted)' }} /> : <MdExpandMore size={20} style={{ color: 'var(--text-muted)' }} />}
+          </button>
+          {showPrompts && (
+            <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--border-primary)' }}>
+              <div style={{ marginTop: 16 }}><VoicePromptsEditor compact /></div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -12,10 +12,22 @@
 
 import { useState, Fragment } from 'react'
 import { MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdShield, MdExpandMore, MdExpandLess } from 'react-icons/md'
-import { JOURNEYS, GATES, TEMPLATE_BUTTONS, bodyFor, type Journey, type JourneyStep } from '@/configs/journeys'
+import { JOURNEYS as BCON_JOURNEYS, GATES as BCON_GATES, TEMPLATE_BUTTONS as BCON_BUTTONS, bodyFor as bconBodyFor, type Journey, type JourneyStep } from '@/configs/journeys'
+import { POP_JOURNEYS, POP_GATES, POP_TEMPLATE_BUTTONS, popBodyFor, POP_SAMPLE, POP_VAR_LABEL, POP_OUTCOMES } from '@/configs/journeys.pop'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
 
-// The sample lead every preview is filled with (same fixture as the test bench).
-const SAMPLE: Record<string, string> = {
+// Which journey set this brand evaluates: 'pop' = voter outreach (grievance
+// loop), 'business' = the lead-gen ladder. Brands with evalJourneys 'none'
+// never mount this view (the Eval tab is hidden on the Brain page).
+const IS_POP = getBrainConfig().evalJourneys === 'pop'
+const JOURNEYS = IS_POP ? POP_JOURNEYS : BCON_JOURNEYS
+const GATES = IS_POP ? POP_GATES : BCON_GATES
+const TEMPLATE_BUTTONS = IS_POP ? POP_TEMPLATE_BUTTONS : BCON_BUTTONS
+const bodyFor = IS_POP ? popBodyFor : bconBodyFor
+
+// The sample every preview is filled with — a citizen for POP, a business
+// lead for everyone else (same fixture as the test bench).
+const SAMPLE: Record<string, string> = IS_POP ? POP_SAMPLE : {
   customer_name: 'Shiv',
   brand_name: "Shiv's Laundry",
   business_name: "Shiv's Laundry",
@@ -24,7 +36,7 @@ const SAMPLE: Record<string, string> = {
   pain_point: 'getting consistent leads',
   probe_question: "What's the one thing you want to fix first?",
 }
-const VAR_LABEL: Record<string, string> = {
+const VAR_LABEL: Record<string, string> = IS_POP ? POP_VAR_LABEL : {
   customer_name: 'name', brand_name: 'brand', business_name: 'brand',
   service_interest: 'goal', booking_time: 'time', pain_point: 'challenge', probe_question: 'probe',
 }
@@ -118,7 +130,7 @@ function Bubble({ step, tone, showVars, onSend, sendState }: {
   )
 }
 
-const OUTCOMES: Array<{ id: string; label: string }> = [
+const OUTCOMES: Array<{ id: string; label: string }> = IS_POP ? POP_OUTCOMES : [
   { id: 'ghost', label: 'Never replies' },
   { id: 'nudge', label: 'Goes quiet mid-chat' },
   { id: 'engaged', label: 'Chats, does not book' },
@@ -168,7 +180,9 @@ export default function EvalView() {
       <div style={{ marginBottom: 16, padding: '12px 15px', borderRadius: 12, background: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)' }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>Every message PROXe can send, in one place.</div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-          Pick how a lead arrives and what happens next. You'll see the exact WhatsApp messages in order - filled in for a sample lead - with the template behind each one. Tap <strong>Send to my WhatsApp</strong> on any message to feel it on your own phone. Real leads are never touched.
+          {IS_POP
+            ? <>Pick how a citizen arrives and what happens next. You&apos;ll see the exact WhatsApp messages in order - filled in for a sample person - with the template behind each one. Tap <strong>Send to my WhatsApp</strong> on any message to feel it on your own phone. Real people are never touched.</>
+            : <>Pick how a lead arrives and what happens next. You&apos;ll see the exact WhatsApp messages in order - filled in for a sample lead - with the template behind each one. Tap <strong>Send to my WhatsApp</strong> on any message to feel it on your own phone. Real leads are never touched.</>}
         </div>
       </div>
 
@@ -176,7 +190,7 @@ export default function EvalView() {
       <div style={{ padding: 16, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
           <div>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 6 }}>1 · HOW DOES THE LEAD ARRIVE?</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 6 }}>{IS_POP ? '1 · HOW DOES THE PERSON ARRIVE?' : '1 · HOW DOES THE LEAD ARRIVE?'}</div>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {entry.steps.map((s, i) => (
                 <button key={s.label} onClick={() => setSource(i)} style={{

@@ -5,19 +5,27 @@ import {
   MdChatBubbleOutline, MdLink, MdShield, MdArrowForward, MdCallEnd, MdEdit,
   MdExpandMore, MdExpandLess, MdRecordVoiceOver,
 } from 'react-icons/md';
-import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { getBrandConfig } from '@/configs';
+import { getBrainConfig } from '@/lib/brain/brainConfig';
 import VoicePromptsEditor from '@/components/dashboard/VoicePromptsEditor';
 
 export default function VoiceAgentTab() {
-  const isBcon = getCurrentBrandId() === 'bcon';
-  const isPop = getCurrentBrandId() === 'pop';
-  // Default "call myself" details — prefilled so one click dials without re-typing.
-  // bcon keeps its live founder prefill; other brands get neutral placeholders.
-  // Non-bcon brands (pop grievance) send NO business/industry — leaving the brand
-  // name in `business` leaked it into the greeting and named the lead after the brand.
-  const DEFAULT_ME = isBcon
-    ? { name: 'Thanzeel', business: 'BCON Club', industry: 'Marketing and AI', phone: '9731660933' }
-    : { name: '', business: '', industry: '', phone: '' };
+  // All brand-specific behavior on this tab (test-call prefill, display number,
+  // engine/language pickers, business fields, prompts editor) comes from the
+  // brand's brain.voiceAgent config block — no brand ids in the component.
+  const VA = getBrainConfig().voiceAgent;
+  const hasEnginePicker = (VA.engines?.length || 0) > 1;
+  const hasLangPicker = (VA.languages?.length || 0) > 1;
+  // Default "call myself" details — prefilled so one click dials without
+  // re-typing (bcon supplies its founder prefill via config). Brands without a
+  // prefill send NO business/industry — leaving the brand name in `business`
+  // leaked it into the greeting and named the lead after the brand.
+  const DEFAULT_ME = {
+    name: VA.testDefaults?.name || '',
+    business: VA.testDefaults?.business || '',
+    industry: VA.testDefaults?.industry || '',
+    phone: VA.testDefaults?.phone || '',
+  };
 
   const [phone, setPhone] = useState(DEFAULT_ME.phone);
   const [personName, setPersonName] = useState(DEFAULT_ME.name);
@@ -27,13 +35,12 @@ export default function VoiceAgentTab() {
   const [calling, setCalling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [live, setLive] = useState<null | { status: string; reasonText?: string | null; durationSeconds?: number | null }>(null);
-  // POP-only A/B: which engine dials — V1 (Vapi orchestration + 11labs voice) or
-  // V2 (ElevenLabs end-to-end: its own STT+LLM+TTS). Same number either way.
-  const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>('vapi');
-  // POP-only: starting language for the grievance call. The agent begins here and
-  // switches to whatever language the caller speaks. Lets us test pa/hi/en calls
-  // individually. Same number, same engine — only the prompt + opening change.
-  const [lang, setLang] = useState<'pa' | 'hi' | 'en'>('pa');
+  // Engine A/B (config-gated): which engine dials — V1 (Vapi orchestration +
+  // 11labs voice), V2 (ElevenLabs end-to-end), V3 (Sarvam). Same number.
+  const [engine, setEngine] = useState<'vapi' | 'elevenlabs' | 'sarvam'>(VA.engines?.[0] || 'vapi');
+  // Starting language (config-gated): the agent begins here and switches to
+  // whatever language the caller speaks. Only the prompt + opening change.
+  const [lang, setLang] = useState<'pa' | 'hi' | 'en'>(VA.languages?.[0] || 'en');
   const [showPrompts, setShowPrompts] = useState(false);
   const LANGS: Record<'pa' | 'hi' | 'en', { label: string; native: string }> = {
     pa: { label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
@@ -56,18 +63,16 @@ export default function VoiceAgentTab() {
   }, [callActive]);
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
-  const voiceNumber = isBcon
-    ? '+918046733388'
-    : (process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending');
-  const showBusinessFields = isBcon;
+  const voiceNumber = VA.voiceNumber || process.env.NEXT_PUBLIC_VOICE_NUMBER || 'Number pending';
+  const showBusinessFields = !!VA.showBusinessFields;
   const canCall = !!phone.trim() && (!showBusinessFields || !!(businessName.trim() && industry.trim()));
   // V1/V2 labels + the stack each runs, so it's clear what the flow is.
   const ENGINES: Record<'vapi' | 'elevenlabs' | 'sarvam', { label: string; stack: string; flow: string }> = {
-    vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: isPop ? 'POP Grievance Outbound' : getBrandConfig().name },
+    vapi: { label: 'V1', stack: 'Azure STT · GPT-4o-mini · 11Labs voice', flow: hasEnginePicker ? 'POP Grievance Outbound' : getBrandConfig().name },
     elevenlabs: { label: 'V2', stack: 'ElevenLabs end-to-end · ASR + LLM + TTS', flow: 'Grievance PUNJAB' },
     sarvam: { label: 'V3', stack: 'Sarvam end-to-end · STT + LLM + TTS (over Vobiz stream)', flow: 'Sarvam Grievance' },
   };
-  const activeFlow = isPop ? ENGINES[engine].flow : getBrandConfig().name;
+  const activeFlow = hasEnginePicker ? ENGINES[engine].flow : getBrandConfig().name;
 
   type CallVals = { phone: string; contactName: string; businessName: string; industry: string };
 
@@ -248,12 +253,12 @@ export default function VoiceAgentTab() {
               </div>
             </div>
 
-            {/* V1 / V2 provider (pop A/B) */}
-            {isPop && (
+            {/* Outbound provider A/B (config-gated: brain.voiceAgent.engines) */}
+            {hasEnginePicker && (
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Outbound provider</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {(['vapi', 'elevenlabs', 'sarvam'] as const).map((val) => {
+                  {(VA.engines || ['vapi']).map((val) => {
                     const on = engine === val;
                     const c = val === 'sarvam' ? '#8b5cf6' : 'var(--accent-primary)';
                     return (
@@ -274,12 +279,12 @@ export default function VoiceAgentTab() {
               </div>
             )}
 
-            {/* Starting language (pop grievance) — agent begins here, switches to the caller */}
-            {isPop && (
+            {/* Starting language (config-gated: brain.voiceAgent.languages) */}
+            {hasLangPicker && (
               <div>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>Starting language</label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {(['pa', 'hi', 'en'] as const).map((val) => {
+                  {(VA.languages || ['en']).map((val) => {
                     const on = lang === val;
                     return (
                       <button key={val} onClick={() => setLang(val)} disabled={calling}
@@ -402,8 +407,8 @@ export default function VoiceAgentTab() {
         </div>
       </div>
 
-      {/* Voice Prompts — editable right here, per language (pop grievance) */}
-      {isPop && (
+      {/* Voice Prompts — editable right here, per language (config-gated) */}
+      {VA.promptsEditor && (
         <div style={{ marginTop: 20, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 16, overflow: 'hidden' }}>
           <button onClick={() => setShowPrompts((v) => !v)} style={{
             display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '16px 20px',
