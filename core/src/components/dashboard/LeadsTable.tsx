@@ -870,7 +870,10 @@ export default function LeadsTable({
           actually stay put. Without min-h-0 the child grows to content height,
           the page scrolls, and the "sticky" header rides away with it. */}
       <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
-        <table className="w-full" style={{ tableLayout: 'fixed' }}>
+        {/* min-width so the many columns keep readable widths and the wrapper
+            scrolls horizontally on small screens, instead of squishing (and
+            clipping) every column to fit a phone. */}
+        <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 900 }}>
           {brandId === 'pop' ? (
             <colgroup>
               {/* POP constituent view - widths sum to 100% */}

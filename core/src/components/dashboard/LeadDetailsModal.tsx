@@ -1718,7 +1718,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           open={isOpen}
           className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg z-50 flex flex-col"
           style={{
-            width: '54vw',
+            // 54vw collapsed to a ~200px sliver on a phone; min() fills small
+            // screens (94vw) while still capping at 720px on desktop.
+            width: 'min(720px, 94vw)',
             maxWidth: '720px',
             height: '88vh',
             maxHeight: '88vh',
@@ -1858,7 +1860,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           )}
 
           {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
-          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-[var(--border-primary)] flex-shrink-0 relative min-h-[140px]">
+          <header className="lead-modal-header lead-details-modal-header flex flex-col md:flex-row items-stretch gap-4 md:gap-6 p-4 border-b border-[var(--border-primary)] flex-shrink-0 relative md:min-h-[140px]">
             {/* LEFT HALF: Contact Card - Business Card Style */}
             <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
               {/* Top Section: Name, Score, Status */}
@@ -2770,7 +2772,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           </header>
 
           {/* TABS */}
-          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
+          <nav className="lead-modal-tabs lead-details-modal-tabs flex flex-nowrap overflow-x-auto border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
               style={{ display: tabOn('summary') ? undefined : 'none' }}

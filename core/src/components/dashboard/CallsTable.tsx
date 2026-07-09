@@ -300,7 +300,9 @@ export default function CallsTable() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left">
+            {/* min-width so columns keep readable widths and the wrapper scrolls
+                on small screens instead of wrapping/squishing every cell. */}
+            <table className="min-w-full text-left" style={{ minWidth: 720 }}>
               <thead>
                 <tr className="text-[11px] uppercase tracking-wide border-b" style={{ color: 'var(--text-muted)', borderColor: 'var(--border-primary)' }}>
                   <th className="px-4 py-2.5 font-medium">Contact</th>

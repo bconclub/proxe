@@ -1,3 +1,11 @@
+## 2026-07-09 15:10 IST · fix: responsive pass — dashboard stops breaking on small screens
+
+- Audited every POP surface for small-screen breakage. Two real breakers fixed:
+  - People table (LeadsTable): table-layout:fixed + w-full squished 9 columns to fit a phone (clipping content). Gave it minWidth 900 so the existing overflow-x wrapper scrolls at readable widths instead. Calls table got the same treatment (minWidth 720).
+  - Person detail modal: width was 54vw → a ~200px sliver on a 375px phone; now min(720px, 94vw) so it fills small screens and still caps at 720px on desktop. The two-half header (contact card | journey+stats) now stacks on mobile (flex-col md:flex-row); the 6-tab row scrolls horizontally (flex-nowrap overflow-x-auto) instead of clipping/wrapping.
+- Verified already-responsive (no change): home (grids collapse grid-cols-2→md-3→xl-6, vertical scroll on mobile), War Room (useIsMobile, 2-col KPI on mobile), Configure (auto-fill grid), Listen + D2D (auto-fit minmax grids; D2D booth table already scrolls), Ask PROXe / Snapshot / Notifications (min(_,94vw)).
+- (pending-sha) — needs a manual 375px eyeball on prod (auth-gated pages can't be driven from here).
+
 ## 2026-07-09 14:55 IST · fix(pop): War Room demo polish — living trend curves, headline slimmed
 
 - User-facing: every War Room trend line (KPI sparklines + District Comparison) reads as a gentle rising wobble instead of flat-then-cliff. The re-dated seed put nearly all volume in the last few days; display curves are now reshaped to the real total with organic variation (deterministic, 30% real daily signal retained).
