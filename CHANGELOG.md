@@ -1,3 +1,12 @@
+## 2026-07-10 05:40 IST · feat(core): Activity Sources on every brand + movable home cards; orb polish; brain quick-actions
+
+- Activity Sources card on EVERY brand's overview (was POP-only): touchpoints by channel · last 30 days, in the reference layout — stat strip (total / vs prior 7d / daily avg), ranked channel rows with bars + counts + trend arrows, and a "★ Top source" highlight panel. Fed by a new brand-generic channel aggregation in founder-metrics (zero extra queries). Conversations Trend remains only as a zero-data fallback.
+- Movable home cards: Engine Overview / Upcoming Events / Priority Queue / Activity Sources can be drag-swapped via a hover grip; layout persists per browser; a Reset button appears in the top bar when customized.
+- Voice orb: aura is now a LIGHT full-page gradient wash (screen-blended, slowly drifting) instead of the hard edge rim; docked orb doubled to 144px (viewport-clamped); FIXED fullscreen rendering as a giant blur (canvas resolution now updates on docked⇄full toggle).
+- Brain quick-actions: the brain can now attach actions (call / open page / open lead) to its replies — buttons render under Ask PROXe answers and the voice briefing (new lib/brain/actions + wiring in the brain routes).
+- User-facing: same dashboard shape on every brand; drag cards to taste; the brain looks right at both sizes and lights the page while talking.
+- `(pending-sha)`
+
 ## 2026-07-10 03:10 IST · feat(core): v0.2 — mini voice orb + Lens aura; bell = what's-new only; top bar decluttered
 
 - Docked brain shrunk to a ~72px floating light (compact orb: no caption/close/lang; tiny × and ⤢ appear on hover). Full screen unchanged.

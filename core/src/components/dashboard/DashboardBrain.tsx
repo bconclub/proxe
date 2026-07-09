@@ -11,9 +11,11 @@
 
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import dynamic from 'next/dynamic'
-import { MdClose, MdSend, MdArrowForward } from 'react-icons/md'
+import { useRouter } from 'next/navigation'
+import { MdClose, MdSend, MdArrowForward, MdCall, MdOpenInNew } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
 import { BRAND_ID } from '@/configs'
+import { PAGE_ROUTES, type BrainAction } from '@/lib/brain/actions'
 
 // The full brain the dock expands into — the talking spiral orb. Loaded lazily
 // (canvas/window heavy) and only when the dock is clicked.
@@ -29,7 +31,7 @@ const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean }
 
 const IS_POP = BRAND_ID === 'pop'
 
-type Msg = { role: 'user' | 'assistant'; content: string }
+type Msg = { role: 'user' | 'assistant'; content: string; actions?: BrainAction[] }
 
 // Inline bold: split on **...** and wrap the captured parts in <strong>.
 function renderInline(text: string, keyPrefix: string) {
@@ -176,7 +178,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // `dock` mode — the inline "Ask PROXe" button is unaffected.
   const DOCK_SIZE = 52
   const DOCK_MARGIN = 16
-  const MINI = 72 // docked orb ≈ the dock bubble — a small expressive light
+  const MINI = 144 // docked orb — roughly 2× the dock bubble; expressive but compact
   const dockRef = useRef<HTMLButtonElement | null>(null)
   const [dockPos, setDockPos] = useState<{ x: number; y: number } | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -209,6 +211,15 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     setWaking(false)
     setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen, view })
   }, [])
+  // The orb renderers size their canvas from clientWidth on WINDOW resize only —
+  // toggling docked ⇄ full changes the CONTAINER, not the window, so without
+  // this kick the canvas stays at the old resolution (fullscreen = giant blur).
+  useEffect(() => {
+    if (!orb) return
+    const raf = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
+    return () => cancelAnimationFrame(raf)
+  }, [orb?.view, orb])
+
   // Single click → brain in place (docked). Double click → full screen. The
   // short timer disambiguates: a second click inside the window means double.
   const onDockClick = useCallback(() => {
@@ -296,11 +307,49 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, open])
 
+  // ── Brain actions — the brain drives the dashboard ───────────────────────
+  // Validated actions come back with the answer (features.brainActions brands).
+  // Navigation keeps the dock alive (it's mounted in DashboardLayout); the
+  // full-screen orb collapses to the corner so the opened page is visible.
+  const router = useRouter()
+  const [dialing, setDialing] = useState<string | null>(null)
+  const executeAction = useCallback(async (a: BrainAction) => {
+    if (a.type === 'open_lead' || a.type === 'open_page') {
+      const href = a.type === 'open_lead'
+        ? `/dashboard/inbox?lead=${encodeURIComponent(a.leadId)}&channel=${a.channel}`
+        : (PAGE_ROUTES[a.page] || '/dashboard')
+      setOpen(false)
+      setOrb((o) => (o && o.view === 'full' ? { ...o, view: 'docked' } : o))
+      router.push(href)
+      return
+    }
+    if (a.type === 'dial') {
+      // Consent = this click. Voice never reaches here (dial is chat-only v1).
+      if (dialing) return
+      setDialing(a.phone)
+      setError(null)
+      try {
+        const res = await fetch('/api/agent/voice/test-call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: a.phone, leadName: a.leadName }),
+        })
+        const d = await res.json().catch(() => ({}))
+        if (!res.ok || d?.error) throw new Error(d?.error || 'Could not place the call')
+        setMessages((m) => [...m, { role: 'assistant', content: `Call placed to **${a.leadName}**. It should ring in a few seconds.` }])
+      } catch (err: any) {
+        setError(err?.message || 'Could not place the call')
+      } finally {
+        setDialing(null)
+      }
+    }
+  }, [router, dialing])
+
   const ask = useCallback(async (question: string) => {
     const q = question.trim()
     if (!q || loading) return
     setError(null)
-    const history = messages.slice(-6)
+    const history = messages.slice(-6).map(({ role, content }) => ({ role, content }))
     setMessages((m) => [...m, { role: 'user', content: q }])
     setInput('')
     setFollowups([])
@@ -313,14 +362,19 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to answer')
-      setMessages((m) => [...m, { role: 'assistant', content: data.answer || '(no answer)' }])
+      const actions: BrainAction[] = Array.isArray(data.actions) ? data.actions : []
+      setMessages((m) => [...m, { role: 'assistant', content: data.answer || '(no answer)', actions }])
       setFollowups(Array.isArray(data.followups) ? data.followups : [])
+      // Explicit "show me X" → the server marked the action auto → open it now.
+      // A beat of delay lets the answer land before the page changes underneath.
+      const autoNav = actions.find((a) => a.type !== 'dial' && a.auto)
+      if (autoNav) setTimeout(() => executeAction(autoNav), 700)
     } catch (err: any) {
       setError(err?.message || 'Failed to answer')
     } finally {
       setLoading(false)
     }
-  }, [loading, messages])
+  }, [loading, messages, executeAction])
 
   // A non-primary dock instance (nested layout) renders nothing at all.
   if (dock && !isPrimaryDock) return null
@@ -449,16 +503,16 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           style={orb.view === 'full'
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
-                // tiny floating orb, centered on where the dock sits
-                left: dockPos ? dockPos.x + DOCK_SIZE / 2 - MINI / 2 : undefined,
-                top: dockPos ? dockPos.y + DOCK_SIZE / 2 - MINI / 2 : undefined,
+                // small floating orb, centered on the dock but clamped on-screen
+                left: dockPos ? Math.min(Math.max(8, dockPos.x + DOCK_SIZE / 2 - MINI / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - MINI - 8) : undefined,
+                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - MINI / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - MINI - 8) : undefined,
                 right: dockPos ? undefined : 10, bottom: dockPos ? undefined : 10,
                 width: MINI, height: MINI, background: 'transparent', overflow: 'visible',
                 animation: 'wc-orb-pop 220ms cubic-bezier(0.2,0,0,1)',
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
         >
-          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} />
+          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction} />
           {/* controls: full → big collapse arrow; docked → tiny × + ⤢, only on hover */}
           {orb.view === 'full' ? (
             <button
@@ -588,7 +642,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               )}
 
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
                     className="max-w-[85%] px-3 py-2 rounded-2xl text-sm"
                     style={
@@ -599,6 +653,27 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   >
                     {m.role === 'assistant' ? renderRich(m.content) : m.content}
                   </div>
+                  {/* Brain actions — filled accent buttons (vs outline followup
+                      chips): tap to open the lead/page or place the call. */}
+                  {m.role === 'assistant' && (m.actions?.length ?? 0) > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-1.5 max-w-[85%]">
+                      {m.actions!.map((a, ai) => {
+                        const isDialing = a.type === 'dial' && dialing === a.phone
+                        return (
+                          <button
+                            key={`${i}-act-${ai}`}
+                            onClick={() => executeAction(a)}
+                            disabled={!!dialing && a.type === 'dial'}
+                            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition disabled:opacity-60"
+                            style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
+                          >
+                            {a.type === 'dial' ? <MdCall size={13} /> : <MdOpenInNew size={13} />}
+                            <span>{isDialing ? 'Calling…' : a.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -673,48 +748,26 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           from { opacity: 0; transform: translateY(12px) scale(0.9); transform-origin: bottom right; }
           to   { opacity: 1; transform: translateY(0) scale(1); transform-origin: bottom right; }
         }
-        /* Lens-style viewport aura: a blurred gradient RIM (mask keeps the
-           middle clear) whose colors drift (hue-rotate) and breathe. */
-        .proxe-voice-aura::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          padding: 10px; /* rim thickness before blur */
-          background: linear-gradient(115deg, #4285F4, #9B72CB 30%, #D96570 55%, #F2A60C 80%, #4285F4);
-          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
-          filter: blur(18px) saturate(160%);
-          animation: proxe-aura-drift-a 7s linear infinite, proxe-aura-breathe 2.6s ease-in-out infinite;
+        /* Voice aura: a LIGHT full-page gradient wash — the whole background
+           takes a gentle Lens-style tint while the brain is interacting. No
+           rims, no hard overlay: screen-blended, heavily blurred, low opacity,
+           colors drifting slowly. */
+        .proxe-voice-aura {
+          background:
+            radial-gradient(120% 90% at 15% 0%, rgba(66,133,244,0.22), transparent 55%),
+            radial-gradient(120% 90% at 85% 10%, rgba(155,114,203,0.20), transparent 55%),
+            radial-gradient(130% 100% at 80% 100%, rgba(217,101,112,0.20), transparent 55%),
+            radial-gradient(130% 100% at 10% 95%, rgba(242,166,12,0.18), transparent 55%);
+          mix-blend-mode: screen;
+          animation: proxe-aura-wash 9s linear infinite, proxe-aura-breathe 3.2s ease-in-out infinite;
         }
-        /* second, wider + softer pass so the glow bleeds into the page */
-        .proxe-voice-aura::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          padding: 26px;
-          background: linear-gradient(245deg, #4285F4, #9B72CB 35%, #D96570 60%, #F2A60C 85%, #4285F4);
-          -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
-          filter: blur(46px) saturate(140%);
-          opacity: 0.55;
-          animation: proxe-aura-drift-b 9s linear infinite reverse, proxe-aura-breathe 2.6s ease-in-out infinite;
-        }
-        /* hue-rotate rides inside filter, so each layer keeps its own blur */
-        @keyframes proxe-aura-drift-a {
-          from { filter: blur(18px) saturate(160%) hue-rotate(0deg); }
-          to   { filter: blur(18px) saturate(160%) hue-rotate(360deg); }
-        }
-        @keyframes proxe-aura-drift-b {
-          from { filter: blur(46px) saturate(140%) hue-rotate(0deg); }
-          to   { filter: blur(46px) saturate(140%) hue-rotate(360deg); }
+        @keyframes proxe-aura-wash {
+          from { filter: blur(48px) saturate(130%) hue-rotate(0deg); }
+          to   { filter: blur(48px) saturate(130%) hue-rotate(360deg); }
         }
         @keyframes proxe-aura-breathe {
-          0%, 100% { opacity: 0.75; }
-          50%      { opacity: 1; }
+          0%, 100% { opacity: 0.55; }
+          50%      { opacity: 0.9; }
         }
       `}</style>
     </>

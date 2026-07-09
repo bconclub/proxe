@@ -43,6 +43,7 @@ export interface BrandConfig {
   features?: {
     voice?: boolean;            // Vapi outbound calls + /dashboard/calls
     brain?: boolean;            // Dashboard Brain insights
+    brainActions?: boolean;     // Brain drives the UI (open lead/page, dial) via the ACTIONS trailer
     pipelineFunnel?: boolean;   // Pipeline funnel widget
     followUpSequence?: boolean; // re-engagement follow-up cron (needs approved template)
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)

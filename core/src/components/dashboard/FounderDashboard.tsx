@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
-import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
+import { MdDragIndicator, MdRestartAlt, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import NotificationCenter from './NotificationCenter'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
@@ -130,6 +130,14 @@ interface FounderMetrics {
     weekHour?: number[][]
     ladder?: { voters: number; supporters: number; volunteers: number; cadre: number; grievances: number }
   }
+  // ALL brands: generic Activity Sources (touchpoints by conversation channel,
+  // last 30 days) — the metrics route ships this for every brand.
+  sources?: {
+    total30d: number
+    mix: Array<{ magnet: string; count: number; share: number; delta7: number }>
+    delta7Total: number
+    dailyAvg30: number
+  }
 }
 
 // "Mon, 15 Jun · 4:00 PM" in IST from a stored booking datetime.
@@ -189,7 +197,9 @@ const MAGNET_META: Record<string, { label: string; color: string }> = {
   d2d: { label: 'Door to Door', color: '#fb7185' },
   event: { label: 'Event', color: '#2ec4b6' },
   landing: { label: 'Landing', color: '#6ea5d4' },
+  landing_page: { label: 'Landing', color: '#6ea5d4' },
   web: { label: 'Web', color: '#38bdf8' },
+  social: { label: 'Social', color: '#e879f9' },
   other: { label: 'Other', color: '#7a8aa0' },
 }
 const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
@@ -204,7 +214,9 @@ const MAGNET_ICON: Record<string, ReactNode> = {
   d2d: <MdDoorFront size={15} />,
   event: <MdEvent size={15} />,
   landing: <MdLanguage size={15} />,
+  landing_page: <MdLanguage size={15} />,
   web: <MdLanguage size={15} />,
+  social: <MdSmartphone size={15} />,
 }
 const magnetIcon = (m: string) => MAGNET_ICON[m] || <MdFlashOn size={15} />
 
@@ -372,6 +384,40 @@ export default function FounderDashboard() {
     }
     return 70
   })
+
+  // ── Movable home cards ──────────────────────────────────────────────────
+  // The four big cards (Engine / Events / Queue / Sources) live in SLOTS. Grab
+  // the grip on a card and drop it on another to SWAP slots; the order persists
+  // per browser. Reset (top bar, shows only when customized) restores default.
+  // Slots keep their grid spans — a card adopts the size of wherever it lands.
+  const DEFAULT_CARD_ORDER = ['engine', 'events', 'queue', 'sources']
+  const CARD_ORDER_KEY = 'proxe-home-cards'
+  const [cardOrder, setCardOrder] = useState<string[]>(DEFAULT_CARD_ORDER)
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CARD_ORDER_KEY) || 'null')
+      if (Array.isArray(saved) && saved.length === 4 && DEFAULT_CARD_ORDER.every((id) => saved.includes(id))) setCardOrder(saved)
+    } catch { /* keep default */ }
+  }, [])
+  const isCustomLayout = cardOrder.join() !== DEFAULT_CARD_ORDER.join()
+  // Drag is ARMED by the grip (so buttons/text inside cards never start a drag).
+  const [dragArm, setDragArm] = useState<string | null>(null)
+  const dragCardRef = useRef<string | null>(null)
+  const swapCards = useCallback((a: string, b: string) => {
+    if (!a || !b || a === b) return
+    setCardOrder((cur) => {
+      const next = [...cur]
+      const ia = next.indexOf(a), ib = next.indexOf(b)
+      if (ia === -1 || ib === -1) return cur
+      ;[next[ia], next[ib]] = [next[ib], next[ia]]
+      try { localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+  const resetLayout = useCallback(() => {
+    setCardOrder(DEFAULT_CARD_ORDER)
+    try { localStorage.removeItem(CARD_ORDER_KEY) } catch { /* ignore */ }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fire the soft "ready" chime once, when the home page's first load lands.
   const readyChimedRef = useRef(false)
@@ -624,9 +670,50 @@ export default function FounderDashboard() {
   // matrix (touchpoints by weekday & hour).
   const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
   const weekHour = isPop ? metrics.campaignHome?.weekHour : undefined
-  // POP home: full-width "Activity Sources" panel (reference design) replaces
-  // the heatmap card when the 30d source mix is available.
-  const popMix = isPop && metrics.campaignHome?.sources?.mix?.length ? metrics.campaignHome.sources.mix : undefined
+  // "Activity Sources" panel — EVERY brand. POP keeps its richer magnet mix
+  // (d2d/qr/missed_call from pop_home_agg); other brands use the generic
+  // conversations-by-channel mix the metrics route now ships for everyone.
+  const popMix = isPop && metrics.campaignHome?.sources?.mix?.length
+    ? metrics.campaignHome.sources.mix
+    : (metrics.sources?.mix?.length ? metrics.sources.mix : undefined)
+  // Card stats: POP derives from its 30d dailyActivity (below); generic brands
+  // come straight off the sources aggregate.
+  const srcChange = isPop && metrics.campaignHome?.sources?.mix?.length ? undefined : metrics.sources?.delta7Total
+  const srcAvg = isPop && metrics.campaignHome?.sources?.mix?.length ? undefined : metrics.sources?.dailyAvg30
+  const srcTotal = isPop && metrics.campaignHome?.sources?.mix?.length ? undefined : metrics.sources?.total30d
+  // ── Movable-card slot geometry (xl only) ─────────────────────────────────
+  // slots 0+1 = top row, 2+3 = bottom row; spans follow the brand variants
+  // that used to size the rows. A card adopts the span of the slot it's in.
+  const engineNarrow = (isPop && !!metrics.campaignHome?.ladder) || showGigsTab
+  const SLOT_SPANS = engineNarrow ? [6, 6, 6, 6] : [8, 4, 6, 6]
+  const slotStyle = (id: string) => {
+    const slot = Math.max(0, cardOrder.indexOf(id))
+    return {
+      ['--slot-col' as any]: `span ${SLOT_SPANS[slot]} / span ${SLOT_SPANS[slot]}`,
+      ['--slot-row' as any]: slot < 2 ? '1' : '2',
+    }
+  }
+  const cardDrag = (id: string) => ({
+    draggable: dragArm === id,
+    onDragStart: (e: React.DragEvent) => { dragCardRef.current = id; e.dataTransfer.effectAllowed = 'move' },
+    onDragEnd: () => { setDragArm(null); dragCardRef.current = null },
+    onDragOver: (e: React.DragEvent) => { if (dragCardRef.current && dragCardRef.current !== id) e.preventDefault() },
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); if (dragCardRef.current) swapCards(dragCardRef.current, id); setDragArm(null); dragCardRef.current = null },
+  })
+  // Grip that ARMS the drag — buttons/text inside cards never start one.
+  const cardGrip = (id: string) => (
+    <button
+      type="button"
+      onMouseDown={() => setDragArm(id)}
+      onMouseUp={() => setDragArm(null)}
+      className="absolute top-2 right-2 z-10 p-1 rounded opacity-0 group-hover:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing"
+      style={{ color: 'var(--text-muted)' }}
+      title="Drag to move this card"
+      aria-label="Move card"
+    >
+      <MdDragIndicator size={15} />
+    </button>
+  )
   const heatTotal = popHeat ? popHeat.reduce((a, b) => a + (b.count || 0), 0) : 0
   const heatAvg = popHeat && popHeat.length ? Math.round((heatTotal / popHeat.length) * 10) / 10 : 0
   const heatLast7 = popHeat ? popHeat.slice(-7).reduce((a, b) => a + (b.count || 0), 0) : 0
@@ -667,6 +754,13 @@ export default function FounderDashboard() {
           .wc-bento > *:nth-child(4) { animation-delay: 0.15s; }
           .wc-bento > *:nth-child(5) { animation-delay: 0.20s; }
         }
+        /* Movable home cards: on xl each card is PLACED by its slot vars (col
+           span + row), so a drag-swap moves it without reordering the DOM.
+           Below xl the grid is one column and slot placement is ignored. */
+        @media (min-width: 1280px) {
+          .wc-slot { grid-column: var(--slot-col); grid-row: var(--slot-row); }
+        }
+        .wc-slot[draggable="true"] { opacity: 0.85; outline: 2px dashed var(--accent-primary); outline-offset: 2px; }
       `}</style>
       {/* ── ROW 0 · Top bar - greeting + range toggle + controls + profile ── */}
       <header className="flex items-center justify-between gap-3 shrink-0">
@@ -711,6 +805,18 @@ export default function FounderDashboard() {
         <div className="flex items-center gap-2 shrink-0">
           {/* Top bar keeps ONLY the bell (product updates + version). Snapshot and
               Ask PROXe were dropped — the Brain dock covers asking by voice. */}
+          {isCustomLayout && (
+            <button
+              type="button"
+              onClick={resetLayout}
+              className="hidden xl:flex items-center justify-center rounded-full transition hover:opacity-90"
+              style={{ width: 36, height: 36, backgroundColor: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+              title="Reset card layout to default"
+              aria-label="Reset card layout"
+            >
+              <MdRestartAlt size={18} />
+            </button>
+          )}
           <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
@@ -889,11 +995,14 @@ export default function FounderDashboard() {
         )}
       </div>
 
-      {/* ── ROW 2 · Engine Overview + Upcoming Events ─────────────────────── */}
-      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
+      {/* ── ROWS 2+3 · the four MOVABLE cards (Engine / Events / Queue / Sources)
+          — ONE grid, two xl rows; each card is placed by its slot (drag the grip
+          to swap; Reset in the top bar restores default). ── */}
+      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-2 gap-4 sm:gap-5 xl:flex-[2] xl:min-h-0">
         {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
             Volunteers → Cadre → Grievances), narrower so Events breathes. */}
-        <section className={`${(isPop && metrics.campaignHome?.ladder) || showGigsTab ? 'xl:col-span-6' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section {...cardDrag('engine')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ ...slotStyle('engine'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          {cardGrip('engine')}
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
             {!(isPop && metrics.campaignHome?.ladder) && (
@@ -957,8 +1066,9 @@ export default function FounderDashboard() {
           </div>
         </section>
 
-        {/* Upcoming Events - POP splits the row 50-50 with the engine; compact cards (going/interested inline) fit 2-3 at a glance */}
-        <section className={`${(isPop && metrics.campaignHome?.ladder) || showGigsTab ? 'xl:col-span-6' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Upcoming Events — movable card (slot: events) */}
+        <section {...cardDrag('events')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ ...slotStyle('events'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          {cardGrip('events')}
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
@@ -1112,12 +1222,10 @@ export default function FounderDashboard() {
             )}
           </div>
         </section>
-      </div>
 
-      {/* ── ROW 3 · Priority Lead Queue + Conversations Trend ─────────────── */}
-      <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
-        {/* Priority Lead Queue. POP: narrower (it's a compact list) so Activity Sources gets the width */}
-        <section className={`${popMix ? 'xl:col-span-6' : 'xl:col-span-7'} rounded-xl border overflow-hidden flex flex-col min-h-0`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        {/* Priority Lead Queue — movable card (slot: queue) */}
+        <section {...cardDrag('queue')} className="wc-slot relative group rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ ...slotStyle('queue'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+          {cardGrip('queue')}
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div className="flex items-center gap-3 min-w-0">
               {isPop && metrics.campaignHome && (
@@ -1245,9 +1353,11 @@ export default function FounderDashboard() {
           )}
         </section>
 
-        {/* Conversations Trend (non-POP; POP gets the Activity Sources panel below) */}
+        {/* Conversations Trend — fallback ONLY when a brand has no 30d source
+            data yet; every brand with data gets Activity Sources instead. */}
         {!popMix && (
-        <section className="xl:col-span-5 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+        <section {...cardDrag('sources')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+          {cardGrip('sources')}
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <div>
               <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{popHeat ? 'Activity Heatmap' : 'Conversations Trend'}</h3>
@@ -1336,83 +1446,67 @@ export default function FounderDashboard() {
         </section>
         )}
 
-        {/* Activity Sources (POP) - compact card, lives in the trend slot */}
+        {/* Activity Sources (ALL brands) - compact card, lives in the trend slot */}
         {popMix && (() => {
-          const mixTotal = metrics.campaignHome?.sources?.total30d || popMix.reduce((a, b) => a + b.count, 0)
+          const mixTotal = metrics.campaignHome?.sources?.total30d || srcTotal || popMix.reduce((a, b) => a + b.count, 0)
+          const mixChange = srcChange ?? heatChange
+          const mixAvg = srcAvg ?? heatAvg
           const top = popMix[0]
-          const offline = popMix.find((s) => ['d2d', 'qr', 'event', 'missed_call'].includes(s.magnet))
-          const voiceShare = popMix.filter((s) => ['voice', 'missed_call'].includes(s.magnet)).reduce((a, b) => a + b.share, 0)
+          const topShare = Math.max(1, top?.share || 1)
           const iconTile = (m: string, size = 24) => (
             <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
           )
           return (
-            <section className="xl:col-span-6 rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
-              <div className="flex items-center justify-between gap-3 shrink-0">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.16)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)' }}>PROXe</span>
-                  </div>
-                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Unified source mix · last 30 days</p>
-                </div>
-                <div className="flex items-center gap-3 text-right shrink-0">
-                  <div>
-                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{fmtComma(mixTotal)}</div>
-                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>touchpoints</div>
-                  </div>
-                  <div>
-                    <div className="text-base font-extrabold leading-tight flex items-center gap-0.5 justify-end" style={{ color: heatChange >= 0 ? '#22c55e' : '#ef4444' }}><MdTrendingUp size={13} />{heatChange >= 0 ? '+' : ''}{heatChange}%</div>
-                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>vs prior 7d</div>
-                  </div>
-                  <div>
-                    <div className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>{heatAvg}</div>
-                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>daily avg</div>
-                  </div>
-                </div>
+            <section {...cardDrag('sources')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+              {cardGrip('sources')}
+              {/* reference layout: title → stat strip → ranked bars + top-source panel */}
+              <div className="shrink-0">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Activity Sources</h3>
+                <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Where touchpoints came from · last 30 days</p>
               </div>
 
-              {/* one card, no scroll, nothing overlapping: SMALL donut + insight lines
-                  left, compact table right, slim share bar pinned at the bottom.
-                  Everything is sized to fit the fixed home-row height. */}
-              <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-                <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[168px,1fr] gap-3 items-center overflow-hidden">
-                  <div className="flex flex-col items-center gap-1 min-h-0">
-                    <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
-                    <div className="flex flex-col gap-0.5 self-stretch">
-                      {top && (
-                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Most active: <b style={{ color: magnetMeta(top.magnet).color }}>{magnetMeta(top.magnet).label}</b></span>
-                      )}
-                      {offline && (
-                        <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Strong offline: <b style={{ color: magnetMeta(offline.magnet).color }}>{magnetMeta(offline.magnet).label}</b></span>
-                      )}
-                      <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>Voice led: <b style={{ color: '#a78bfa' }}>{voiceShare}%</b></span>
-                    </div>
+              {/* stat strip */}
+              <div className="shrink-0 grid grid-cols-3 rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                {[
+                  { label: 'Total touchpoints', value: fmtComma(mixTotal), color: 'var(--text-primary)' },
+                  { label: 'vs prior 7d', value: `${mixChange >= 0 ? '+' : ''}${mixChange}%`, color: mixChange >= 0 ? '#22c55e' : '#ef4444' },
+                  { label: 'Daily avg', value: String(mixAvg), color: 'var(--text-primary)' },
+                ].map((t, i) => (
+                  <div key={t.label} className="px-3 py-2" style={i > 0 ? { borderLeft: '1px solid var(--border-primary)' } : undefined}>
+                    <div className="text-base font-extrabold leading-tight" style={{ color: t.color }}>{t.value}</div>
+                    <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{t.label}</div>
                   </div>
-                  <div className="rounded-lg border overflow-hidden self-center" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
-                    {popMix.slice(0, 6).map((s) => (
-                      <div key={s.magnet} className="grid items-center px-2.5 py-1 border-b last:border-b-0" style={{ gridTemplateColumns: 'minmax(0,1.5fr) 0.5fr 0.7fr 0.7fr', borderColor: 'var(--border-primary)' }}>
-                        <span className="flex items-center gap-2 min-w-0">
-                          {iconTile(s.magnet, 18)}
-                          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
-                        </span>
-                        <span className="text-right text-[11px] font-bold" style={{ color: magnetMeta(s.magnet).color }}>{s.share}%</span>
-                        <span className="text-right text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtComma(s.count)}</span>
-                        <span className="text-right text-[10.5px] font-bold flex items-center justify-end gap-0.5" style={{ color: s.delta7 >= 0 ? '#22c55e' : '#ef4444' }}>
-                          {s.delta7 >= 0 ? <MdArrowUpward size={11} /> : <MdTrendingDown size={11} />}{s.delta7 >= 0 ? '+' : ''}{s.delta7}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                ))}
+              </div>
 
-                {/* share-of-total bar (labels live inside it - no legend row) */}
-                <div className="shrink-0 flex h-4 rounded-full overflow-hidden">
-                  {popMix.map((s) => (
-                    <div key={s.magnet} title={`${magnetMeta(s.magnet).label} ${s.share}%`} className="flex items-center justify-center" style={{ width: `${s.share}%`, background: magnetMeta(s.magnet).color }}>
-                      {s.share >= 8 && <span className="text-[9px] font-bold" style={{ color: '#0b0d12' }}>{s.share}%</span>}
+              {/* ranked source rows + Top source highlight */}
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[1fr,148px] gap-3 overflow-hidden">
+                <div className="flex flex-col gap-1 min-h-0 overflow-hidden justify-center">
+                  {popMix.slice(0, 6).map((s, i) => (
+                    <div key={s.magnet} className="grid items-center gap-2 rounded-lg border px-2.5 py-1.5" style={{ gridTemplateColumns: '14px 22px minmax(64px,0.9fr) 1.4fr 40px 46px 34px', borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                      <span className="text-[10.5px] font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
+                      {iconTile(s.magnet, 20)}
+                      <span className="text-[11.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
+                      <span className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+                        <span className="block h-full rounded-full" style={{ width: `${Math.max(4, Math.round((s.share / topShare) * 100))}%`, background: magnetMeta(s.magnet).color }} />
+                      </span>
+                      <span className="text-right text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>{s.share}%</span>
+                      <span className="text-right text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{fmtComma(s.count)}</span>
+                      <span className="text-right text-[10.5px] font-bold flex items-center justify-end" style={{ color: s.delta7 > 0 ? '#22c55e' : s.delta7 < 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                        {s.delta7 > 0 ? <MdArrowUpward size={11} /> : s.delta7 < 0 ? <MdTrendingDown size={11} /> : <MdRemove size={11} />}
+                      </span>
                     </div>
                   ))}
                 </div>
+                {top && (
+                  <div className="hidden sm:flex flex-col items-center justify-center gap-1.5 rounded-lg border text-center px-2" style={{ borderColor: `${magnetMeta(top.magnet).color}55`, background: `${magnetMeta(top.magnet).color}0d` }}>
+                    <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: `${magnetMeta(top.magnet).color}22`, color: magnetMeta(top.magnet).color }}>★ Top source</span>
+                    {iconTile(top.magnet, 40)}
+                    <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{magnetMeta(top.magnet).label}</span>
+                    <span className="text-xl font-extrabold leading-none" style={{ color: magnetMeta(top.magnet).color }}>{top.share}%</span>
+                    <span className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>of all touchpoints</span>
+                  </div>
+                )}
               </div>
             </section>
           )

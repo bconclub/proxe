@@ -6,6 +6,7 @@ import { recordTokenUsage, recordVoiceUsage } from '@/lib/token-usage'
 import { getJson, setJsonWithTtl } from '@/lib/server/redis'
 import { getBrandConfig, BRAND_ID } from '@/configs'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
+import { buildLeadIndex, id8, parseActionsTrailer, validateActions, actionsPromptSpec } from '@/lib/brain/actions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -178,14 +179,39 @@ export async function POST(req: NextRequest) {
     const brain = getBrainConfig()
     const question: string | null = typeof body?.question === 'string' && body.question.trim() ? body.question.trim().slice(0, 300) : null
     const lang = brain.languages.find((l) => l.id === body?.language) || brain.languages[0]
+    // Conversation so far (voice loop) — lets the model resolve "yes" / "show
+    // me that one" against what it just said. Sent by the orb client.
+    const history: Array<{ role: string; content: string }> = Array.isArray(body?.history)
+      ? body.history.slice(-6).filter((h: any) => h && typeof h.content === 'string')
+      : []
 
     const cookie = req.headers.get('cookie') || ''
     const origin = req.nextUrl.origin
     const brand = getBrandConfig()
     // Campaign-shaped data sources ride on the warRoom feature, not the brand id.
     const hasWarRoom = !!brand.features?.warRoom
+    // Brain-drives-UI: ids ride to the model so it can emit an ACTIONS trailer.
+    const actionsOn = !!brand.features?.brainActions
     const svc = getServiceClient()
     const t0 = Date.now()
+
+    // People the voice brain can point at: recently active + top scored, with
+    // ids. Phones stay in this server-side slice (Redis) — never sent to the
+    // model; validateActions attaches them if a dial ever ships for voice.
+    const fetchPeople = async (): Promise<any[]> => {
+      if (!actionsOn || !svc) return []
+      try {
+        const sel = 'id, customer_name, phone, lead_score, last_touchpoint, last_interaction_at, unified_context'
+        const [recent, top] = await Promise.all([
+          svc.from('all_leads').select(sel).eq('brand', BRAND_ID)
+            .order('last_interaction_at', { ascending: false, nullsFirst: false }).limit(25).then((r: any) => r.data || []),
+          svc.from('all_leads').select(sel).eq('brand', BRAND_ID)
+            .order('lead_score', { ascending: false, nullsFirst: false }).limit(15).then((r: any) => r.data || []),
+        ])
+        const seen = new Set<string>()
+        return [...top, ...recent].filter((l: any) => l?.id && !seen.has(l.id) && seen.add(l.id))
+      } catch { return [] }
+    }
 
     // Profile is cheap; the heavy context is CACHED for 90s so quick-question
     // clicks answer fast instead of re-gathering everything.
@@ -240,9 +266,12 @@ export async function POST(req: NextRequest) {
           ? Object.fromEntries(Object.entries(warRoom.seatDetails).slice(0, 6))
           : null,
       } : null
-      ctx = { overview, pulse, leader_pushes: leaderPushes, news_buzz: news }
+      ctx = { overview, pulse, leader_pushes: leaderPushes, news_buzz: news, people: await fetchPeople() }
       await setJsonWithTtl(CTX_KEY, ctx, CTX_TTL).catch(() => {})
     }
+    // A ctx cached before actions shipped (or while the flag was off) has no
+    // people slice — backfill without invalidating the rest of the cache.
+    if (actionsOn && !Array.isArray(ctx.people)) ctx.people = await fetchPeople()
 
     const profile = await profileP
     const fullName = (profile?.full_name || user.email?.split('@')[0] || '').trim()
@@ -267,11 +296,15 @@ export async function POST(req: NextRequest) {
       // Scouts/gigs are a completely different population from sales leads — keep
       // them distinct in the spoken briefing so the count and the story are right.
       `LEADS vs GIGS: taken_in.leads_total counts real leads only — property owners and brands (the people who lease or list space). taken_in.gigs_total counts GIGS: scouts (gig workers who spot vacant shops and get paid) and connectors. These are NOT leads and must NEVER be lumped into a lead count. If gigs_total is present and non-zero, mention scouts as their own thing (e.g. "on the gig side, X scouts came in"), separate from leads. Never say "we got N leads" using a number that includes scouts.`,
+      ...(actionsOn ? [actionsPromptSpec(true)] : []),
     ].join('\n')
 
     // Trim what goes to the model — Groq's on-demand tier caps tokens/minute,
     // and the raw overview carries far more than a spoken briefing can use.
     const ov = ctx.overview || {}
+    // The id index the model's actions are validated against — built from the
+    // same people slice the model sees, so ids can't point outside it.
+    const peopleIdx = actionsOn ? buildLeadIndex(ctx.people || []) : null
     const slim = {
       taken_in: ov.taken_in || null,
       handling_now: ov.handling_now || null,
@@ -280,11 +313,38 @@ export async function POST(req: NextRequest) {
       pulse: ctx.pulse || null,
       leader_pushes: (ctx.leader_pushes || []).slice(0, 8),
       news_buzz: ctx.news_buzz || null,
+      // ids only (no phones) — what the ACTIONS trailer may point at
+      ...(actionsOn && (ctx.people || []).length ? {
+        people: (ctx.people as any[]).slice(0, 30).map((p: any) => ({
+          id: id8(p.id),
+          name: p.customer_name || 'Unknown',
+          score: p.lead_score ?? null,
+          channel: peopleIdx!.get(id8(p.id))?.channel || 'web',
+        })),
+      } : {}),
     }
     let context = JSON.stringify(slim)
     if (context.length > 9000) context = context.slice(0, 9000)
-    const { text, engine } = await writeWords(system, `Today's live data:\n${context}`)
-    return NextResponse.json({ text, llmMs: Date.now() - t0, engine, language: lang.id })
+    const transcript = history
+      .map((h) => `${h.role === 'assistant' ? 'Brain' : 'Operator'}: ${String(h.content).slice(0, 300)}`)
+      .join('\n')
+    const userPrompt = transcript
+      ? `Today's live data:\n${context}\n\nConversation so far (spoken aloud):\n${transcript}`
+      : `Today's live data:\n${context}`
+    const { text: rawText, engine } = await writeWords(system, userPrompt)
+    // Strip + validate the ACTIONS trailer server-side, so TTS can never voice
+    // it and a hallucinated id never reaches the client.
+    let text = rawText
+    let actions: ReturnType<typeof validateActions> = []
+    if (actionsOn && peopleIdx) {
+      const parsed = parseActionsTrailer(rawText)
+      text = parsed.text
+      // voice v1: navigation only — dial never ships from the voice path; nav
+      // is always auto (the voice says what it's doing, there's no button).
+      actions = validateActions(parsed.actions, peopleIdx)
+        .flatMap((a) => (a.type === 'dial' ? [] : [{ ...a, auto: true }]))
+    }
+    return NextResponse.json({ text, actions, llmMs: Date.now() - t0, engine, language: lang.id })
   } catch (e: any) {
     console.error('[brain/briefing] error:', e?.message)
     return NextResponse.json({ error: e?.message || 'briefing failed' }, { status: 500 })

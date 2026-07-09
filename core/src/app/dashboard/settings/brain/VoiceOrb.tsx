@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
+import type { BrainAction } from '@/lib/brain/actions'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
 import { resolvePalette } from './renderers/palette'
 import { createPulseOrb } from './renderers/pulseOrb'
@@ -79,9 +80,13 @@ export type VoiceOrbProps = {
   listenFirst?: boolean
   onClose?: () => void
   compact?: boolean
+  // Brain-drives-UI: validated nav actions from the briefing route land here
+  // (open lead / open page). The host (DashboardBrain) executes them — the page
+  // loads behind the orb while it keeps speaking. Dial never comes via voice.
+  onAction?: (a: BrainAction) => void
 }
 
-export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false }: VoiceOrbProps = {}) {
+export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false, onAction }: VoiceOrbProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mode, setMode] = useState<Mode>('idle')
   const [caption, setCaption] = useState('')
@@ -106,6 +111,13 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const waveBufRef = useRef(new Uint8Array(128))
 
   const setModeBoth = (m: Mode) => { modeRef.current = m; setMode(m) }
+
+  // Conversation turns (voice loop) — sent with each mode:'text' request so the
+  // brain can resolve "yes" / "that one" against what it just said. onAction
+  // rides in a ref so engage() never re-creates over a new callback identity.
+  const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([])
+  const onActionRef = useRef<typeof onAction>(onAction)
+  onActionRef.current = onAction
 
   // ── mic (talk back) ────────────────────────────────────────────────────────
   // Browser Web Speech API via the shared hook — no key, no server. Used only
@@ -271,11 +283,29 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       // 1. the words (fast — Groq when configured)
       const tr = await fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'text', language: langRef.current, ...(question ? { question } : {}) }),
+        body: JSON.stringify({
+          mode: 'text', language: langRef.current,
+          ...(question ? { question } : {}),
+          ...(historyRef.current.length ? { history: historyRef.current.slice(-6) } : {}),
+        }),
         signal: ac.signal,
       }).then((r) => r.json())
       if (tr?.error) throw new Error(tr.error)
       const text: string = tr.text || 'Nothing to report yet.'
+
+      // Keep the spoken exchange as history for the next turn (capped).
+      if (question) historyRef.current.push({ role: 'user', content: question })
+      historyRef.current.push({ role: 'assistant', content: text })
+      if (historyRef.current.length > 12) historyRef.current = historyRef.current.slice(-12)
+
+      // Brain-drives-UI: execute the first validated nav action now — the page
+      // opens BEHIND the orb while the voice keeps talking (the orb lives in
+      // the layout and survives in-dashboard navigation). Dial is filtered
+      // server-side for voice; skip it here too, belt and suspenders.
+      if (onActionRef.current && Array.isArray(tr.actions)) {
+        const nav = tr.actions.find((a: BrainAction) => a?.type === 'open_lead' || a?.type === 'open_page')
+        if (nav) try { onActionRef.current(nav) } catch { /* nav must never kill the voice */ }
+      }
 
       // 2. split: first sentence plays the moment it's voiced; rest in parallel
       const sentences = splitSentences(text)

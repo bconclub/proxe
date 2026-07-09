@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { generateResponse } from '@/lib/agent-core'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, getBrandConfig } from '@/configs'
+import { buildLeadIndex, id8, parseActionsTrailer, validateActions, actionsPromptSpec } from '@/lib/brain/actions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -148,6 +149,9 @@ export async function POST(request: NextRequest) {
     const supabase = getServiceClient() || authClient
     const brand = BRAND_ID
     const isPop = brand === 'pop'
+    // Brain-drives-UI: when on, lead ids (short id8) ride in DATA so the model
+    // can emit an ACTIONS trailer, validated server-side against the snapshot.
+    const actionsOn = !!getBrandConfig().features?.brainActions
     // Intensity ladder labels (POP): all_leads.intensity 0-4.
     const TIER_LABELS = ['Contact', 'Voter', 'Supporter', 'Volunteer', 'Cadre']
 
@@ -162,7 +166,7 @@ export async function POST(request: NextRequest) {
       .from('all_leads')
       // POP campaign columns (022/026) exist only for pop — append conditionally
       // so other brands' schemas don't error on the select.
-      .select('id, customer_name, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context'
+      .select('id, customer_name, phone, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context'
         + (isPop ? ', intensity, grievance_category, magnet, lean' : ''))
       .eq('brand', brand)
       .order('created_at', { ascending: false })
@@ -198,8 +202,8 @@ export async function POST(request: NextRequest) {
       if (created >= istMidnight) {
         today++
         if (todayLeads.length < 40) todayLeads.push(isPop
-          ? { name: l.customer_name || 'Unknown', channel: l.magnet || src, tier: TIER_LABELS[Math.max(0, Math.min(4, l.intensity ?? 0))], grievance: l.grievance_category || null }
-          : { name: l.customer_name || 'Unknown', source: src, score, stage })
+          ? { ...(actionsOn ? { id: id8(l.id) } : {}), name: l.customer_name || 'Unknown', channel: l.magnet || src, tier: TIER_LABELS[Math.max(0, Math.min(4, l.intensity ?? 0))], grievance: l.grievance_category || null }
+          : { ...(actionsOn ? { id: id8(l.id) } : {}), name: l.customer_name || 'Unknown', source: src, score, stage })
       }
       if (created >= weekStart) week++
       const b = bookingFromCtx(l.unified_context)
@@ -217,6 +221,18 @@ export async function POST(request: NextRequest) {
     }
     upcoming.sort((a, b) => a._ms - b._ms)
     const upcomingTop = upcoming.slice(0, 25).map(({ _ms, ...rest }) => rest)
+
+    // ── Top leads by score (actions only) — makes "show me the top lead"
+    // resolvable: the model needs a ranked list WITH ids to point at. ─────────
+    const topLeads = actionsOn
+      ? [...safe]
+          .filter((l: any) => l.lead_score != null)
+          .sort((a: any, b: any) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
+          .slice(0, 10)
+          .map((l: any) => isPop
+            ? { id: id8(l.id), name: l.customer_name || 'Unknown', score: l.lead_score, tier: tierOf(l.intensity) }
+            : { id: id8(l.id), name: l.customer_name || 'Unknown', score: l.lead_score, stage: l.lead_stage || 'New' })
+      : []
 
     // ── Today's stage changes ────────────────────────────────────────────────
     const { data: changes } = await supabase
@@ -271,6 +287,7 @@ export async function POST(request: NextRequest) {
       conversations_today: convToday ?? 0,
       todays_new_people: todayLeads,
       upcoming_events: upcomingTop,
+      ...(actionsOn && topLeads.length ? { most_engaged_people: topLeads } : {}),
       ...(command_context ? { command_context } : {}),
     } : {
       brand,
@@ -283,6 +300,7 @@ export async function POST(request: NextRequest) {
       todays_new_leads: todayLeads,
       todays_status_changes: todayActivity,
       upcoming_bookings: upcomingTop,
+      ...(actionsOn && topLeads.length ? { top_leads: topLeads } : {}),
     }
     const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} ${isPop ? 'campaign dashboard' : 'sales dashboard'}.
 ${isPop ? 'This is a political campaign. Use campaign vocabulary ONLY: people / voters / supporters / volunteers / cadre / grievances / constituencies / events — NEVER sales terms (leads, pipeline, deals, bookings, customers, prospects, stages like "Qualified" or "Booking Made"). The DATA JSON is already campaign-shaped: intensity_ladder is the frontline funnel (Contact→Voter→Supporter→Volunteer→Cadre); top_grievances is issues raised by category; by_channel is how people were reached; engagement_heat is how active they are; upcoming_events is the event calendar. Answer strictly from these fields — do not invent sales stages.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
@@ -297,7 +315,7 @@ FORMAT (built for a phone-sized panel, ~360px wide):
 SHORTCUTS: if DATA has a "command_context", the operator used a shortcut. A leading /command (command_context.command = war_room / d2d / listener / directives) means "summarize that artifact" — answer from command_context.<that> and lead with the headline number. If command_context.command = "unknown", tell them the command isn't recognized and list command_context.available_commands. @mentions (command_context.mentions[]) ask about specific people/workers: for each, report what they've done from .worker (visits/met/constituencies/last_active) and/or .people (tier/grievance/lean/channel); if .not_found is true, say you couldn't find anyone by that name. Show names and times exactly as given.
 
 This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: ${isPop ? '"Breakdown by constituency | Frontline today | Top grievances"' : '"Breakdown by source | Lead quality today | Show hot leads"'}. Put FOLLOWUPS only on that last line, nowhere else.
-
+${actionsOn ? `\n${actionsPromptSpec(false)}\n` : ''}
 DATA:
 ${JSON.stringify(data)}`
 
@@ -314,16 +332,21 @@ ${JSON.stringify(data)}`
       return NextResponse.json({ error: 'The brain is unavailable right now. Try again in a moment.' }, { status: 502 })
     }
 
+    // Strip the ACTIONS trailer FIRST — the FOLLOWUPS regex below matches
+    // across newlines and would swallow a trailing ACTIONS line into the chips.
+    const parsedActions = actionsOn ? parseActionsTrailer(raw) : { text: raw, actions: [] }
+    const actions = actionsOn ? validateActions(parsedActions.actions, buildLeadIndex(safe)) : []
+
     // Split the answer from the trailing "FOLLOWUPS: a | b | c" line.
-    let answer = raw
+    let answer = parsedActions.text
     let followups: string[] = []
-    const fm = raw.match(/FOLLOWUPS:\s*(.+)\s*$/is)
+    const fm = answer.match(/FOLLOWUPS:\s*(.+)\s*$/is)
     if (fm) {
-      answer = raw.slice(0, fm.index).trim()
       followups = fm[1].split('|').map((s) => s.trim()).filter(Boolean).slice(0, 3)
+      answer = answer.slice(0, fm.index).trim()
     }
 
-    return NextResponse.json({ success: true, answer, followups, data_summary: { today, all_time: safe.length, upcoming: upcomingTop.length } })
+    return NextResponse.json({ success: true, answer, followups, actions, data_summary: { today, all_time: safe.length, upcoming: upcomingTop.length } })
   } catch (error: any) {
     console.error('[brain] Error:', error?.message || error)
     return NextResponse.json({ error: 'Failed to answer' }, { status: 500 })

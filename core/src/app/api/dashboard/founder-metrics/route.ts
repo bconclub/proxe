@@ -1924,6 +1924,48 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Activity Sources (ALL brands): touchpoints by channel over the last 30
+    // days + a 7d-vs-prior-7d delta per channel. Computed from the 45-day
+    // messages buffer already paginated above — zero extra queries. POP's
+    // campaignHome.sources (magnet-based, includes d2d/qr/missed_call) wins on
+    // the client when present; this generic one covers every other brand.
+    let sources: any = undefined
+    try {
+      const d30 = now.getTime() - 30 * 86400000
+      const d7 = now.getTime() - 7 * 86400000
+      const d14 = now.getTime() - 14 * 86400000
+      const byChannel: Record<string, { count: number; last7: number; prior7: number }> = {}
+      for (const m of messages) {
+        const t = new Date(m.created_at).getTime()
+        if (t < d30) continue
+        const ch = (m.channel || 'other') as string
+        const b = byChannel[ch] || { count: 0, last7: 0, prior7: 0 }
+        b.count++
+        if (t >= d7) b.last7++
+        else if (t >= d14) b.prior7++
+        byChannel[ch] = b
+      }
+      const total30d = Object.values(byChannel).reduce((a, b) => a + b.count, 0)
+      if (total30d > 0) {
+        const mix = Object.entries(byChannel)
+          .map(([magnet, b]) => ({
+            magnet,
+            count: b.count,
+            share: Math.round((b.count / total30d) * 100),
+            delta7: b.prior7 > 0 ? Math.round(((b.last7 - b.prior7) / b.prior7) * 100) : (b.last7 > 0 ? 100 : 0),
+          }))
+          .sort((a, b) => b.count - a.count)
+        const last7 = Object.values(byChannel).reduce((a, b) => a + b.last7, 0)
+        const prior7 = Object.values(byChannel).reduce((a, b) => a + b.prior7, 0)
+        sources = {
+          total30d,
+          mix,
+          delta7Total: prior7 > 0 ? Math.round(((last7 - prior7) / prior7) * 100) : (last7 > 0 ? 100 : 0),
+          dailyAvg30: Math.round((total30d / 30) * 10) / 10,
+        }
+      }
+    } catch { /* sources card simply doesn't render */ }
+
     // Prepare response data
     const responseData = {
       hotLeads: {
@@ -1980,6 +2022,8 @@ export async function GET(request: NextRequest) {
       ...(funnel ? { funnel } : {}),
       // POP-only campaign home cards (events / attention seats / sources).
       ...(campaignHome ? { campaignHome } : {}),
+      // ALL brands: generic Activity Sources (touchpoints by conversation channel).
+      ...(sources ? { sources } : {}),
       responseHealth: {
         avgMs: avgResponseTimeMs,
         status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
