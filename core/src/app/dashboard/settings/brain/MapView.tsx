@@ -212,10 +212,7 @@ export default function MapView() {
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
         />
       </ReactFlow>
-      {/* caption + legend */}
-      <div style={{ position: 'absolute', top: 10, left: 12, fontSize: 10.5, color: 'var(--text-muted)', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '5px 10px', maxWidth: 340 }}>
-        {loadedLive ? 'Live counts on the badges · ' : ''}How the whole engine is wired — sources feed MyVoice, PROXe gauges every person, the frontline climbs, the artifacts surface it.
-      </div>
+      {/* legend (explanatory caption removed — the map speaks for itself) */}
       <div style={{ position: 'absolute', bottom: 12, left: 12, display: 'flex', flexWrap: 'wrap', gap: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '7px 11px' }}>
         {LEGEND.map((l) => (
           <span key={l.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--text-secondary)' }}>

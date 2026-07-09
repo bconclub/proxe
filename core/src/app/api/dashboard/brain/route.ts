@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServiceClient() || authClient
     const brand = BRAND_ID
+    const isPop = brand === 'pop'
+    // Intensity ladder labels (POP): all_leads.intensity 0-4.
+    const TIER_LABELS = ['Contact', 'Voter', 'Supporter', 'Volunteer', 'Cadre']
 
     // IST day boundaries.
     const istDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) // YYYY-MM-DD
@@ -76,7 +79,10 @@ export async function POST(request: NextRequest) {
     // ── Gather leads (aggregate in-process) ──────────────────────────────────
     const { data: leads } = await supabase
       .from('all_leads')
-      .select('id, customer_name, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context')
+      // POP campaign columns (022/026) exist only for pop — append conditionally
+      // so other brands' schemas don't error on the select.
+      .select('id, customer_name, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context'
+        + (isPop ? ', intensity, grievance_category, magnet, lean' : ''))
       .eq('brand', brand)
       .order('created_at', { ascending: false })
       .limit(2000)
@@ -87,6 +93,11 @@ export async function POST(request: NextRequest) {
     let today = 0, week = 0, hot = 0, warm = 0, cold = 0
     const todayLeads: any[] = []
     const upcoming: any[] = []
+    // POP campaign accumulators — the intensity ladder + grievances + channel,
+    // so the brain answers in campaign terms, not sales lead_stage names.
+    const tierCounts = [0, 0, 0, 0, 0]
+    const grievanceCounts: Record<string, number> = {}
+    const channelCounts: Record<string, number> = {}
 
     for (const l of safe) {
       const created = l.created_at ? new Date(l.created_at).getTime() : 0
@@ -96,9 +107,18 @@ export async function POST(request: NextRequest) {
       bySource[src] = (bySource[src] || 0) + 1
       const score = l.lead_score ?? null
       if (score != null) { if (score >= 70) hot++; else if (score >= 40) warm++; else cold++ }
+      if (isPop) {
+        const t = typeof l.intensity === 'number' ? l.intensity : 0
+        if (t >= 0 && t <= 4) tierCounts[t]++
+        if (l.grievance_category) grievanceCounts[l.grievance_category] = (grievanceCounts[l.grievance_category] || 0) + 1
+        const ch = l.magnet || src
+        channelCounts[ch] = (channelCounts[ch] || 0) + 1
+      }
       if (created >= istMidnight) {
         today++
-        if (todayLeads.length < 40) todayLeads.push({ name: l.customer_name || 'Unknown', source: src, score, stage })
+        if (todayLeads.length < 40) todayLeads.push(isPop
+          ? { name: l.customer_name || 'Unknown', channel: l.magnet || src, tier: TIER_LABELS[Math.max(0, Math.min(4, l.intensity ?? 0))], grievance: l.grievance_category || null }
+          : { name: l.customer_name || 'Unknown', source: src, score, stage })
       }
       if (created >= weekStart) week++
       const b = bookingFromCtx(l.unified_context)
@@ -124,7 +144,7 @@ export async function POST(request: NextRequest) {
       .gte('created_at', new Date(istMidnight).toISOString())
       .order('created_at', { ascending: false })
       .limit(60)
-    const changeNames = new Map(safe.map((l) => [l.id, l.customer_name || 'Unknown']))
+    const changeNames = new Map(safe.map((l: any) => [l.id, l.customer_name || 'Unknown']))
     const todayActivity = (changes || []).slice(0, 40).map((c: any) => ({
       name: changeNames.get(c.lead_id) || 'Unknown',
       from: c.old_stage || null,
@@ -138,7 +158,24 @@ export async function POST(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', new Date(istMidnight).toISOString())
 
-    const data = {
+    const intensity_ladder: Record<string, number> = {}
+    TIER_LABELS.forEach((lbl, i) => { intensity_ladder[lbl] = tierCounts[i] })
+
+    // POP gets a campaign-shaped snapshot (ladder + grievances + channels); every
+    // other brand keeps the sales-shaped one (pipeline stages + sources). The
+    // model can only speak from what's in DATA, so the shape IS the guardrail.
+    const data = isPop ? {
+      brand,
+      today_ist: istDate,
+      totals: { all_time: safe.length, today, last_7_days: week },
+      intensity_ladder,
+      top_grievances: grievanceCounts,
+      by_channel: channelCounts,
+      engagement_heat: { high_70plus: hot, medium_40to69: warm, low_under40: cold },
+      conversations_today: convToday ?? 0,
+      todays_new_people: todayLeads,
+      upcoming_events: upcomingTop,
+    } : {
       brand,
       today_ist: istDate,
       totals: { all_time: safe.length, today, last_7_days: week },
@@ -150,10 +187,8 @@ export async function POST(request: NextRequest) {
       todays_status_changes: todayActivity,
       upcoming_bookings: upcomingTop,
     }
-
-    const isPop = BRAND_ID === 'pop'
     const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} ${isPop ? 'campaign dashboard' : 'sales dashboard'}.
-${isPop ? 'Use campaign vocabulary throughout: people / voters / supporters / volunteers / cadre / grievances / constituencies / events — never sales terms (leads, pipeline, deals, bookings, customers, prospects). In the DATA JSON, "leads" = people/voters, "pipeline_by_stage" = the intensity ladder, "leads_by_source" = where people came in via, "upcoming_bookings" = upcoming events / callbacks.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
+${isPop ? 'This is a political campaign. Use campaign vocabulary ONLY: people / voters / supporters / volunteers / cadre / grievances / constituencies / events — NEVER sales terms (leads, pipeline, deals, bookings, customers, prospects, stages like "Qualified" or "Booking Made"). The DATA JSON is already campaign-shaped: intensity_ladder is the frontline funnel (Contact→Voter→Supporter→Volunteer→Cadre); top_grievances is issues raised by category; by_channel is how people were reached; engagement_heat is how active they are; upcoming_events is the event calendar. Answer strictly from these fields — do not invent sales stages.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
 
 Times in DATA (e.g. upcoming_bookings "when") are already formatted IST strings — show them EXACTLY as given. Never convert, recompute, or restate a time in a different value.
 

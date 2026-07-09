@@ -1,3 +1,10 @@
+## 2026-07-09 08:15 IST · fix(pop): Ask PROXe in campaign context, sidebar split into two groups, drop Brain map caption
+
+- Ask PROXe (the dashboard chat) was answering POP in aviation/sales terms - a table of New / Qualified / High Intent / Booking Made / In Sequence stages - because the data it received was built from lead_stage. It now gets a campaign-shaped snapshot: intensity_ladder (Contact→Voter→Supporter→Volunteer→Cadre), top_grievances by issue, by_channel, engagement_heat, upcoming_events. The model can only speak from what's in the data, so the shape IS the guardrail - it can no longer show random sales stages. System prompt hardened to campaign-only vocabulary.
+- Sidebar split back into two groups for POP: the day-to-day (People · Chats · Calls · Events) and the system (Humans · Agents · Knowledge · Configure), one divider before Humans. (Other brands unchanged.)
+- Brain engine-map: removed the explanatory floating caption ("How the whole engine is wired…") - the map speaks for itself.
+- (pending-sha)
+
 ## 2026-07-09 07:45 IST · feat(pop): Recent Activity shows campaign signals, not lead-stage churn
 
 - The notification bell / Recent Activity drawer used to stream every lead stage move ("X entered Qualified stage") - noise at thousands of leads/day. For POP it now surfaces the relevant stuff coming in: new directives (AI suggests / Leader directive), external Listen signals (Crisis / Opposition / Positive coverage), and upcoming campaign events - each with its own icon + label. Other brands keep their lead-activity feed unchanged (scoped by BRAND_ID in the notifications API).
