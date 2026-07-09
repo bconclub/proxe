@@ -253,7 +253,9 @@ export async function POST(req: NextRequest) {
       lang.promptRule,
       question
         ? `${firstName} asked: "${question}". Answer THAT question directly from the live data — no daily-briefing preamble. Open with the answer, not a greeting.`
-        : `START with a greeting equivalent to: "Hi ${firstName}, this is how today looks." (in the speaking language).`,
+        // A short spoken greeting ("Hi <name>, let me pull together today…") is
+        // ALWAYS played first, so the briefing must NOT greet or repeat the name.
+        : `A greeting to ${firstName} was ALREADY spoken aloud just before this, so DO NOT greet and DO NOT say their name again. Open DIRECTLY with today's state — e.g. "Here's how today looks." — in the speaking language.`,
       `Style: spoken word, warm, confident, first person. No markdown, no bullets, no emojis — natural sentences read aloud. The FIRST sentence must be short (under 12 words) — it plays first.`,
       question ? `Length: 3 to 6 sentences, under 100 words total.` : `Length: 5 to 8 sentences, under 130 words total.`,
       `You ARE PROXe — the system itself. NEVER say "AI", "the AI", "artificial intelligence" or "AI suggests". When a suggestion came from the system, say "PROXe suggests" or simply "I suggest" (you are PROXe speaking).`,

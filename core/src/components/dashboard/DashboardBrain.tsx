@@ -21,7 +21,8 @@ const VoiceOrb = dynamic(() => import('@/app/dashboard/settings/brain/VoiceOrb')
 
 // Quick actions revealed when the dock wakes on hover.
 const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean }[] = [
-  { label: 'Update me', auto: true },                              // today's briefing (default)
+  // Catch me up = just the latest/most-recent activity, not the full briefing.
+  { label: 'Catch me up', q: "Catch me up — what's happened most recently? Just the latest updates, kept short.", auto: true },
   { label: 'Anything urgent?', q: 'What most needs my attention right now?', auto: true },
   { label: 'Ask something…', auto: false, listen: true },          // opens the orb, mic first
 ]
@@ -210,8 +211,9 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // short timer disambiguates: a second click inside the window means double.
   const onDockClick = useCallback(() => {
     if (drag.current.moved) return
-    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; openOrb({ auto: true }, 'full'); return }
-    clickTimer.current = setTimeout(() => { clickTimer.current = null; openOrb({ auto: true }, 'docked') }, 240)
+    // Click runs the first quick action (Catch me up). Double → full screen.
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; openOrb(DOCK_QUICK[0], 'full'); return }
+    clickTimer.current = setTimeout(() => { clickTimer.current = null; openOrb(DOCK_QUICK[0], 'docked') }, 240)
   }, [openOrb])
   useEffect(() => {
     if (!dock) return
@@ -355,17 +357,25 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
                   backdropFilter: 'blur(16px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-                  border: '1px solid color-mix(in srgb, var(--text-primary) 14%, transparent)',
-                  boxShadow: dragging ? '0 14px 40px rgba(0,0,0,0.4)' : '0 8px 30px rgba(0,0,0,0.28)',
+                  // Hover: a neon accent ring lights up around the circle (border
+                  // + layered outer glow); idle is a hairline.
+                  border: waking
+                    ? '1.5px solid var(--accent-primary)'
+                    : '1px solid color-mix(in srgb, var(--text-primary) 14%, transparent)',
+                  boxShadow: dragging
+                    ? '0 14px 40px rgba(0,0,0,0.4)'
+                    : waking
+                      ? '0 0 0 1px color-mix(in srgb, var(--accent-primary) 80%, transparent), 0 0 14px 2px color-mix(in srgb, var(--accent-primary) 55%, transparent), 0 0 32px 8px color-mix(in srgb, var(--accent-primary) 28%, transparent), 0 8px 30px rgba(0,0,0,0.3)'
+                      : '0 8px 30px rgba(0,0,0,0.28)',
                   cursor: dragging ? 'grabbing' : 'grab',
                   touchAction: 'none',
-                  transform: dragging ? 'scale(1.06)' : 'scale(1)',
+                  transform: dragging ? 'scale(1.06)' : waking ? 'scale(1.04)' : 'scale(1)',
                   // While dragging, position tracks the pointer 1:1 (no left/top
                   // easing). On release, ease left/top so the snap-home-to-left
                   // slides smoothly.
                   transition: dragging
                     ? 'transform 140ms ease, box-shadow 140ms ease'
-                    : 'transform 140ms ease, box-shadow 140ms ease, left 260ms cubic-bezier(0.2,0,0,1), top 260ms cubic-bezier(0.2,0,0,1)',
+                    : 'transform 160ms ease, box-shadow 220ms ease, border-color 220ms ease, left 260ms cubic-bezier(0.2,0,0,1), top 260ms cubic-bezier(0.2,0,0,1)',
                 }
               : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           ...(dock ? {} : { height: '36px' }),
@@ -429,10 +439,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           style={orb.view === 'full'
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
-                right: 16, bottom: 16, width: 'min(360px, calc(100vw - 32px))', height: 'min(460px, calc(100vh - 32px))',
-                borderRadius: 22, overflow: 'hidden', background: 'var(--bg-primary)',
-                border: '1px solid color-mix(in srgb, var(--text-primary) 12%, transparent)',
-                boxShadow: '0 24px 70px rgba(0,0,0,0.45)',
+                // Docked = just the small orb, floating in the corner. No box:
+                // transparent, no border/shadow, glow bleeds onto the page.
+                right: 8, bottom: 8, width: 'min(240px, 72vw)', height: 'min(300px, 60vh)',
+                background: 'transparent', overflow: 'visible',
                 animation: 'wc-orb-pop 240ms cubic-bezier(0.2,0,0,1)',
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"

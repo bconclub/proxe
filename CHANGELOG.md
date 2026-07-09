@@ -1,3 +1,11 @@
+## 2026-07-10 01:30 IST · feat(brain): floating docked orb, "Catch me up" quick action, hover neon ring, no double-greet
+
+- Docked view is now just the small orb floating in the corner (~240×300, transparent — no box/border/shadow), instead of a large panel. Full-screen unchanged.
+- Dock hover lights up a neon accent ring around the circle (border + layered outer glow) and nudges the bubble up slightly.
+- First quick action renamed "Update me" → "Catch me up" and scoped to the most recent activity only (not the full daily briefing); a single click runs it.
+- Voice: the spoken briefing no longer greets/says the name a second time — a short greeting ("Hi <name>, let me pull together today…") always plays first, so the briefing now opens straight into the update.
+- `(pending-sha)`
+
 ## 2026-07-10 00:30 IST · feat(brain): dock click → brain in place (docked corner), double-click → full screen
 
 - User-facing: single-clicking the Brain dock now makes the widget BECOME the brain right there — a compact corner panel pops in, animates, and talks — instead of taking over the whole screen. Double-click (or the ⤢ button inside) goes full screen; ⤡ collapses back to the corner. One orb instance across the resize, so it keeps talking without restarting. The dock bubble hides while open and returns on close.
