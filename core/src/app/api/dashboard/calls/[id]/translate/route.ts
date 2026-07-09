@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
 import Anthropic from '@anthropic-ai/sdk';
+import { resolveModel } from '@/lib/agent-core';
 
 // Translate a call's transcript turns to English on demand. Grievance calls are
 // in Punjabi/Hindi; dashboard staff read English — listening (recording) and
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'CLAUDE_API_KEY not set' }, { status: 500 });
   const anthropic = new Anthropic({ apiKey });
-  const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+  const model = resolveModel(process.env.CLAUDE_MODEL);
 
   // One call: translate every turn, return a JSON array aligned to the input.
   const numbered = turns.map((t: any, i: number) => `${i}. [${t.sender}] ${t.content}`).join('\n');

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
+import { resolveModel } from '@/lib/agent-core'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 
@@ -169,7 +170,7 @@ Respond with ONLY a JSON object in this exact format:
             'anthropic-version': '2023-06-01',
           },
           body: JSON.stringify({
-            model: process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001',
+            model: resolveModel(process.env.CLAUDE_MODEL),
             max_tokens: 300,
             messages: [
               {

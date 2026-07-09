@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { getServiceClient, getClient } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 import Anthropic from '@anthropic-ai/sdk';
+import { resolveModel } from '@/lib/agent-core';
 
 // Vapi retries end-of-call-report, so this handler runs concurrently for the
 // same call more than once. A select-then-insert idempotency check has a
@@ -28,7 +29,7 @@ async function toEnglish(text: string): Promise<string> {
   if (!apiKey) return text;
   try {
     const anthropic = new Anthropic({ apiKey });
-    const model = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+    const model = resolveModel(process.env.CLAUDE_MODEL);
     const resp = await (anthropic.messages.create as any)({
       model, max_tokens: 200,
       system: 'Translate the grievance to concise natural English. Reply with ONLY the English, no quotes or commentary.',

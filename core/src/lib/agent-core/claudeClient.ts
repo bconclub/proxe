@@ -37,14 +37,55 @@ const RETIRED_MODEL_MAP: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'claude-sonnet-4-5-20250929',
 };
 
-function getModel(): string {
-  const configured = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
-  const remapped = RETIRED_MODEL_MAP[configured];
-  if (remapped) {
-    console.warn(`[ClaudeClient] CLAUDE_MODEL="${configured}" is retired — using "${remapped}". Update the env var.`);
-    return remapped;
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+
+// Friendly / malformed aliases → canonical Anthropic model IDs. The dashboard
+// env is hand-edited, so values like "sonnet_5", "sonnet 5", or a bare "opus"
+// end up in CLAUDE_MODEL and 404 the API (the whole "Snapshot / re-score isn't
+// working" symptom). Normalize them so a plausible name always resolves to a
+// real model ID instead of silently failing. Keys are lowercased with spaces /
+// underscores collapsed to hyphens before lookup.
+const MODEL_ALIAS_MAP: Record<string, string> = {
+  'sonnet': 'claude-sonnet-5',
+  'sonnet-5': 'claude-sonnet-5',
+  'sonnet5': 'claude-sonnet-5',
+  'sonnet-4-6': 'claude-sonnet-4-6',
+  'opus': 'claude-opus-4-8',
+  'opus-4-8': 'claude-opus-4-8',
+  'opus-4-7': 'claude-opus-4-7',
+  'haiku': DEFAULT_MODEL,
+  'haiku-4-5': DEFAULT_MODEL,
+  'fable': 'claude-fable-5',
+  'fable-5': 'claude-fable-5',
+};
+
+/**
+ * Resolve a configured model string to a valid Anthropic model ID.
+ * Order: retired-model remap → trust any explicit `claude-*` id → friendly-alias
+ * normalization → last-resort `claude-`-prefix. Exported so the raw-fetch call
+ * sites (lead scoring, voice webhook, call translation) share the same guard.
+ */
+export function resolveModel(configured?: string | null): string {
+  const raw = (configured || '').trim();
+  if (!raw) return DEFAULT_MODEL;
+  if (RETIRED_MODEL_MAP[raw]) {
+    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is retired — using "${RETIRED_MODEL_MAP[raw]}". Update the env var.`);
+    return RETIRED_MODEL_MAP[raw];
   }
-  return configured;
+  // Already a canonical id — trust it as-is.
+  if (/^claude-/i.test(raw)) return raw;
+  const norm = raw.toLowerCase().replace(/[\s_]+/g, '-');
+  if (MODEL_ALIAS_MAP[norm]) {
+    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a valid model ID — using "${MODEL_ALIAS_MAP[norm]}". Set CLAUDE_MODEL to a canonical claude-* id.`);
+    return MODEL_ALIAS_MAP[norm];
+  }
+  // Unknown alias: best-effort prefix so it at least reaches the API as a claude-* id.
+  console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a recognized alias — trying "claude-${norm}".`);
+  return `claude-${norm}`;
+}
+
+function getModel(): string {
+  return resolveModel(process.env.CLAUDE_MODEL);
 }
 
 // Model for the actual CONVERSATION (the part that needs reasoning). Sonnet 5
@@ -53,8 +94,7 @@ function getModel(): string {
 // extraction — deliberately stay on getModel() (Haiku) to keep token spend down.
 // Currently used only by the Lokazen-gated non-streaming web path in engine.ts.
 export function getReasoningModel(): string {
-  const configured = process.env.CLAUDE_MODEL_REASONING || 'claude-sonnet-5';
-  return RETIRED_MODEL_MAP[configured] || configured;
+  return resolveModel(process.env.CLAUDE_MODEL_REASONING || 'claude-sonnet-5');
 }
 
 /**

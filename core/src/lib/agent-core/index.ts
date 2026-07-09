@@ -19,7 +19,7 @@ export type {
 // Individual modules (for direct access if needed)
 export { searchKnowledgeBase } from './knowledgeSearch';
 export { buildPrompt } from './promptBuilder';
-export { streamResponse, generateResponse, generateShort, generateResponseWithTools, generateFromImage } from './claudeClient';
+export { streamResponse, generateResponse, generateShort, generateResponseWithTools, generateFromImage, resolveModel, getReasoningModel } from './claudeClient';
 export type { ToolDefinition, ToolHandler, ToolUseOptions, VisionMediaType } from './claudeClient';
 export { extractIntent, isBookingIntent } from './intentExtractor';
 export { generateFollowUps } from './followUpGenerator';

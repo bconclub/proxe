@@ -1,3 +1,10 @@
+## 2026-07-09 06:40 IST · fix: tolerate friendly/malformed CLAUDE_MODEL so AI scoring + snapshots stop 404ing
+
+- Root cause: CLAUDE_MODEL was set to "sonnet_5" (not a real model ID). Every Claude call using it 404'd, so lead re-scoring silently fell back to rule-based scores and the AI narrative surfaces (war-room summary, brain) failed. The retired-model remap did not cover this class of typo.
+- Added resolveModel() in claudeClient: retired-remap → trust any explicit claude-* id → normalize friendly aliases (sonnet_5 / "sonnet 5" / sonnet / opus / haiku / fable → canonical ids) → last-resort claude- prefix. getModel() and getReasoningModel() now route through it, and the three raw-fetch call sites that read CLAUDE_MODEL directly (leads/score, calls/[id]/translate, voice vapi-webhook) share the same guard.
+- Net: whatever plausible value is in CLAUDE_MODEL resolves to a live model ID instead of failing. Recommended: still set CLAUDE_MODEL=claude-sonnet-5 (canonical) in the deploy env, and keep CLAUDE_API_KEY set in Vercel + brands/pop/.env.local (not core/.env.local, which stage-brand wipes).
+- (pending-sha)
+
 ## 2026-07-09 06:10 IST · feat(pop): Brain engine-map spread out (no overlap) + platform icons on trending keywords
 
 - Brain > Map: the engine connection flow was cramped (5 lanes ~340px apart, nodes ~232px wide → boxes and edges overlapping). Blasted the layout out — ~560px between lanes, ~140px between rows. Verified 24 nodes, ZERO overlapping pairs; fitView frames the whole flow so you can read exactly what feeds what.
