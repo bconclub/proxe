@@ -153,6 +153,9 @@ export async function GET(
     const standingPhrase = isPopBrand
       ? `a ${popTier}${popGrievance ? ` raising a ${popGrievance} grievance` : ''}`
       : `in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
+    // Attribution action: a campaign has no sales "stage" — say it plainly for POP.
+    const stageActionText = (newStage: string | null | undefined) =>
+      isPopBrand ? 'updated their status' : `changed stage to ${newStage}`
 
     // ============================================
     // STEP 0: Hallucination guard — refuse to summarize with no real signal
@@ -229,7 +232,7 @@ export async function GET(
           const { data: u } = await supabase.from('dashboard_users').select('name, email').eq('id', lastStageChange.changed_by).single()
           if (u) actorName = u.name || u.email || 'Team Member'
         }
-        attribution = `Last updated by ${actorName} ${formatTimeAgo(lastStageChange.created_at)} - changed stage to ${lastStageChange.new_stage}`
+        attribution = `Last updated by ${actorName} ${formatTimeAgo(lastStageChange.created_at)} - ${stageActionText(lastStageChange.new_stage)}`
       } else if (guardActivities && guardActivities.length > 0) {
         const a = guardActivities[0]
         const creator = Array.isArray(a.dashboard_users) ? a.dashboard_users[0] : a.dashboard_users
@@ -302,7 +305,7 @@ export async function GET(
       if (lastStageChange) {
         const changedBy = lastStageChange.changed_by
         let actorName = 'PROXe AI'
-        let action = `changed stage to ${lastStageChange.new_stage}`
+        let action = stageActionText(lastStageChange.new_stage)
 
         if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
           const { data: user } = await supabase
@@ -549,7 +552,7 @@ export async function GET(
               if (lastStageChange) {
                 const changedBy = lastStageChange.changed_by
                 let actorName = 'PROXe AI'
-                let action = `changed stage to ${lastStageChange.new_stage}`
+                let action = stageActionText(lastStageChange.new_stage)
 
                 if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
                   const { data: user } = await supabase
@@ -644,7 +647,7 @@ export async function GET(
       if (lastStageChange) {
         const changedBy = lastStageChange.changed_by
         let actorName = 'PROXe AI'
-        let action = `changed stage to ${lastStageChange.new_stage}`
+        let action = stageActionText(lastStageChange.new_stage)
 
         if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
           const { data: user } = await supabase
@@ -924,7 +927,7 @@ export async function GET(
             if (lastStageChange) {
               const changedBy = lastStageChange.changed_by
               let actorName = 'PROXe AI'
-              let action = `changed stage to ${lastStageChange.new_stage}`
+              let action = stageActionText(lastStageChange.new_stage)
 
               if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
                 // Try to get user name

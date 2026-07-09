@@ -1,3 +1,8 @@
+## 2026-07-09 13:40 IST · fix(pop): person-modal attribution drops the sales "changed stage to Qualified"
+
+- The Summary attribution line ("Last updated by PROXe AI 14h ago - changed stage to Qualified") still leaked a sales stage for POP. Added a stageActionText() helper: for POP it reads "updated their status"; other brands keep "changed stage to X". Applied to all six attribution builders in the summary route.
+- (pending-sha)
+
 ## 2026-07-09 13:30 IST · fix(pop): person-modal summary reads campaign, not sales ("Qualified stage")
 
 - The person detail Summary said "X is currently in the Qualified stage" — sales language on a voter. Two causes: (1) the AI summary path hardcoded a RETIRED model (claude-sonnet-4-20250514) so it 404'd and always fell back to the crude sales-stage line; (2) the summary prompt had no POP domain. Fixed both: the model now resolves via resolveModel(CLAUDE_MODEL) — so the AI summary actually runs (helps every brand, they were all 404ing) — and POP gets a campaign domain (voter/supporter/volunteer/cadre + grievance, no sales words). The non-AI fallbacks now describe a person by their frontline tier + grievance instead of a sales stage. Other brands' wording unchanged.
