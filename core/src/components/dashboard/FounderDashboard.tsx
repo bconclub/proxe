@@ -1051,70 +1051,66 @@ export default function FounderDashboard() {
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No party events scheduled yet - create one from Events, and RSVPs will show here.</p>
               )
             ) : metrics.upcomingBookings.length > 0 ? (
-              metrics.upcomingBookings.map((booking) => (
-                <button
-                  key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
-                  className="w-full flex items-start gap-2 p-2 text-left rounded-lg transition-all border"
-                  style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
-                >
-                  <InitialsAvatar name={booking.name} size={24} />
-                  <div className="flex-1 min-w-0">
-                    {/* Line 1 - name · date · owner, with the recency-coloured
-                        countdown chip on the right (only thing that's coloured). */}
-                    <div className="flex items-center justify-between gap-2">
-                      {hasNewHomeLook ? (
-                        /* BCON/POP layout (fork parity): name · when · owner, no category chip. */
-                        <div className="flex items-baseline gap-2.5 min-w-0">
-                          <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                          <span className="flex items-center gap-1.5 shrink-0 text-[10px] whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                            <span>{formatBookingWhen(booking.datetime)}</span>
-                            <span style={{ opacity: 0.4 }}>·</span>
-                            <span style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <p className="text-[13px] font-semibold truncate shrink-0" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
-                          {(() => { const c = eventCategory(booking.courseInterest, booking.title); return c && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap shrink-0" style={{ background: c.bg, color: c.color }}>
-                              {c.label}
+              // Timeline design (ported from POP's Upcoming Events, generalized to
+              // core): a brand-accent rail with a dot per item and a date tile, so
+              // every brand's Upcoming Events card reads as an agenda, not a plain
+              // list. Uses --accent-primary, so it's Lokazen-orange here, and each
+              // brand's own accent elsewhere. Campaign-only bits (RSVP counts,
+              // volunteers) are dropped; bookings show category + time + owner.
+              <div className="relative pl-5">
+                <span className="absolute left-[5px] top-2 bottom-2 w-px" style={{ background: 'color-mix(in srgb, var(--accent-primary) 45%, transparent)' }} />
+                <div className="space-y-2">
+                  {metrics.upcomingBookings.map((booking) => {
+                    const d = booking.datetime ? new Date(booking.datetime) : null
+                    const dow = d ? d.toLocaleDateString('en-IN', { weekday: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const day = d ? d.toLocaleDateString('en-IN', { day: '2-digit', timeZone: 'Asia/Kolkata' }) : ''
+                    const mon = d ? d.toLocaleDateString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' }).toUpperCase() : ''
+                    const time = d ? d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
+                    const cat = eventCategory(booking.courseInterest, booking.title)
+                    const t = countdownTint(booking.datetime)
+                    const detail = booking.title
+                      || [cat?.label || booking.courseInterest || null, booking.userType, booking.timeline].filter(Boolean).join(' · ')
+                    return (
+                      <button
+                        key={booking.id} type="button" onClick={() => openLeadModal(booking.id)}
+                        className="relative w-full text-left rounded-xl transition-all border block p-2.5"
+                        style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+                      >
+                        <span className="absolute -left-[19px] top-6 w-2.5 h-2.5 rounded-full border-2" style={{ background: 'var(--accent-primary)', borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, transparent)' }} />
+                        <div className="flex items-start gap-3">
+                          {d && (
+                            <span className="flex flex-col items-center rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, transparent)', minWidth: 42 }}>
+                              <span className="w-full text-center text-[9px] font-extrabold py-0.5" style={{ background: 'var(--accent-primary)', color: '#0b0d12' }}>{dow}</span>
+                              <span className="text-[17px] font-extrabold leading-tight pt-0.5" style={{ color: 'var(--text-primary)' }}>{day}</span>
+                              <span className="text-[9px] font-bold pb-1" style={{ color: 'var(--accent-primary)' }}>{mon}</span>
                             </span>
-                          ) })()}
-                          <span className="text-[10px] whitespace-nowrap shrink-0" style={{ color: 'var(--text-secondary)' }}>{formatBookingWhen(booking.datetime)}</span>
-                          <span className="text-[9px] truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>· {booking.owner?.name || 'Unassigned'}</span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{booking.name}</p>
+                              {cat && <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: cat.bg, color: cat.color }}>{cat.label}</span>}
+                            </div>
+                            {detail && <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{detail}</p>}
+                            <p className="text-[10.5px] truncate mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
+                              {time && (<><MdAccessTime size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /><span className="whitespace-nowrap">{time}</span><span style={{ opacity: 0.4 }}>·</span></>)}
+                              <span className="truncate" style={{ color: booking.owner?.name ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{booking.owner?.name || 'Unassigned'}</span>
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end justify-between self-stretch shrink-0 gap-2">
+                            <span className="text-[9.5px] px-2 py-1 rounded-full font-bold whitespace-nowrap" style={{ background: t.bg, color: t.color }}>{formatCountdown(booking.datetime)}</span>
+                            <MdChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+                          </div>
                         </div>
-                      )}
-                      {(() => { const t = countdownTint(booking.datetime); return (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap shrink-0" style={{ background: t.bg, color: t.color }}>
-                          {formatCountdown(booking.datetime)}
-                        </span>
-                      ) })()}
-                    </div>
-                    {/* Line 2 - free-text booking title when present; otherwise a
-                        detail composed from the structured intent we already captured
-                        (program · who · timeline) so the row is never bare. No third line.
-                        POP (fork parity): event title only, nothing composed. */}
-                    {(() => {
-                      if (booking.title) return (
-                        <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>{booking.title}</p>
-                      )
-                      if (hasNewHomeLook) return null
-                      const cat = eventCategory(booking.courseInterest, booking.title)
-                      const bits = [
-                        cat?.label || booking.courseInterest || null,
-                        booking.userType,
-                        booking.timeline,
-                      ].filter(Boolean)
-                      if (!bits.length) return null
-                      return (
-                        <p className="text-[11px] truncate mt-0.5 capitalize" style={{ color: 'var(--text-secondary)' }}>{bits.join(' · ')}</p>
-                      )
-                    })()}
-                  </div>
-                </button>
-              ))
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-center mt-2.5 flex items-center justify-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                  <MdCalendarToday size={11} /> All times shown in local time
+                </p>
+              </div>
             ) : (
               <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
             )}
