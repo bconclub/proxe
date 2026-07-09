@@ -3540,7 +3540,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           <div className="space-y-3">
                             <h4 className="flex items-center gap-2 text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em]">
                               <MdTrendingUp size={12} />
-                              Buying Signals
+                              {brandId === 'pop' ? 'Key Signals' : 'Buying Signals'}
                             </h4>
                             <div className="flex flex-wrap gap-x-8 gap-y-3">
                               {summaryData.keyInfo.budget && (
@@ -3629,7 +3629,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart data={[
                               { axis: 'Intent', value: calculatedScore.breakdown.details.intentScore },
-                              { axis: 'Buying Signals', value: calculatedScore.breakdown.details.buyingScore },
+                              { axis: brandId === 'pop' ? 'Commitment' : 'Buying Signals', value: calculatedScore.breakdown.details.buyingScore },
                               { axis: 'Sentiment', value: calculatedScore.breakdown.details.sentimentScore },
                               { axis: 'Response Rate', value: calculatedScore.breakdown.details.responseRate },
                               { axis: 'Recency', value: Math.max(0, 100 - calculatedScore.breakdown.details.daysInactive * 10) },

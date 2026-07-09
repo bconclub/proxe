@@ -1363,6 +1363,10 @@ export default function LeadsTable({
 
                       {/* TYPE - intensity tier: who this person is (Voter→Cadre) */}
                       <td className="px-3 py-2 text-center">
+                        {/* TYPE is just the intensity tier now. The engagement_type
+                            sub-label duplicated the INTENT column (both read
+                            "Volunteer" etc.) and confused more than it helped —
+                            intent lives in its own column. */}
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
                           style={{ backgroundColor: `${tierCfg.color}22`, color: tierCfg.color, border: `1px solid ${tierCfg.color}44` }}
@@ -1370,11 +1374,6 @@ export default function LeadsTable({
                         >
                           {tierCfg.label}
                         </span>
-                        {engCfg && (
-                          <div className="text-[9px] mt-0.5 uppercase tracking-wide" style={{ color: engCfg.color }} title="Why they engaged">
-                            {engCfg.label}
-                          </div>
-                        )}
                       </td>
 
                       {/* CONTACT - phone + email (when provided) */}

@@ -1,3 +1,11 @@
+## 2026-07-09 09:30 IST · fix(pop): dedupe People TYPE column, full-width Configure, drop sales "buying signal" in person modal
+
+- People table: the TYPE column carried an engagement_type sub-label (INFO / VOLUNTEER) that duplicated the INTENT column - the same intent shown in two places. Removed the sub-label; TYPE is just the intensity tier now, INTENT is the single home for intent.
+- Configure page: was capped at 1120px, so on a wide screen the 9 cards crammed into the top-left with a sea of empty space. Removed the cap - the auto-fill grid now fills the full width (4-5 columns).
+- Person detail modal: "Buying Signals" is sales language that does not belong on a voter. For POP the Score Breakdown radar axis reads "Commitment" and the Summary insights group reads "Key Signals" instead. Structure unchanged.
+- (Battlegrounds KPI card: the redundant "swing" badge is removed - it is already in the headline line; that edit ships with the in-progress War Room window work.)
+- (pending-sha)
+
 ## 2026-07-09 09:00 IST · feat(pop): seed campaign-playbook knowledge base (20 entries)
 
 - Loaded a starter POP knowledge base (brand='pop') so Ask PROXe / the agent draw on real campaign context: issue positions (water, drugs, jobs, farm debt, power, roads, education, health), grievance-handling scripts (doorstep water/jobs/drugs, how to log a knock), event FAQs (RSVP, booth meetings, booth assignment), and playbook entries (one-line message, the intensity ladder, channels, what POP is, what PROXe does). Q&A + FTS chunks, no embeddings needed. Migration 032 committed; the 20 rows are already inserted in the POP DB. Placeholder content - refine with the campaign's own positions.
