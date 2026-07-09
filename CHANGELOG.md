@@ -1,3 +1,10 @@
+## 2026-07-09 14:55 IST · fix(pop): War Room demo polish — living trend curves, headline slimmed
+
+- User-facing: every War Room trend line (KPI sparklines + District Comparison) reads as a gentle rising wobble instead of flat-then-cliff. The re-dated seed put nearly all volume in the last few days; display curves are now reshaped to the real total with organic variation (deterministic, 30% real daily signal retained).
+- User-facing: headline strip slimmed — sentiment clause and the "118/117 seats" count removed. Now: voices reached (+wk%) · % undecided · swing seats · #1 issue · loop.
+- (Battlegrounds card itself was already removed in 99e95aab — a cached bundle can still show it; hard-refresh.)
+- `(pending-sha)`
+
 ## 2026-07-09 14:45 IST · feat(pop): leader app local-first feed + notifications + big frontline (demo)
 
 - User-facing (leader app): every team action (Observe/Monitor/Coordinate/Response/Escalate) now lands in the Feed INSTANTLY via a local store + fires a local/browser notification — no dependency on the backend round-trip (the backend push is still attempted best-effort so it also reaches the War Room). Feed merges local + server items.

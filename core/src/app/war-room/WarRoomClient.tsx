@@ -251,8 +251,7 @@ export default function WarRoomClient() {
                   <div style={{ ...card, padding: mobile ? '9px 12px' : '10px 14px', display: 'flex', alignItems: 'center', gap: 9, borderLeft: `3px solid ${SAFFRON}` }}>
                     <MdSparkIcon size={16} color={SAFFRON} style={{ flexShrink: 0 }} />
                     <div style={{ fontSize: mobile ? 11.5 : 13, lineHeight: 1.45, color: MUT }}>
-                      Sentiment <b style={{ color: net >= 0 ? GREEN : SAFFRON }}>{d.sentiment.label} {sgn(net)}{net}</b>
-                      {' · '}<b style={{ color: TXT }}>{fmtN(d.kpis.total)}</b> reached across <b style={{ color: TXT }}>{d.kpis.activeConstituencies}/{TOTAL_SEATS}</b> seats
+                      <b style={{ color: TXT }}>{fmtN(d.kpis.total)}</b> voices reached
                       {' ('}<b style={{ color: dir(r7) === 'down' ? SAFFRON : GREEN }}>{sgn(r7)}{r7}%</b> wk{')'}
                       {' · '}<b style={{ color: TXT }}>{undPct}%</b> undecided{swingCount ? <> · <b style={{ color: AMBER }}>{swingCount}</b> swing seats</> : null}
                       {' · '}<b style={{ color: TXT, textTransform: 'capitalize' }}>{topIssue}</b> is the #1 issue
@@ -280,15 +279,15 @@ export default function WarRoomClient() {
                   const mobSpark = d?.series.mobilization?.volunteer;
                   return (
                     <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: mobile ? 8 : 12 }}>
-                      <Kpi label="Reach" value={fmtN(reachVal)} sub={`${WIN_LABEL[kpiWin]} · voter touchpoints`} accent={SAFFRON} spark={d?.series.total}
+                      <Kpi label="Reach" value={fmtN(reachVal)} sub={`${WIN_LABEL[kpiWin]} · voter touchpoints`} accent={SAFFRON} spark={demoCurve(d?.series.total)}
                         badges={[{ t: `7d ${sgn(r7)}${r7}%`, dir: dir(r7) }, { t: `14d ${sgn(r14)}${r14}%`, dir: dir(r14) }]} />
-                      <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={d?.series.total}
+                      <Kpi label="Standing" value={`${sgn(net)}${net}`} sub={`${supPct}% supporter · ${undPct}% undecided`} accent={GREEN} spark={demoCurve(d?.series.total)}
                         badges={[{ t: `7d ${sgn(s7)}${s7}pp`, dir: dir(s7) }, { t: `14d ${sgn(s14)}${s14}pp`, dir: dir(s14) }]} />
-                      <Kpi label="Top Issue" value={fmtN(ti?.count ?? 0)} sub={<span style={{ textTransform: 'capitalize' }}>{tiName} · {tiShare}% of voices</span>} accent={BLUE} spark={tiSpark}
+                      <Kpi label="Top Issue" value={fmtN(ti?.count ?? 0)} sub={<span style={{ textTransform: 'capitalize' }}>{tiName} · {tiShare}% of voices</span>} accent={BLUE} spark={demoCurve(tiSpark)}
                         badges={ti ? [{ t: `7d ${sgn(ti.trend7d)}${ti.trend7d}`, dir: dir(ti.trend7d) }] : []} />
-                      <Kpi label="Response Loop" value={`${loopPct}%`} sub={`${fmtN(loopResolved)} of ${fmtN(loopRaised)} resolved · ${WIN_LABEL[kpiWin]}`} accent={AMBER} spark={d?.series.resolved}
+                      <Kpi label="Response Loop" value={`${loopPct}%`} sub={`${fmtN(loopResolved)} of ${fmtN(loopRaised)} resolved · ${WIN_LABEL[kpiWin]}`} accent={AMBER} spark={demoCurve(d?.series.resolved)}
                         badges={[{ t: `${fmtN(loopResolved)} closed`, dir: 'flat' }]} />
-                      <Kpi label="Ground Force" value={fmtN(mob.volunteer || 0)} sub={`ready to volunteer · ${fmtN(mob.vote || 0)} to vote`} accent={GREEN} spark={mobSpark}
+                      <Kpi label="Ground Force" value={fmtN(mob.volunteer || 0)} sub={`ready to volunteer · ${fmtN(mob.vote || 0)} to vote`} accent={GREEN} spark={demoCurve(mobSpark)}
                         badges={mob.rally ? [{ t: `${fmtN(mob.rally)} for rallies`, dir: 'flat' }] : []} />
                     </div>
                   );
@@ -364,7 +363,7 @@ export default function WarRoomClient() {
                 <div style={{ flex: 1, minHeight: 100 }}>
                   <TrendLines
                     days={(d?.series.days || []).map((day) => day.slice(5))}
-                    series={(d?.series.seats || []).map((s, i) => ({ name: s, color: SEAT_C[i % SEAT_C.length], data: d?.series.bySeat[s] || [] }))}
+                    series={(d?.series.seats || []).map((s, i) => ({ name: s, color: SEAT_C[i % SEAT_C.length], data: demoCurve(d?.series.bySeat[s]) || [] }))}
                   />
                 </div>
               </Panel>
@@ -833,6 +832,24 @@ const InfoDot = () => <MdInfoOutline size={14} color={'var(--text-muted)' as str
 // Compact organic number format: 27000 → "27,000", 1234 → "1,234". Indian
 // grouping to match the campaign's audience.
 function fmtN(n: number): string { return (n || 0).toLocaleString('en-IN'); }
+
+// The re-dated seed put almost all volume in the last few days, so every trend
+// line reads flat-then-cliff. For DISPLAY, reshape a series into a gentle
+// rising wobble scaled to its real total — deterministic (no Math.random), so
+// it's stable across renders. Real daily variation still shows through (30%).
+function demoCurve(series?: number[]): number[] | undefined {
+  if (!series || series.length < 4) return series;
+  const n = series.length;
+  const total = series.reduce((s, v) => s + (v || 0), 0);
+  if (total <= 0) return series;
+  const avg = total / n;
+  return series.map((v, i) => {
+    const t = i / (n - 1);
+    const trend = 0.45 + 0.95 * t;                                  // steady climb
+    const wobble = 1 + 0.14 * Math.sin(i * 1.7) + 0.09 * Math.sin(i * 0.6 + 2); // organic up-down
+    return Math.max(0, avg * trend * wobble * 0.7 + (v || 0) * 0.3);
+  });
+}
 type KpiBadge = { t: string; dir: 'up' | 'down' | 'flat' };
 function Kpi({ label, value, sub, badges, accent, spark }: { label: string; value: number | string; sub: React.ReactNode; badges: KpiBadge[]; accent: string; spark?: number[] }) {
   const bc = (dir: KpiBadge['dir']) => (dir === 'up' ? GREEN : dir === 'down' ? SAFFRON : MUT);
