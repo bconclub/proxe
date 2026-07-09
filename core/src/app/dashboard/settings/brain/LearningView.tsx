@@ -10,7 +10,7 @@
 //   · AI-vs-human decision match rate (the verify signal)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { MdPsychology, MdAutoAwesome, MdRefresh, MdMemory, MdToken, MdLoop } from 'react-icons/md'
 
 type Bucket = { input_tokens: number; output_tokens: number; calls: number; cost_usd: number }
@@ -19,16 +19,43 @@ type Stats = {
   sources: { leads_scanned: number; chats_today: number; messages_today: number; decisions_today: number; decisions_total: number; notes_today: number; notes_total: number }
   usage: { brain_today: Bucket; brain_7d: Bucket; brain_all_time: Bucket; all_categories_today: Bucket }
 }
+type ChatRef = { n: number; lead_id: string | null; name: string }
 type Reflection = {
   chats_analyzed: number
   sources?: Stats['sources']
   reflection_usage?: { input_tokens: number; output_tokens: number; cost_usd: number }
+  chat_map?: ChatRef[]
   biggest_learning: string | null
   understanding_shifts: string[]
   objection_patterns: string[]
   recursive_actions?: string[]
   note?: string
   generated_at?: string
+}
+
+// Turn every "Chat N" reference the reflection cites into a clickable link that
+// opens that exact conversation in the inbox — so the reviewer can jump straight
+// to the chat the learning came from instead of guessing which one "Chat 7" is.
+function linkifyChats(text: string, chatMap?: ChatRef[]): ReactNode {
+  if (!text) return text
+  const parts = text.split(/(Chat\s+\d+)/g)
+  return parts.map((part, i) => {
+    const m = part.match(/^Chat\s+(\d+)$/)
+    if (!m) return <span key={i}>{part}</span>
+    const n = parseInt(m[1], 10)
+    const ref = chatMap?.find((c) => c.n === n)
+    if (!ref?.lead_id) return <span key={i}>{part}</span>
+    return (
+      <a
+        key={i}
+        href={`/dashboard/inbox?lead=${ref.lead_id}`}
+        title={`Open ${ref.name}'s conversation`}
+        style={{ color: 'var(--accent-primary)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px dashed var(--accent-primary)' }}
+      >
+        {part}
+      </a>
+    )
+  })
 }
 type LearnData = {
   total: number
@@ -203,17 +230,17 @@ export default function LearningView() {
             {reflection.biggest_learning && (
               <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)' }}>
                 <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.5, color: 'var(--accent-primary)', marginBottom: 4 }}>BIGGEST LEARNING</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{reflection.biggest_learning}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 }}>{linkifyChats(reflection.biggest_learning, reflection.chat_map)}</div>
               </div>
             )}
             {reflection.understanding_shifts.length > 0 && (
-              <ListBlock title="understanding shifts" items={reflection.understanding_shifts} />
+              <ListBlock title="understanding shifts" items={reflection.understanding_shifts} chatMap={reflection.chat_map} />
             )}
             {reflection.objection_patterns.length > 0 && (
-              <ListBlock title="objection patterns" items={reflection.objection_patterns} />
+              <ListBlock title="objection patterns" items={reflection.objection_patterns} chatMap={reflection.chat_map} />
             )}
             {(reflection.recursive_actions?.length || 0) > 0 && (
-              <ListBlock title="what it should now do differently" items={reflection.recursive_actions!} accent />
+              <ListBlock title="what it should now do differently" items={reflection.recursive_actions!} accent chatMap={reflection.chat_map} />
             )}
           </div>
         )}
@@ -273,13 +300,13 @@ export default function LearningView() {
   )
 }
 
-function ListBlock({ title, items, accent }: { title: string; items: string[]; accent?: boolean }) {
+function ListBlock({ title, items, accent, chatMap }: { title: string; items: string[]; accent?: boolean; chatMap?: ChatRef[] }) {
   return (
     <div>
       <div style={{ fontSize: 11, color: accent ? 'var(--accent-primary)' : 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: accent ? 800 : 500 }}>{title}</div>
       <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }}>
         {items.map((s, i) => (
-          <li key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{s}</li>
+          <li key={i} style={{ fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.45 }}>{linkifyChats(s, chatMap)}</li>
         ))}
       </ul>
     </div>

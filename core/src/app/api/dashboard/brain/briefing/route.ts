@@ -214,6 +214,7 @@ export async function POST(req: NextRequest) {
       question
         ? `If the data genuinely doesn't cover the question, say so in one sentence and give the nearest useful signal instead.`
         : `Cover: what came in today and from where, what people are raising and responding to, what you're handling right now, and end with the single thing that most needs ${firstName}'s attention — or a calm all-quiet close. Skip zeros and missing data gracefully; never apologize for quiet days.`,
+      `If highlights.most_active_lead is present, name them and mention how engaged they've been (e.g. "X has been messaging a lot today"). If highlights.top_area is present, mention it as where most listings/activity are concentrated right now. Only mention a highlight if it's actually present in the data — never invent one.`,
     ].join('\n')
 
     // Trim what goes to the model — Groq's on-demand tier caps tokens/minute,
@@ -223,6 +224,7 @@ export async function POST(req: NextRequest) {
       taken_in: ov.taken_in || null,
       handling_now: ov.handling_now || null,
       recent_activity: (ov.activity || []).slice(0, 8).map((e: any) => ({ kind: e.kind, label: e.label, detail: String(e.detail || '').slice(0, 60) })),
+      highlights: ov.highlights || null,
       pulse: ctx.pulse || null,
       leader_pushes: (ctx.leader_pushes || []).slice(0, 8),
       news_buzz: ctx.news_buzz || null,

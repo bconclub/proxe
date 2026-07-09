@@ -1601,6 +1601,23 @@ function buildBookingTools(
           if (availability) brandCtx.availability_date = String(availability).trim();
           if (area_locality) brandCtx.property_zone = String(area_locality).trim();
           if (maps_url) brandCtx.google_maps_url = String(maps_url).trim();
+          // Tag the audience so the lead is filed as owner/brand (not left
+          // untyped) the moment property details are captured. A listing detail
+          // (floor / asking rent / deposit / property_type) with no explicit
+          // brand-requirement audience = OWNER. This is what surfaces the
+          // "Property Owner" badge and files them correctly — previously the
+          // details landed but user_type stayed blank, so the lead read as
+          // "unknown" and the agent kept treating it as a fresh conversation.
+          if (!brandCtx.user_type) {
+            const resolved = input.lokazenAudience === 'brand' ? 'brand'
+              : input.lokazenAudience === 'owner' ? 'owner'
+              : (floor || deposit_or_terms || property_type || monthly_rent || area_locality || maps_url) ? 'owner'
+              : null;
+            if (resolved) {
+              brandCtx.user_type = resolved;
+              brandCtx.lead_type = resolved === 'owner' ? 'property_owner' : resolved;
+            }
+          }
           updatedCtx[brandKey] = brandCtx;
         }
 

@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
+import { getBrandConfig } from '@/configs'
 
 type Mode = 'idle' | 'thinking' | 'speaking' | 'error'
 
@@ -46,7 +47,20 @@ function cssLuma(varName: string): number {
 function accentColor(): { h: number; s: number; rgb: [number, number, number] } {
   const fallback = { h: 262, s: 83, rgb: [139, 92, 246] as [number, number, number] }
   try {
-    const hex = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim()
+    // The orb is a BRAND element — it must always render in the brand's own
+    // colour, NOT the dashboard's --accent-primary (which is monochrome white/
+    // black in the default bw themes, and empty/purple-fallback before the
+    // theme applies). Read the brand config's colour directly so Lokazen's orb
+    // is orange, POP's is its own, etc. — regardless of the light/dark theme.
+    let hex = ''
+    try {
+      const c = getBrandConfig().colors
+      hex = (c.primary || c.primaryVibrant || '').trim()
+    } catch { /* fall through to CSS var */ }
+    // Fallback: the theme var, only if the brand config had nothing usable.
+    if (!/^#?[0-9a-f]{6}$/i.test(hex)) {
+      hex = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim()
+    }
     const m = hex.match(/^#?([0-9a-f]{6})$/i)
     if (!m) return fallback
     const n = parseInt(m[1], 16)

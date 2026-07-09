@@ -16,7 +16,9 @@ interface MediaResponse {
   title: string | null
 }
 
-const ORANGE = '#FF5200'
+// Brand action color — resolves to whatever brand this core is staged as
+// (Lokazen orange fallback). Never hardcode a brand hex in a shared component.
+const ACCENT = 'var(--accent-primary, #FF5200)'
 
 export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
   const [state, setState] = useState<'loading' | 'ready' | 'empty' | 'error'>('loading')
@@ -47,7 +49,7 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
         </span>
         {data?.property_url && (
           <a href={data.property_url} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 11, fontWeight: 600, color: ORANGE, textDecoration: 'none' }}>
+            style={{ fontSize: 11, fontWeight: 600, color: ACCENT, textDecoration: 'none' }}>
             View listing ↗
           </a>
         )}
@@ -101,12 +103,12 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
             <img src={images[lightbox]} alt="Property" style={{ maxWidth: '92vw', maxHeight: '80vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
               <button type="button" onClick={() => setLightbox((l) => (l! - 1 + images.length) % images.length)}
-                style={{ background: 'transparent', border: `1px solid ${ORANGE}`, color: ORANGE, borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ background: 'transparent', border: `1px solid ${ACCENT}`, color: ACCENT, borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 ‹ Prev
               </button>
               <span style={{ color: '#fff', fontSize: 12 }}>{lightbox + 1} / {images.length}</span>
               <button type="button" onClick={() => setLightbox((l) => (l! + 1) % images.length)}
-                style={{ background: ORANGE, border: 'none', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                style={{ background: ACCENT, border: 'none', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 Next ›
               </button>
             </div>

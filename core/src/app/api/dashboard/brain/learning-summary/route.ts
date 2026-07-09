@@ -71,13 +71,16 @@ async function gatherSources(supabase: any, brand: string) {
       .order('created_at', { ascending: true })
       .limit(600),
     supabase.from('all_leads')
-      .select('customer_name, unified_context')
+      .select('id, customer_name, unified_context')
       .in('brand', [brand, 'default'])
       .limit(2000),
   ])
 
   const messages = convRes.data || []
   const leadIds = new Set(messages.map((m: any) => m.lead_id).filter(Boolean))
+  const nameById = new Map<string, string>(
+    ((leadsRes.data || []) as any[]).map((l) => [l.id, l.customer_name || 'Lead'])
+  )
 
   // Per-lead compact transcripts (token-bounded).
   const byLead: Record<string, string[]> = {}
@@ -89,10 +92,17 @@ async function gatherSources(supabase: any, brand: string) {
     const text = String(m.content || '').replace(/\s+/g, ' ').slice(0, 240)
     if (text) byLead[id].push(`${who}: ${text}`)
   }
-  const transcripts = Object.entries(byLead)
-    .slice(0, 40)
+  const orderedLeads = Object.entries(byLead).slice(0, 40)
+  const transcripts = orderedLeads
     .map(([, lines], i) => `--- Chat ${i + 1} ---\n${lines.join('\n')}`)
     .join('\n\n')
+  // Map "Chat N" (as the model cites it) → the actual lead, so the UI can make
+  // each reference clickable and open that conversation in the inbox.
+  const chatMap = orderedLeads.map(([leadId], i) => ({
+    n: i + 1,
+    lead_id: leadId === 'unknown' ? null : leadId,
+    name: nameById.get(leadId) || 'Lead',
+  }))
 
   // Decisions + notes across leads.
   const decisionsToday: string[] = []
@@ -128,6 +138,7 @@ async function gatherSources(supabase: any, brand: string) {
   return {
     istDate,
     transcripts,
+    chatMap,
     decisionsToday,
     notesToday,
     counts: {
@@ -229,6 +240,7 @@ ${src.notesToday.slice(0, 40).join('\n') || '(none)'}`
         sources: src.counts,
         usage: after,
         reflection_usage,
+        chat_map: src.chatMap,
         biggest_learning: raw.slice(0, 240),
         understanding_shifts: [],
         objection_patterns: [],
@@ -241,6 +253,7 @@ ${src.notesToday.slice(0, 40).join('\n') || '(none)'}`
       sources: src.counts,
       usage: after,
       reflection_usage,
+      chat_map: src.chatMap,
       biggest_learning: typeof parsed.biggest_learning === 'string' ? parsed.biggest_learning : null,
       understanding_shifts: Array.isArray(parsed.understanding_shifts) ? parsed.understanding_shifts.slice(0, 5) : [],
       objection_patterns: Array.isArray(parsed.objection_patterns) ? parsed.objection_patterns.slice(0, 4) : [],

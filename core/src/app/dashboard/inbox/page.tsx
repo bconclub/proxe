@@ -2570,7 +2570,12 @@ export default function InboxPage() {
             </div>
           ) : (() => {
             const uc = leadDetails.unified_context || {}
-            const wc = uc.windchasers || {}
+            // Brand-namespaced context (e.g. uc.lokazen / uc.windchasers). Was
+            // hardcoded to `windchasers`, so Lokazen's owner/scout/brand audience
+            // (uc.lokazen.user_type) never surfaced in the panel. Read the active
+            // brand's namespace, then fall back to windchasers for legacy rows.
+            const bc = uc[getCurrentBrandId()] || {}
+            const wc = { ...(uc.windchasers || {}), ...bc }
             const webCtx = uc.web || {}
             const waCtx = uc.whatsapp || {}
             const profile = webCtx.profile || waCtx.profile || {}
@@ -2746,6 +2751,23 @@ export default function InboxPage() {
                           {leadDetails.lead_stage}
                         </span>
                       )}
+                      {/* Audience badge — who we're talking to (Lokazen: owner /
+                          scout / brand). So the agent knows the conversation type
+                          at a glance instead of inferring it from the messages. */}
+                      {(() => {
+                        const ut = String(userType || '').toLowerCase()
+                        const aud = ut.includes('owner') ? { label: 'Property Owner', color: '#0EA5E9' }
+                          : ut.includes('scout') ? { label: 'Scout', color: '#F59E0B' }
+                          : ut.includes('brand') ? { label: 'Brand', color: '#A855F7' }
+                          : null
+                        if (!aud) return null
+                        return (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: `${aud.color}22`, color: aud.color, border: `1px solid ${aud.color}55` }}>
+                            {aud.label}
+                          </span>
+                        )
+                      })()}
                       {selectedConversation?.channels?.map(ch => (
                         <ChannelIcon key={ch} channel={ch} size={12} active={true} />
                       ))}

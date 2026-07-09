@@ -20,6 +20,7 @@ import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } fr
 // into the client bundle. Webpack tree-shaking became less generous after the
 // resend import was added to the barrel.
 import { cleanDisplayName } from '@/lib/services/utils'
+import { LokazenPropertyGallery } from './LokazenPropertyGallery'
 
 // Property-owner leads get a synthetic placeholder email
 // (owner_<phone>_<ts>@noemail.lokazen.in) when they have no real email. It's an
@@ -404,6 +405,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   }, [])
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showPropertyModal, setShowPropertyModal] = useState(false)
   const [showAttribution, setShowAttribution] = useState(false)
   const [showPATResult, setShowPATResult] = useState(false)
   const stageButtonRef = useRef<HTMLButtonElement>(null)
@@ -2109,30 +2111,82 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     types the details in chat. */}
                 {(() => {
                   const lkz: any = currentLead.unified_context?.lokazen || {};
-                  const rows = ([
+                  // Free-text "any other details" the owner shared that don't fit a
+                  // fixed field (e.g. "No front glass", "fully visible prime property",
+                  // landmark "Atri square"). Captured into notes/key_interest_signal.
+                  const otherDetails =
+                    lkz.notes || lkz.other_details || lkz.description || lkz.key_interest_signal || null;
+                  const amenities = Array.isArray(lkz.amenities)
+                    ? lkz.amenities.filter(Boolean).join(', ')
+                    : (typeof lkz.amenities === 'string' ? lkz.amenities : null);
+                  // Full field set (modal). The inline card shows the first few.
+                  const allRows = ([
                     ['Property', lkz.property_type],
                     ['Size', lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null],
                     ['Floor', lkz.floor],
                     ['Rent', lkz.asking_rent_monthly],
                     ['Deposit / terms', lkz.deposit],
+                    ['Frontage', lkz.frontage_ft ? `${lkz.frontage_ft} ft` : null],
+                    ['Amenities', amenities],
                     ['Area', lkz.property_zone || lkz.city],
                     ['Available', lkz.availability_date],
+                    ['Other details', otherDetails],
                   ] as Array<[string, string | null | undefined]>).filter((r) => !!r[1]);
                   const maps = lkz.google_maps_url;
-                  if (rows.length === 0 && !maps) return null;
+                  if (allRows.length === 0 && !maps && !lkz.property_id) return null;
+                  const previewRows = allRows.slice(0, 4);
+                  const hasMore = allRows.length > previewRows.length || !!maps || !!lkz.property_id;
                   return (
                     <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                      <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Property details</span>
-                      {rows.map(([label, value]) => (
+                      {/* Clickable header — opens the full property modal. */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPropertyModal(true)}
+                        className="flex items-center justify-between gap-2 w-full text-left group"
+                        title="View all property details"
+                      >
+                        <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Property details</span>
+                        <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                          {hasMore ? 'View all' : 'View'} <MdChevronRight size={13} />
+                        </span>
+                      </button>
+                      {previewRows.map(([label, value]) => (
                         <div key={label} className="flex items-center justify-between gap-2 text-xs">
                           <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                           <span className="text-right truncate max-w-[60%]" style={{ color: 'var(--text-secondary)' }} title={String(value)}>{value}</span>
                         </div>
                       ))}
-                      {maps && (
-                        <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline mt-0.5" style={{ color: 'var(--accent-primary, #10b981)' }}>
-                          View on Google Maps →
-                        </a>
+
+                      {/* Full details modal */}
+                      {showPropertyModal && (
+                        <div
+                          onClick={() => setShowPropertyModal(false)}
+                          style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                        >
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ width: 'min(440px, 92vw)', maxHeight: '85vh', overflowY: 'auto', background: 'var(--bg-secondary, #111)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 18 }}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Property details</h3>
+                              <button type="button" onClick={() => setShowPropertyModal(false)} style={{ color: 'var(--text-muted)' }}><MdClose size={18} /></button>
+                            </div>
+                            <div className="flex flex-col gap-y-2">
+                              {allRows.map(([label, value]) => (
+                                <div key={label} className="flex items-start justify-between gap-3 text-xs">
+                                  <span className="flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                                  <span className="text-right" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }} title={String(value)}>{value}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {maps && (
+                              <a href={String(maps)} target="_blank" rel="noopener noreferrer" className="inline-block text-xs hover:underline mt-3" style={{ color: 'var(--accent-primary, #10b981)' }}>
+                                View on Google Maps →
+                              </a>
+                            )}
+                            {lkz.property_id && <LokazenPropertyGallery propertyId={String(lkz.property_id)} />}
+                          </div>
+                        </div>
                       )}
                     </div>
                   );

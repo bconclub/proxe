@@ -23,6 +23,17 @@ export const lokazenConfig: BrandConfig = {
     followUpSequence: false,
     scouts: true, // Scout segment: /dashboard/scouts + scout widget mode + scout KB scope
   },
+  brain: {
+    persona: ' — the intelligence behind Lokazen\'s commercial real-estate matching operation in Bangalore',
+    vocabularyRule: 'Vocabulary: speak in the language of commercial real estate — brands, property owners, scouts, listings, areas, site visits, deals. No CRM jargon, no internal system terms.',
+    quickQuestions: [
+      'What needs my attention today?',
+      'What came in today?',
+      'Which area is getting the most listings?',
+      'Anything at risk right now?',
+    ],
+    voiceId: 'VzpSvJsTu0BvRUgOoMMU',
+  },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
     path: '@/api/prompts/lokazen-prompt',

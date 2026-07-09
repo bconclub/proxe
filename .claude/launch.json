@@ -110,9 +110,15 @@
       "port": 4011
     },
     {
+      "name": "lokazen-live",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&set NEXT_DIST_DIR=.next-lokazen&&node scripts/stage-brand.js&&npx next dev -p 4020"],
+      "port": 4020
+    },
+    {
       "name": "kargil-gas",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd /d C:\\Users\\user\\Desktop\\Gas\\kargil-gas-app && npm run dev -- -p 4100"],
+      "runtimeArgs": ["/c", "cd /d C:\\Users\\user\\Builds\\Kargil && npm run dev -- -p 4100"],
       "port": 4100
     }
   ]

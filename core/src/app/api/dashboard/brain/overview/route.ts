@@ -63,7 +63,7 @@ export async function GET() {
     const now = Date.now()
 
     // ── Parallel fetches ─────────────────────────────────────────────────────
-    const [kbRes, chatsTodayRes, tasksRes, leadsRes, convRes, stageRes, sendsRes] = await Promise.all([
+    const [kbRes, chatsTodayRes, tasksRes, leadsRes, convRes, stageRes, sendsRes, msgsTodayRes] = await Promise.all([
       supabase.from('knowledge_base').select('id', { count: 'exact', head: true }).eq('brand', brand),
       supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('created_at', istMidnightIso),
       supabase.from('agent_tasks').select('status').limit(5000),
@@ -87,6 +87,11 @@ export async function GET() {
         .gte('completed_at', istMidnightIso)
         .order('completed_at', { ascending: false })
         .limit(25),
+      // Today's customer messages, for the "who's been talking the most" highlight.
+      supabase.from('conversations')
+        .select('lead_id, sender')
+        .gte('created_at', istMidnightIso)
+        .limit(3000),
     ])
 
     const leads = leadsRes.data || []
@@ -106,6 +111,10 @@ export async function GET() {
     let hot = 0, warm = 0, cold = 0, inFlight = 0, bookingsUpcoming = 0
     let notesTotal = 0, notesToday = 0, leadsToday = 0
     const noteEvents: Event[] = []
+    // Property-listing area tally (real-estate brands only — property_zone lives
+    // in unified_context.<channel> for OWNER leads; brands without that field
+    // simply never populate this, so the highlight stays empty and unmentioned).
+    const areaCounts: Record<string, number> = {}
 
     for (const l of leads as any[]) {
       const src = l.first_touchpoint || l.last_touchpoint || 'unknown'
@@ -133,6 +142,30 @@ export async function GET() {
           }
         }
       }
+      for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
+        const area = l.unified_context?.[ch]?.property_zone
+        if (area && typeof area === 'string') {
+          const key = area.trim()
+          if (key) areaCounts[key] = (areaCounts[key] || 0) + 1
+        }
+      }
+    }
+
+    // ── Highlights: who's been talking the most today, where listings cluster ──
+    const talkCounts: Record<string, number> = {}
+    for (const m of (msgsTodayRes.data || []) as any[]) {
+      const s = String(m.sender || '').toLowerCase()
+      if ((s === 'customer' || s === 'user') && m.lead_id) talkCounts[m.lead_id] = (talkCounts[m.lead_id] || 0) + 1
+    }
+    let mostActiveLead: { name: string; messages: number } | null = null
+    for (const [leadId, count] of Object.entries(talkCounts)) {
+      if (count >= 3 && (!mostActiveLead || count > mostActiveLead.messages)) {
+        mostActiveLead = { name: nameOf.get(leadId) || 'A lead', messages: count }
+      }
+    }
+    let topArea: { area: string; count: number } | null = null
+    for (const [area, count] of Object.entries(areaCounts)) {
+      if (!topArea || count > topArea.count) topArea = { area, count }
     }
 
     // ── Mixed activity feed (drives the region firing) ───────────────────────
@@ -182,6 +215,10 @@ export async function GET() {
       },
       stages,
       activity: events.slice(0, 30),
+      highlights: {
+        most_active_lead: mostActiveLead,
+        top_area: topArea,
+      },
     })
   } catch (err) {
     console.error('[brain/overview] Error:', err)
