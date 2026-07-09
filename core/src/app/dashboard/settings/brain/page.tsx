@@ -11,7 +11,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { MdPsychology, MdArrowBack } from 'react-icons/md'
 import { getBrandConfig } from '@/configs'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
@@ -47,7 +46,7 @@ export default function BrainPage() {
   if (!brainEnabled) return null
 
   return (
-    <DashboardLayout>
+    <>
       <div style={{ height: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
         {/* Header + tab rail */}
         <div style={{ padding: '14px 20px 10px', flexShrink: 0 }}>
@@ -85,6 +84,6 @@ export default function BrainPage() {
           {tab === 'learning' && <LearningView />}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

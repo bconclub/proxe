@@ -10,9 +10,21 @@
  */
 
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
+import dynamic from 'next/dynamic'
 import { MdClose, MdSend, MdArrowForward } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
 import { BRAND_ID } from '@/configs'
+
+// The full brain the dock expands into — the talking spiral orb. Loaded lazily
+// (canvas/window heavy) and only when the dock is clicked.
+const VoiceOrb = dynamic(() => import('@/app/dashboard/settings/brain/VoiceOrb'), { ssr: false })
+
+// Quick actions revealed when the dock wakes on hover.
+const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean }[] = [
+  { label: 'Update me', auto: true },                              // today's briefing (default)
+  { label: 'Anything urgent?', q: 'What most needs my attention right now?', auto: true },
+  { label: 'Ask something…', auto: false, listen: true },          // opens the orb, mic first
+]
 
 const IS_POP = BRAND_ID === 'pop'
 
@@ -168,6 +180,37 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const [dragging, setDragging] = useState(false)
   const drag = useRef({ active: false, moved: false, startX: 0, startY: 0, offX: 0, offY: 0 })
 
+  // Singleton guard — only ONE dock may render. Several dashboard pages wrap
+  // themselves in <DashboardLayout> while the segment layout (dashboard/
+  // layout.tsx) already does, nesting two layouts → two identical draggable
+  // bubbles stacked at the same spot. The first mounted dock claims a global
+  // flag; any extra instance renders nothing.
+  const [isPrimaryDock, setIsPrimaryDock] = useState(false)
+  const dockClaimed = useRef(false)
+
+  // Hover-wake fan + the full-screen orb the dock expands into.
+  const [waking, setWaking] = useState(false)
+  const [orb, setOrb] = useState<null | { q?: string; auto: boolean; listen?: boolean }>(null)
+  const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wake = useCallback((on: boolean) => {
+    if (wakeTimer.current) { clearTimeout(wakeTimer.current); wakeTimer.current = null }
+    if (on) setWaking(true)
+    else wakeTimer.current = setTimeout(() => setWaking(false), 180) // small grace so moving to a pill doesn't close it
+  }, [])
+  const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean }) => {
+    setWaking(false)
+    setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen })
+  }, [])
+  useEffect(() => {
+    if (!dock) return
+    const w = window as any
+    if (w.__proxeDockClaimed) return
+    w.__proxeDockClaimed = true
+    dockClaimed.current = true
+    setIsPrimaryDock(true)
+    return () => { if (dockClaimed.current) { w.__proxeDockClaimed = false; dockClaimed.current = false } }
+  }, [dock])
+
   const clampToViewport = useCallback((x: number, y: number) => ({
     x: Math.min(Math.max(x, DOCK_MARGIN), window.innerWidth - DOCK_SIZE - DOCK_MARGIN),
     y: Math.min(Math.max(y, DOCK_MARGIN), window.innerHeight - DOCK_SIZE - DOCK_MARGIN),
@@ -213,8 +256,14 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     setDragging(false)
     dockRef.current?.releasePointerCapture(e.pointerId)
     setDockPos((cur) => {
-      if (cur) { try { localStorage.setItem('proxe-brain-dock-pos', JSON.stringify(cur)) } catch { /* quota */ } }
-      return cur
+      if (!cur) return cur
+      // On release after an actual drag, snap the dock home to the RIGHT edge
+      // (keep the vertical position); the left/top CSS transition animates the
+      // slide. A plain click (no move) leaves it where it is — that opens the panel.
+      const rightX = window.innerWidth - DOCK_SIZE - DOCK_MARGIN
+      const next = d.moved ? { x: rightX, y: cur.y } : cur
+      try { localStorage.setItem('proxe-brain-dock-pos', JSON.stringify(next)) } catch { /* quota */ }
+      return next
     })
   }, [])
 
@@ -257,12 +306,20 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     }
   }, [loading, messages])
 
+  // A non-primary dock instance (nested layout) renders nothing at all.
+  if (dock && !isPrimaryDock) return null
+
   return (
     <>
       {/* Brain button — stacked under the eye (14) + bell (54). */}
       <button
         ref={dockRef}
-        onClick={() => { if (dock && drag.current.moved) return; setOpen(true) }}
+        onClick={() => {
+          if (dock) { if (drag.current.moved) return; openOrb({ auto: true }); return } // click → brain wakes + speaks the update
+          setOpen(true)
+        }}
+        onMouseEnter={dock ? () => wake(true) : undefined}
+        onMouseLeave={dock ? () => wake(false) : undefined}
         onPointerDown={dock ? onDockPointerDown : undefined}
         onPointerMove={dock ? onDockPointerMove : undefined}
         onPointerUp={dock ? onDockPointerUp : undefined}
@@ -290,7 +347,12 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   cursor: dragging ? 'grabbing' : 'grab',
                   touchAction: 'none',
                   transform: dragging ? 'scale(1.06)' : 'scale(1)',
-                  transition: 'transform 140ms ease, box-shadow 140ms ease',
+                  // While dragging, position tracks the pointer 1:1 (no left/top
+                  // easing). On release, ease left/top so the snap-home-to-left
+                  // slides smoothly.
+                  transition: dragging
+                    ? 'transform 140ms ease, box-shadow 140ms ease'
+                    : 'transform 140ms ease, box-shadow 140ms ease, left 260ms cubic-bezier(0.2,0,0,1), top 260ms cubic-bezier(0.2,0,0,1)',
                 }
               : { top: '94px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
           ...(dock ? {} : { height: '36px' }),
@@ -299,9 +361,58 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         aria-label={dock ? 'Ask PROXe — drag to move' : 'Ask PROXe'}
         title={dock ? 'Ask PROXe (drag to move)' : 'Ask PROXe'}
       >
-        <ProxeMark size={dock ? 24 : 18} />
+        <ProxeMark size={dock ? 40 : 18} />
         {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
       </button>
+
+      {/* Hover-wake fan — quick actions that slide up-left from the dock. Anchored
+          to the dock's top-right corner; a plain click on the bubble runs the
+          first action (the update) without needing the fan. */}
+      {dock && isPrimaryDock && waking && !dragging && !orb && dockPos && (
+        <div
+          onMouseEnter={() => wake(true)}
+          onMouseLeave={() => wake(false)}
+          style={{
+            position: 'fixed',
+            left: dockPos.x + DOCK_SIZE,
+            top: dockPos.y,
+            transform: 'translate(-100%, -100%)',
+            paddingBottom: 10,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+            zIndex: 61,
+          }}
+        >
+          {/* wake caption */}
+          <span style={{ fontSize: 11, letterSpacing: 0.3, color: 'var(--text-muted)', marginBottom: 2 }}>
+            What&rsquo;s the update?
+          </span>
+          {DOCK_QUICK.map((pill, i) => (
+            <button
+              key={pill.label}
+              onClick={() => openOrb(pill)}
+              style={{
+                fontSize: 12.5, fontWeight: 600, padding: '8px 14px', borderRadius: 999, cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                background: 'color-mix(in srgb, var(--bg-secondary) 92%, transparent)',
+                color: 'var(--text-primary)',
+                border: '1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent)',
+                boxShadow: '0 6px 20px rgba(0,0,0,0.28)',
+                backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                animation: `wc-fan-in .2s ease ${i * 0.04}s both`,
+              }}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* The dock expanded into the full talking brain (spiral orb). */}
+      {orb && (
+        <div className="fixed inset-0 z-[80]" style={{ background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }} aria-modal="true" role="dialog">
+          <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational onClose={() => setOrb(null)} />
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-[70]" aria-modal="true" role="dialog">
@@ -484,6 +595,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         @keyframes wc-fade-in {
           from { opacity: 0; }
           to   { opacity: 1; }
+        }
+        @keyframes wc-fan-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </>

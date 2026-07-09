@@ -74,6 +74,12 @@
       "port": 4002
     },
     {
+      "name": "bcon-core",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=bcon&&set NEXT_DIST_DIR=.next-bcon&&node scripts/stage-brand.js&&npx next dev -p 4022"],
+      "port": 4022
+    },
+    {
       "name": "windchasers-multi",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd .multi\\windchasers&&npx next dev -p 4003"],
@@ -114,6 +120,12 @@
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&set NEXT_DIST_DIR=.next-lokazen&&node scripts/stage-brand.js&&npx next dev -p 4020"],
       "port": 4020
+    },
+    {
+      "name": "lokazen-live-b",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=lokazen&&set NEXT_DIST_DIR=.next-lokazen-b&&node scripts/stage-brand.js&&npx next dev -p 4021"],
+      "port": 4021
     },
     {
       "name": "kargil-gas",

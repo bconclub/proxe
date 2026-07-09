@@ -6,7 +6,6 @@
 //   Widget Appearance → /dashboard/settings/widget
 //   Notifications & Sounds → /dashboard/settings/notifications
 
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import {
   MdPsychology, MdGroup, MdGridView, MdOutlineForum, MdHub,
   MdNotificationsActive, MdPalette, MdChatBubbleOutline, MdToken,
@@ -77,7 +76,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6">
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Configure</h1>
         <p className="text-xs mb-6" style={{ color: 'var(--text-secondary)' }}>Everything that shapes how PROXe runs, in one place.</p>
@@ -124,6 +123,6 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

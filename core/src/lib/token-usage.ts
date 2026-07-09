@@ -19,7 +19,8 @@ export type TokenCategory =
   | 'chat'          // WhatsApp / web / voice agent replies
   | 'scoring'       // lead scoring
   | 'notes_summary' // note classification + summaries
-  | 'brain'         // Ask PROXe
+  | 'brain'         // Ask PROXe / Brain — TEXT (LLM: briefing words, Q&A)
+  | 'brain_voice'   // Ask PROXe / Brain — VOICE (ElevenLabs TTS, char-billed)
   | 'vision'        // screenshot / image reads
   | 'other'
 
@@ -27,10 +28,17 @@ export const CATEGORY_LABELS: Record<TokenCategory, string> = {
   chat: 'Agent chat (WhatsApp/Web)',
   scoring: 'Lead scoring',
   notes_summary: 'Notes & summaries',
-  brain: 'Ask PROXe',
+  brain: 'Ask PROXe (text)',
+  brain_voice: 'Ask PROXe (voice)',
   vision: 'Screenshot reads',
   other: 'Other',
 }
+
+// Voice categories are billed by CHARACTERS spoken (ElevenLabs), not LLM
+// tokens. The tracker stores the char count in `input_tokens` so the table's
+// totals still add up to something meaningful, and cost comes from the
+// per-1K-char price below instead of estimateCost().
+export const VOICE_CATEGORIES: ReadonlySet<TokenCategory> = new Set<TokenCategory>(['brain_voice'])
 
 const SETTINGS_KEY = 'token_usage'
 
@@ -86,6 +94,24 @@ export function estimateCost(model: string, inputTokens: number, outputTokens: n
 }
 
 /**
+ * Rough USD per 1,000 characters for ElevenLabs TTS. ElevenLabs actually bills
+ * in subscription credits, not per-char USD — these are ballpark conversions
+ * for the "rough spend" panel (flash models cost ~half the credits of the
+ * standard/v3 models). Match by model-id substring like priceFor().
+ */
+function voicePricePer1kChars(model: string): number {
+  const m = (model || '').toLowerCase()
+  if (m.includes('flash')) return 0.08          // eleven_flash_v2_5 (greeting)
+  if (m.includes('v3')) return 0.15             // eleven_v3 (main briefing)
+  if (m.includes('multilingual')) return 0.15   // eleven_multilingual_v2 (fallback)
+  return 0.15
+}
+
+export function estimateVoiceCost(model: string, chars: number): number {
+  return (Math.max(0, chars) / 1000) * voicePricePer1kChars(model)
+}
+
+/**
  * Add a Claude call's token usage to the running aggregate. Fire-and-forget —
  * callers should NOT await in a way that blocks the reply (use `void`).
  */
@@ -138,6 +164,65 @@ export async function recordTokenUsage(
     // Best-effort — never throw into a live reply path — but DO log, so a silent
     // write failure (like the updated_by UUID bug) is visible next time.
     console.error('[token-usage] write failed:', (e as any)?.message || e)
+  }
+}
+
+/** Add a voice bucket's characters + char-billed cost into a map under `key`. */
+function addVoiceToBucket(
+  map: Partial<Record<TokenCategory, UsageBucket>>,
+  category: TokenCategory,
+  chars: number,
+  model: string,
+): void {
+  const b: UsageBucket = map[category] || { input_tokens: 0, output_tokens: 0, calls: 0, cost_usd: 0 }
+  b.input_tokens += chars || 0  // chars stored here so table totals stay meaningful
+  b.calls += 1
+  b.cost_usd += estimateVoiceCost(model, chars || 0)
+  map[category] = b
+}
+
+/**
+ * Record an ElevenLabs TTS call — billed by characters, not tokens. Same
+ * fire-and-forget contract as recordTokenUsage; writes into the same
+ * dashboard_settings 'token_usage' aggregate under a voice category.
+ */
+export async function recordVoiceUsage(
+  category: TokenCategory,
+  model: string,
+  chars: number,
+): Promise<void> {
+  try {
+    if (!chars) return
+    const svc = getServiceClient()
+    if (!svc) {
+      console.error('[token-usage] recordVoiceUsage skipped: getServiceClient() returned null')
+      return
+    }
+    const { data } = await svc
+      .from('dashboard_settings')
+      .select('value')
+      .eq('key', SETTINGS_KEY)
+      .maybeSingle()
+
+    const nowIso = new Date().toISOString()
+    const cur: TokenUsageDoc =
+      (data?.value as TokenUsageDoc) || { byCategory: {}, byDay: {}, since: nowIso, updatedAt: nowIso }
+
+    addVoiceToBucket(cur.byCategory, category, chars, model)
+    if (!cur.byDay) cur.byDay = {}
+    const dayKey = istDayKey()
+    if (!cur.byDay[dayKey]) cur.byDay[dayKey] = {}
+    addVoiceToBucket(cur.byDay[dayKey], category, chars, model)
+    cur.updatedAt = nowIso
+
+    await svc
+      .from('dashboard_settings')
+      .upsert(
+        { key: SETTINGS_KEY, value: cur, description: 'TEST: Claude token usage by category' },
+        { onConflict: 'key' },
+      )
+  } catch (e) {
+    console.error('[token-usage] voice write failed:', (e as any)?.message || e)
   }
 }
 

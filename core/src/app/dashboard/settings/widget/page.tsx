@@ -4,7 +4,6 @@
 // single-scroll settings page when Configure became a card grid.
 
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { MdArrowBack } from 'react-icons/md';
 
 type WidgetStyle = 'searchbar' | 'bubble';
@@ -64,7 +63,7 @@ export default function WidgetAppearancePage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-4xl">
         <a href="/dashboard/settings" className="inline-flex items-center gap-1.5 text-xs mb-4" style={{ color: 'var(--text-secondary)', textDecoration: 'none' }}>
           <MdArrowBack size={15} /> Configure
@@ -157,6 +156,6 @@ export default function WidgetAppearancePage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

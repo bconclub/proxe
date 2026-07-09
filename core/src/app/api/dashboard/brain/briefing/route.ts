@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { generateResponse } from '@/lib/agent-core/claudeClient'
+import { recordTokenUsage, recordVoiceUsage } from '@/lib/token-usage'
 import { getJson, setJsonWithTtl } from '@/lib/server/redis'
 import { getBrandConfig, BRAND_ID } from '@/configs'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
@@ -62,8 +63,14 @@ async function writeWords(system: string, userPrompt: string): Promise<{ text: s
         }),
       })
       if (res.ok) {
-        const text = (await res.json())?.choices?.[0]?.message?.content?.trim()
-        if (text) return { text, engine: 'groq/llama-3.3-70b' }
+        const json = await res.json()
+        const text = json?.choices?.[0]?.message?.content?.trim()
+        if (text) {
+          // meter Groq's briefing tokens under the Brain TEXT bucket
+          const u = json?.usage || {}
+          void recordTokenUsage('brain', 'groq/llama-3.3-70b', u.prompt_tokens || 0, u.completion_tokens || 0)
+          return { text, engine: 'groq/llama-3.3-70b' }
+        }
       } else {
         console.error('[brain/briefing] groq failed:', res.status, await res.text().catch(() => ''))
       }
@@ -71,7 +78,8 @@ async function writeWords(system: string, userPrompt: string): Promise<{ text: s
       console.error('[brain/briefing] groq error:', e?.message)
     }
   }
-  return { text: (await generateResponse(system, userPrompt, 400)).trim(), engine: 'claude' }
+  // Claude fallback — bucket under the Brain TEXT category (was defaulting to 'chat')
+  return { text: (await generateResponse(system, userPrompt, 400, undefined, 'brain')).trim(), engine: 'claude' }
 }
 
 export async function GET() {
@@ -128,6 +136,7 @@ export async function POST(req: NextRequest) {
       if (!ttsRes || !ttsRes.ok) return NextResponse.json({ text, firstName })
       const audio = Buffer.from(await ttsRes.arrayBuffer()).toString('base64')
       console.log(`[brain/briefing] greet TTS (flash) ${Date.now() - t0}ms`)
+      void recordVoiceUsage('brain_voice', 'eleven_flash_v2_5', text.length)
       return NextResponse.json({ text, firstName, audio, mime: 'audio/mpeg' })
     }
 
@@ -161,6 +170,7 @@ export async function POST(req: NextRequest) {
       }
       const audio = Buffer.from(await ttsRes.arrayBuffer()).toString('base64')
       console.log(`[brain/briefing] TTS ok via ${usedModel} (${Date.now() - t0}ms, voice=${voiceId})`)
+      void recordVoiceUsage('brain_voice', usedModel, text.length)
       return NextResponse.json({ audio, mime: 'audio/mpeg', ttsMs: Date.now() - t0, model: usedModel })
     }
 

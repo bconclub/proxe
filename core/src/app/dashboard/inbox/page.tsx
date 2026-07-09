@@ -135,6 +135,48 @@ const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }
   );
 };
 
+// WhatsApp-style contact avatar — a colored circle of initials (we don't
+// capture real profile photos yet), with a tiny channel badge tucked into the
+// bottom-right corner (WhatsApp/web/voice), so the row reads like a WA chat.
+// Background hue is derived from the name so each contact keeps a stable color.
+const AVATAR_HUES = [4, 24, 45, 140, 175, 200, 260, 300, 330]
+const WaAvatar = ({ name, phone, channel, size = 46 }: { name?: string | null; phone?: string | null; channel?: string; size?: number }) => {
+  const label = (name || phone || 'U').trim()
+  const initials = label.split(/\s+/).map((n) => n[0]).join('').substring(0, 2).toUpperCase() || 'U'
+  let hash = 0
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) & 0xffff
+  const hue = AVATAR_HUES[hash % AVATAR_HUES.length]
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <div
+        className="rounded-full flex items-center justify-center font-semibold select-none"
+        style={{
+          width: size, height: size,
+          background: `hsl(${hue}, 46%, 42%)`,
+          color: '#fff',
+          fontSize: size * 0.36,
+          letterSpacing: 0.3,
+        }}
+      >
+        {initials}
+      </div>
+      {channel && (
+        <span
+          className="absolute rounded-full flex items-center justify-center"
+          style={{
+            right: -1, bottom: -1,
+            width: size * 0.42, height: size * 0.42,
+            background: 'var(--bg-primary)',
+            boxShadow: '0 0 0 1.5px var(--bg-primary)',
+          }}
+        >
+          <ChannelIcon channel={channel} size={size * 0.28} active={true} />
+        </span>
+      )}
+    </div>
+  )
+}
+
 // Types
 interface Conversation {
   lead_id: string
@@ -175,6 +217,21 @@ interface Message {
   read_at?: string | null
 }
 
+
+// Audience type badge for a conversation (Lokazen: owner / scout / brand).
+// Same resolution order as the right-panel badge — brand-namespaced context
+// first, windchasers fallback for legacy rows, then channel contexts. Shown in
+// the conversation list so the agent knows who each chat is with at a glance.
+function audienceOf(uc: Record<string, any> | null | undefined): { label: string; color: string } | null {
+  if (!uc) return null
+  const bc = { ...(uc.windchasers || {}), ...(uc[getCurrentBrandId()] || {}) }
+  const profile = uc.web?.profile || uc.whatsapp?.profile || {}
+  const ut = String(bc.user_type || uc.web?.user_type || uc.whatsapp?.user_type || profile.user_type || '').toLowerCase()
+  if (ut.includes('owner')) return { label: 'Owner', color: '#0EA5E9' }
+  if (ut.includes('scout')) return { label: 'Scout', color: '#F59E0B' }
+  if (ut.includes('brand')) return { label: 'Brand', color: '#A855F7' }
+  return null
+}
 
 function cleanMessageContent(text: string): string {
   if (!text) return '';
@@ -1585,6 +1642,27 @@ export default function InboxPage() {
           z-index: 10;
         }
         .template-status-tag:hover::after { opacity: 1; }
+        /* WhatsApp-style bubble tails — a small triangle at the top corner of
+           the first bubble in a run. Incoming tail on the left, outgoing on
+           the right, tinted to match the bubble background. */
+        .wa-bubble { position: relative; }
+        .wa-in::before, .wa-out::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          width: 10px;
+          height: 12px;
+        }
+        .wa-in::before {
+          left: -7px;
+          background: var(--wa-in-bg, var(--bg-secondary));
+          clip-path: polygon(100% 0, 100% 100%, 0 0);
+        }
+        .wa-out::before {
+          right: -7px;
+          background: var(--wa-out-bg, rgba(37,211,102,0.14));
+          clip-path: polygon(0 0, 0 100%, 100% 0);
+        }
       `}</style>
       {/* Loading Overlay */}
       <LoadingOverlay
@@ -1673,6 +1751,7 @@ export default function InboxPage() {
               // conversation list, the right panel, and the lead modal all
               // agree on what "Warm" looks like.
               const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
+              const aud = audienceOf(conv.unified_context);
 
               if (isSelected) {
                 // ── SELECTED CARD (minimal) ──
@@ -1696,17 +1775,19 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
                     <div className="px-4 py-3 pl-5">
-                      {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
+                      {/* Line 1: Avatar + Score Ring + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
-                        <ScoreRing score={displayScore} size={28} />
-                        <span className="inline-flex items-center gap-0.5 flex-shrink-0">
-                          {conv.channels.map((ch) => (
-                            <ChannelIcon key={ch} channel={ch} size={14} active={true} />
-                          ))}
-                        </span>
+                        <WaAvatar name={conv.lead_name} phone={conv.lead_phone} channel={conv.channels[0]} size={40} />
+                        <ScoreRing score={displayScore} size={26} />
                         <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
+                        {aud && (
+                          <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: `${aud.color}22`, color: aud.color, border: `1px solid ${aud.color}55` }}>
+                            {aud.label}
+                          </span>
+                        )}
                         <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                           {timeAgo(conv.last_message_at)}
                         </span>
@@ -1771,27 +1852,27 @@ export default function InboxPage() {
                     borderColor: 'var(--border-primary)',
                   }}
                 >
-                  <div className="px-4 py-3">
-                    {/* Line 1: Channel icons + Name + Timestamp
-                        (Per design: only the SELECTED row shows a ScoreRing —
-                        unselected rows just show the name to keep the list
-                        scannable.) */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center gap-0.5 flex-shrink-0">
-                        {conv.channels.map((ch) => (
-                          <ChannelIcon key={ch} channel={ch} size={13} active={true} />
-                        ))}
-                      </span>
-                      <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
+                  <div className="px-3 py-2.5 flex items-center gap-3">
+                    <WaAvatar name={conv.lead_name} phone={conv.lead_phone} channel={conv.channels[0]} size={46} />
+                    <div className="flex-1 min-w-0">
+                    {/* Line 1: Name + Timestamp (WhatsApp-style row) */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13.5px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
-                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
+                      {aud && (
+                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${aud.color}22`, color: aud.color }}>
+                          {aud.label}
+                        </span>
+                      )}
+                      <span className="text-[10.5px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
                     {/* Line 2: Last message preview + EVENT badge */}
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <p className="text-[11px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
+                      <p className="text-[12px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
                         {conv.last_message || '\u00A0'}
                       </p>
                       {conv.booking_status && (
@@ -1803,6 +1884,7 @@ export default function InboxPage() {
                           EVENT
                         </span>
                       )}
+                    </div>
                     </div>
                   </div>
                 </div>
@@ -2122,34 +2204,29 @@ export default function InboxPage() {
                       <div
                         className={isTemplate
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
-                          : 'max-w-[440px] rounded-2xl px-4 py-2.5 shadow-sm border'}
+                          : `max-w-[440px] rounded-2xl px-3 py-2 shadow-sm border wa-bubble ${isCustomer ? 'wa-in' : 'wa-out'}`}
                         style={{
-                          // Three subtle bubble tints so customer / agent /
-                          // template all read as distinct at a glance:
-                          //   Customer      → neutral var(--bg-secondary)
-                          //   PROXe AI      → faint brand-gold tint
-                          //   Template (WA) → WhatsApp-green tint + border
-                          // Opaque + backdropFilter blur(8px) so the chat
-                          // pane's dotted grid pattern doesn't bleed through.
+                          // WhatsApp bubble tints — incoming (customer) neutral,
+                          // outgoing (agent/template) WhatsApp-green. The tail
+                          // pseudo-element reads --wa-in-bg / --wa-out-bg so its
+                          // colour tracks the bubble. Reduced corner radius on
+                          // the tail side gives the classic WA speech-bubble.
                           background: isCustomer
                             ? 'var(--bg-secondary)'
                             : isTemplate
                               ? 'rgba(37, 211, 102, 0.10)'
-                              // Faint brand-gold tint for free-form AI replies.
-                              // Subtle enough that templates still dominate
-                              // visually, distinct enough that the eye knows
-                              // "this isn't a customer message".
-                              : 'rgba(201, 169, 97, 0.08)',
+                              : 'rgba(37, 211, 102, 0.14)',
+                          ['--wa-in-bg' as any]: 'var(--bg-secondary)',
+                          ['--wa-out-bg' as any]: 'rgba(37, 211, 102, 0.14)',
                           backdropFilter: 'blur(8px)',
                           WebkitBackdropFilter: 'blur(8px)',
                           borderColor: isCustomer
                             ? 'var(--border-primary)'
                             : isTemplate
                               ? 'rgba(37, 211, 102, 0.45)'
-                              // Matching subtle gold edge so the AI bubble
-                              // has a hint of brand framing.
-                              : 'rgba(201, 169, 97, 0.25)',
+                              : 'rgba(37, 211, 102, 0.30)',
                           borderWidth: '1px',
+                          ...(isCustomer ? { borderTopLeftRadius: 4 } : { borderTopRightRadius: 4 }),
                           ...(!isTemplate && msg.metadata?.template_name
                             ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` }
                             : !isTemplate && taskTag
@@ -2193,25 +2270,8 @@ export default function InboxPage() {
                             )}
                           </>
                         )}
-                        {!isTemplate && (
-                          <div className="flex items-center justify-between gap-3 mb-1">
-                            <div className="flex items-center gap-1">
-                              <ChannelIcon channel={msg.channel} size={11} active={true} />
-                              <span
-                                className="text-[9px] font-bold uppercase tracking-wider"
-                                style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
-                              >
-                                {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
-                              </span>
-                              <span className="text-[8px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.10)', color: 'var(--text-secondary)' }}>
-                                {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
-                              </span>
-                            </div>
-                            <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
-                              {formatTime(msg.created_at)}
-                            </span>
-                          </div>
-                        )}
+                        {/* WhatsApp bubbles carry no per-message header — just the
+                            text, with the time (and ticks) tucked bottom-right. */}
                         <div
                           className={isTemplate
                             ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap'
@@ -2229,6 +2289,16 @@ export default function InboxPage() {
                             ? renderWhatsAppMarkdown(msg.content)
                             : renderMarkdown(msg.content)}
                         </div>
+                        {/* WhatsApp-style time, bottom-right of the bubble (ticks
+                            for outbound WhatsApp render just below via their own
+                            delivery block). Templates carry their own footer. */}
+                        {!isTemplate && !msg.metadata?.template_name && (
+                          <div className="flex justify-end mt-0.5 -mb-0.5">
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                              {formatTime(msg.created_at)}
+                            </span>
+                          </div>
+                        )}
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
                           const statusStyle = getDeliveryStatusStyle(ds)

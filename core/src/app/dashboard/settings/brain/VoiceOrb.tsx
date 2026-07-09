@@ -1,12 +1,12 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VoiceOrb — the Brain tab: a neural particle orb in brand colors.
-//
-// Touch: ripples stay ON the blob — hovering or clicking the sphere itself
-// sends a ripple through its particles; the rest of the page holds only the
-// quiet radar chrome (hairline + slow dashed rings). Speaking: the sphere
-// turns malleable and sways to the live waveform.
+// VoiceOrb — the Brain tab container: voice engine + overlays + the variant
+// picker. The visualization itself is pluggable — three renderers live in
+// ./renderers (cortex / pulseOrb / mandala), selected by the dot picker at the
+// bottom and persisted in localStorage. Renderers read the live voice state
+// (mode, amplitude, waveform, ripples) through a small env object each frame,
+// so switching variants mid-speech never touches the playing audio.
 //
 // Voice: staged for speed. 1) mode:"text" writes the words (Groq-fast),
 // 2) the FIRST sentence and the REST are voiced in parallel (mode:"tts",
@@ -19,14 +19,15 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
-import { getBrandConfig } from '@/configs'
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { resolvePalette } from './renderers/palette'
+import { createPulseOrb } from './renderers/pulseOrb'
+import { createCortex } from './renderers/cortex'
+import { createMandala } from './renderers/mandala'
+import type { OrbMode, Ripple, RendererEnv, VariantId } from './renderers/types'
 
-type Mode = 'idle' | 'thinking' | 'speaking' | 'error'
-
-const N = 900
-
-type P = { theta: number; phi: number; r: number; speed: number; hue: number; size: number; wob: number }
-type Ripple = { x: number; y: number; born: number }
+// 'listening' is orb-only (renderers don't know it → mapped to idle visual).
+type Mode = OrbMode | 'listening'
 
 // Per-brand content: questions, languages, thinking-step captions, palette.
 // Resolved once at module scope — the brand is fixed for the build.
@@ -34,63 +35,57 @@ const BRAIN = getBrainConfig()
 const QUICK_QUESTIONS = BRAIN.quickQuestions
 const LANGS = BRAIN.languages
 
-function cssLuma(varName: string): number {
-  try {
-    const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-    const m = v.match(/^#?([0-9a-f]{6})$/i)
-    if (!m) return 0
-    const n = parseInt(m[1], 16)
-    return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
-  } catch { return 0 }
-}
-
-function accentColor(): { h: number; s: number; rgb: [number, number, number] } {
-  const fallback = { h: 262, s: 83, rgb: [139, 92, 246] as [number, number, number] }
-  try {
-    // The orb is a BRAND element — it must always render in the brand's own
-    // colour, NOT the dashboard's --accent-primary (which is monochrome white/
-    // black in the default bw themes, and empty/purple-fallback before the
-    // theme applies). Read the brand config's colour directly so Lokazen's orb
-    // is orange, POP's is its own, etc. — regardless of the light/dark theme.
-    let hex = ''
-    try {
-      const c = getBrandConfig().colors
-      hex = (c.primary || c.primaryVibrant || '').trim()
-    } catch { /* fall through to CSS var */ }
-    // Fallback: the theme var, only if the brand config had nothing usable.
-    if (!/^#?[0-9a-f]{6}$/i.test(hex)) {
-      hex = getComputedStyle(document.documentElement).getPropertyValue('--accent-primary').trim()
-    }
-    const m = hex.match(/^#?([0-9a-f]{6})$/i)
-    if (!m) return fallback
-    const n = parseInt(m[1], 16)
-    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
-    const r1 = r / 255, g1 = g / 255, b1 = b / 255
-    const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1), d = max - min
-    let h = 0
-    if (d) {
-      if (max === r1) h = ((g1 - b1) / d) % 6
-      else if (max === g1) h = (b1 - r1) / d + 2
-      else h = (r1 - g1) / d + 4
-      h = (h * 60 + 360) % 360
-    }
-    const l = (max + min) / 2
-    const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0
-    return { h, s: Math.max(45, Math.round(s * 100)), rgb: [r, g, b] }
-  } catch { return fallback }
-}
+const VARIANT_KEY = 'proxe-brain-variant'
+const VARIANTS: Array<{ id: VariantId; label: string }> = [
+  { id: 'cortex', label: 'Cortex' },
+  { id: 'pulse', label: 'Pulse Orb' },
+  { id: 'mandala', label: 'Mandala' },
+]
+const DEFAULT_VARIANT: VariantId = 'pulse'
 
 function splitSentences(text: string): string[] {
   return (text.match(/[^.!?।]+[.!?।]+["']?|\S[^.!?।]*$/g) || [text]).map((s) => s.trim()).filter(Boolean)
 }
 
-export default function VoiceOrb() {
+// Karaoke chunks — 1–3 words that swap as the audio plays, so the caption
+// stays as narrow as the orb instead of a long sentence. Punctuation-ending
+// words get their own short chunk so the line breathes at natural pauses.
+function chunkWords(text: string): string[] {
+  const words = text.split(/\s+/).filter(Boolean)
+  const out: string[] = []
+  let buf: string[] = []
+  for (const w of words) {
+    buf.push(w)
+    const endsClause = /[,;:.!?।—]$/.test(w)
+    if (buf.length >= 3 || endsClause) { out.push(buf.join(' ')); buf = [] }
+  }
+  if (buf.length) out.push(buf.join(' '))
+  return out
+}
+
+// Props let the orb be embedded as a full-screen overlay (dock → brain wakes):
+//   autoStart       — run on mount (the dock click IS the gesture)
+//   initialQuestion — if set, autoStart asks THIS instead of the daily briefing
+//   conversational  — after it finishes speaking, open the mic and listen for a
+//                     spoken reply, then answer it — a back-and-forth voice loop
+//   listenFirst     — skip the opening briefing; go straight to listening
+//   onClose         — show a close button; the overlay unmounts the orb
+export type VoiceOrbProps = {
+  autoStart?: boolean
+  initialQuestion?: string
+  conversational?: boolean
+  listenFirst?: boolean
+  onClose?: () => void
+}
+
+export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose }: VoiceOrbProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mode, setMode] = useState<Mode>('idle')
   const [caption, setCaption] = useState('')
   const [subtitle, setSubtitle] = useState('')
-  const [askOpen, setAskOpen] = useState(false)
   const [lang, setLang] = useState<string>(LANGS[0]?.id || 'en')
+  // null until mount → hydration-safe localStorage read, renderer mounts once
+  const [variant, setVariant] = useState<VariantId | null>(null)
   const langRef = useRef<string>(LANGS[0]?.id || 'en')
   const modeRef = useRef<Mode>('idle')
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -99,271 +94,81 @@ export default function VoiceOrb() {
   const audioCtxRef = useRef<AudioContext | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const ripplesRef = useRef<Ripple[]>([])
-  const frameRef = useRef(0)
   const lastHoverRippleRef = useRef(0)
   // loading ring: fills while the brain connects, completes when audio starts
   const thinkStartRef = useRef<number | null>(null)
-  const ringDoneFrameRef = useRef<number | null>(null)
+  const ringDoneAtRef = useRef<number | null>(null)
+  // shared per-frame buffers for the analyser reads (one alloc, all renderers)
+  const ampBufRef = useRef(new Uint8Array(64))
+  const waveBufRef = useRef(new Uint8Array(128))
 
   const setModeBoth = (m: Mode) => { modeRef.current = m; setMode(m) }
 
-  // Ripple only when the pointer is ON the blob itself.
+  // ── mic (talk back) ────────────────────────────────────────────────────────
+  // Browser Web Speech API via the shared hook — no key, no server. Used only
+  // in conversational overlay mode; the brain-page orb never listens.
+  const { isSupported: micSupported, transcript: heard, startListening, stopListening, resetTranscript } = useSpeechRecognition()
+  const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevModeRef = useRef<Mode>('idle')
+
+  // Load the saved variant once on mount.
+  useEffect(() => {
+    let v: VariantId = DEFAULT_VARIANT
+    try {
+      const saved = localStorage.getItem(VARIANT_KEY)
+      if (VARIANTS.some((x) => x.id === saved)) v = saved as VariantId
+    } catch { /* storage unavailable */ }
+    setVariant(v)
+  }, [])
+
+  // Ripple only when the pointer is near the visualization center.
   const addRipple = useCallback((clientX: number, clientY: number): boolean => {
     const canvas = canvasRef.current
     if (!canvas) return false
     const rect = canvas.getBoundingClientRect()
     const cxCss = rect.left + rect.width / 2
-    const cyCss = rect.top + rect.height / 2
-    const Rcss = Math.min(rect.width, rect.height) * 0.24
+    const cyCss = rect.top + rect.height * 0.43
+    const Rcss = Math.min(rect.width, rect.height) * 0.30
     const dx = clientX - cxCss, dy = clientY - cyCss
     if (dx * dx + dy * dy > Rcss * Rcss * 1.35) return false // outside the sphere
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    ripplesRef.current.push({ x: (clientX - rect.left) * dpr, y: (clientY - rect.top) * dpr, born: frameRef.current })
+    ripplesRef.current.push({ x: (clientX - rect.left) * dpr, y: (clientY - rect.top) * dpr, born: performance.now() })
     if (ripplesRef.current.length > 6) ripplesRef.current.shift()
     return true
   }, [])
 
-  // ── render loop ────────────────────────────────────────────────────────────
+  // ── renderer mount: one env closure, re-created only when the variant flips.
+  // The voice engine has ZERO dependency on the variant — audio keeps playing
+  // across switches and the new renderer picks up live amp on its first frame.
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    let raf = 0
-    let t = 0
-
-    // Palette: a brand may supply brain.orbPalette (chrome rgb + weighted
-    // particle-hue mix + sweep color); without it the orb derives everything
-    // from the theme accent — the generic look every brand starts with.
-    const pal = BRAIN.orbPalette
-    const rgbToHsl = (r: number, g: number, b: number): { h: number; s: number } => {
-      const r1 = r / 255, g1 = g / 255, b1 = b / 255
-      const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1), d = max - min
-      let h = 0
-      if (d) {
-        if (max === r1) h = ((g1 - b1) / d) % 6
-        else if (max === g1) h = (b1 - r1) / d + 2
-        else h = (r1 - g1) / d + 4
-        h = (h * 60 + 360) % 360
-      }
-      const l = (max + min) / 2
-      const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0
-      return { h, s: Math.max(45, Math.round(s * 100)) }
-    }
-    const ac = pal
-      ? { ...rgbToHsl(...pal.chromeRgb), rgb: pal.chromeRgb }
-      : accentColor()
-    const [ar, ag, ab] = ac.rgb
-    // per-particle hue: weighted mix from the palette, else accent-spread
-    const paletteHue = (): number => {
-      const hues = pal?.particleHues
-      if (!hues?.length) return ac.h + (Math.random() * 36 - 18) - (Math.random() < 0.2 ? 40 : 0)
-      const total = hues.reduce((s, x) => s + x.weight, 0) || 1
-      let r = Math.random() * total
-      for (const x of hues) { if ((r -= x.weight) <= 0) return x.hue + Math.random() * x.spread * 2 - x.spread }
-      return hues[0].hue
-    }
-    const isLight = cssLuma('--bg-primary') > 0.5
-    // On white, glowing whites read as a smudge — swap to accent-weighted inks.
-    const pLightBase = isLight ? 34 : 56          // particle lightness base
-    const pLightSpan = isLight ? 12 : 14
-    const glowMul = isLight ? 0.45 : 1            // soften all glows on light
-    const coreRGB = isLight ? `${ar},${ag},${ab}` : '255,255,255'
-
-    const parts: P[] = Array.from({ length: N }, () => {
-      const u = Math.random() * 2 - 1
-      return {
-        theta: Math.random() * Math.PI * 2,
-        phi: Math.acos(u),
-        r: 0.72 + Math.random() * 0.28,
-        speed: 0.0006 + Math.random() * 0.0016,
-        hue: paletteHue(),
-        size: 0.8 + Math.random() * 1.6,
-        wob: Math.random() * Math.PI * 2,
-      }
-    })
-    const freq = new Uint8Array(64)
-
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = canvas.clientWidth * dpr
-      canvas.height = canvas.clientHeight * dpr
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    const RIPPLE_SPEED = 4
-    const RIPPLE_LIFE = 90
-    const RIPPLE_BAND = 42
-
-    const draw = () => {
-      raf = requestAnimationFrame(draw)
-      t += 1
-      frameRef.current = t
-      const w = canvas.width, h = canvas.height
-      const cx = w / 2, cy = h / 2
-      const R = Math.min(w, h) * 0.24
-      ctx.clearRect(0, 0, w, h)
-
-      let amp = 0
-      if (modeRef.current === 'speaking' && analyserRef.current) {
-        analyserRef.current.getByteFrequencyData(freq)
+    if (!canvas || !variant) return
+    const env: RendererEnv = {
+      getMode: () => (modeRef.current === 'listening' ? 'idle' : modeRef.current),
+      getAmp: () => {
+        if (modeRef.current !== 'speaking') return 0
+        const an = analyserRef.current
+        if (!an) return 0.3 + 0.2 * Math.abs(Math.sin(performance.now() * 0.0042))
+        an.getByteFrequencyData(ampBufRef.current)
         let s = 0
-        for (let i = 2; i < 40; i++) s += freq[i]
-        amp = Math.min(1, s / (38 * 160))
-      } else if (modeRef.current === 'speaking') {
-        amp = 0.3 + 0.2 * Math.abs(Math.sin(t * 0.07))
-      }
-
-      const m = modeRef.current
-      const breathe = 1 + 0.022 * Math.sin(t * 0.011)
-      const think = m === 'thinking' ? 0.55 + 0.45 * Math.sin(t * 0.028) : 0
-      const scale = m === 'speaking' ? 1 + amp * 0.14 : breathe
-
-      ripplesRef.current = ripplesRef.current.filter((rp) => t - rp.born < RIPPLE_LIFE)
-
-      // ── quiet radar chrome (page-level, static, no rippling) ────────────────
-      const dpr2 = window.devicePixelRatio > 1 ? 1.5 : 1
-      const lineA = (0.04 + amp * 0.06 + think * 0.03) * (isLight ? 1.4 : 1)
-      const lg = ctx.createLinearGradient(cx - R * 3.2, cy, cx + R * 3.2, cy)
-      lg.addColorStop(0, `rgba(${ar},${ag},${ab},0)`)
-      lg.addColorStop(0.5, `rgba(${ar},${ag},${ab},${lineA})`)
-      lg.addColorStop(1, `rgba(${ar},${ag},${ab},0)`)
-      ctx.strokeStyle = lg
-      ctx.lineWidth = dpr2
-      ctx.beginPath(); ctx.moveTo(cx - R * 3.2, cy); ctx.lineTo(cx + R * 3.2, cy); ctx.stroke()
-      const rings: Array<[number, number, number, number[]]> = [
-        [R * 1.38, t * 0.002, 0.09, [4 * dpr2, 10 * dpr2]],
-        [R * 1.62, -t * 0.0012, 0.06, [1.5 * dpr2, 14 * dpr2]],
-        [R * 1.9, t * 0.0006, 0.04, [22 * dpr2, 30 * dpr2]],
-      ]
-      for (const [rr, rot, a, dash] of rings) {
-        ctx.save()
-        ctx.translate(cx, cy)
-        ctx.rotate(rot)
-        ctx.strokeStyle = `rgba(${ar},${ag},${ab},${(a + amp * 0.08 + think * 0.04) * (isLight ? 1.5 : 1)})`
-        ctx.lineWidth = dpr2 * 0.8
-        ctx.setLineDash(dash)
-        ctx.beginPath(); ctx.arc(0, 0, rr, 0, Math.PI * 2); ctx.stroke()
-        ctx.restore()
-      }
-      ctx.setLineDash([])
-
-      // ── loading ring: fills while connecting, snaps closed when voice starts
-      let ringP = -1, ringA = 0
-      if (m === 'thinking' && thinkStartRef.current != null) {
-        const el = performance.now() - thinkStartRef.current
-        ringP = Math.min(0.92, 1 - Math.exp(-el / 4200)) // eases toward full, never stalls at same spot
-        ringA = 0.55
-      } else if (ringDoneFrameRef.current != null && t - ringDoneFrameRef.current < 45) {
-        ringP = 1
-        ringA = 0.55 * (1 - (t - ringDoneFrameRef.current) / 45) // full circle, then fade out
-      }
-      if (ringP >= 0 && ringA > 0.01) {
-        ctx.strokeStyle = `rgba(${ar},${ag},${ab},${ringA})`
-        ctx.lineWidth = dpr2 * 2
-        ctx.lineCap = 'round'
-        ctx.beginPath()
-        ctx.arc(cx, cy, R * 1.22, -Math.PI / 2, -Math.PI / 2 + ringP * Math.PI * 2)
-        ctx.stroke()
-        ctx.lineCap = 'butt'
-      }
-
-      // radar sweep along the spine — one slow arm (green for pop: the second
-      // tricolor note; blue body + green sweep + saffron flecks in the cloud)
-      const [sr, sg2, sb] = pal?.sweepRgb || [ar, ag, ab]
-      const sweepA = t * 0.0035
-      const sg = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9)
-      sg.addColorStop(0, `rgba(${sr},${sg2},${sb},0)`)
-      sg.addColorStop(1, `rgba(${sr},${sg2},${sb},${0.12 * (isLight ? 1.4 : 1)})`)
-      ctx.strokeStyle = sg
-      ctx.lineWidth = dpr2
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9); ctx.stroke()
-      for (let i = 0; i < 4; i++) {
-        const a = t * 0.003 + (i * Math.PI) / 2
-        const ox = cx + Math.cos(a) * R * 1.38
-        const oy = cy + Math.sin(a) * R * 1.38 * 0.98
-        ctx.fillStyle = `rgba(${ar},${ag},${ab},${0.5 + amp * 0.2})`
-        ctx.beginPath(); ctx.arc(ox, oy, 1.3 * dpr2, 0, Math.PI * 2); ctx.fill()
-      }
-
-      // core glow + nucleus — accent-inked on light so it never smudges white
-      const glowR = R * (1.7 + amp * 0.7 + think * 0.3)
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
-      const glowA = (m === 'speaking' ? 0.14 + amp * 0.16 : m === 'thinking' ? 0.12 + think * 0.06 : 0.09) * glowMul
-      g.addColorStop(0, `rgba(${ar},${ag},${ab},${glowA})`)
-      g.addColorStop(1, `rgba(${ar},${ag},${ab},0)`)
-      ctx.fillStyle = g
-      ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2)
-      const nucR = R * (0.085 + amp * 0.05 + 0.008 * Math.sin(t * 0.02))
-      const ng = ctx.createRadialGradient(cx, cy, 0, cx, cy, nucR)
-      ng.addColorStop(0, `rgba(${coreRGB},${(isLight ? 0.55 : 0.8) + amp * 0.15})`)
-      ng.addColorStop(0.4, `rgba(${ar},${ag},${ab},${(isLight ? 0.25 : 0.4) + amp * 0.2})`)
-      ng.addColorStop(1, `rgba(${ar},${ag},${ab},0)`)
-      ctx.fillStyle = ng
-      ctx.beginPath(); ctx.arc(cx, cy, nucR, 0, Math.PI * 2); ctx.fill()
-
-      // ── particle cloud ──────────────────────────────────────────────────────
-      const rotY = t * (m === 'thinking' ? 0.006 : 0.002)
-      const pts: Array<{ x: number; y: number; z: number; p: P }> = []
-      for (const p of parts) {
-        if (m === 'thinking') p.theta += p.speed * 3
-        else p.theta += p.speed
-        let r = p.r
-        if (m === 'thinking') r = p.r * (0.7 + 0.3 * Math.abs(Math.sin(t * 0.012 + p.wob)))
-        if (m === 'speaking') {
-          const blob =
-            0.10 * (0.35 + amp) * Math.sin(2.3 * p.phi + t * 0.018 + p.wob) +
-            0.06 * (0.35 + amp) * Math.sin(3.1 * p.theta - t * 0.013 + p.wob * 0.7)
-          r = p.r * (1 + blob)
-        }
-        const sx = Math.sin(p.phi) * Math.cos(p.theta + rotY)
-        const sy = Math.cos(p.phi) + 0.05 * Math.sin(t * 0.016 + p.wob)
-        const sz = Math.sin(p.phi) * Math.sin(p.theta + rotY)
-        pts.push({ x: sx * r, y: sy * r, z: sz * r, p })
-      }
-      pts.sort((a, b) => a.z - b.z)
-
-      ctx.lineWidth = 0.5
-      for (let i = 0; i < pts.length; i += 23) {
-        const a = pts[i], b = pts[(i + 61) % pts.length]
-        const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z
-        if (dx * dx + dy * dy + dz * dz < 0.16) {
-          const depth = (a.z + 1) / 2
-          ctx.strokeStyle = `rgba(${ar},${ag},${ab},${(0.05 + depth * 0.08 + amp * 0.1) * (isLight ? 1.6 : 1)})`
-          ctx.beginPath()
-          ctx.moveTo(cx + a.x * R * scale, cy + a.y * R * scale)
-          ctx.lineTo(cx + b.x * R * scale, cy + b.y * R * scale)
-          ctx.stroke()
-        }
-      }
-
-      for (const { x, y, z, p } of pts) {
-        const depth = (z + 1) / 2
-        let px = cx + x * R * scale
-        let py = cy + y * R * scale
-        for (const rp of ripplesRef.current) {
-          const age = t - rp.born
-          const rw = age * RIPPLE_SPEED
-          const dx = px - rp.x, dy = py - rp.y
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          const off = dist - rw
-          if (Math.abs(off) < RIPPLE_BAND) {
-            const strength = (1 - Math.abs(off) / RIPPLE_BAND) * (1 - age / RIPPLE_LIFE) * 10
-            px += (dx / dist) * strength
-            py += (dy / dist) * strength
-          }
-        }
-        const alpha = (isLight ? 0.35 : 0.15) + depth * 0.6 + amp * 0.15
-        const sz = p.size * (0.6 + depth * 0.9) * (1 + amp * 0.35) * (window.devicePixelRatio > 1 ? 1.4 : 1)
-        ctx.fillStyle = `hsla(${p.hue}, ${ac.s}%, ${pLightBase + depth * pLightSpan + amp * 8}%, ${Math.min(1, alpha)})`
-        ctx.beginPath()
-        ctx.arc(px, py, sz, 0, Math.PI * 2)
-        ctx.fill()
-      }
+        for (let i = 2; i < 40; i++) s += ampBufRef.current[i]
+        return Math.min(1, s / (38 * 160))
+      },
+      getWaveform: () => {
+        const an = analyserRef.current
+        if (!an || modeRef.current !== 'speaking') return null
+        an.getByteTimeDomainData(waveBufRef.current)
+        return waveBufRef.current
+      },
+      getRipples: () => ripplesRef.current,
+      getThinkStart: () => thinkStartRef.current,
+      getRingDoneAt: () => ringDoneAtRef.current,
+      palette: resolvePalette(BRAIN.orbPalette),
     }
-    draw()
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
-  }, [])
+    // One brain for now — the pulse orb (cortex/mandala parked; they read rough).
+    const r = createPulseOrb(canvas, env)
+    return () => r.destroy()
+  }, [variant])
 
   // ── stop everything — ONE voice, always ────────────────────────────────────
   const stop = useCallback(() => {
@@ -375,12 +180,12 @@ export default function VoiceOrb() {
     queueRef.current = []
     analyserRef.current = null
     thinkStartRef.current = null
-    ringDoneFrameRef.current = null
+    ringDoneAtRef.current = null
     setCaption('')
     setSubtitle('')
     setModeBoth('idle')
   }, [])
-  useEffect(() => () => { stop(); audioCtxRef.current?.close().catch(() => {}) }, [stop])
+  useEffect(() => () => { stop(); stopListening(); audioCtxRef.current?.close().catch(() => {}) }, [stop, stopListening])
 
   const wireAnalyser = useCallback(async (audio: HTMLAudioElement) => {
     try {
@@ -401,7 +206,7 @@ export default function VoiceOrb() {
     if (modeRef.current === 'thinking' || modeRef.current === 'speaking') { stop(); return }
     stop()
     thinkStartRef.current = performance.now()
-    ringDoneFrameRef.current = null
+    ringDoneAtRef.current = null
     setModeBoth('thinking')
     const steps = question ? BRAIN.thinkingSteps.question : BRAIN.thinkingSteps.briefing
     let stepIdx = 0
@@ -453,7 +258,7 @@ export default function VoiceOrb() {
           clearInterval(stepTimer); clearInterval(secTimer)
           setCaption(''); setSubtitle('')
           thinkStartRef.current = null
-          ringDoneFrameRef.current = frameRef.current // ring completes the moment we speak
+          ringDoneAtRef.current = performance.now() // ring completes the moment we speak
           setModeBoth('speaking')
           wireAnalyser(ga).catch(() => {})
           greetDone = new Promise<void>((res) => { ga.onended = () => res(); ga.onerror = () => res(); ga.onpause = () => res() })
@@ -500,9 +305,10 @@ export default function VoiceOrb() {
       await greetP.catch(() => {}); await greetDone
       if (modeRef.current === 'idle' || modeRef.current === 'error') return
 
-      // subtitles per chunk
-      const firstSents = splitSentences(firstChunk)
-      const restSents = restChunk ? splitSentences(restChunk) : []
+      // subtitles per short chunk (1–3 words), driven by audio progress so the
+      // words swap in time with the voice — narrow, never a long line
+      const firstSents = chunkWords(firstChunk)
+      const restSents = restChunk ? chunkWords(restChunk) : []
       const subs = (audio: HTMLAudioElement, sents: string[]) => {
         const total = sents.reduce((s, x) => s + x.length, 0) || 1
         const cum: number[] = []; let acc = 0
@@ -522,7 +328,7 @@ export default function VoiceOrb() {
       setCaption('')
       setSubtitle(firstSents[0] || '')
       thinkStartRef.current = null
-      ringDoneFrameRef.current = frameRef.current // ring completes + fades
+      ringDoneAtRef.current = performance.now() // ring completes + fades
       setModeBoth('speaking')
 
       // 3. log the run's latency metadata — the "brain voice" eval record
@@ -571,16 +377,70 @@ export default function VoiceOrb() {
     }
   }, [stop, wireAnalyser])
 
+  // ── listen: open the mic, capture a spoken reply, feed it back to the brain ──
+  const beginListening = useCallback(() => {
+    if (!micSupported) {
+      setCaption('voice input isn’t supported in this browser')
+      setModeBoth('idle')
+      return
+    }
+    stop()                    // silence any TTS first
+    resetTranscript()
+    setSubtitle('')
+    setCaption('')
+    setModeBoth('listening')
+    startListening()
+  }, [micSupported, stop, resetTranscript, startListening])
+
+  const submitSpoken = useCallback(() => {
+    if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null }
+    const q = (heard || '').trim()
+    stopListening()
+    if (q) engage(q)          // brain answers out loud; the loop re-listens after
+    else setModeBoth('idle')
+  }, [heard, stopListening, engage])
+
+  // While listening: show what's heard as the live subtitle, and treat ~1.4s of
+  // silence after speech as the end of the user's turn → submit it.
+  useEffect(() => {
+    if (modeRef.current !== 'listening') return
+    if (heard) setSubtitle(heard)
+    if (silenceTimer.current) clearTimeout(silenceTimer.current)
+    if (heard.trim()) {
+      silenceTimer.current = setTimeout(() => { if (modeRef.current === 'listening') submitSpoken() }, 1400)
+    }
+    return () => { if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null } }
+  }, [heard, submitSpoken])
+
+  // Conversational loop: each time the brain finishes SPEAKING, reopen the mic.
+  useEffect(() => {
+    const prev = prevModeRef.current
+    prevModeRef.current = mode
+    if (conversational && prev === 'speaking' && mode === 'idle') beginListening()
+  }, [mode, conversational, beginListening])
+
+  // Overlay embed: on mount either start talking (briefing / a question) or, for
+  // "Ask something", go straight to listening. The dock click was the gesture.
+  const didAutoStart = useRef(false)
+  useEffect(() => {
+    if (didAutoStart.current) return
+    if (listenFirst) { didAutoStart.current = true; beginListening() }
+    else if (autoStart) { didAutoStart.current = true; engage(initialQuestion) }
+  }, [autoStart, listenFirst, initialQuestion, engage, beginListening])
+
   const hint =
     mode === 'idle' ? 'tap to hear today' :
     mode === 'thinking' ? 'thinking' :
+    mode === 'listening' ? (subtitle ? 'tap when done' : 'listening…') :
     mode === 'speaking' ? 'tap to stop' : ''
 
-  const line = mode === 'speaking' ? subtitle : (mode === 'error' ? caption : (caption || hint))
+  // While listening, the subtitle IS the live transcript (styled like speaking).
+  const bigLine = mode === 'speaking' || (mode === 'listening' && !!subtitle)
+  const line = bigLine ? subtitle : (mode === 'error' ? caption : (caption || hint))
 
   return (
     <div
-      onClick={(e) => { addRipple(e.clientX, e.clientY); engage() }}
+      onClick={(e) => { addRipple(e.clientX, e.clientY); if (modeRef.current === 'listening') submitSpoken(); else engage() }}
       onPointerMove={(e) => {
         const now = performance.now()
         if (now - lastHoverRippleRef.current > 340) {
@@ -592,55 +452,40 @@ export default function VoiceOrb() {
     >
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 
-      {/* ONE line under the orb — subtitle while speaking, hint/steps otherwise */}
+      {/* Close (overlay embed only) — collapse the brain back to the dock */}
+      {onClose && (
+        <button
+          onClick={(e) => { e.stopPropagation(); stop(); stopListening(); onClose() }}
+          onPointerMove={(e) => e.stopPropagation()}
+          aria-label="Close"
+          style={{
+            position: 'absolute', top: 18, left: 18, zIndex: 5,
+            width: 38, height: 38, borderRadius: 999, cursor: 'pointer',
+            fontSize: 20, lineHeight: 1, fontWeight: 400,
+            background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+            border: '1px solid var(--border-primary)',
+          }}
+        >
+          ×
+        </button>
+      )}
+
+      {/* ONE line under the orb — short karaoke words while speaking (blob-wide),
+          hint/steps otherwise (wider) */}
       <div style={{
         position: 'absolute', left: '50%', bottom: '8%', transform: 'translateX(-50%)',
-        width: 'min(720px, 90%)', textAlign: 'center', pointerEvents: 'none',
-        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        fontSize: mode === 'speaking' ? 14 : 11.5,
-        letterSpacing: mode === 'speaking' ? 0.3 : 2.5,
-        textTransform: mode === 'speaking' ? 'none' : 'uppercase',
-        color: mode === 'error' ? '#ef4444' : mode === 'speaking' ? 'var(--text-secondary)' : 'var(--text-muted)',
-        transition: 'opacity .4s ease', opacity: line ? 0.9 : 0,
+        width: bigLine ? 'min(340px, 66%)' : 'min(720px, 90%)',
+        textAlign: 'center', pointerEvents: 'none',
+        whiteSpace: bigLine ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        fontSize: bigLine ? 17 : 11.5,
+        fontWeight: bigLine ? 600 : 400,
+        letterSpacing: bigLine ? 0.2 : 2.5,
+        textTransform: bigLine ? 'none' : 'uppercase',
+        color: mode === 'error' ? '#ef4444' : bigLine ? 'var(--text-primary)' : 'var(--text-muted)',
+        transition: 'opacity .25s ease', opacity: line ? 0.92 : 0,
       }}>
         {line}
         {mode === 'thinking' && <span style={{ display: 'inline-block', marginLeft: 6, animation: 'voPulse 1.1s ease infinite' }}>●</span>}
-      </div>
-
-      {/* quick-ask fan (right middle) */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        onPointerMove={(e) => e.stopPropagation()}
-        style={{ position: 'absolute', right: 26, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, zIndex: 3 }}
-      >
-        {askOpen && QUICK_QUESTIONS.map((q, i) => (
-          <button
-            key={q}
-            onClick={() => { setAskOpen(false); if (modeRef.current === 'thinking' || modeRef.current === 'speaking') stop(); engage(q) }}
-            style={{
-              fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 999, cursor: 'pointer',
-              background: 'var(--bg-secondary)', color: 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
-              animation: `voFan .22s ease ${i * 0.045}s both`,
-              boxShadow: '0 4px 16px rgba(0,0,0,.3)',
-            }}
-          >
-            {q}
-          </button>
-        ))}
-        <button
-          onClick={() => setAskOpen((o) => !o)}
-          aria-label="Quick questions"
-          style={{
-            width: 42, height: 42, borderRadius: 999, cursor: 'pointer', fontSize: 17, fontWeight: 700,
-            background: askOpen ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-            color: askOpen ? '#fff' : 'var(--accent-primary)',
-            border: '1px solid var(--border-primary)', boxShadow: '0 4px 16px rgba(0,0,0,.3)',
-            transition: 'all .18s ease',
-          }}
-        >
-          {askOpen ? '×' : '?'}
-        </button>
       </div>
 
       {/* language switcher (bottom right) — only when the brand speaks >1 language */}

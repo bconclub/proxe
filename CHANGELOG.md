@@ -1,3 +1,13 @@
+## 2026-07-09 23:30 IST · feat(brain): dock → talking voice brain + two-way mic; single orb; inbox WhatsApp look; layout dedupe
+
+- User-facing: the Brain dock now wakes on hover (Update me / Anything urgent? / Ask something…) and CLICK expands into the full-screen talking orb that speaks today's briefing; after it speaks it opens the mic (Web Speech API) and listens for a spoken reply — a two-way voice loop. ("Ask something…" goes straight to listening.)
+- Brain: reverted to a single pulse-orb visualization (removed cortex/mandala + the variant dot picker); removed the "?" quick-ask button; orb is bigger (R 0.24→0.30) and sits a little above center (cy 0.5→0.43h).
+- Dock: singleton guard (kills the duplicate icon), icon enlarged 24→40px, snaps to the right edge on drag-release.
+- Token usage: split "Ask PROXe" into (text) vs (voice); ElevenLabs TTS now metered as char-billed voice charges (new brain_voice bucket + estimateVoiceCost).
+- Inbox: WhatsApp look — contact avatars (initials + channel badge), green/neutral bubbles with tails, per-bubble header stripped, time bottom-right.
+- Layout: removed redundant self-wrapping `<DashboardLayout>` from 9 dashboard pages (the segment layout already wraps them) → single sidebar/header/dock (fixes the nested/duplicated layout).
+- `(pending-sha)`
+
 ## 2026-07-09 16:20 IST · feat: Brain + Configure ported to ALL brands — functionality shared, content per-brand
 
 - User-facing: every brand now has the Brain (voice orb + Learning) and the Configure card grid. Non-POP brands get neutral business behavior: generic persona built from the brand name, generic quick questions, English-only (no language switcher), accent-colored orb — POP's campaign prompts/vocabulary/tricolor/3 languages did NOT leak anywhere.

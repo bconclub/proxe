@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ErrorLogsModal from '@/components/dashboard/ErrorLogsModal'
 import HealthStrip from '@/components/dashboard/HealthStrip'
 import EndpointHealthDetail from '@/components/dashboard/EndpointHealthDetail'
@@ -284,7 +283,7 @@ export default function StatusPage() {
 
   if (loading && !status) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-6">
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-current" style={{ borderColor: 'var(--accent-primary)' }}></div>
@@ -293,14 +292,14 @@ export default function StatusPage() {
             </p>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     )
   }
 
   if (!status) return null
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -403,6 +402,6 @@ export default function StatusPage() {
           component={logsModalComponent}
         />
       </div>
-    </DashboardLayout>
+    </>
   )
 }

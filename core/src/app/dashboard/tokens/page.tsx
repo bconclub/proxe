@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { MdRefresh, MdScience, MdRestartAlt } from 'react-icons/md'
 
 interface Row {
@@ -31,6 +30,9 @@ interface DailyPoint {
 
 const fmt = (n: number) => n.toLocaleString('en-IN')
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`
+// Voice rows (ElevenLabs TTS) are billed by characters spoken, not LLM tokens —
+// their Input/Total columns hold char counts, so label them and blank Output.
+const VOICE_CATEGORIES = new Set(['brain_voice'])
 // Short IST day label from a 'YYYY-MM-DD' key, e.g. "18 Jun".
 const dayLabel = (d: string) =>
   new Date(d + 'T00:00:00+05:30').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
@@ -170,7 +172,7 @@ export default function TokenUsagePage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -261,24 +263,28 @@ export default function TokenUsagePage() {
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
                   No usage recorded yet. Counters start filling once the agent runs (chats, scoring, summaries).
                 </td></tr>
-              ) : rows.map((r) => (
+              ) : rows.map((r) => {
+                const isVoice = VOICE_CATEGORIES.has(r.category)
+                return (
                 <tr key={r.category} className="border-t" style={{ borderColor: 'var(--border-primary)' }}>
                   <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.label}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(r.calls)}</td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(r.input_tokens)}</td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(r.output_tokens)}</td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>{fmt(r.total_tokens)}</td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{isVoice ? `${fmt(r.input_tokens)} chars` : fmt(r.input_tokens)}</td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{isVoice ? '—' : fmt(r.output_tokens)}</td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>{isVoice ? `${fmt(r.total_tokens)} chars` : fmt(r.total_tokens)}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums font-semibold" style={{ color: 'var(--accent-primary)' }}>{usd(r.cost_usd)}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         <p className="text-[11px] mt-4" style={{ color: 'var(--text-muted)' }}>
           Web chat streaming isn't metered yet. Costs use public per-model pricing and are indicative, not billed amounts.
+          Voice rows (Ask PROXe voice) are ElevenLabs text-to-speech, billed by characters spoken — their Input/Total columns show character counts, not tokens.
         </p>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

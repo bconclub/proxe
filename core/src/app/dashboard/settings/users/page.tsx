@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { MdPersonAdd, MdContentCopy, MdDelete, MdCheck, MdRefresh, MdEdit } from 'react-icons/md'
 import { getCurrentBrandId } from '@/configs'
 
@@ -230,7 +229,7 @@ export default function UserManagementPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -559,6 +558,6 @@ export default function UserManagementPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }
