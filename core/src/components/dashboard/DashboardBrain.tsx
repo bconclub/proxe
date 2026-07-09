@@ -12,6 +12,9 @@
 import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import { MdClose, MdSend, MdArrowForward } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
+import { BRAND_ID } from '@/configs'
+
+const IS_POP = BRAND_ID === 'pop'
 
 type Msg = { role: 'user' | 'assistant'; content: string }
 
@@ -116,19 +119,33 @@ function renderRich(content: string) {
   return out
 }
 
-const SUGGESTIONS = [
-  'What happened today?',
-  'How many leads today?',
-  "What's my pipeline?",
-  'Any upcoming bookings?',
-]
+const SUGGESTIONS = IS_POP
+  ? [
+      'What happened today?',
+      'How many people reached today?',
+      'How is the frontline looking?',
+      'Any upcoming events?',
+    ]
+  : [
+      'What happened today?',
+      'How many leads today?',
+      "What's my pipeline?",
+      'Any upcoming bookings?',
+    ]
 
-const LOADING_MSGS = [
-  'Pulling lead numbers…',
-  'Reading your pipeline…',
-  "Checking today's bookings…",
-  'Crunching the data…',
-]
+const LOADING_MSGS = IS_POP
+  ? [
+      'Pulling the numbers…',
+      'Reading the ground…',
+      "Checking today's events…",
+      'Crunching the data…',
+    ]
+  : [
+      'Pulling lead numbers…',
+      'Reading your pipeline…',
+      "Checking today's bookings…",
+      'Crunching the data…',
+    ]
 
 export default function DashboardBrain({ inline = false, label }: { inline?: boolean; label?: string }) {
   const [open, setOpen] = useState(false)
@@ -255,7 +272,7 @@ export default function DashboardBrain({ inline = false, label }: { inline?: boo
                     <ProxeMark size={34} color="var(--accent-primary)" className="relative" />
                   </div>
                   <p className="text-sm mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>Ask anything about your dashboard.</p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Leads, pipeline, today’s activity, bookings.</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{IS_POP ? 'Voters, grievances, today’s activity, events.' : 'Leads, pipeline, today’s activity, bookings.'}</p>
                   <div className="flex flex-col gap-2 mt-5">
                     {SUGGESTIONS.map((s) => (
                       <button

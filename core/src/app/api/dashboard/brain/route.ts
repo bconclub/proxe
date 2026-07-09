@@ -151,8 +151,9 @@ export async function POST(request: NextRequest) {
       upcoming_bookings: upcomingTop,
     }
 
-    const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} sales dashboard.
-Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
+    const isPop = BRAND_ID === 'pop'
+    const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} ${isPop ? 'campaign dashboard' : 'sales dashboard'}.
+${isPop ? 'Use campaign vocabulary throughout: people / voters / supporters / volunteers / cadre / grievances / constituencies / events — never sales terms (leads, pipeline, deals, bookings, customers, prospects). In the DATA JSON, "leads" = people/voters, "pipeline_by_stage" = the intensity ladder, "leads_by_source" = where people came in via, "upcoming_bookings" = upcoming events / callbacks.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
 
 Times in DATA (e.g. upcoming_bookings "when") are already formatted IST strings — show them EXACTLY as given. Never convert, recompute, or restate a time in a different value.
 
@@ -161,7 +162,7 @@ FORMAT (built for a phone-sized panel, ~360px wide):
 - Keep prose to 1-2 short lines around each table. Use **bold** for standout numbers/names. Use "- " bullets only for non-numeric lists (e.g. lead names).
 - No "---" divider lines, no "###" headings, no long paragraphs. Skimmable, not a report.
 
-This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: "Breakdown by source | Lead quality today | Show hot leads". Put FOLLOWUPS only on that last line, nowhere else.
+This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: ${isPop ? '"Breakdown by constituency | Frontline today | Top grievances"' : '"Breakdown by source | Lead quality today | Show hot leads"'}. Put FOLLOWUPS only on that last line, nowhere else.
 
 DATA:
 ${JSON.stringify(data)}`
