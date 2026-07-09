@@ -897,7 +897,7 @@ export default function FounderDashboard() {
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 gap-4 sm:gap-5 xl:flex-1 xl:min-h-0">
         {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
             Volunteers → Cadre → Grievances), narrower so Events breathes. */}
-        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className={`${(isPop && metrics.campaignHome?.ladder) || showGigsTab ? 'xl:col-span-6' : 'xl:col-span-8'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-2 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{brandLabel('Engine Overview')}</h3>
             {!(isPop && metrics.campaignHome?.ladder) && (
@@ -962,7 +962,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Upcoming Events - POP splits the row 50-50 with the engine; compact cards (going/interested inline) fit 2-3 at a glance */}
-        <section className={`${isPop && metrics.campaignHome?.ladder ? 'xl:col-span-6' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section className={`${(isPop && metrics.campaignHome?.ladder) || showGigsTab ? 'xl:col-span-6' : 'xl:col-span-4'} rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden`} style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming Events</h3>
             <button onClick={() => router.push('/dashboard/bookings')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>

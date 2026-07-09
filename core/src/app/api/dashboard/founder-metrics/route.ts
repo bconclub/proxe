@@ -608,12 +608,18 @@ export async function GET(request: NextRequest) {
       return isNaN(d.getTime()) ? null : d
     }
 
+    // "Upcoming" = from the START of today (IST), not from `now` — a call booked
+    // for earlier today is still today's agenda and must show, otherwise the list
+    // reads "No upcoming events" while the Booked Calls KPI counts those same
+    // same-day bookings (the exact 2-booked-but-nothing-shown mismatch).
+    const istTodayStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+    const startOfTodayIST = new Date(`${istTodayStr}T00:00:00+05:30`)
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
         return { lead, bookingDate, bookingTime, dt: parseBookingIST(bookingDate, bookingTime) }
       })
-      .filter(({ dt }) => dt !== null && dt >= now)
+      .filter(({ dt }) => dt !== null && dt >= startOfTodayIST)
       .sort((a, b) => a.dt!.getTime() - b.dt!.getTime())
       .slice(0, 10)
       .map(({ lead, bookingDate, bookingTime, dt }) => {
