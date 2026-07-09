@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { Txt } from '../components/ui';
 import { colors, radius } from '../theme';
 import { api, actionOf, type FeedItem } from '../lib/api';
+import { mergeFeed, subscribeFeed, markSeen } from '../lib/feedStore';
 
 const ago = (iso: string) => {
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -21,20 +22,26 @@ const STATUS: Record<FeedItem['status'], { label: string; color: string; icon: a
 };
 
 export default function FeedScreen() {
-  const [items, setItems] = React.useState<FeedItem[]>([]);
+  // Local actions (what the leader just pushed) show instantly; server items
+  // (War Room status changes) merge in when they load.
+  const serverRef = React.useRef<FeedItem[]>([]);
+  const [items, setItems] = React.useState<FeedItem[]>(() => mergeFeed([]));
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
 
   const load = React.useCallback(async () => {
     const data = await api.getFeed();
-    setItems(data);
+    serverRef.current = data;
+    setItems(mergeFeed(data));
     setLoading(false);
   }, []);
 
   React.useEffect(() => {
     load();
+    markSeen(); // opening the Feed clears the bell badge
     const id = setInterval(load, 15000); // live — surface status changes as the team works
-    return () => clearInterval(id);
+    const unsub = subscribeFeed(() => setItems(mergeFeed(serverRef.current)));
+    return () => { clearInterval(id); unsub(); };
   }, [load]);
 
   const onRefresh = React.useCallback(async () => {
@@ -71,7 +78,7 @@ export default function FeedScreen() {
         </View>
       )}
 
-      {loading ? (
+      {loading && items.length === 0 ? (
         <View style={{ paddingVertical: 48, alignItems: 'center' }}>
           <ActivityIndicator color={colors.accent} />
         </View>

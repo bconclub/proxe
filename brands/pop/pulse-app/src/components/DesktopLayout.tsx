@@ -14,6 +14,7 @@ import SeatList from './SeatList';
 import DetailContent from './DetailContent';
 import { constituencies, districts } from '../data';
 import { colors, radius } from '../theme';
+import { unreadCount, subscribeFeed } from '../lib/feedStore';
 import type { Pulse } from '../lib/pulse';
 import type { ColorMode } from '../lib/geo';
 
@@ -38,6 +39,11 @@ export default function DesktopLayout({
   onOpenFeed,
   onBell,
 }: Props) {
+  const [unread, setUnread] = React.useState(0);
+  React.useEffect(() => {
+    setUnread(unreadCount());
+    return subscribeFeed(() => setUnread(unreadCount()));
+  }, []);
   return (
     <View style={styles.root}>
       {/* LEFT - nav rail */}
@@ -59,8 +65,13 @@ export default function DesktopLayout({
               ਸਭ ਦੀ ਸੁਣਾਂਗੇ · Sab di sunenge
             </Txt>
           </View>
-          <Pressable style={styles.iconBtn} onPress={onBell} hitSlop={8}>
-            <Feather name="bell" size={16} color={colors.textDim} />
+          <Pressable style={styles.iconBtn} onPress={unread > 0 ? onOpenFeed : onBell} hitSlop={8}>
+            <Feather name="bell" size={16} color={unread > 0 ? colors.accent : colors.textDim} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Txt size={8.5} weight="bold" color="#fff">{unread > 9 ? '9+' : String(unread)}</Txt>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -187,6 +198,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },

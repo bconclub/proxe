@@ -25,6 +25,8 @@ import Constants from 'expo-constants';
 import { constituencies, results, framework, byNo } from '../data';
 import { buildPulse, buildAgeGroups, type Pulse } from './pulse';
 import { grievancesFor } from './grievances';
+import { addLocalAction } from './feedStore';
+import { sendLocal } from './notifications';
 
 export const API_BASE =
   process.env.EXPO_PUBLIC_API_URL ||
@@ -346,11 +348,16 @@ export const api = {
    */
   async pushAction(payload: { no: number; kind: ActionKind; target: string; context?: string }): Promise<{ ok: boolean }> {
     const a = actionMeta(payload.kind);
-    return this.pushToTeam({
-      no: payload.no,
-      title: `${a.verb}: ${payload.target}`,
-      body: payload.context ? `${a.next} ${payload.context}` : a.next,
-    });
+    const seat = byNo[payload.no];
+    const title = `${a.verb}: ${payload.target}`;
+    const body = payload.context ? `${a.next} ${payload.context}` : a.next;
+    // Optimistic: land it in the Feed + fire a notification NOW, so the demo
+    // always shows movement regardless of the backend.
+    addLocalAction({ title, body, constituency: seat?.name ?? null });
+    sendLocal(`${a.label} · ${payload.target}`, a.next).catch(() => {});
+    // Best-effort backend push so it also reaches the War Room (non-blocking).
+    this.pushToTeam({ no: payload.no, title, body }).catch(() => {});
+    return { ok: true };
   },
 
   /**

@@ -1,3 +1,11 @@
+## 2026-07-09 14:45 IST · feat(pop): leader app local-first feed + notifications + big frontline (demo)
+
+- User-facing (leader app): every team action (Observe/Monitor/Coordinate/Response/Escalate) now lands in the Feed INSTANTLY via a local store + fires a local/browser notification — no dependency on the backend round-trip (the backend push is still attempted best-effort so it also reaches the War Room). Feed merges local + server items.
+- User-facing: the header bell shows an unread badge (saffron + count) that clears when the Feed is opened.
+- User-facing: frontline reads BIG on the bundled pulse — voters 7k-20k, supporters 2-5.2k, volunteers 1.1-2.8k, cadre 380-1000 per seat (was ~95 volunteers, 0 supporters/cadre). Fixes the leader seeing tiny/zero numbers.
+- Root cause noted: the app was falling back to bundled mock (getPulseAll), and the live /api/leader/pulse under-samples (10k-row cap over 84k rows across 118 seats) + date-filters the standing ladder — a proper server-side aggregation fix is queued for the backend; the demo path is now local-first and reliable.
+- Shipped to pulse-punjab (44945c5) + mirrored here.
+
 ## 2026-07-09 14:20 IST · feat(pop): pre-presentation batch — War Room 5-pillar strip + instant cache, campaign wording, theme visibility fixes
 
 - User-facing: War Room KPI strip is now 5 cards — Reach · Standing · TOP ISSUE (biggest issue, its size, % of voices, 7d trend, own sparkline) · Response Loop · GROUND FORCE (ready to volunteer / to vote / rally). Battlegrounds card removed (no constituency numbers up top).

@@ -49,18 +49,27 @@ export function buildAgeGroups(no: number): AgeGroups {
 }
 
 export function buildPulse(no: number): Pulse {
-  const base = 40 + Math.floor(seeded(no, 1) * 460);
-  const comments = Math.floor(base * (0.2 + seeded(no, 2) * 0.4));
-  const volunteers = Math.floor(seeded(no, 3) * 120);
-  const grievances = Math.floor(seeded(no, 4) * 60);
+  // A heavily-mobilised campaign: the frontline ladder reads BIG (voters →
+  // supporters → volunteers → cadre, a wide pyramid) so "frontline you can
+  // move" shows thousands, not tens. Deterministic per seat.
+  const voters = 7000 + Math.floor(seeded(no, 7) * 13000);      // 7k–20k
+  const supporters = 2000 + Math.floor(seeded(no, 2) * 3200);   // 2.0k–5.2k
+  const volunteers = 1100 + Math.floor(seeded(no, 3) * 1700);   // 1.1k–2.8k
+  const cadre = 380 + Math.floor(seeded(no, 8) * 620);          // 380–1000
+  const base = voters;
+  const comments = Math.floor(supporters * (0.2 + seeded(no, 9) * 0.4));
+  const grievances = 800 + Math.floor(seeded(no, 4) * 5400);
   const resolved = Math.floor(grievances * (0.3 + seeded(no, 5) * 0.6));
-  const conversion = Math.floor(seeded(no, 6) * 100);
-  const engagement = Math.min(100, Math.floor(base / 5 + volunteers * 0.3));
+  const conversion = 40 + Math.floor(seeded(no, 6) * 55);
+  const engagement = Math.min(100, 55 + Math.floor(seeded(no, 3) * 40));
   const phase = (['P1', 'P2', 'P3'] as const)[no % 3];
   return {
     interactions: base,
     comments,
     volunteers,
+    supporters,
+    cadre,
+    voters,
     grievances,
     resolved,
     conversion,
