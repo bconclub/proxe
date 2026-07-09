@@ -7,7 +7,7 @@ import { ScrollView, View, RefreshControl, ActivityIndicator, StyleSheet } from 
 import { Feather } from '@expo/vector-icons';
 import { Txt } from '../components/ui';
 import { colors, radius } from '../theme';
-import { api, type FeedItem } from '../lib/api';
+import { api, actionOf, type FeedItem } from '../lib/api';
 
 const ago = (iso: string) => {
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -88,18 +88,28 @@ export default function FeedScreen() {
           {items.map((it) => {
             const st = STATUS[it.status] || STATUS.new;
             const isAi = it.source === 'ai';
+            // The action kind rides in the title verb ("Escalate: …"); pull it out
+            // for a coloured badge and show the title without the verb prefix.
+            const act = actionOf(it.title);
+            const title = act ? it.title.slice(act.verb.length + 1).trim() : it.title;
             return (
-              <View key={it.id} style={[styles.card, { borderLeftColor: st.color }]}>
+              <View key={it.id} style={[styles.card, { borderLeftColor: act ? act.color : st.color }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <View style={[styles.srcTag, { backgroundColor: (isAi ? '#8B5CF6' : colors.accent) + '22' }]}>
                     <Feather name={isAi ? 'zap' : 'user'} size={10} color={isAi ? '#8B5CF6' : colors.accent} />
                     <Txt size={9} weight="bold" color={isAi ? '#8B5CF6' : colors.accent}>{isAi ? 'AI' : 'YOU'}</Txt>
                   </View>
+                  {act ? (
+                    <View style={[styles.srcTag, { backgroundColor: act.color + '22' }]}>
+                      <Feather name={act.icon as any} size={10} color={act.color} />
+                      <Txt size={9} weight="bold" color={act.color}>{act.label.toUpperCase()}</Txt>
+                    </View>
+                  ) : null}
                   {it.constituency ? <Txt size={11} faint>{it.constituency}</Txt> : null}
                   <View style={{ flex: 1 }} />
                   <Txt size={10.5} faint>{ago(it.created_at)}</Txt>
                 </View>
-                <Txt size={14} weight="semibold" style={{ lineHeight: 19 }}>{it.title}</Txt>
+                <Txt size={14} weight="semibold" style={{ lineHeight: 19 }}>{title}</Txt>
                 {it.body ? <Txt size={12} dim style={{ marginTop: 4, lineHeight: 17 }}>{it.body}</Txt> : null}
                 <View style={[styles.statusRow, { backgroundColor: st.color + '18', borderColor: st.color + '44' }]}>
                   <Feather name={st.icon} size={12} color={st.color} />

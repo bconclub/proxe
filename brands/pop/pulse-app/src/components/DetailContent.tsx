@@ -12,7 +12,8 @@ import { byNo } from '../data';
 import { winnerOf } from '../lib/geo';
 import { party as PARTY, colors, radius, space, phase } from '../theme';
 import type { Pulse } from '../lib/pulse';
-import { api } from '../lib/api';
+import { api, type ActionKind } from '../lib/api';
+import ActionModal from './ActionModal';
 
 export default function DetailContent({
   no,
@@ -44,8 +45,10 @@ export default function DetailContent({
     );
   }
 
-  // Leader mobilisation: push a "move these people here" directive to the team.
-  const [mob, setMob] = React.useState<Record<string, 'sending' | 'done'>>({});
+  // Leader mobilisation: pick a team action, which becomes a Feed directive.
+  const [done, setDone] = React.useState<Record<string, boolean>>({});
+  const [sheet, setSheet] = React.useState<{ key: string; target: string; context: string } | null>(null);
+  const [busy, setBusy] = React.useState<ActionKind | null>(null);
   const activeWorkforce = (p.volunteers || 0) + (p.cadre ?? 0);
   const workforce = [
     { key: 'vol', label: 'Volunteers', value: p.volunteers || 0, icon: 'users', color: phase.P3 },
@@ -53,11 +56,12 @@ export default function DetailContent({
     { key: 'cad', label: 'Cadre', value: p.cadre ?? 0, icon: 'award', color: phase.P1 },
   ];
 
-  async function pushWorkforce(key: string, title: string, body: string) {
-    if (no == null || mob[key]) return;
-    setMob((s) => ({ ...s, [key]: 'sending' }));
-    const res = await api.pushToTeam({ no, title, body });
-    setMob((s) => { const n = { ...s }; if (res.ok) n[key] = 'done'; else delete n[key]; return n; });
+  async function pick(kind: ActionKind) {
+    if (no == null || !sheet || busy) return;
+    setBusy(kind);
+    const res = await api.pushAction({ no, kind, target: sheet.target, context: sheet.context });
+    setBusy(null);
+    if (res.ok) { setDone((s) => ({ ...s, [sheet.key]: true })); setSheet(null); }
   }
 
   return (
@@ -115,23 +119,23 @@ export default function DetailContent({
       </Txt>
       <View style={styles.wfGrid}>
         {workforce.map((wf) => {
-          const st = mob[wf.key];
+          const st = done[wf.key];
           return (
             <Pressable
               key={wf.key}
-              disabled={!!st}
+              disabled={st}
               onPress={() =>
-                pushWorkforce(
-                  wf.key,
-                  `Mobilise ${wf.label} in ${c.name}`,
-                  `${wf.value.toLocaleString()} ${wf.label.toLowerCase()} available in ${c.name}. Leader is asking the team to activate them here.`,
-                )
+                setSheet({
+                  key: wf.key,
+                  target: `Mobilise ${wf.label} in ${c.name}`,
+                  context: `${wf.value.toLocaleString()} ${wf.label.toLowerCase()} available in ${c.name}.`,
+                })
               }
               style={({ pressed }) => [styles.wfCard, { borderLeftColor: wf.color }, pressed && { opacity: 0.7 }]}
             >
               <View style={styles.wfTop}>
                 <Feather name={wf.icon as any} size={14} color={wf.color} />
-                <Feather name={st === 'done' ? 'check-circle' : 'send'} size={12} color={st === 'done' ? '#2FD08A' : colors.faint} />
+                <Feather name={st ? 'check-circle' : 'send'} size={12} color={st ? '#2FD08A' : colors.faint} />
               </View>
               <Txt size={20} weight="bold">
                 {wf.value.toLocaleString()}
@@ -139,8 +143,8 @@ export default function DetailContent({
               <Txt size={10} faint style={{ letterSpacing: 0.3, marginTop: 1 }}>
                 {wf.label.toUpperCase()}
               </Txt>
-              <Txt size={9} weight="bold" color={st === 'done' ? '#2FD08A' : colors.accent} style={{ marginTop: 4 }}>
-                {st === 'done' ? 'SENT TO TEAM' : st === 'sending' ? 'SENDING…' : 'PUSH →'}
+              <Txt size={9} weight="bold" color={st ? '#2FD08A' : colors.accent} style={{ marginTop: 4 }}>
+                {st ? 'SENT TO TEAM' : 'PUSH →'}
               </Txt>
             </Pressable>
           );
@@ -148,21 +152,29 @@ export default function DetailContent({
       </View>
 
       <Pressable
-        style={[styles.cta, mob.all === 'done' && { backgroundColor: '#2FD08A' }]}
-        disabled={mob.all === 'sending'}
+        style={[styles.cta, done.all && { backgroundColor: '#2FD08A' }]}
+        disabled={done.all}
         onPress={() =>
-          pushWorkforce(
-            'all',
-            `Mobilise the ground in ${c.name}`,
-            `Frontline ready in ${c.name}: ${(p.volunteers || 0).toLocaleString()} volunteers, ${(p.supporters ?? 0).toLocaleString()} supporters, ${(p.cadre ?? 0).toLocaleString()} cadre (${activeWorkforce.toLocaleString()} boots on the ground). Leader requests activation.`,
-          )
+          setSheet({
+            key: 'all',
+            target: `Mobilise the ground in ${c.name}`,
+            context: `Frontline in ${c.name}: ${(p.volunteers || 0).toLocaleString()} volunteers, ${(p.supporters ?? 0).toLocaleString()} supporters, ${(p.cadre ?? 0).toLocaleString()} cadre (${activeWorkforce.toLocaleString()} boots on the ground).`,
+          })
         }
       >
-        <Feather name={mob.all === 'done' ? 'check' : 'send'} size={16} color={colors.bg} />
+        <Feather name={done.all ? 'check' : 'send'} size={16} color={colors.bg} />
         <Txt size={14.5} weight="bold" color={colors.bg}>
-          {mob.all === 'done' ? 'Pushed to team' : mob.all === 'sending' ? 'Pushing…' : 'Push to team'}
+          {done.all ? 'Pushed to team' : 'Push to team'}
         </Txt>
       </Pressable>
+
+      <ActionModal
+        visible={!!sheet}
+        target={sheet ? sheet.target : null}
+        busy={busy}
+        onClose={() => { if (!busy) setSheet(null); }}
+        onPick={pick}
+      />
     </ScrollView>
   );
 }

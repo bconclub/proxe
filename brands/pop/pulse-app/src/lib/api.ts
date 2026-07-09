@@ -34,6 +34,23 @@ export const API_BASE =
 // Live only when a backend origin is configured; otherwise bundled/seeded data.
 const USE_LOCAL = !API_BASE;
 
+// ── Team actions ──
+// When the leader taps ACT (or Push to team), they pick WHAT the team should do.
+// Each action becomes a directive in the Feed + War Room, its kind carried in the
+// title verb ("Escalate: …") so no schema change is needed. `next` is the plain
+// "here's what happens now" line shown to the leader and stored as the body.
+export type ActionKind = 'observe' | 'monitor' | 'coordinate' | 'response' | 'escalate';
+export const ACTIONS: { kind: ActionKind; verb: string; label: string; desc: string; next: string; icon: string; color: string }[] = [
+  { kind: 'observe', verb: 'Observe', label: 'Observe', desc: 'Log it and keep an eye on it', next: 'Added to your feed — the team logs any movement here.', icon: 'eye', color: '#7A8AA0' },
+  { kind: 'monitor', verb: 'Monitor', label: 'Monitor', desc: 'Track it and get updates as it moves', next: 'Team is tracking this — updates land in your feed as it moves.', icon: 'activity', color: '#2E8DE6' },
+  { kind: 'coordinate', verb: 'Coordinate', label: 'Coordinate', desc: 'Share with your team to plan a response', next: 'Shared with your team to coordinate a plan of action.', icon: 'users', color: '#8B5CF6' },
+  { kind: 'response', verb: 'Respond', label: 'Response', desc: 'Draft a response and route it to the team', next: 'Response drafted and routed to your team to act on.', icon: 'send', color: '#F5A623' },
+  { kind: 'escalate', verb: 'Escalate', label: 'Escalate', desc: 'Make it political — loop in leadership + media', next: 'Escalated — leadership and the media cell are looped in.', icon: 'alert-triangle', color: '#F2545B' },
+];
+export const actionMeta = (kind: ActionKind) => ACTIONS.find((a) => a.kind === kind)!;
+// Feed items carry the kind in the title verb; derive it back for the badge.
+export const actionOf = (title: string) => ACTIONS.find((a) => title.toLowerCase().startsWith(a.verb.toLowerCase() + ':')) || null;
+
 // ── Session token (login-gated) ──
 // No secret ships in the bundle. The leader logs in with a passcode, which is
 // exchanged server-side for a short-lived token; that token authorizes every
@@ -320,6 +337,20 @@ export const api = {
     } catch {
       return { ok: false };
     }
+  },
+
+  /**
+   * The leader picked a team action (Observe/Monitor/Coordinate/Response/
+   * Escalate) on a grievance or the frontline. Becomes a directive whose kind
+   * rides in the title verb; the body is the plain "what happens next" line.
+   */
+  async pushAction(payload: { no: number; kind: ActionKind; target: string; context?: string }): Promise<{ ok: boolean }> {
+    const a = actionMeta(payload.kind);
+    return this.pushToTeam({
+      no: payload.no,
+      title: `${a.verb}: ${payload.target}`,
+      body: payload.context ? `${a.next} ${payload.context}` : a.next,
+    });
   },
 
   /**

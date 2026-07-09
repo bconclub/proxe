@@ -6,8 +6,9 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Txt } from './ui';
 import { grievancesFor, CAT_META, type Grievance } from '../lib/grievances';
-import { api } from '../lib/api';
+import { api, type ActionKind } from '../lib/api';
 import { colors, radius } from '../theme';
+import ActionModal from './ActionModal';
 
 const STATUS: Record<Grievance['status'], { label: string; color: string }> = {
   open: { label: 'Open', color: '#F06C18' },
@@ -23,19 +24,28 @@ const TREND: Record<Grievance['trend'], { icon: string; color: string }> = {
 export default function GrievanceList({ no, district, seatName }: { no: number; district: string; seatName?: string }) {
   const { total, items } = grievancesFor(no, district);
   const max = items[0]?.votes || 1;
-  // Which grievances the leader has already pushed to the team this session.
-  const [sent, setSent] = React.useState<Record<string, 'sending' | 'done'>>({});
+  // Grievances the leader has already acted on this session.
+  const [sent, setSent] = React.useState<Record<string, boolean>>({});
+  // The grievance whose action sheet is open, and which action is in flight.
+  const [active, setActive] = React.useState<Grievance | null>(null);
+  const [busy, setBusy] = React.useState<ActionKind | null>(null);
 
-  async function act(g: Grievance) {
-    if (sent[g.id]) return;
-    setSent((s) => ({ ...s, [g.id]: 'sending' }));
+  async function pick(kind: ActionKind) {
+    if (!active || busy) return;
+    const g = active;
+    setBusy(kind);
     const meta = CAT_META[g.category];
-    const res = await api.pushToTeam({
+    const res = await api.pushAction({
       no,
-      title: `Act on: ${g.title}`,
-      body: `${seatName ? seatName + ' · ' : ''}${meta.label} · ${g.votes.toLocaleString()} reports · currently ${STATUS[g.status].label}. Pushed by the leader from Pulse of Punjab.`,
+      kind,
+      target: g.title,
+      context: `${seatName ? seatName + ' · ' : ''}${meta.label} · ${g.votes.toLocaleString()} reports · currently ${STATUS[g.status].label}.`,
     });
-    setSent((s) => ({ ...s, [g.id]: res.ok ? 'done' : undefined as any }));
+    setBusy(null);
+    if (res.ok) {
+      setSent((s) => ({ ...s, [g.id]: true }));
+      setActive(null);
+    }
   }
 
   return (
@@ -64,7 +74,7 @@ export default function GrievanceList({ no, district, seatName }: { no: number; 
         return (
           <Pressable
             key={g.id}
-            onPress={() => act(g)}
+            onPress={() => setActive(g)}
             disabled={!!state}
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.65 }]}
           >
@@ -88,14 +98,10 @@ export default function GrievanceList({ no, district, seatName }: { no: number; 
                 <Txt size={10.5} faint>
                   {meta.label} · {g.pct}% of reports
                 </Txt>
-                {state === 'done' ? (
+                {state ? (
                   <View style={[styles.statusPill, { borderColor: '#2FD08A66', backgroundColor: '#2FD08A1A', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                     <Feather name="check" size={10} color="#2FD08A" />
                     <Txt size={9.5} weight="bold" color="#2FD08A">SENT TO TEAM</Txt>
-                  </View>
-                ) : state === 'sending' ? (
-                  <View style={[styles.statusPill, { borderColor: colors.accent + '66', backgroundColor: colors.accent + '1A' }]}>
-                    <Txt size={9.5} weight="bold" color={colors.accent}>SENDING…</Txt>
                   </View>
                 ) : (
                   <View style={styles.actRow}>
@@ -115,6 +121,14 @@ export default function GrievanceList({ no, district, seatName }: { no: number; 
           </Pressable>
         );
       })}
+
+      <ActionModal
+        visible={!!active}
+        target={active ? active.title : null}
+        busy={busy}
+        onClose={() => { if (!busy) setActive(null); }}
+        onPick={pick}
+      />
     </View>
   );
 }

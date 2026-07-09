@@ -1,3 +1,10 @@
+## 2026-07-09 14:10 IST · feat(pop): leader team-action modal + frontline boost
+
+- User-facing (leader app): tapping ACT on a grievance, a workforce card, or "Push to team" now opens a modal to pick what the team should do — Observe / Monitor / Coordinate / Response / Escalate — each with a plain "what happens next" line. Every choice becomes a directive in the Feed (and War Room Directives) with live status; the Feed badges each item by its action. Shipped to pulse-punjab (1e7ccbc) + mirrored here.
+- Data: boosted the POP frontline ~5-8× — Volunteers 3.6k→30.6k, Cadre 3k→11.5k, Supporters 9.4k→31.1k (insert-only, phone prefix +9198766). Every seat now shows a big, non-zero Supporters/Volunteers/Cadre base (~617 / ~356 / ~97 per seat). Fixes the "0 supporters/0 cadre" the leader saw (that was a stale cached bundle over pre-ramp data).
+- Verified: leader Bearer path returns directives on prod; boost tier counts confirmed in DB; pulse-punjab deploy READY.
+- Next phase: Coordinate/Response actually emailing the team + Monitor push-notifications (today they create the feed directive with the "what happens next" copy).
+
 ## 2026-07-09 13:40 IST · fix(pop): person-modal attribution drops the sales "changed stage to Qualified"
 
 - The Summary attribution line ("Last updated by PROXe AI 14h ago - changed stage to Qualified") still leaked a sales stage for POP. Added a stageActionText() helper: for POP it reads "updated their status"; other brands keep "changed stage to X". Applied to all six attribution builders in the summary route.
