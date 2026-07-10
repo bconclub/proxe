@@ -40,6 +40,7 @@ export type JourneyStep = {
   template: string | null      // Meta template name, or null when free-form/AI
   freeform?: string            // free-form body (worker-composed), when no template
   note?: string                // gate / behaviour note
+  buttons?: string[]           // quick-reply chips on a free-form step (template steps get theirs from TEMPLATE_BUTTONS)
 }
 
 export type Journey = {

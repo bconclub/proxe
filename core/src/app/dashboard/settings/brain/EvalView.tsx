@@ -14,20 +14,24 @@ import { useState, Fragment } from 'react'
 import { MdSend, MdCheckCircle, MdErrorOutline, MdWhatsapp, MdShield, MdExpandMore, MdExpandLess } from 'react-icons/md'
 import { JOURNEYS as BCON_JOURNEYS, GATES as BCON_GATES, TEMPLATE_BUTTONS as BCON_BUTTONS, bodyFor as bconBodyFor, type Journey, type JourneyStep } from '@/configs/journeys'
 import { POP_JOURNEYS, POP_GATES, POP_TEMPLATE_BUTTONS, popBodyFor, POP_SAMPLE, POP_VAR_LABEL, POP_OUTCOMES } from '@/configs/journeys.pop'
+import { LOKAZEN_JOURNEYS, LOKAZEN_GATES, LOKAZEN_TEMPLATE_BUTTONS, lokazenBodyFor, LOKAZEN_SAMPLE, LOKAZEN_VAR_LABEL, LOKAZEN_OUTCOMES } from '@/configs/journeys.lokazen'
 import { getBrainConfig } from '@/lib/brain/brainConfig'
+import { getBrandConfig } from '@/configs'
 
-// Which journey set this brand evaluates: 'pop' = voter outreach (grievance
-// loop), 'business' = the lead-gen ladder. Brands with evalJourneys 'none'
-// never mount this view (the Eval tab is hidden on the Brain page).
+// Which journey set this brand evaluates. The bench is brand-specific truth,
+// not one generic ladder: POP = voter grievance loop, Lokazen = CRE match +
+// site-visit loop, everyone else = the BCON lead-gen ladder. Brands with
+// evalJourneys 'none' never mount this view (the Eval tab is hidden).
 const IS_POP = getBrainConfig().evalJourneys === 'pop'
-const JOURNEYS = IS_POP ? POP_JOURNEYS : BCON_JOURNEYS
-const GATES = IS_POP ? POP_GATES : BCON_GATES
-const TEMPLATE_BUTTONS = IS_POP ? POP_TEMPLATE_BUTTONS : BCON_BUTTONS
-const bodyFor = IS_POP ? popBodyFor : bconBodyFor
+const IS_LOKAZEN = getBrandConfig().brand === 'lokazen'
+const JOURNEYS = IS_POP ? POP_JOURNEYS : IS_LOKAZEN ? LOKAZEN_JOURNEYS : BCON_JOURNEYS
+const GATES = IS_POP ? POP_GATES : IS_LOKAZEN ? LOKAZEN_GATES : BCON_GATES
+const TEMPLATE_BUTTONS = IS_POP ? POP_TEMPLATE_BUTTONS : IS_LOKAZEN ? LOKAZEN_TEMPLATE_BUTTONS : BCON_BUTTONS
+const bodyFor = IS_POP ? popBodyFor : IS_LOKAZEN ? lokazenBodyFor : bconBodyFor
 
-// The sample every preview is filled with — a citizen for POP, a business
-// lead for everyone else (same fixture as the test bench).
-const SAMPLE: Record<string, string> = IS_POP ? POP_SAMPLE : {
+// The sample every preview is filled with — a citizen for POP, a CRE lead for
+// Lokazen, a business lead for everyone else (same fixture as the test bench).
+const SAMPLE: Record<string, string> = IS_POP ? POP_SAMPLE : IS_LOKAZEN ? LOKAZEN_SAMPLE : {
   customer_name: 'Shiv',
   brand_name: "Shiv's Laundry",
   business_name: "Shiv's Laundry",
@@ -36,7 +40,7 @@ const SAMPLE: Record<string, string> = IS_POP ? POP_SAMPLE : {
   pain_point: 'getting consistent leads',
   probe_question: "What's the one thing you want to fix first?",
 }
-const VAR_LABEL: Record<string, string> = IS_POP ? POP_VAR_LABEL : {
+const VAR_LABEL: Record<string, string> = IS_POP ? POP_VAR_LABEL : IS_LOKAZEN ? LOKAZEN_VAR_LABEL : {
   customer_name: 'name', brand_name: 'brand', business_name: 'brand',
   service_interest: 'goal', booking_time: 'time', pain_point: 'challenge', probe_question: 'probe',
 }
@@ -69,7 +73,9 @@ function Bubble({ step, tone, showVars, onSend, sendState }: {
   onSend?: () => void; sendState?: 'idle' | 'sending' | 'sent' | 'error'
 }) {
   const body = step.freeform || bodyFor(step.template)
-  const buttons = step.template ? TEMPLATE_BUTTONS[step.template] : undefined
+  // Free-form steps can carry their own quick-reply chips (step.buttons);
+  // template steps get theirs from the TEMPLATE_BUTTONS map.
+  const buttons = step.buttons ?? (step.template ? TEMPLATE_BUTTONS[step.template] : undefined)
   return (
     <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
       {/* timing rail */}
@@ -130,7 +136,7 @@ function Bubble({ step, tone, showVars, onSend, sendState }: {
   )
 }
 
-const OUTCOMES: Array<{ id: string; label: string }> = IS_POP ? POP_OUTCOMES : [
+const OUTCOMES: Array<{ id: string; label: string }> = IS_POP ? POP_OUTCOMES : IS_LOKAZEN ? LOKAZEN_OUTCOMES : [
   { id: 'ghost', label: 'Never replies' },
   { id: 'nudge', label: 'Goes quiet mid-chat' },
   { id: 'engaged', label: 'Chats, does not book' },
@@ -163,7 +169,7 @@ export default function EvalView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           body: fillPlain(raw),
-          buttons: step.template ? (TEMPLATE_BUTTONS[step.template] || []).slice(0, 3) : [],
+          buttons: (step.buttons ?? (step.template ? TEMPLATE_BUTTONS[step.template] : []) ?? []).slice(0, 3),
           label: step.label,
         }),
       })
