@@ -1,3 +1,9 @@
+## 2026-07-07 · fix(widget): links in agent messages are now clickable
+
+- formatText() linkifies bare URLs and markdown [text](url) into <a target=_blank> anchors (underlined, bold), so "Register here: https://…" is tappable in the embedded widget instead of plain text.
+- Bundled (per user OK): in-progress widget open-animation position changes from a parallel task (useLayoutEffect + bottom:104px anchor, slideUpBubble transform-only) in the same ChatWidget.tsx/.module.css.
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): agent asks parent-or-student before sharing the webinar link
 
 - Avia was picking the student link by default. Now, if the audience isn't already clear, it ASKS "student/aspiring pilot or parent?" first, then shares the matching page (parents → /webinar/parents, student → /webinar/students). Updated CURRENT_WEBINAR.rule in brand-facts (all channels).

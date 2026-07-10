@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useChat } from '@/hooks/useChat';
 import type { Message } from '@/hooks/useChatStream';
 
@@ -1432,16 +1432,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     return () => window.removeEventListener('resize', applyDeviceStyles);
   }, [isOpen]);
 
-  // Force docked positioning (right, above bubble) when open
-  useEffect(() => {
+  // Docked positioning when open. CRITICAL for the open animation: this MUST
+  // set the SAME anchor the CSS already uses (.chatboxBubbleMobile fullscreen /
+  // .chatboxBubbleDesktop bottom:104px) — writing a DIFFERENT position here
+  // (this used to center the panel with top:0;bottom:0;margin:auto) yanked the
+  // freshly-painted panel to a new spot one frame later, which read as the
+  // "flicker" on open. And do NOT override `transform` here — slideUpBubble
+  // animates it; the panel settles to the CSS `transform:none` on its own.
+  // useLayoutEffect: apply before paint so there is never a wrong first frame.
+  useLayoutEffect(() => {
     if (!isOpen || !chatboxContainerRef.current) return;
     const el = chatboxContainerRef.current;
     // In bubble/embed mode, use parent viewport size (not iframe width) to decide layout
     const isMobile = widgetStyle === 'bubble' ? isParentMobile === true : window.innerWidth < 769;
 
     el.style.setProperty('position', 'fixed', 'important');
-    el.style.setProperty('transform', 'none', 'important');
-    el.style.setProperty('-webkit-transform', 'none', 'important');
 
     if (isMobile) {
       el.style.setProperty('top', '0', 'important');
@@ -1456,16 +1461,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('max-height', '100vh', 'important');
       el.style.setProperty('margin', '0', 'important');
     } else {
+      // Desktop: anchor ABOVE the launcher bubble — SAME as .chatboxBubbleDesktop
+      // (no centering, no margin-auto), so JS and CSS agree and nothing jumps.
       el.style.setProperty('right', '24px', 'important');
       el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('top', '0', 'important');
-      el.style.setProperty('bottom', '0', 'important');
+      el.style.setProperty('bottom', '104px', 'important');
+      el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
       el.style.setProperty('height', '580px', 'important');
-      el.style.setProperty('max-height', 'calc(100vh - 100px)', 'important');
-      el.style.setProperty('margin-top', 'auto', 'important');
-      el.style.setProperty('margin-bottom', 'auto', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
+      el.style.removeProperty('margin-top');
+      el.style.removeProperty('margin-bottom');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
@@ -3277,6 +3284,18 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // Convert <br> tags if already present
     return cleanedText
       .replace(/<br\s*\/?>/gi, '\n') // Normalize <br> tags to newlines first
+      // Markdown links [text](url) → clickable anchor (before bare-URL linkify).
+      .replace(
+        /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;font-weight:600">$1</a>',
+      )
+      // Bare URLs → clickable anchor. The leading [^"'>] guard skips URLs that
+      // are already inside an href="…" (from the markdown-link pass above), so
+      // they're never double-wrapped. Trailing punctuation is left outside.
+      .replace(
+        /(^|[^"'>])(https?:\/\/[^\s<]+[^\s<.,;:!?)])/g,
+        '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;font-weight:600">$2</a>',
+      )
       .replace(/\n\n+/g, '<br><br>') // Double newlines become double breaks
       .replace(/\n(?=\s*•)/g, '<br>') // Preserve line breaks before bullet points
       .replace(/\n/g, '<br>') // Single newlines become breaks (for sentence separation)
