@@ -155,6 +155,29 @@ The Meet link will arrive 30 minutes before the session. Tap "Add to Calendar" b
 
 ---
 
+## 2b. `windchasers_pilot_parents_welcome_v1` 🟡 PENDING
+
+**Trigger:** Facebook/Meta Lead Form submit where the form/campaign/ad name contains "parent" (i.e. a parent enquiring on behalf of their child), detected by `isParentSource()`.
+**Endpoint:** `POST /api/agent/facebook-lead`.
+**Sender:** `sendParentWelcomeTemplate()` in `src/lib/services/whatsappSender.ts`.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY |
+| Language | English |
+| Header | — |
+
+**Body (1 NAMED variable — `parent_name`, not positional):**
+```
+Hi {{parent_name}}, welcome to Windchasers...
+```
+(see Meta Business Manager for the exact approved body — this is a named-parameter template, distinct from the student welcome templates which use `customer_name`.)
+
+**Buttons:** TBD per Meta submission.
+**Footer:** TBD.
+
+---
+
 ## 3. `windchasers_facebook_welcome` 🟡 PENDING
 
 **Trigger:** Lead submits a Facebook / Meta Lead Form (forwarded via Pabbly Connect).

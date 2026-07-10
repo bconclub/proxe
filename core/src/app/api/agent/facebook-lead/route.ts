@@ -13,16 +13,25 @@
  *   education / education_level → education level
  *   city                        → city
  *   utm_source/medium/campaign/content → ad attribution
+ *
+ * Auth: x-api-key header must match INBOUND_API_KEY env var.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const apiKey = request.headers.get('x-api-key');
+    const expectedKey = process.env.INBOUND_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     // ── Field parsing ─────────────────────────────────────────────────────────
@@ -180,17 +189,22 @@ export async function POST(request: NextRequest) {
     if (inCooldown) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
     } else {
-      // ── 3. Fire the welcome template — pilot vs generic by the ad/form/campaign
-      // the lead came from (a pilot ad/form/campaign → pilot welcome).
-      const welcomeTpl = pickWelcomeTemplate(
+      // ── 3. Fire the welcome template — parent enquiry gets its own template
+      // (named param `parent_name`); otherwise pilot vs generic by the
+      // ad/form/campaign the lead came from (a pilot ad/form/campaign → pilot welcome).
+      const attributionSignals = [
         facebookMeta.form_name,
         facebookMeta.campaign_name,
         facebookMeta.ad_name,
         facebookMeta.utm_campaign,
         facebookMeta.utm_content,
         facebookMeta.utm_source,
-      );
-      const sendResult = await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
+      ];
+      const isParentLead = isParentSource(...attributionSignals);
+      const welcomeTpl = isParentLead ? 'windchasers_pilot_parents_welcome_v1' : pickWelcomeTemplate(...attributionSignals);
+      const sendResult = isParentLead
+        ? await sendParentWelcomeTemplate(phone, cleanName)
+        : await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
       whatsappSent = sendResult.success;
 
       if (!sendResult.success) {
