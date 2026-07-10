@@ -23,6 +23,7 @@ import {
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { normalizeCourse } from '@/configs/courses'
 
 export const dynamic = 'force-dynamic'
 
@@ -288,32 +289,19 @@ export async function POST(request: NextRequest) {
       brandCtxData.user_type = audienceRaw
     }
     if (leadBrand === 'windchasers') {
-      // Map the interest value the form sends to the short course label the
-      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
+      // Normalize the interest to one canonical course label
+      // (Pilot / DGCA / Helicopter / Cabin Crew / Drone) — no abbreviated variations.
       const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
-      const courseMap: Record<string, string> = {
-        dgca_ground: 'DGCA',
-        dgca: 'DGCA',
-        pilot_training_abroad: 'Flight',
-        flight: 'Flight',
-        helicopter_license: 'Heli',
-        helicopter: 'Heli',
-        heli: 'Heli',
-        cabin_crew: 'Cabin',
-        cabin: 'Cabin',
-        drone: 'Drone',
-      }
-      if (interestRaw && courseMap[interestRaw]) {
-        brandCtxData.course_interest = courseMap[interestRaw]
-      } else if (interestRaw && interestRaw !== 'other') {
-        brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
+      const normalizedCourse = normalizeCourse(interestRaw)
+      if (normalizedCourse && interestRaw !== 'other') {
+        brandCtxData.course_interest = normalizedCourse
       }
       // Cabin-crew lead: from the mapped course interest OR any cabin-crew
       // signal in the source/form/campaign. Gets the dedicated cabin-crew
       // welcome below (with generic fallback) instead of the counsellor
       // first_outreach task.
       isCabinCrewLead =
-        brandCtxData.course_interest === 'Cabin' ||
+        brandCtxData.course_interest === 'Cabin Crew' ||
         isCabinCrewSource(
           normalizedSource,
           interestRaw,

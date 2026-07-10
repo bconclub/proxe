@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
+import { normalizeCourse } from '@/configs/courses';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (class12Pcm) windchasersProfile.class_12_pcm = class12Pcm;
     if (startTimeline) windchasersProfile.start_timeline = startTimeline;
     if (age) windchasersProfile.age = age;
-    if (course) windchasersProfile.course_interest = course;
+    if (course) windchasersProfile.course_interest = normalizeCourse(course);
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
     // real UTM (rare on lead forms) → placement platform (ig → Instagram,

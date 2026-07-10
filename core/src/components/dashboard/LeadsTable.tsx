@@ -10,6 +10,7 @@ import AddLeadModal from './AddLeadModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId, brandConfig, brandLabel } from '@/configs'
+import { COURSE_OPTIONS, normalizeCourse } from '@/configs/courses'
 import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
@@ -438,7 +439,7 @@ export default function LeadsTable({
     if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
-        return brandData.course_interest === courseInterestFilter
+        return normalizeCourse(brandData.course_interest) === courseInterestFilter
       })
     }
 
@@ -875,11 +876,9 @@ export default function LeadsTable({
               {showAviationColumns && (
                 <select value={courseInterestFilter} onChange={(e) => setCourseInterestFilter(e.target.value)} className={filterClass} style={filterStyle}>
                   <option value="all">All courses</option>
-                  <option value="DGCA">DGCA</option>
-                  <option value="Flight">Flight</option>
-                  <option value="Heli">Heli</option>
-                  <option value="Cabin">Cabin</option>
-                  <option value="Drone">Drone</option>
+                  {COURSE_OPTIONS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               )}
             </>
@@ -2004,10 +2003,10 @@ export default function LeadsTable({
                       <td className="px-3 py-2 text-xs text-center">
                         {lead.unified_context?.[brandId]?.course_interest ? (
                           <span
-                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
                             style={{ background: 'rgba(14,165,233,0.15)', color: '#7dd3fc', border: '1px solid rgba(14,165,233,0.3)' }}
                           >
-                            {lead.unified_context[brandId].course_interest}
+                            {normalizeCourse(lead.unified_context[brandId].course_interest)}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>-</span>
