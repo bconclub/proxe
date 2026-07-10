@@ -18,7 +18,6 @@ import {
   notifySlackLead,
   sendWhatsAppTemplate,
   sendWebinarConfirm,
-  sendWebinarConfirmParents,
   isCabinCrewSource,
   sendCabinCrewWelcome,
 } from '@/lib/services'
@@ -1143,17 +1142,13 @@ export async function POST(request: NextRequest) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
       const webinarName = String(cfields.webinar_name || cfields.webinar_topic || (body as any).webinar_name || (body as any).event_name || '').trim()
       const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || (body as any).webinar_date || '').trim()
-      // Parents vs students get a different welcome (user's ask) — routed by the
-      // audience the landing page tagged (unified_context.windchasers.user_type).
-      const isParentAudience = brandCtxData.user_type === 'parent'
-      const confirmTpl = isParentAudience ? 'windchasers_webinar_confirm_parents_v1' : 'windchasers_webinar_confirm_v1'
+      // Single confirmation template for all audiences (windchasers_webinar_confirmation_v1).
+      const confirmTpl = 'windchasers_webinar_confirmation_v1'
       const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
         console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
-        const result = isParentAudience
-          ? await sendWebinarConfirmParents(phone, firstName, webinarName, webinarDate)
-          : await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
+        const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
         const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (${confirmTpl} template)`
         await supabase.from('conversations').insert({
           lead_id: leadId,

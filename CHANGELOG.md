@@ -1,3 +1,9 @@
+## 2026-07-07 · fix(webinar): wire the real confirmation template (windchasers_webinar_confirmation_v1)
+
+- The created Meta template is windchasers_webinar_confirmation_v1 (not _confirm_v1) with params customer_name / topic / date / time (date + time SEPARATE) + a Join-WhatsApp-Group quick reply. sendWebinarConfirm now targets it and splits the combined "18 July 2026 at 11:30 AM IST" label into date + time. sendWebinarConfirmParents delegates to it (no parent-specific template exists). inbound uses the single template name.
+- It's PENDING Meta review — sends 404 until approved, then registrants get the confirmation automatically (no redeploy).
+- `(pending-sha)`
+
 ## 2026-07-07 · fix(windchasers): Flows tab shows windchasers templates, not bcon's
 
 - core/configs/flows-automation.ts was hardcoded to bcon template names (bcon_proxe_*), so the windchasers dashboard's Sequences/Triggers showed bcon templates that don't exist -> everything "Not created" / gated. Made it brand-aware (by BRAND_ID): windchasers now gets its OWN triggers + sequences using real approved templates.

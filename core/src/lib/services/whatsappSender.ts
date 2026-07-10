@@ -647,56 +647,50 @@ export async function sendParentWelcomeTemplate(
   ])
 }
 
+/** The webinar confirmation template name (single template for all audiences). */
+export const WEBINAR_CONFIRM_TEMPLATE = 'windchasers_webinar_confirmation_v1'
+
 /**
- * Webinar registration confirmation (Zoom → Pabbly → leads/inbound).
- * Template: windchasers_webinar_confirm_v1 — NAMED params:
- *   customer_name · webinar_name · webinar_date
+ * Webinar registration confirmation (Zoom → Pabbly / landing → leads/inbound).
+ * Template: windchasers_webinar_confirmation_v1 — NAMED params:
+ *   customer_name · topic · date · time  (+ a Join-WhatsApp-Group quick reply).
+ * `dateTime` is the combined "18 July 2026 at 11:30 AM IST" label — split into
+ * the separate date + time the template expects.
  */
 export async function sendWebinarConfirm(
   to: string,
   name: string,
   webinarName: string,
-  webinarDate: string,
+  dateTime: string,
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_webinar_confirm_v1', [
+  const [datePart, timePart] = String(dateTime || '').split(/\s+at\s+/i)
+  return sendWhatsAppTemplate(to, WEBINAR_CONFIRM_TEMPLATE, [
     {
       type: 'body',
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
-        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our upcoming webinar' },
-        { type: 'text', parameter_name: 'webinar_date', text: webinarDate || 'the scheduled date' },
+        { type: 'text', parameter_name: 'topic', text: webinarName || 'our webinar' },
+        { type: 'text', parameter_name: 'date', text: (datePart || dateTime || 'the scheduled date').trim() },
+        { type: 'text', parameter_name: 'time', text: (timePart || 'the scheduled time').trim() },
       ],
     },
   ])
 }
 
 /**
- * Webinar registration confirmation for PARENT registrants (from the parents
- * landing page / parent ads). Same shape as sendWebinarConfirm but a distinct
- * Meta template so the copy speaks to a parent, not the student.
- * Template: windchasers_webinar_confirm_parents_v1 — NAMED params:
- *   parent_name · webinar_name · webinar_date
+ * No parent-specific confirmation template exists — parents get the same
+ * windchasers_webinar_confirmation_v1. Kept as a named alias so callers that
+ * branch on audience stay unchanged.
  */
 export async function sendWebinarConfirmParents(
   to: string,
   name: string,
   webinarName: string,
-  webinarDate: string,
+  dateTime: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const cleanName = /\d/.test(name || '') ? '' : name
-  const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_webinar_confirm_parents_v1', [
-    {
-      type: 'body',
-      parameters: [
-        { type: 'text', parameter_name: 'parent_name', text: firstName },
-        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our upcoming webinar' },
-        { type: 'text', parameter_name: 'webinar_date', text: webinarDate || 'the scheduled date' },
-      ],
-    },
-  ])
+  return sendWebinarConfirm(to, name, webinarName, dateTime)
 }
 
 /**
