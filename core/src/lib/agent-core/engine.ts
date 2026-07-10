@@ -323,6 +323,18 @@ User's message: ${input.message}`
   cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
   cleanedResponse = advanceLokazenBookingAfterEmail(cleanedResponse, input, brandId);
 
+  // EMPTY-RESPONSE GUARD: never hand the WhatsApp route an empty reply — it would
+  // send the generic "Give me a moment, I'll have someone from the team get in
+  // touch" holding line, which repeats turn after turn and reads as broken (the
+  // scout kept asking "when will they connect" and got the same robotic line).
+  // If the model produced nothing usable, ESCALATE to a human (Slack ping + task
+  // via flagForHumanFollowup) and give ONE warm, specific line instead.
+  if (!cleanedResponse || !cleanedResponse.trim()) {
+    console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" — escalating to a human instead of the generic holding line.`);
+    await flagForHumanFollowup(supabase, input, `Empty AI response to: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
+    cleanedResponse = "Thanks for bearing with me — I've flagged this straight to the Lokazen team so a person can pick it up, and they have your number. Anything else you'd like me to pass along to them?";
+  }
+
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
     console.error('[Engine] Flow task scheduling failed:', err?.message);
