@@ -1,3 +1,10 @@
+## 2026-07-07 · fix(windchasers): Flows tab shows windchasers templates, not bcon's
+
+- core/configs/flows-automation.ts was hardcoded to bcon template names (bcon_proxe_*), so the windchasers dashboard's Sequences/Triggers showed bcon templates that don't exist -> everything "Not created" / gated. Made it brand-aware (by BRAND_ID): windchasers now gets its OWN triggers + sequences using real approved templates.
+- windchasers TRIGGERS: New-lead welcome (4 source variants: generic_v3 / pilot_v3 / cabin_crew_v1 / parents_v1), PAT result (pat_result_v2), Demo confirm (online/offline v2), Webinar confirm (confirm_v1/_parents_v1 - flagged Not-created until made), Missed-call -> RNR. SEQUENCE: No-response/cold = rnr_generic_1/2_v1 (approved, no longer gated).
+- bcon/other brands unchanged (else branch keeps the bcon config).
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): wire the new welcome templates (v3) with approved-version fallback
 
 - pickWelcomeTemplate now targets the latest copy — windchasers_generic_welcome_v3 / windchasers_pilot_welcome_v3 (both currently PENDING Meta review). sendWelcomeTemplate tries the preferred version and auto-falls-back to the last APPROVED one (generic_v1 / pilot_v2) so no welcome ever fails while v3 clears review — and v3 activates automatically on approval, no redeploy.
