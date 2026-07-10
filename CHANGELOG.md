@@ -1,3 +1,10 @@
+## 2026-07-07 · feat(windchasers): agent knows the current webinar (web + WhatsApp + voice)
+
+- Avia was answering "I don't have details on a specific webinar" — added a CURRENT_WEBINAR block to brands/windchasers/brand-facts.ts (title, 18 Jul 2026 11:30 IST, what it covers, register links) injected into the shared brand-fact bundle, so every channel prompt (web chat, WhatsApp, voice) can speak to the webinar and route registrants to the right landing page (parents vs students).
+- Time-bound: set CURRENT_WEBINAR.active = false once the session passes.
+- User-facing: the chat/voice agent now answers "tell me about the webinar" with real details + the register link.
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): webinar registration wired to the website + parent/student welcome split
 
 - Website (separate repo, committed there): windchasers.in/webinar/parents & /students now have a live "Reserve my free seat" form (name/phone/email) that captures into PROXe then redirects to Zoom. Audience tagged by page.

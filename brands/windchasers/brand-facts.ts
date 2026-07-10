@@ -262,6 +262,31 @@ export const BANNED_PHRASES = [
 ] as const;
 
 // ============================================================================
+// CURRENT WEBINAR — time-bound. Set active:false (or clear) once it has passed.
+// Injected into every channel prompt so Avia can answer webinar questions on
+// web chat, WhatsApp, AND voice calls. Registrants land here from the webinar
+// landing pages / ads, so the agent must be able to speak to it.
+// ============================================================================
+export const CURRENT_WEBINAR = {
+  active: true,
+  title: '2026 Pilot Career Blueprint — free Pilot Career Webinar',
+  when: 'Friday, 18 July 2026, 11:30 AM IST',
+  format: 'Free live online webinar on Zoom (~60–90 min with live Q&A)',
+  audience: 'Serious aspiring pilots (students) and their parents',
+  covers: [
+    'Whether pilots are really in demand over the next 10 years (global pilot demand)',
+    'The real, complete cost of becoming a pilot and how to plan the investment',
+    'The full step-by-step roadmap from Class 12 to CPL to the cockpit',
+    'Clarity on jobs and ROI after CPL',
+    'How to choose the right flight school',
+  ],
+  registerUrl: 'https://windchasers.in/webinar/students',
+  parentRegisterUrl: 'https://windchasers.in/webinar/parents',
+  rule:
+    'If a user asks about the webinar, give the date/time and 1–2 things it covers, then share the register link (parents → parent link, students/aspirants → student link). It is FREE. Do NOT invent a Zoom link, price, or speaker names. Never use scarcity phrasing ("limited seats", "seats are limited").',
+} as const;
+
+// ============================================================================
 // EXPORT - Brand fact bundle injected into all channel prompts.
 // ============================================================================
 export function getBrandFactsForPrompt(): string {
@@ -289,6 +314,12 @@ ${HARD_RULES.map((r, i) => `${i + 1}. ${r}`).join('\n')}
 BANNED PHRASES (NEVER USE): ${BANNED_PHRASES.join(', ')}.
 PRIMARY CTA: ${PRIMARY_CTAS.primary.label}. ${PRIMARY_CTAS.primary.whenToPush}
 SECONDARY CTA: ${PRIMARY_CTAS.secondary.label}. ${PRIMARY_CTAS.secondary.whenToPush}
-TERTIARY CTA: ${PRIMARY_CTAS.tertiary.label}. ${PRIMARY_CTAS.tertiary.whenToPush}
+TERTIARY CTA: ${PRIMARY_CTAS.tertiary.label}. ${PRIMARY_CTAS.tertiary.whenToPush}${CURRENT_WEBINAR.active ? `
+CURRENT WEBINAR (registration open — you CAN speak to this):
+- ${CURRENT_WEBINAR.title}
+- When: ${CURRENT_WEBINAR.when}. ${CURRENT_WEBINAR.format}. For: ${CURRENT_WEBINAR.audience}.
+- Covers: ${CURRENT_WEBINAR.covers.join('; ')}.
+- Register: students/aspirants → ${CURRENT_WEBINAR.registerUrl} · parents → ${CURRENT_WEBINAR.parentRegisterUrl}.
+- ${CURRENT_WEBINAR.rule}` : ''}
 =================================================================================`.trim();
 }
