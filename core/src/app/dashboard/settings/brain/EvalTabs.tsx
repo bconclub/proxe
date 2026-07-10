@@ -1,20 +1,23 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EvalTabs — the Eval surface, split into two benches:
+// EvalTabs — the Eval surface, split into benches:
 //   Messaging — every WhatsApp message a lead can receive, by permutation (EvalView)
+//   Team      — every Slack alert PROXe raises to the team, by trigger (TeamMessagesView)
 //   Calls     — every voice call measured: latency, turns, wait, cost (CallsView)
 // A light segmented switcher sits above; each bench fills the rest of the surface.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react'
-import { MdWhatsapp, MdPhone } from 'react-icons/md'
+import { MdWhatsapp, MdPhone, MdGroups } from 'react-icons/md'
 import EvalView from './EvalView'
 import CallsView from './CallsView'
+import TeamMessagesView from './TeamMessagesView'
 
-type Sub = 'messaging' | 'calls'
+type Sub = 'messaging' | 'team' | 'calls'
 const SUBS: Array<{ id: Sub; label: string; icon: React.ReactNode }> = [
   { id: 'messaging', label: 'Messaging', icon: <MdWhatsapp size={14} /> },
+  { id: 'team', label: 'Team', icon: <MdGroups size={14} /> },
   { id: 'calls', label: 'Calls', icon: <MdPhone size={14} /> },
 ]
 
@@ -39,6 +42,7 @@ export default function EvalTabs() {
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         {sub === 'messaging' && <EvalView />}
+        {sub === 'team' && <TeamMessagesView />}
         {sub === 'calls' && <CallsView />}
       </div>
     </div>
