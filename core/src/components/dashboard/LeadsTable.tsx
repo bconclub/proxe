@@ -2054,16 +2054,19 @@ export default function LeadsTable({
                     {webinarView && (() => {
                       const wc = lead.unified_context?.[brandId] || {}
                       return (
-                        <td className="px-3 py-2 text-xs text-center">
+                        <td className="px-3 py-2 text-xs">
                           {wc.webinar_name || wc.webinar_date ? (
-                            <span
-                              className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-normal break-words leading-snug max-w-[170px] align-middle"
-                              style={{ background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+                            <div
+                              className="leading-tight min-w-0"
                               title={[wc.webinar_name, wc.webinar_date].filter(Boolean).join(' · ')}
                             >
-                              {wc.webinar_name || 'Webinar'}
-                              {wc.webinar_date ? <span className="block text-[9px] font-medium opacity-80">{wc.webinar_date}</span> : null}
-                            </span>
+                              <span className="block truncate text-[11px] font-semibold" style={{ color: '#fbbf24' }}>
+                                {wc.webinar_name || 'Webinar'}
+                              </span>
+                              {wc.webinar_date ? (
+                                <span className="block truncate text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{wc.webinar_date}</span>
+                              ) : null}
+                            </div>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
