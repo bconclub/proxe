@@ -43,8 +43,9 @@ const NAME_PLACEHOLDER_BLOCKLIST = new Set([
   'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
   'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
 ])
-function cleanName(raw?: string | null): string {
-  const trimmed = (raw || '').trim()
+function cleanName(raw?: string | number | null): string {
+  // Coerce first — inbound payloads sometimes send name/number fields non-string.
+  const trimmed = (raw == null ? '' : String(raw)).trim()
   if (!trimmed) return ''
   // Synthetic account ids / placeholder emails the owner & scout apps stamp on a
   // brand-new account BEFORE a real name exists — never a person's name. e.g.
