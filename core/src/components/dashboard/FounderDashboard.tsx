@@ -1479,23 +1479,24 @@ export default function FounderDashboard() {
                 ))}
               </div>
 
-              {/* the ring (LEFT) + ranked source rows */}
-              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[148px,1fr] gap-3 overflow-hidden">
+              {/* the ring (LEFT) + ranked source rows. Every column shrinkable so
+                  the card can NEVER clip its right edge at narrow xl widths. */}
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(112px,148px),minmax(0,1fr)] gap-3 overflow-hidden">
                 {/* the ring — source-mix donut with the total in the middle */}
-                <div className="hidden sm:flex items-center justify-center min-h-0">
-                  <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
+                <div className="hidden sm:flex items-center justify-center min-h-0 min-w-0">
+                  <div className="w-full" style={{ maxWidth: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
                 </div>
-                <div className="flex flex-col gap-1 min-h-0 overflow-hidden justify-center">
+                <div className="flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden justify-center">
                   {popMix.slice(0, 6).map((s, i) => (
-                    <div key={s.magnet} className="grid items-center gap-2 rounded-lg border px-2.5 py-1.5" style={{ gridTemplateColumns: '14px 22px minmax(64px,0.9fr) 1.4fr 40px 46px 34px', borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
+                    <div key={s.magnet} className="grid items-center gap-1.5 rounded-lg border px-2 py-1.5" style={{ gridTemplateColumns: '12px 20px minmax(0,0.9fr) minmax(20px,1.4fr) 34px minmax(28px,auto) 16px', borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
                       <span className="text-[10.5px] font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
                       {iconTile(s.magnet, 20)}
                       <span className="text-[11.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{magnetMeta(s.magnet).label}</span>
-                      <span className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+                      <span className="h-1.5 rounded-full overflow-hidden min-w-0" style={{ background: 'var(--bg-primary)' }}>
                         <span className="block h-full rounded-full" style={{ width: `${Math.max(4, Math.round((s.share / topShare) * 100))}%`, background: magnetMeta(s.magnet).color }} />
                       </span>
-                      <span className="text-right text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>{s.share}%</span>
-                      <span className="text-right text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{fmtComma(s.count)}</span>
+                      <span className="text-right text-[11px] font-bold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{s.share}%</span>
+                      <span className="text-right text-[11px] font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{fmtComma(s.count)}</span>
                       <span className="text-right text-[10.5px] font-bold flex items-center justify-end" style={{ color: s.delta7 > 0 ? '#22c55e' : s.delta7 < 0 ? '#ef4444' : 'var(--text-muted)' }}>
                         {s.delta7 > 0 ? <MdArrowUpward size={11} /> : s.delta7 < 0 ? <MdTrendingDown size={11} /> : <MdRemove size={11} />}
                       </span>

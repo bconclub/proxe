@@ -26,6 +26,11 @@
 - User-facing: the whole dashboard now works one-handed on a phone; desktop rendering is byte-identical.
 - `(pending-sha)`
 
+## 2026-07-10 08:00 IST · fix(home): Activity Sources can no longer clip its right edge
+
+- Ranked-row columns are all shrinkable now (fixed px columns → minmax; name truncates; tighter gaps; ring column flexes 112–148px), so the %/count/arrow columns can't get cut off at narrow xl widths (e.g. 1280 with the sidebar expanded). Verified via DOM measurement at 1024/1280/1366/1440 and squeezed to a 440px card — zero clipping.
+- `(pending-sha)`
+
 ## 2026-07-10 07:30 IST · polish(inbox): chat list drops the score — avatar only
 
 - No score ring/chip in the conversation list at all; the selected row shows the same plain avatar as every other row. The score lives in the right details panel, which is enough.
