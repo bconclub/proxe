@@ -439,6 +439,11 @@ export async function POST(request: NextRequest) {
         if (deposit) brandCtxData.deposit = deposit
         const gmaps = asStr(pick('google_maps_link', 'google_maps_url', 'gmaps_link', 'map_link', 'maps_url'))
         if (gmaps) brandCtxData.google_maps_url = gmaps
+        // Free-text the owner typed (floor / "other details" / description) — the
+        // website bundles floor into this, so it carries the extra detail PROXe
+        // otherwise dropped. Surfaces in the property modal's "Other details".
+        const notes = asStr(pick('notes', 'description', 'other_details', 'details', 'message'))
+        if (notes) brandCtxData.notes = notes
       } else if (lkzType === 'brand') {
         brandCtxData.user_type = 'brand'
         const bname = asStr(pick('brand_name', 'brandName', 'company', 'brand'))
