@@ -13,7 +13,7 @@ import type { CreateRenderer } from './types'
 
 const N = 900
 
-type P = { theta: number; phi: number; r: number; speed: number; hue: number; size: number; wob: number }
+type P = { idx: number; theta: number; phi: number; r: number; speed: number; hue: number; size: number; wob: number }
 
 export const createPulseOrb: CreateRenderer = (canvas, env) => {
   const ctx = canvas.getContext('2d')!
@@ -22,9 +22,10 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
   let raf = 0
   let t = 0
 
-  const parts: P[] = Array.from({ length: N }, () => {
+  const parts: P[] = Array.from({ length: N }, (_, i) => {
     const u = Math.random() * 2 - 1
     return {
+      idx: i,
       theta: Math.random() * Math.PI * 2,
       phi: Math.acos(u),
       r: 0.72 + Math.random() * 0.28,
@@ -57,6 +58,11 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
     // bigger/fuller than before so the brain fills the space.
     const cx = w / 2, cy = h * 0.43
     const R = Math.min(w, h) * 0.30
+    // Small canvas (the docked mini orb) → draw every 3rd particle at a finer
+    // size, and skip the connection lines: 900 full-screen particles crammed
+    // into a ~45px sphere read as solid mush, not a neural cloud.
+    const airy = R < 110 ? 3 : 1
+    const sizeK = airy > 1 ? 0.72 : 1
     ctx.clearRect(0, 0, w, h)
 
     const m = env.getMode()
@@ -190,20 +196,27 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
     pts.sort((a, b) => a.z - b.z)
 
     ctx.lineWidth = 0.5
-    for (let i = 0; i < pts.length; i += 23) {
-      const a = pts[i], b = pts[(i + 61) % pts.length]
-      const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z
-      if (dx * dx + dy * dy + dz * dz < 0.16) {
-        const depth = (a.z + 1) / 2
-        ctx.strokeStyle = `rgba(${ar},${ag},${ab},${(0.05 + depth * 0.08 + amp * 0.1) * (isLight ? 1.6 : 1)})`
-        ctx.beginPath()
-        ctx.moveTo(cx + a.x * R * scale, cy + a.y * R * scale)
-        ctx.lineTo(cx + b.x * R * scale, cy + b.y * R * scale)
-        ctx.stroke()
+    if (airy === 1) {
+      for (let i = 0; i < pts.length; i += 23) {
+        const a = pts[i], b = pts[(i + 61) % pts.length]
+        const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z
+        if (dx * dx + dy * dy + dz * dz < 0.16) {
+          const depth = (a.z + 1) / 2
+          ctx.strokeStyle = `rgba(${ar},${ag},${ab},${(0.05 + depth * 0.08 + amp * 0.1) * (isLight ? 1.6 : 1)})`
+          ctx.beginPath()
+          ctx.moveTo(cx + a.x * R * scale, cy + a.y * R * scale)
+          ctx.lineTo(cx + b.x * R * scale, cy + b.y * R * scale)
+          ctx.stroke()
+        }
       }
     }
 
     for (const { x, y, z, p } of pts) {
+      // airy mini-orb: draw a STABLE 1/airy subset by particle identity, not by
+      // position in the per-frame depth sort. Subsampling the re-sorted array
+      // drew a different set of dots each frame → strobe/flicker. A fixed subset
+      // rotates smoothly like the full orb, just sparser.
+      if (airy > 1 && p.idx % airy !== 0) continue
       const depth = (z + 1) / 2
       let px = cx + x * R * scale
       let py = cy + y * R * scale
@@ -220,7 +233,7 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
         }
       }
       const alpha = (isLight ? 0.35 : 0.15) + depth * 0.6 + amp * 0.15
-      const sz = p.size * (0.6 + depth * 0.9) * (1 + amp * 0.35) * (window.devicePixelRatio > 1 ? 1.4 : 1)
+      const sz = p.size * (0.6 + depth * 0.9) * (1 + amp * 0.35) * (window.devicePixelRatio > 1 ? 1.4 : 1) * sizeK
       ctx.fillStyle = `hsla(${p.hue}, ${sat}%, ${pLightBase + depth * pLightSpan + amp * 8}%, ${Math.min(1, alpha)})`
       ctx.beginPath()
       ctx.arc(px, py, sz, 0, Math.PI * 2)
