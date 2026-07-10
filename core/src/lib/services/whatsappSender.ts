@@ -569,6 +569,42 @@ export function pickWelcomeTemplate(...signals: Array<string | null | undefined>
 }
 
 /**
+ * True when the lead's form/campaign/ad/course context marks it as a cabin-crew
+ * enquiry (air hostess / flight attendant), as opposed to a pilot or generic lead.
+ */
+export function isCabinCrewSource(...signals: Array<string | null | undefined>): boolean {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  return /\bcabin\s?crew\b|\bcabincrew\b|air\s?hostess|flight\s?attendant/.test(hay)
+}
+
+/**
+ * Welcome for cabin-crew leads. Tries the cabin-crew-specific template; if it's
+ * not approved in Meta yet, falls back to the generic welcome so a live
+ * cabin-crew ad lead is NEVER left unwelcomed. Auto-upgrades to the dedicated
+ * copy the moment Meta approves — no redeploy needed. `templateUsed` reports
+ * which one actually went out so the caller can log it accurately.
+ * Template: windchasers_cabin_crew_welcome_v1 (NAMED param customer_name).
+ */
+export async function sendCabinCrewWelcome(
+  to: string,
+  name: string,
+): Promise<{ success: boolean; error?: string; templateUsed: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  const primary = await sendWhatsAppTemplate(to, 'windchasers_cabin_crew_welcome_v1', [
+    { type: 'body', parameters: [{ type: 'text', parameter_name: 'customer_name', text: firstName }] },
+  ])
+  if (primary.success) {
+    return { success: true, templateUsed: 'windchasers_cabin_crew_welcome_v1' }
+  }
+  // Cabin-crew template not live yet (or send failed) → generic welcome so the
+  // lead still gets a first message. A 4xx template error sends nothing, so this
+  // fallback never double-messages.
+  const fallback = await sendWelcomeTemplate(to, name, 'windchasers_generic_welcome_v1')
+  return { success: fallback.success, error: fallback.error, templateUsed: 'windchasers_generic_welcome_v1' }
+}
+
+/**
  * True when the lead's form/campaign/ad context marks it as a parent enquiry
  * (a parent enquiring on behalf of their child), as opposed to the student
  * enquiring for themselves.

@@ -19,6 +19,8 @@ import {
   sendWhatsAppTemplate,
   sendWebinarConfirm,
   sendWebinarConfirmParents,
+  isCabinCrewSource,
+  sendCabinCrewWelcome,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -273,6 +275,9 @@ export async function POST(request: NextRequest) {
     // Webinar registration flag (windchasers) — set in the brand block below,
     // read later for task-skip + confirmation send.
     let isWebinarReg = false
+    // Cabin-crew lead flag (windchasers) — set in the brand block below, read
+    // later for the dedicated cabin-crew welcome + first_outreach skip.
+    let isCabinCrewLead = false
     const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
@@ -303,6 +308,19 @@ export async function POST(request: NextRequest) {
       } else if (interestRaw && interestRaw !== 'other') {
         brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
       }
+      // Cabin-crew lead: from the mapped course interest OR any cabin-crew
+      // signal in the source/form/campaign. Gets the dedicated cabin-crew
+      // welcome below (with generic fallback) instead of the counsellor
+      // first_outreach task.
+      isCabinCrewLead =
+        brandCtxData.course_interest === 'Cabin' ||
+        isCabinCrewSource(
+          normalizedSource,
+          interestRaw,
+          String(cf2.form_type || (body as any).form_type || ''),
+          String(cf2.form_name || cf2.campaign || campaign || ''),
+          String(cf2.ad_name || ''),
+        )
       const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
       const educationRaw = String(cf2.education || '').toLowerCase().trim()
@@ -798,6 +816,11 @@ export async function POST(request: NextRequest) {
       // Webinar registrants are pre-leads at volume — the confirm + reminder
       // templates ARE the outreach; no counsellor first_outreach task.
       console.log(`[inbound] Webinar registration ${leadName} — no first_outreach task`)
+    } else if (isCabinCrewLead) {
+      // Cabin-crew leads get the dedicated cabin-crew welcome below as the first
+      // touch (mirrors the FB path) — no separate first_outreach task, so the
+      // lead isn't messaged twice. The worker still follows up by scanning.
+      console.log(`[inbound] Cabin-crew lead ${leadName} — cabin-crew welcome, no first_outreach task`)
     } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
@@ -1143,6 +1166,46 @@ export async function POST(request: NextRequest) {
         }
       } catch (err: any) {
         console.error(`[inbound] Webinar confirm EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
+      }
+    }
+
+    // ── Cabin-crew lead → dedicated welcome (website path) ────────────────────
+    // Mirrors the FB path. sendCabinCrewWelcome falls back to the generic
+    // welcome until the cabin-crew template is Meta-approved, so a cabin-crew
+    // lead is never left unwelcomed. Dedup-guarded against re-submits/retries.
+    if (phone && isCabinCrewLead && !isWebinarReg && !isPatSubmission && !isDemoBooking) {
+      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const ccAlready =
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_cabin_crew_welcome_v1')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v1'))
+      if (ccAlready) {
+        console.log(`[inbound] Cabin-crew welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
+      } else try {
+        const result = await sendCabinCrewWelcome(phone, firstName)
+        const bodyText = `Hi ${firstName}, welcome to Windchasers cabin crew training. (${result.templateUsed} template)`
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: result.success ? bodyText : `[Template send FAILED: ${result.templateUsed}]\n\n${bodyText}`,
+          message_type: 'template',
+          metadata: {
+            template_name: result.templateUsed,
+            template_language: 'en',
+            auto_sent: true,
+            trigger: 'cabin_crew_lead',
+            sent_by: 'system (inbound webhook)',
+            send_succeeded: !!result.success,
+            send_error: result.success ? null : (result.error || 'unknown'),
+          },
+        })
+        if (!result.success) {
+          console.error(`[inbound] Cabin-crew welcome FAILED lead=${leadId} phone=${phone} tpl=${result.templateUsed} error=${result.error}`)
+        } else {
+          console.log(`[inbound] Cabin-crew welcome OK lead=${leadId} phone=${phone} tpl=${result.templateUsed}`)
+        }
+      } catch (err: any) {
+        console.error(`[inbound] Cabin-crew welcome EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
       }
     }
 

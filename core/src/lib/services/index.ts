@@ -102,6 +102,8 @@ export {
   isPilotSource,
   isParentSource,
   sendParentWelcomeTemplate,
+  isCabinCrewSource,
+  sendCabinCrewWelcome,
   sendWebinarConfirm,
   sendWebinarConfirmParents,
   sendWebinarReminder,

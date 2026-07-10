@@ -1,3 +1,21 @@
+## 2026-07-07 · feat(windchasers): dedicated cabin-crew welcome (FB ads + website)
+
+- Cabin-crew ads are live; cabin-crew leads now get their own welcome instead of the generic one. New isCabinCrewSource() detection + sendCabinCrewWelcome() (tries windchasers_cabin_crew_welcome_v1, falls back to the generic welcome until Meta approves — auto-upgrades, no redeploy).
+- Wired into BOTH paths: facebook-lead (FB Lead Ads → Pabbly) branches parent → cabin crew → pilot/generic; leads/inbound (website) sends the cabin-crew welcome as the first touch for cabin-crew leads (course_interest=Cabin or a cabin-crew signal) and skips the first_outreach task so they aren't messaged twice. Guarded against PAT/demo/webinar double-sends + dedup window.
+- Template spec added to templates.md (submit windchasers_cabin_crew_welcome_v1 to Meta).
+- User-facing: cabin-crew leads get a cabin-crew-appropriate first WhatsApp message.
+- `(pending-sha)`
+
+## 2026-07-10 · feat(brain): Brain drives the dashboard — ACTIONS trailer (open lead / open page / dial) — bcon only, PARKED pending voice keys
+
+- The Brain (chat panel + voice orb) can now act, not just answer: "show me the top lead" opens that lead's inbox conversation; count questions offer an [Open Leads] button; "want me to call him?" renders a [Call <name>] button (click = consent, chat only — voice NEVER dials).
+- Protocol: model emits a final `ACTIONS: [...]` line (same pattern as FOLLOWUPS) with short ids copied from DATA; server strips + validates against the lead snapshot (hallucinated ids dropped, phone attached server-side, never sent to the model). New shared module core/src/lib/brain/actions.ts; wired into brain/route.ts (chat, top_leads with id8) and brain/briefing/route.ts (voice: history for "yes"-resolution, people slice, trailer stripped before TTS).
+- Client: DashboardBrain executor (inbox deep-link ?lead=&channel=, page routes, test-call POST); auto:true opens immediately on explicit "show me X", proposals render accent-filled buttons; full-screen orb auto-collapses to the corner on navigation so the page shows while it talks. New "Type instead…" pill on the dock fan restores the typed surface (inline pill was removed in v0.2).
+- Gated: features.brainActions — ON for bcon only; flag off = prompt and response byte-identical to before (verified).
+- Verified live on bcon local: chat auto-open → Uday Katkar's WhatsApp thread; voice nav → pipeline behind the orb; dial button rendered (not clicked); flag off/on; 12/12 validator unit checks; no console errors.
+- PARKED: bcon voice AUDIO + DIAL are dark — ELEVENLABS_API_KEY invalid (401), VAPI keys empty, GROQ_API_KEY empty, in local AND all three bcon-proxe Vercel environments (checked). Text brain + actions + voice-driven navigation fully work. Resume = drop valid keys into brands/bcon/.env.local (or authorize pulling from another brand's project — key-isolation rule applies), restart bcon-core-b, re-probe tts/greet/test-call.
+- `(pending-sha)`
+
 ## 2026-07-10 09:50 IST · feat(brain): CORE COMMUNICATIONS checklist on Eval — windchasers first
 
 - New Eval bench "Communications": every message the brand's agent must handle autonomously as a visible slot — welcome per lead source, AI replies to incoming messages (prompt + knowledge base), confirmations, reminders, follow-ups — each with a LIVE / PARTIAL / MISSING / OFF status pill, trigger, channel, template chip, WhatsApp-style preview, honesty note, and "Send to my WhatsApp" test.

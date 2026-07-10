@@ -21,7 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 
 export const dynamic = 'force-dynamic';
@@ -225,11 +225,24 @@ export async function POST(request: NextRequest) {
         facebookMeta.utm_content,
         facebookMeta.utm_source,
       ];
+      // Priority: parent → cabin crew → pilot/generic. Cabin-crew leads (from
+      // the cabin-crew ads/forms) get their own welcome; sendCabinCrewWelcome
+      // falls back to the generic template until the cabin-crew one is approved.
       const isParentLead = isParentSource(...attributionSignals);
-      const welcomeTpl = isParentLead ? 'windchasers_pilot_parents_welcome_v1' : pickWelcomeTemplate(...attributionSignals);
-      const sendResult = isParentLead
-        ? await sendParentWelcomeTemplate(phone, cleanName)
-        : await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
+      const isCabinCrewLead = !isParentLead && isCabinCrewSource(...attributionSignals);
+      let welcomeTpl: string;
+      let sendResult: { success: boolean; error?: string };
+      if (isParentLead) {
+        welcomeTpl = 'windchasers_pilot_parents_welcome_v1';
+        sendResult = await sendParentWelcomeTemplate(phone, cleanName);
+      } else if (isCabinCrewLead) {
+        const r = await sendCabinCrewWelcome(phone, cleanName);
+        welcomeTpl = r.templateUsed;
+        sendResult = { success: r.success, error: r.error };
+      } else {
+        welcomeTpl = pickWelcomeTemplate(...attributionSignals);
+        sendResult = await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
+      }
       whatsappSent = sendResult.success;
 
       if (!sendResult.success) {

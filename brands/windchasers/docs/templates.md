@@ -265,6 +265,33 @@ The Zoom link is in your registration email. See you there!
 
 ---
 
+## 2e. `windchasers_cabin_crew_welcome_v1` 🔵 PLANNED (submit to Meta)
+
+**Trigger:** A cabin-crew lead — from a cabin-crew FB/Meta ad or form (`facebook-lead`, detected by `isCabinCrewSource` on form/campaign/ad name) OR a website cabin-crew enquiry (`leads/inbound`, `course_interest = Cabin` or a cabin-crew signal).
+**Senders:** `sendCabinCrewWelcome()` in `src/lib/services/whatsappSender.ts` (used by both routes). Falls back to `windchasers_generic_welcome_v1` until this template is approved, so cabin-crew leads are never left unwelcomed — it auto-upgrades the moment Meta approves, no redeploy.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY (or MARKETING) |
+| Language | English |
+| Header | — |
+
+**Body (1 NAMED variable — `customer_name`):**
+```
+Hi {{customer_name}}, thanks for your interest in Cabin Crew training at Windchasers.
+
+Our cabin crew program runs in-house at our Bengaluru campus — grooming, aviation English, safety & service, and interview prep for airline recruitment.
+
+Reply here with any question and our counsellor will guide you on eligibility, fees, and the next batch.
+
+- Team Windchasers
+```
+
+**Variables:** `{{customer_name}}` (first name).
+**Buttons:** optional.
+
+---
+
 ## 3. `windchasers_facebook_welcome` 🟡 PENDING
 
 **Trigger:** Lead submits a Facebook / Meta Lead Form (forwarded via Pabbly Connect).
