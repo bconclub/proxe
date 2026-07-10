@@ -209,6 +209,31 @@ The join link will come from Zoom — keep an eye on your email. We'll also remi
 
 ---
 
+## 2c-parents. `windchasers_webinar_confirm_parents_v1` 🔵 PLANNED (submit to Meta)
+
+**Trigger:** Webinar registration where the landing page tagged the audience as **parent** (windchasers.in/webinar/parents). Same flow as 2c but a parent-voiced confirmation.
+**Sender:** `sendWebinarConfirmParents()` in `src/lib/services/whatsappSender.ts`.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY |
+| Language | English |
+| Header | — |
+
+**Body (3 NAMED variables — `parent_name`, not `customer_name`):**
+```
+Hi {{parent_name}}, your seat for {{webinar_name}} on {{webinar_date}} is reserved.
+
+The Zoom join link comes from Zoom by email. We'll remind you here before we go live — and you can reply any time with questions about your child's path.
+
+- Team Windchasers
+```
+
+**Variables:** `{{parent_name}}` (first name) · `{{webinar_name}}` · `{{webinar_date}}`.
+**Buttons:** none.
+
+---
+
 ## 2d. `windchasers_webinar_reminder_v1` 🔵 PLANNED (submit to Meta)
 
 **Trigger:** ~24h and ~2h before `webinar_date`, fired by `GET /api/cron/webinar-reminder` (hourly, Bearer CRON_SECRET — schedule in the same external scheduler as booking-reminders).

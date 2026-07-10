@@ -18,6 +18,7 @@ import {
   notifySlackLead,
   sendWhatsAppTemplate,
   sendWebinarConfirm,
+  sendWebinarConfirmParents,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -1104,24 +1105,31 @@ export async function POST(request: NextRequest) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
       const webinarName = String(cfields.webinar_name || cfields.webinar_topic || '').trim()
       const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || '').trim()
-      const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, 'windchasers_webinar_confirm_v1')
+      // Parents vs students get a different welcome (user's ask) — routed by the
+      // audience the landing page tagged (unified_context.windchasers.user_type).
+      const isParentAudience = brandCtxData.user_type === 'parent'
+      const confirmTpl = isParentAudience ? 'windchasers_webinar_confirm_parents_v1' : 'windchasers_webinar_confirm_v1'
+      const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
         console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
-        const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
-        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (windchasers_webinar_confirm_v1 template)`
+        const result = isParentAudience
+          ? await sendWebinarConfirmParents(phone, firstName, webinarName, webinarDate)
+          : await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
+        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (${confirmTpl} template)`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
           sender: 'agent',
-          content: result.success ? bodyText : `[Template send FAILED: windchasers_webinar_confirm_v1]\n\n${bodyText}`,
+          content: result.success ? bodyText : `[Template send FAILED: ${confirmTpl}]\n\n${bodyText}`,
           message_type: 'template',
           metadata: {
-            template_name: 'windchasers_webinar_confirm_v1',
+            template_name: confirmTpl,
             template_language: 'en',
             auto_sent: true,
             trigger: 'webinar_registration',
             sent_by: 'system (inbound webhook)',
+            audience: brandCtxData.user_type || null,
             webinar_name: webinarName || null,
             webinar_date: webinarDate || null,
             send_succeeded: !!result.success,
@@ -1129,9 +1137,9 @@ export async function POST(request: NextRequest) {
           },
         })
         if (!result.success) {
-          console.error(`[inbound] Webinar confirm send FAILED lead=${leadId} phone=${phone} error=${result.error}`)
+          console.error(`[inbound] Webinar confirm send FAILED lead=${leadId} phone=${phone} tpl=${confirmTpl} error=${result.error}`)
         } else {
-          console.log(`[inbound] Webinar confirm OK lead=${leadId} phone=${phone} webinar=${webinarName}`)
+          console.log(`[inbound] Webinar confirm OK lead=${leadId} phone=${phone} tpl=${confirmTpl} webinar=${webinarName}`)
         }
       } catch (err: any) {
         console.error(`[inbound] Webinar confirm EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)

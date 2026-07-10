@@ -625,6 +625,33 @@ export async function sendWebinarConfirm(
 }
 
 /**
+ * Webinar registration confirmation for PARENT registrants (from the parents
+ * landing page / parent ads). Same shape as sendWebinarConfirm but a distinct
+ * Meta template so the copy speaks to a parent, not the student.
+ * Template: windchasers_webinar_confirm_parents_v1 — NAMED params:
+ *   parent_name · webinar_name · webinar_date
+ */
+export async function sendWebinarConfirmParents(
+  to: string,
+  name: string,
+  webinarName: string,
+  webinarDate: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_confirm_parents_v1', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'parent_name', text: firstName },
+        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our upcoming webinar' },
+        { type: 'text', parameter_name: 'webinar_date', text: webinarDate || 'the scheduled date' },
+      ],
+    },
+  ])
+}
+
+/**
  * Pre-webinar reminder (fired by /api/cron/webinar-reminder).
  * Template: windchasers_webinar_reminder_v1 — NAMED params:
  *   customer_name · webinar_name · when (e.g. "tomorrow at 5:00 PM" / "in 2 hours")

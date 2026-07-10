@@ -103,6 +103,7 @@ export {
   isParentSource,
   sendParentWelcomeTemplate,
   sendWebinarConfirm,
+  sendWebinarConfirmParents,
   sendWebinarReminder,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,

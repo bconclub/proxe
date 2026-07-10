@@ -1,3 +1,10 @@
+## 2026-07-07 · feat(windchasers): webinar registration wired to the website + parent/student welcome split
+
+- Website (separate repo, committed there): windchasers.in/webinar/parents & /students now have a live "Reserve my free seat" form (name/phone/email) that captures into PROXe then redirects to Zoom. Audience tagged by page.
+- PROXe: webinar confirmation is now audience-aware — parents get windchasers_webinar_confirm_parents_v1 (named param parent_name), students get windchasers_webinar_confirm_v1. Routed by unified_context.windchasers.user_type. New sender sendWebinarConfirmParents + template spec.
+- User-facing: parents and students who register get a different, audience-appropriate WhatsApp confirmation.
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): webinar leads — Zoom intake, Webinar tab, confirm + reminder templates
 
 - leads/inbound recognizes webinar registrations (form_type/lead_type/source = 'webinar', windchasers-gated): tags unified_context.windchasers.lead_type='webinar' + webinar_name/date, touchpoint 'webinar' (migration 035 adds the enum value), fires windchasers_webinar_confirm_v1 (dedup-guarded, soft-fails until Meta approves). Re-registration never demotes an existing real lead; webinar regs skip the first_outreach counsellor task.
