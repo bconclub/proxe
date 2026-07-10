@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
           ...(email ? { email } : {}),
           phone,
           customer_phone_normalized: normalizedPhone,
-          last_touchpoint: 'facebook_lead',
+          last_touchpoint: 'meta_forms', // 'facebook_lead' fails all_leads CHECK; meta_forms is the allowed Meta-lead-form value
           last_interaction_at: now,
           unified_context: {
             ...existingCtx,
@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', leadId);
     } else {
-      // Brand-new lead — set first_touchpoint: facebook_lead directly
+      // Brand-new lead — set first_touchpoint: meta_forms (Meta lead form)
       const { data: created, error: insertError } = await supabase
         .from('all_leads')
         .insert({
@@ -191,8 +191,8 @@ export async function POST(request: NextRequest) {
           phone,
           customer_phone_normalized: normalizedPhone,
           brand,
-          first_touchpoint: 'facebook_lead',
-          last_touchpoint: 'facebook_lead',
+          first_touchpoint: 'meta_forms',
+          last_touchpoint: 'meta_forms', // 'facebook_lead' fails all_leads CHECK; meta_forms is the allowed Meta-lead-form value
           last_interaction_at: now,
           unified_context: {
             facebook: { ...facebookMeta, lead_created_at: now },
