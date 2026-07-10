@@ -1353,6 +1353,13 @@ export default function LeadsTable({
                   srcCfg = channelConfig[source] || channelConfig.unknown
                 }
 
+                // Legacy "Res1 Platform" — the old Pabbly workflow hardcoded
+                // utm_source="Res1 Platform" on Meta lead-form leads. Until those
+                // rows are backfilled, surface them as Meta Forms (Meta blue).
+                if (/res\s*1\s*platform/i.test(srcCfg.label)) {
+                  srcCfg = { label: 'Meta Forms', color: '#0668E1' }
+                }
+
                 // Google Ads → distinct PURPLE so it never reads as Meta's blue.
                 // Applied after resolution so it wins regardless of which branch
                 // set the color (map hit, generic attr-label fallback, etc.).
