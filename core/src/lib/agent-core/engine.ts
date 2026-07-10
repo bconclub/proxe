@@ -975,6 +975,40 @@ async function flagForHumanFollowup(
     } else {
       console.log(`[Engine] Slack alert sent for lead ${lead.id}: "${reason}"`);
     }
+
+    // Create a real TASK so the handoff/support request is visible + actionable
+    // on the Tasks page, not just a Slack ping + a flag. De-duped: skip if this
+    // lead already has an open human-followup task. (No-op / soft-fail if the
+    // brand's Supabase lacks the agent_tasks table — see migration 002.)
+    try {
+      let brandId2 = 'lokazen';
+      try { brandId2 = getCurrentBrandId() || 'lokazen'; } catch { /* keep default */ }
+      const taskType = isScout ? 'scout_support' : 'human_followup';
+      const { data: openTask } = await supabase
+        .from('agent_tasks')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('task_type', taskType)
+        .in('status', ['pending', 'queued', 'awaiting_approval'])
+        .limit(1);
+      if (!openTask || openTask.length === 0) {
+        const { error: taskErr } = await supabase.from('agent_tasks').insert({
+          brand: brandId2,
+          lead_id: lead.id,
+          lead_name: input.userProfile.name || null,
+          lead_phone: input.userProfile.phone || null,
+          task_type: taskType,
+          task_description: reason,
+          status: 'pending',
+          metadata: { audience: audienceLabel, channel: input.channel || null, source: 'flagForHumanFollowup' },
+          created_at: new Date().toISOString(),
+        });
+        if (taskErr) console.warn(`[Engine] Could not create ${taskType} task for lead ${lead.id}: ${taskErr.message}`);
+        else console.log(`[Engine] Created ${taskType} task for lead ${lead.id}`);
+      }
+    } catch (taskEx: any) {
+      console.warn('[Engine] Task creation for human follow-up failed:', taskEx?.message || taskEx);
+    }
   } catch (err) {
     console.error('[Engine] Failed to flag for human follow-up:', err);
   }
