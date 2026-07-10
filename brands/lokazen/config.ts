@@ -33,6 +33,10 @@ export const lokazenConfig: BrandConfig = {
       'Anything at risk right now?',
     ],
     voiceId: '2zRM7PkgwBPiau2jvVXc',
+    // Brings the Eval tab into Lokazen's Brain — the business lead-gen journey
+    // bench (every message a lead can receive, by permutation). 'none' would hide
+    // it; 'business' = the generic lead ladder (owners/brands), same bench BCON uses.
+    evalJourneys: 'business',
   },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {
