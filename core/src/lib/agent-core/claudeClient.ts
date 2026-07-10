@@ -149,11 +149,15 @@ export async function* streamResponse(
   // message_start, output_tokens accumulate on message_delta.
   let tuInput = 0;
   let tuOutput = 0;
+  let tuCacheRead = 0;
+  let tuCacheWrite = 0;
   try {
     for await (const chunk of stream) {
       if (chunk.type === 'message_start') {
         const u = chunk.message?.usage || {};
-        tuInput = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+        tuCacheWrite = u.cache_creation_input_tokens || 0;
+        tuCacheRead = u.cache_read_input_tokens || 0;
+        tuInput = (u.input_tokens || 0) + tuCacheWrite + tuCacheRead;
       } else if (chunk.type === 'message_delta' && chunk.usage?.output_tokens != null) {
         tuOutput = chunk.usage.output_tokens;
       } else if (chunk.type === 'content_block_delta' &&
@@ -167,7 +171,7 @@ export async function* streamResponse(
     }
   } finally {
     // Fires even if the consumer stops early — best-effort metering.
-    await recordTokenUsage('chat', model, tuInput, tuOutput);
+    await recordTokenUsage('chat', model, tuInput, tuOutput, tuCacheRead, tuCacheWrite);
   }
 }
 
@@ -203,8 +207,8 @@ export async function generateResponse(
         messages: [{ role: 'user', content: userPrompt }],
       });
 
-      const { input, output } = usageFrom(response);
-      await recordTokenUsage(category, model, input, output);
+      const { input, output, cacheRead, cacheWrite } = usageFrom(response);
+      await recordTokenUsage(category, model, input, output, cacheRead, cacheWrite);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {
@@ -294,8 +298,8 @@ export async function generateResponseWithTools(
 
     if (!response) throw lastError || new Error('Failed after retries');
 
-    const { input: tuIn, output: tuOut } = usageFrom(response);
-    await recordTokenUsage(category, model, tuIn, tuOut);
+    const { input: tuIn, output: tuOut, cacheRead: tuCR, cacheWrite: tuCW } = usageFrom(response);
+    await recordTokenUsage(category, model, tuIn, tuOut, tuCR, tuCW);
 
     // Extract text from this response (may accompany tool_use blocks)
     const textBlocks = response.content.filter((b: any) => b.type === 'text');
@@ -422,8 +426,8 @@ export async function generateFromImage(
         ],
       });
 
-      const { input, output } = usageFrom(response);
-      await recordTokenUsage('vision', model, input, output);
+      const { input, output, cacheRead, cacheWrite } = usageFrom(response);
+      await recordTokenUsage('vision', model, input, output, cacheRead, cacheWrite);
 
       const content = response.content?.[0];
       if (content && content.type === 'text') {

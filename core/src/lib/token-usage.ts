@@ -70,12 +70,14 @@ function addToBucket(
   inputTokens: number,
   outputTokens: number,
   model: string,
+  cacheRead: number = 0,
+  cacheWrite: number = 0,
 ): void {
   const b: UsageBucket = map[category] || { input_tokens: 0, output_tokens: 0, calls: 0, cost_usd: 0 }
   b.input_tokens += inputTokens || 0
   b.output_tokens += outputTokens || 0
   b.calls += 1
-  b.cost_usd += estimateCost(model, inputTokens || 0, outputTokens || 0)
+  b.cost_usd += estimateCost(model, inputTokens || 0, outputTokens || 0, cacheRead || 0, cacheWrite || 0)
   map[category] = b
 }
 
@@ -88,9 +90,33 @@ function priceFor(model: string): { in: number; out: number } {
   return { in: 1, out: 5 }
 }
 
-export function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
+/**
+ * Estimate a call's USD cost, correctly accounting for prompt caching.
+ *
+ * `inputTokens` is the TOTAL input (uncached + cache writes + cache reads).
+ * Anthropic bills those tiers at very different rates:
+ *   - uncached input : 1×   the input price
+ *   - cache WRITE    : 1.25× (cache_creation_input_tokens)
+ *   - cache READ     : 0.1×  (cache_read_input_tokens) — 10× cheaper
+ * We cached a large system prompt on every chat call, so most "input" tokens
+ * are cache reads. Pricing them all at 1× over-stated chat cost ~2×. Passing
+ * cacheRead/cacheWrite (default 0 = treat all input as uncached) fixes it.
+ */
+export function estimateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheRead: number = 0,
+  cacheWrite: number = 0,
+): number {
   const p = priceFor(model)
-  return (inputTokens / 1e6) * p.in + (outputTokens / 1e6) * p.out
+  const uncached = Math.max(0, (inputTokens || 0) - (cacheRead || 0) - (cacheWrite || 0))
+  return (
+    (uncached / 1e6) * p.in +
+    (cacheRead / 1e6) * p.in * 0.1 +
+    (cacheWrite / 1e6) * p.in * 1.25 +
+    (outputTokens / 1e6) * p.out
+  )
 }
 
 /**
@@ -120,6 +146,8 @@ export async function recordTokenUsage(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  cacheRead: number = 0,
+  cacheWrite: number = 0,
 ): Promise<void> {
   try {
     if (!inputTokens && !outputTokens) return
@@ -140,12 +168,12 @@ export async function recordTokenUsage(
       (data?.value as TokenUsageDoc) || { byCategory: {}, byDay: {}, since: nowIso, updatedAt: nowIso }
 
     // All-time cumulative bucket.
-    addToBucket(cur.byCategory, category, inputTokens, outputTokens, model)
+    addToBucket(cur.byCategory, category, inputTokens, outputTokens, model, cacheRead, cacheWrite)
     // Per-IST-day bucket (for windowed views).
     if (!cur.byDay) cur.byDay = {}
     const dayKey = istDayKey()
     if (!cur.byDay[dayKey]) cur.byDay[dayKey] = {}
-    addToBucket(cur.byDay[dayKey], category, inputTokens, outputTokens, model)
+    addToBucket(cur.byDay[dayKey], category, inputTokens, outputTokens, model, cacheRead, cacheWrite)
     cur.updatedAt = nowIso
 
     await svc
@@ -269,9 +297,13 @@ export async function resetTokenUsage(): Promise<void> {
  * Helper for the Anthropic SDK: pull input/output token counts out of a
  * response.usage object in a version-tolerant way.
  */
-export function usageFrom(resp: any): { input: number; output: number } {
+export function usageFrom(resp: any): { input: number; output: number; cacheRead: number; cacheWrite: number } {
   const u = resp?.usage || {}
-  const input = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0)
+  const cacheWrite = u.cache_creation_input_tokens || 0
+  const cacheRead = u.cache_read_input_tokens || 0
+  // `input` is the TOTAL (uncached + both cache tiers) so token COUNTS stay
+  // accurate on the dashboard; estimateCost() re-prices the cache tiers cheaply.
+  const input = (u.input_tokens || 0) + cacheWrite + cacheRead
   const output = u.output_tokens || 0
-  return { input, output }
+  return { input, output, cacheRead, cacheWrite }
 }
