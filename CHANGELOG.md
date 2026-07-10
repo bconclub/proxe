@@ -1,3 +1,10 @@
+## 2026-07-07 · fix(dashboard): Activity Sources list no longer clips — scrolls, shows up to 10 sources
+
+- The ranked-source list used justify-center + overflow-hidden: with 6+ sources the stack centered and clipped BOTH ends (top row half-cut, bottom rows hidden). Now my-auto + overflow-y-auto — centered when it fits, scrolls from the top when not.
+- Row cap raised 6 → 10 so the full source mix (Meta Ads / Google Ads / WhatsApp / Google Organic / Direct / …) is reachable.
+- User-facing: every Activity Sources row visible again.
+- `(pending-sha)`
+
 ## 2026-07-10 08:40 IST · fix(widget): opaque dark box around the embedded chat widget in in-app browsers
 
 - Root cause: the widget iframe's document declared `color-scheme: dark` (inherited from the dashboard shell) — modern WebKit/Chromium force an OPAQUE iframe canvas when the embedded doc's color-scheme mismatches the host page's, so Instagram/other in-app browsers painted a dark rectangle around the bubble and a dark background behind the open chat.

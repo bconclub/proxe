@@ -1510,8 +1510,12 @@ export default function FounderDashboard() {
                 <div className="hidden sm:flex items-center justify-center min-h-0 min-w-0">
                   <div className="w-full" style={{ maxWidth: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
                 </div>
-                <div className="flex flex-col gap-1 min-h-0 min-w-0 overflow-hidden justify-center">
-                  {popMix.slice(0, 6).map((s, i) => (
+                {/* overflow-y-auto + my-auto (not justify-center + hidden): with
+                    many sources justify-center clipped BOTH ends of the list —
+                    my-auto centers when it fits, scrolls from the top when not. */}
+                <div className="flex flex-col min-h-0 min-w-0 overflow-y-auto">
+                  <div className="my-auto flex flex-col gap-1">
+                  {popMix.slice(0, 10).map((s, i) => (
                     <div key={s.magnet} className="grid items-center gap-1.5 rounded-lg border px-2 py-1.5" style={{ gridTemplateColumns: '12px 20px minmax(0,0.9fr) minmax(20px,1.4fr) 34px minmax(28px,auto) 16px', borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
                       <span className="text-[10.5px] font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
                       {iconTile(s.magnet, 20)}
@@ -1526,6 +1530,7 @@ export default function FounderDashboard() {
                       </span>
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
             </section>
