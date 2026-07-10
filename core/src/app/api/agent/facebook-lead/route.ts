@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
           leadId,
           'whatsapp',
           'agent',
-          `Hey ${name.split(' ')[0]}! (${welcomeTpl} template)`,
+          `Hey ${name.split(' ')[0]}! Welcome to Windchasers.`,
           'template',
           { source: 'facebook_lead', template_name: welcomeTpl, ...facebookMeta },
           supabase,

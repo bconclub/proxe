@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
             leadId,
             'whatsapp',
             'agent',
-            `Hey ${firstName}! (${welcomeTpl} template)`,
+            `Hey ${firstName}! Welcome to Windchasers.`,
             'template',
             {
               source: 'dashboard_add_lead',

@@ -1137,7 +1137,7 @@ export async function POST(request: NextRequest) {
         console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
-        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (${confirmTpl} template)`
+        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
@@ -1181,7 +1181,7 @@ export async function POST(request: NextRequest) {
         console.log(`[inbound] Cabin-crew welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const result = await sendCabinCrewWelcome(phone, firstName)
-        const bodyText = `Hi ${firstName}, welcome to Windchasers cabin crew training. (${result.templateUsed} template)`
+        const bodyText = `Hi ${firstName}, welcome to Windchasers cabin crew training.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
