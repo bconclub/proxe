@@ -1,3 +1,9 @@
+## 2026-07-07 · feat(windchasers): agent asks parent-or-student before sharing the webinar link
+
+- Avia was picking the student link by default. Now, if the audience isn't already clear, it ASKS "student/aspiring pilot or parent?" first, then shares the matching page (parents → /webinar/parents, student → /webinar/students). Updated CURRENT_WEBINAR.rule in brand-facts (all channels).
+- Also instructs presenting the link as a plain full URL (the chat widget linkifies it — see the paired ChatWidget formatText change).
+- `(pending-sha)`
+
 ## 2026-07-10 11:47 IST · fix(windchasers): deterministic cabin-crew routing via course_interest
 
 - Finished the `course` wiring in the FB Lead Ads path: a static Pabbly param `course_interest=cabin_crew` (or `interest`/`program`/`course`) now (a) stores on the lead as `unified_context.windchasers.course_interest` and (b) is the FIRST attribution signal, so the cabin-crew welcome fires deterministically regardless of ad/adset/form naming.

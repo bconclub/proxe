@@ -283,7 +283,7 @@ export const CURRENT_WEBINAR = {
   registerUrl: 'https://windchasers.in/webinar/students',
   parentRegisterUrl: 'https://windchasers.in/webinar/parents',
   rule:
-    'If a user asks about the webinar, give the date/time and 1–2 things it covers, then share the register link (parents → parent link, students/aspirants → student link). It is FREE. Do NOT invent a Zoom link, price, or speaker names. Never use scarcity phrasing ("limited seats", "seats are limited").',
+    'If a user asks about the webinar: give the date/time + 1–2 things it covers. Before sharing a register link, if you do NOT already know whether they are a parent or a student/aspirant, ASK that first ("Are you registering as a student/aspiring pilot, or as a parent?") and share the matching link ONLY after they answer — parent → parentRegisterUrl, student/aspirant → registerUrl. If it is already clear from the conversation, skip the question and share the right link directly. Present the link as a plain full URL on its own (the chat makes it clickable). It is FREE. Do NOT invent a Zoom link, price, or speaker names. Never use scarcity phrasing ("limited seats", "seats are limited").',
 } as const;
 
 // ============================================================================
