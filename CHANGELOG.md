@@ -26,6 +26,11 @@
 - User-facing: the whole dashboard now works one-handed on a phone; desktop rendering is byte-identical.
 - `(pending-sha)`
 
+## 2026-07-10 07:10 IST · polish(inbox): selected row — one circle, not two
+
+- The selected conversation row was stacking TWO circles (avatar + score ring) and truncating the name. Now the score ring wraps the avatar itself, with the score as a small chip on the ring — one circle, name gets its space back.
+- `(pending-sha)`
+
 ## 2026-07-10 06:50 IST · polish(home): Activity Sources — ring moves to the LEFT of the card
 
 - The source-mix ring now sits on the left; ranked channel rows fill the right. Nothing else changed.

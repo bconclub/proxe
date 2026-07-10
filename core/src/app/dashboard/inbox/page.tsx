@@ -1789,10 +1789,29 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
                     <div className="px-4 py-3 pl-5">
-                      {/* Line 1: Avatar + Score Ring + Name + Timestamp + Open */}
+                      {/* Line 1: ONE circle — the score ring wraps the avatar, with
+                          the score as a small chip (two circles crowded the row and
+                          truncated the name). */}
                       <div className="flex items-center gap-2.5">
-                        <WaAvatar name={conv.lead_name} phone={conv.lead_phone} channel={conv.channels[0]} size={40} />
-                        <ScoreRing score={displayScore} size={26} />
+                        <div className="relative flex-shrink-0" style={{ width: 46, height: 46 }}>
+                          {/* score arc around the avatar */}
+                          <svg width={46} height={46} viewBox="0 0 46 46" className="absolute inset-0">
+                            <circle cx={23} cy={23} r={21.5} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+                            <circle cx={23} cy={23} r={21.5} fill="none" stroke={scoreColor || 'var(--border-primary)'} strokeWidth="2.5"
+                              strokeDasharray={`${((displayScore ?? 0) / 100) * 2 * Math.PI * 21.5} ${2 * Math.PI * 21.5}`}
+                              strokeLinecap="round" transform="rotate(-90 23 23)" />
+                          </svg>
+                          <div className="absolute" style={{ left: 4, top: 4 }}>
+                            <WaAvatar name={conv.lead_name} phone={conv.lead_phone} channel={conv.channels[0]} size={38} />
+                          </div>
+                          {/* score chip, top-left of the ring */}
+                          {displayScore != null && (
+                            <span className="absolute flex items-center justify-center rounded-full text-[8.5px] font-bold"
+                              style={{ top: -2, left: -4, minWidth: 17, height: 15, padding: '0 3px', background: scoreColor || 'var(--bg-tertiary)', color: '#0b0d12', boxShadow: '0 0 0 1.5px var(--bg-primary)' }}>
+                              {displayScore}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
