@@ -1935,13 +1935,39 @@ export async function GET(request: NextRequest) {
       const d7 = now.getTime() - 7 * 86400000
       const d14 = now.getTime() - 14 * 86400000
       const byChannel: Record<string, { count: number; last7: number; prior7: number }> = {}
+      // windchasers: group touchpoints by the LEAD's marketing source
+      // (attribution.source — Instagram / Google Ads / Meta Ads / Direct …)
+      // instead of the conversation channel. Nearly all conversations happen on
+      // WhatsApp, so channel grouping collapsed the card to "WhatsApp 100%" and
+      // hid where leads actually came from. Other brands keep channel grouping.
+      const groupBySource = BRAND_ID === 'windchasers'
+      const canonSource = (raw: string): string => {
+        const s = raw.toLowerCase().trim()
+        if (!s) return 'direct'
+        if (s === 'ig' || s === 'instagram') return 'instagram'
+        if (s === 'fb' || s === 'facebook') return 'facebook'
+        if (['meta', 'meta_ads', 'meta_forms', 'meta_forms_clickthrough', 'meta_lead_form', 'facebook_lead', 'facebook_ads', 'fb_ads'].includes(s)) return 'meta_ads'
+        if (s === 'google_ads' || s === 'googleads') return 'google_ads'
+        if (s === 'google' || s === 'google_organic') return 'google_organic'
+        return s.replace(/\s+/g, '_')
+      }
+      const leadSrc = new Map<string, string>()
+      if (groupBySource) {
+        for (const l of safeLeads) {
+          const ctx = (l as any).unified_context || {}
+          const raw = ctx.attribution?.source || ctx.attribution?.utm?.source || (l as any).first_touchpoint || ''
+          leadSrc.set(l.id, canonSource(String(raw)))
+        }
+      }
       // scopedMessages (not raw messages) so Activity Sources follows the
       // Leads/Gigs toggle — gig-worker conversations don't bleed into the lead
       // source mix and vice versa.
       for (const m of scopedMessages) {
         const t = new Date(m.created_at).getTime()
         if (t < d30) continue
-        const ch = (m.channel || 'other') as string
+        const ch = groupBySource
+          ? (leadSrc.get(m.lead_id) || 'direct')
+          : ((m.channel || 'other') as string)
         const b = byChannel[ch] || { count: 0, last7: 0, prior7: 0 }
         b.count++
         if (t >= d7) b.last7++

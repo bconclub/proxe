@@ -12,7 +12,10 @@
  *   email                       → email (optional)
  *   education / education_level → education level
  *   city                        → city
- *   utm_source/medium/campaign/content → ad attribution
+ *   platform                    → Meta placement surface: 'ig' | 'fb' (drives source badge)
+ *   campaign_name / adset_name / ad_name / form_name / form_id / lead_id → ad metadata
+ *   class_12_pcm / start_timeline / age → lead-form qualifying answers
+ *   utm_source/medium/campaign/content → ONLY real UTMs — never hardcode a label here
  *
  * Auth: x-api-key header must match INBOUND_API_KEY env var.
  */
@@ -55,6 +58,13 @@ export async function POST(request: NextRequest) {
     const city: string | null =
       body.city || body.City || body.location || null;
 
+    // Qualifying answers from the lead form (mapped in Pabbly to these keys)
+    const class12Pcm: string | null =
+      body.class_12_pcm || body.class12_pcm || null;
+    const startTimeline: string | null =
+      body.start_timeline || body.when_looking_to_start || null;
+    const age: string | null = body.age != null ? String(body.age) : null;
+
     // UTM attribution from Facebook Ads
     const utmData = {
       utm_source:   body.utm_source   || null,
@@ -64,10 +74,17 @@ export async function POST(request: NextRequest) {
     };
 
     // Facebook campaign metadata
+    // `platform` is Meta's per-lead placement surface: 'ig' (Instagram) or
+    // 'fb' (Facebook) — the true marketing source for lead-form leads.
+    const platform: string =
+      String(body.platform || '').toLowerCase().trim();
     const facebookMeta = {
-      ad_name:       body.ad_name || body.adset_name || null,
+      platform:      platform || null,
+      ad_name:       body.ad_name || null,
+      adset_name:    body.adset_name || null,
       campaign_name: body.campaign_name || body.campaign || null,
       form_name:     body.form_name || body.leadgen_form_name || null,
+      form_id:       body.form_id || null,
       lead_id:       body.lead_id || body.fb_lead_id || null,
       ...utmData,
     };
@@ -105,11 +122,18 @@ export async function POST(request: NextRequest) {
     const windchasersProfile: Record<string, string> = {};
     if (education) windchasersProfile.education = education;
     if (city) windchasersProfile.city = city;
+    if (class12Pcm) windchasersProfile.class_12_pcm = class12Pcm;
+    if (startTimeline) windchasersProfile.start_timeline = startTimeline;
+    if (age) windchasersProfile.age = age;
 
-    // Attribution: Facebook Lead Form is always Meta paid. UTM (if Pabbly passes it)
-    // can refine the source; otherwise default to meta_ads.
+    // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
+    // real UTM (rare on lead forms) → placement platform (ig → Instagram,
+    // fb → Facebook) → meta_ads. Pabbly must NOT hardcode utm_source — that's
+    // how every lead ended up badged "Res1 Platform".
+    const platformSource =
+      platform === 'ig' ? 'ig' : platform === 'fb' ? 'facebook' : null;
     const attribution = buildAttribution({
-      utmSource: facebookMeta.utm_source || 'meta_ads',
+      utmSource: facebookMeta.utm_source || platformSource || 'meta_ads',
       formType: 'meta_lead_form',
       channel: 'meta_forms',
       utm: {
@@ -195,6 +219,7 @@ export async function POST(request: NextRequest) {
       const attributionSignals = [
         facebookMeta.form_name,
         facebookMeta.campaign_name,
+        facebookMeta.adset_name,
         facebookMeta.ad_name,
         facebookMeta.utm_campaign,
         facebookMeta.utm_content,

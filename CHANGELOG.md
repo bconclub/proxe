@@ -1,3 +1,12 @@
+## 2026-07-07 · fix(windchasers): FB lead attribution — real platform data, source mix, 50-50 home rows
+
+- facebook-lead route now captures Meta's real per-lead data from Pabbly: `platform` (ig/fb — drives the SOURCE badge: Instagram/Facebook instead of a hardcoded label), `adset_name`, `form_id`, and the lead-form qualifying answers (`class_12_pcm`, `start_timeline`, `age`) into the windchasers profile.
+- Root cause of every lead badging "RES1 PLATFORM": Pabbly hardcoded `utm_source: "Res1 Platform"` — utm_source is priority-1 in deriveSource. Backfill SQL at brands/windchasers/supabase/backfill_res1_platform_source.sql (user runs in Supabase).
+- Activity Sources card (windchasers only): touchpoints now grouped by the LEAD's marketing source (Instagram / Meta Ads / Google Ads / Google Organic / Direct …) instead of conversation channel — channel grouping collapsed to "WhatsApp 100%" and hid where leads came from. New brand colors + FA icons for marketing sources.
+- Dashboard home (windchasers only): top row now a true 50-50 split (Engine Overview span 8 → 6, Upcoming Events 4 → 6).
+- User-facing: SOURCE badges show Instagram/Facebook for new FB leads; Activity Sources shows the real channel mix; home cards evenly sized.
+- `(pending-sha)`
+
 ## 2026-07-10 · fix(core): prebuild no longer overwrites the version
 
 - set-build-time.js was recomputing the patch from the git commit count on every Vercel build — fighting the new hook-maintained version (and shallow clones made it plain wrong: live showed v0.1.10 from a depth-10 clone). It now stamps ONLY the build time; the committed package.json version is the single source of truth.

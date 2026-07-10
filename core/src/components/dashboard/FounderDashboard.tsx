@@ -8,6 +8,7 @@ import { createClient } from '../../lib/supabase/client'
 import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
 import { MdDragIndicator, MdRestartAlt, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
+import { FaInstagram, FaFacebookF, FaGoogle, FaYoutube, FaLinkedinIn } from 'react-icons/fa'
 import LeadDetailsModal from './LeadDetailsModal'
 import NotificationCenter from './NotificationCenter'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
@@ -201,6 +202,17 @@ const MAGNET_META: Record<string, { label: string; color: string }> = {
   web: { label: 'Web', color: '#38bdf8' },
   social: { label: 'Social', color: '#e879f9' },
   other: { label: 'Other', color: '#7a8aa0' },
+  // Marketing sources (windchasers Activity Sources groups by lead attribution)
+  instagram: { label: 'Instagram', color: '#E1306C' },
+  facebook: { label: 'Facebook', color: '#1877F2' },
+  meta_ads: { label: 'Meta Ads', color: '#0668E1' },
+  google_ads: { label: 'Google Ads', color: '#4285F4' },
+  google_organic: { label: 'Google Organic', color: '#34A853' },
+  youtube: { label: 'YouTube', color: '#FF0000' },
+  linkedin: { label: 'LinkedIn', color: '#0A66C2' },
+  referral: { label: 'Referral', color: '#f59e0b' },
+  organic: { label: 'Organic', color: '#84cc16' },
+  direct: { label: 'Direct', color: '#7a8aa0' },
 }
 const magnetMeta = (m: string) => MAGNET_META[m] || { label: m.replace('_', ' '), color: '#7a8aa0' }
 
@@ -217,6 +229,16 @@ const MAGNET_ICON: Record<string, ReactNode> = {
   landing_page: <MdLanguage size={15} />,
   web: <MdLanguage size={15} />,
   social: <MdSmartphone size={15} />,
+  instagram: <FaInstagram size={15} />,
+  facebook: <FaFacebookF size={13} />,
+  meta_ads: <FaFacebookF size={13} />,
+  google_ads: <FaGoogle size={13} />,
+  google_organic: <FaGoogle size={13} />,
+  youtube: <FaYoutube size={15} />,
+  linkedin: <FaLinkedinIn size={13} />,
+  referral: <MdPeople size={15} />,
+  organic: <MdTrendingUp size={15} />,
+  direct: <MdLanguage size={15} />,
 }
 const magnetIcon = (m: string) => MAGNET_ICON[m] || <MdFlashOn size={15} />
 
@@ -684,7 +706,9 @@ export default function FounderDashboard() {
   // ── Movable-card slot geometry (xl only) ─────────────────────────────────
   // slots 0+1 = top row, 2+3 = bottom row; spans follow the brand variants
   // that used to size the rows. A card adopts the span of the slot it's in.
-  const engineNarrow = (isPop && !!metrics.campaignHome?.ladder) || showGigsTab
+  // windchasers: even 50-50 rows — Engine Overview at span 8 left Upcoming
+  // Events squeezed (user-requested true 50-50 split).
+  const engineNarrow = (isPop && !!metrics.campaignHome?.ladder) || showGigsTab || brandCfg.brand === 'windchasers'
   const SLOT_SPANS = engineNarrow ? [6, 6, 6, 6] : [8, 4, 6, 6]
   const slotStyle = (id: string) => {
     const slot = Math.max(0, cardOrder.indexOf(id))
