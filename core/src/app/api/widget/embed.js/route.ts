@@ -67,7 +67,11 @@ export async function GET() {
   var isMobileInit = window.innerWidth <= 768;
   var collapsedWidth = isMobileInit ? 88 : 100;
   var collapsedHeight = 165;
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedWidth + 'px;height:' + collapsedHeight + 'px;border:none;background:transparent;z-index:2147483647;';
+  // color-scheme:normal on the iframe ELEMENT: Chromium/WebKit force an OPAQUE
+  // canvas when the embedded doc's color-scheme mismatches the embedder's —
+  // the "dark box around the bubble" in Instagram's in-app browser. The widget
+  // doc declares color-scheme:normal too (widget/bubble layout), so they match.
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedWidth + 'px;height:' + collapsedHeight + 'px;border:none;background:transparent;color-scheme:normal;z-index:2147483647;';
 
   // Check for pre-loaded lead context from host page
   var leadContext = window.__proxe_lead || null;

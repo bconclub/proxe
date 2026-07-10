@@ -1,3 +1,11 @@
+## 2026-07-10 08:40 IST · fix(widget): opaque dark box around the embedded chat widget in in-app browsers
+
+- Root cause: the widget iframe's document declared `color-scheme: dark` (inherited from the dashboard shell) — modern WebKit/Chromium force an OPAQUE iframe canvas when the embedded doc's color-scheme mismatches the host page's, so Instagram/other in-app browsers painted a dark rectangle around the bubble and a dark background behind the open chat.
+- Fix, three layers: widget doc forces `color-scheme: normal` + transparent html/body (bubble layout); the root theme-init no longer adds `.dark` (and its body paint) on /widget routes; the embed iframe element also declares `color-scheme:normal` so both sides match.
+- Verified on /widget/bubble: html classes none, color-scheme normal, html+body fully transparent, bubble renders; embed.js serves the matching style.
+- User-facing: the chat bubble floats clean on brand sites again — no dark box, no dark backdrop, including Instagram's in-app browser.
+- `(pending-sha)`
+
 ## 2026-07-07 · fix(windchasers): FB lead attribution — real platform data, source mix, 50-50 home rows
 
 - facebook-lead route now captures Meta's real per-lead data from Pabbly: `platform` (ig/fb — drives the SOURCE badge: Instagram/Facebook instead of a hardcoded label), `adset_name`, `form_id`, and the lead-form qualifying answers (`class_12_pcm`, `start_timeline`, `age`) into the windchasers profile.

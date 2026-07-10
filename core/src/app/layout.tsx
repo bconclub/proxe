@@ -46,8 +46,17 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var t = localStorage.getItem('proxe-theme') || 'bw-dark';
                   var el = document.documentElement;
+                  // Widget routes render inside a TRANSPARENT iframe on brand
+                  // sites — never force the dashboard's dark theme there: the
+                  // .dark body paint + color-scheme:dark make WebViews render
+                  // an opaque dark canvas around the widget (Instagram bug).
+                  if (location.pathname.indexOf('/widget') === 0) {
+                    el.classList.remove('dark');
+                    el.classList.remove('light');
+                    return;
+                  }
+                  var t = localStorage.getItem('proxe-theme') || 'bw-dark';
                   if (t === 'bw-light') {
                     el.setAttribute('data-theme', 'bw-light');
                     el.classList.add('light');
