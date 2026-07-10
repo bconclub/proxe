@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getBrandConfig } from '@/configs';
-import type { BrandConfig } from '@/configs/types';
+import type { BrandConfig, CoreCommunication } from '@/configs/types';
 
 type BrainBlock = NonNullable<BrandConfig['brain']>;
 
@@ -27,6 +27,7 @@ export interface ResolvedBrainConfig {
   summaryPrompt: string;
   reflectionPersona: string;
   evalJourneys: 'pop' | 'business' | 'none';
+  communications: CoreCommunication[];
   voiceAgent: NonNullable<BrainBlock['voiceAgent']>;
 }
 
@@ -69,6 +70,7 @@ export function getBrainConfig(): ResolvedBrainConfig {
       `You are summarizing a customer conversation for the ${brand.name} team. Write 3-5 SHORT plain sentences: who they are and what they came in for (from what THEY said), what was discussed or resolved, where it stands, and the next step for the team if any. Plain prose only — NO markdown, NO asterisks, NO headings, NO meta-commentary. NEVER say there is nothing to summarize; summarize whatever happened. Be specific — use actual details from the conversation, not generic phrases like "shows interest".`,
     reflectionPersona: b.reflectionPersona ?? `the ${brand.name} assistant`,
     evalJourneys: b.evalJourneys ?? 'none',
+    communications: b.communications ?? [],
     voiceAgent: b.voiceAgent ?? {},
   };
 }

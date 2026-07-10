@@ -2,27 +2,37 @@
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EvalTabs — the Eval surface, split into benches:
+//   Communications — the CORE COMMUNICATIONS checklist: every message the agent
+//                    must handle autonomously, filled or missing (CommunicationsView)
 //   Messaging — every WhatsApp message a lead can receive, by permutation (EvalView)
 //   Team      — every Slack alert PROXe raises to the team, by trigger (TeamMessagesView)
 //   Calls     — every voice call measured: latency, turns, wait, cost (CallsView)
-// A light segmented switcher sits above; each bench fills the rest of the surface.
+// Communications shows only for brands with brain.communications; Messaging only
+// when evalJourneys !== 'none' (the journeys benches carry BCON/POP content and
+// must never render on other brands). A light segmented switcher sits above.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from 'react'
-import { MdWhatsapp, MdPhone, MdGroups } from 'react-icons/md'
+import { MdWhatsapp, MdPhone, MdGroups, MdChecklist } from 'react-icons/md'
+import { getBrainConfig } from '@/lib/brain/brainConfig'
+import CommunicationsView from './CommunicationsView'
 import EvalView from './EvalView'
 import CallsView from './CallsView'
 import TeamMessagesView from './TeamMessagesView'
 
-type Sub = 'messaging' | 'team' | 'calls'
+type Sub = 'comms' | 'messaging' | 'team' | 'calls'
+const BRAIN = getBrainConfig()
+const HAS_COMMS = BRAIN.communications.length > 0
+const HAS_JOURNEYS = BRAIN.evalJourneys !== 'none'
 const SUBS: Array<{ id: Sub; label: string; icon: React.ReactNode }> = [
-  { id: 'messaging', label: 'Messaging', icon: <MdWhatsapp size={14} /> },
+  ...(HAS_COMMS ? [{ id: 'comms' as Sub, label: 'Communications', icon: <MdChecklist size={14} /> }] : []),
+  ...(HAS_JOURNEYS ? [{ id: 'messaging' as Sub, label: 'Messaging', icon: <MdWhatsapp size={14} /> }] : []),
   { id: 'team', label: 'Team', icon: <MdGroups size={14} /> },
   { id: 'calls', label: 'Calls', icon: <MdPhone size={14} /> },
 ]
 
 export default function EvalTabs() {
-  const [sub, setSub] = useState<Sub>('messaging')
+  const [sub, setSub] = useState<Sub>(SUBS[0].id)
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '10px 18px 0', flexShrink: 0 }}>
@@ -41,7 +51,8 @@ export default function EvalTabs() {
         </div>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
-        {sub === 'messaging' && <EvalView />}
+        {sub === 'comms' && <CommunicationsView />}
+        {sub === 'messaging' && HAS_JOURNEYS && <EvalView />}
         {sub === 'team' && <TeamMessagesView />}
         {sub === 'calls' && <CallsView />}
       </div>

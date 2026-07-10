@@ -20,6 +20,25 @@ export interface ArtifactDef {
   features?: ArtifactFeature[]; // full feature checklist — rendered on /dashboard/artifacts
 }
 
+// CORE COMMUNICATIONS — the checklist of every message the brand's agent must
+// handle autonomously, surfaced on Brain → Eval → Communications. Each entry is
+// hand-curated DISPLAY TRUTH (same philosophy as configs/journeys.ts): it
+// mirrors send-truth in whatsappSender.ts + the intake routes, with `status`
+// and `note` kept honest in the same commit as sender changes.
+export interface CoreCommunication {
+  id: string;                       // stable slug, e.g. 'fb_pilot_welcome'
+  category: 'welcome' | 'inbound' | 'confirmation' | 'reminder' | 'followup';
+  title: string;                    // 'FB Lead Ad welcome — pilot'
+  trigger: string;                  // plain words: what makes this fire
+  channel: 'whatsapp' | 'webchat';
+  template?: string;                // Meta template name, when templated
+  body?: string;                    // display mirror with {{vars}}; absent → no preview/send
+  buttons?: string[];               // quick-reply chips (max 3 sent by the bench)
+  status: 'live' | 'partial' | 'missing' | 'off';
+  note?: string;                    // honesty line: why partial/missing, warnings
+  sampleParams?: Record<string, string>; // per-entry overrides of the sample fill
+}
+
 export interface BrandConfig {
   name: string;
   brand: string;
@@ -68,7 +87,8 @@ export interface BrandConfig {
     };
     summaryPrompt?: string;      // person-summary system prompt (summarizer.ts)
     reflectionPersona?: string;  // learning-summary persona (replaces "sales agent")
-    evalJourneys?: 'pop' | 'business' | 'none'; // Eval tab content ('none' hides the tab)
+    evalJourneys?: 'pop' | 'business' | 'none'; // Eval tab content ('none' hides the journeys bench)
+    communications?: CoreCommunication[];       // CORE COMMUNICATIONS checklist (Eval → Communications sub)
     voiceAgent?: {
       testDefaults?: { name?: string; business?: string; industry?: string; phone?: string };
       voiceNumber?: string;      // display number on the voice tab

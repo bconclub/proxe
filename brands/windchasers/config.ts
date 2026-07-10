@@ -1,4 +1,5 @@
 import type { BrandConfig } from '@/configs/types';
+import { WINDCHASERS_COMMUNICATIONS } from './communications';
 
 export const windchasersConfig: BrandConfig = {
   name: 'Windchasers',
@@ -23,6 +24,12 @@ export const windchasersConfig: BrandConfig = {
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
     pipelineFunnel: true,
     followUpSequence: false,
+  },
+  // Brain content: the CORE COMMUNICATIONS checklist (Eval → Communications).
+  // evalJourneys is deliberately omitted ('none') — the journeys bench renders
+  // BCON's content, which is wrong-brand here.
+  brain: {
+    communications: WINDCHASERS_COMMUNICATIONS,
   },
   apiUrl: '/api/agent/web/chat',
   systemPrompt: {

@@ -21,11 +21,13 @@ import LearningView from './LearningView'
 
 type Tab = 'brain' | 'map' | 'eval' | 'learning'
 // Per-brand tabs: Map draws the campaign engine topology (warRoom brands only);
-// Eval content is brand-specific (brain.evalJourneys, 'none' hides the tab).
+// Eval shows when the brand has journeys (brain.evalJourneys) OR a CORE
+// COMMUNICATIONS checklist (brain.communications) — either gives it content.
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'brain', label: 'Brain' },
   ...(getBrandConfig().features?.warRoom ? ([{ id: 'map', label: 'Map' }] as Array<{ id: Tab; label: string }>) : []),
-  ...(getBrainConfig().evalJourneys !== 'none' ? ([{ id: 'eval', label: 'Eval' }] as Array<{ id: Tab; label: string }>) : []),
+  ...(getBrainConfig().evalJourneys !== 'none' || getBrainConfig().communications.length > 0
+    ? ([{ id: 'eval', label: 'Eval' }] as Array<{ id: Tab; label: string }>) : []),
   { id: 'learning', label: 'Learning' },
 ]
 

@@ -1,3 +1,12 @@
+## 2026-07-10 09:50 IST · feat(brain): CORE COMMUNICATIONS checklist on Eval — windchasers first
+
+- New Eval bench "Communications": every message the brand's agent must handle autonomously as a visible slot — welcome per lead source, AI replies to incoming messages (prompt + knowledge base), confirmations, reminders, follow-ups — each with a LIVE / PARTIAL / MISSING / OFF status pill, trigger, channel, template chip, WhatsApp-style preview, honesty note, and "Send to my WhatsApp" test.
+- Per-brand data: new `brain.communications` (CoreCommunication[] in BrandConfig) — hand-curated display truth mirroring whatsappSender + intake routes, updated in the same commit as sender changes (journeys.ts philosophy).
+- Windchasers: 18-slot checklist shipped (brands/windchasers/communications.ts) — 11 live · 4 partial (Meta approvals pending: parent welcome, webinar confirm ×2, webinar reminder) · 1 missing (generic website-form welcome — branch disabled, template deleted) · 1 off (day-1/3/5 nurture) · 3 live-with-warning (booking/reminder/missed-call templates carry BCON-branded Meta copy).
+- Gating: Eval tab now shows when a brand has journeys OR communications; windchasers gets Eval for the first time (Communications · Team · Calls — the BCON journeys bench correctly never renders there). bcon/pop/lokazen unchanged.
+- User-facing: Brain → Eval on windchasers is now the autonomy scorecard — what the agent handles alone, what still needs filling.
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): agent knows the current webinar (web + WhatsApp + voice)
 
 - Avia was answering "I don't have details on a specific webinar" — added a CURRENT_WEBINAR block to brands/windchasers/brand-facts.ts (title, 18 Jul 2026 11:30 IST, what it covers, register links) injected into the shared brand-fact bundle, so every channel prompt (web chat, WhatsApp, voice) can speak to the webinar and route registrants to the right landing page (parents vs students).
