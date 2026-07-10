@@ -1,3 +1,9 @@
+## 2026-07-10 · fix(core): prebuild no longer overwrites the version
+
+- set-build-time.js was recomputing the patch from the git commit count on every Vercel build — fighting the new hook-maintained version (and shallow clones made it plain wrong: live showed v0.1.10 from a depth-10 clone). It now stamps ONLY the build time; the committed package.json version is the single source of truth.
+- This commit is also the first auto-bump: the pre-commit hook takes the version to 0.1.1.
+- `(pending-sha)`
+
 ## 2026-07-10 · feat(core): v0.1 versioning system + release notes
 
 - Version reset to **0.1.0** — the mobile release. package.json / .build-info / generated-version.ts now agree (were 0.2.0 / 0.0.130 / 0.0.19).
