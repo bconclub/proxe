@@ -26,6 +26,7 @@ import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import { stripBookedTimeSlots } from '@/lib/services/quickReplyMap';
 import { crawlBusiness } from '@/lib/services/businessCrawler';
 import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifier';
+import { slackBotConfigured, slackPostMessage, leadAlertBlocks } from '@/lib/services/slackApi';
 
 /**
  * Lokazen has three separate audiences (brand/owner/scout) that must never
@@ -961,20 +962,41 @@ async function flagForHumanFollowup(
     // a generic lead follow-up.
     const isScout = input.lokazenAudience === 'scout';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
-    const slackResult = await notifySlackLead({
-      brandLabel,
-      title: isScout ? 'Scout support request' : 'Needs human follow-up',
-      name: input.userProfile.name || null,
-      phone: input.userProfile.phone || null,
-      email: input.userProfile.email || null,
-      leadType: audienceLabel,
-      source: input.channel || null,
-      detail: reason,
-      footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
-      // Working URL button (no Slack app needed) — opens the conversation so the
-      // team can act and mark it resolved in the dashboard.
-      actions: [{ text: 'View lead in dashboard', url: `${appUrl}/dashboard/inbox?lead=${lead.id}`, style: 'primary' }],
-    });
+    const title = isScout ? 'Scout support request' : 'Needs human follow-up';
+    let slackResult: { success: boolean; skipped?: boolean; error?: string };
+    if (slackBotConfigured()) {
+      // INTERACTIVE app: post via bot token so the message carries Resolved /
+      // Reopen buttons AND a thread the team can reply in (→ WhatsApp the lead).
+      const blocks = leadAlertBlocks({
+        brandLabel, leadId: lead.id, title,
+        name: input.userProfile.name || null, leadType: audienceLabel,
+        phone: input.userProfile.phone || null, detail: reason,
+        footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
+        dashboardUrl: `${appUrl}/dashboard/inbox?lead=${lead.id}`, reply: true,
+      });
+      const posted = await slackPostMessage({ text: `${title} · ${brandLabel}: ${input.userProfile.name || input.userProfile.phone || 'Lead'}`, blocks });
+      slackResult = { success: posted.ok, skipped: false, error: posted.error };
+      // Store the Slack thread ts on the lead so a reply in that thread maps back
+      // to this customer's WhatsApp (see /api/integrations/slack/events).
+      if (posted.ok && posted.ts) {
+        await supabase.from('all_leads').update({
+          metadata: { ...(lead.metadata || {}), human_followup_reason: reason, human_followup_at: new Date().toISOString(), slack_channel: posted.channel, slack_ts: posted.ts },
+        }).eq('id', lead.id).then(() => {}, () => {});
+      }
+    } else {
+      // Fallback: incoming webhook (one-way, URL buttons only).
+      slackResult = await notifySlackLead({
+        brandLabel, title,
+        name: input.userProfile.name || null,
+        phone: input.userProfile.phone || null,
+        email: input.userProfile.email || null,
+        leadType: audienceLabel,
+        source: input.channel || null,
+        detail: reason,
+        footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
+        actions: [{ text: 'View lead in dashboard', url: `${appUrl}/dashboard/inbox?lead=${lead.id}`, style: 'primary' }],
+      });
+    }
     // notifySlackLead soft-fails SILENTLY (no log at all) when SLACK_WEBHOOK_URL
     // isn't set — the AI tells the person "I've raised a support request" and
     // the DB flag is real, but the team never actually gets pinged, with zero
