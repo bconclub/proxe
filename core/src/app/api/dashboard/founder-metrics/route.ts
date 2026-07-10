@@ -1935,7 +1935,10 @@ export async function GET(request: NextRequest) {
       const d7 = now.getTime() - 7 * 86400000
       const d14 = now.getTime() - 14 * 86400000
       const byChannel: Record<string, { count: number; last7: number; prior7: number }> = {}
-      for (const m of messages) {
+      // scopedMessages (not raw messages) so Activity Sources follows the
+      // Leads/Gigs toggle — gig-worker conversations don't bleed into the lead
+      // source mix and vice versa.
+      for (const m of scopedMessages) {
         const t = new Date(m.created_at).getTime()
         if (t < d30) continue
         const ch = (m.channel || 'other') as string

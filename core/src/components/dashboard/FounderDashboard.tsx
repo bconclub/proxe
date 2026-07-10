@@ -1234,12 +1234,12 @@ export default function FounderDashboard() {
                 </span>
               )}
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : brandLabel('Priority Lead Queue')}</h3>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : brandLabel('Leads that need your attention now')}</p>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{isPop && metrics.campaignHome ? 'Priority Constituencies' : isGigsView ? 'Priority Gig Queue' : brandLabel('Priority Lead Queue')}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{isPop && metrics.campaignHome ? 'Seats that need attention now' : isGigsView ? 'Scouts that need attention now' : brandLabel('Leads that need your attention now')}</p>
               </div>
             </div>
-            <button onClick={() => router.push(isPop && metrics.campaignHome ? '/war-room' : '/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
-              {isPop && metrics.campaignHome ? 'War Room' : `View ${brandLabel('Lead') === 'Person' ? 'People' : 'Leads'}`} <MdArrowForward size={13} />
+            <button onClick={() => router.push(isPop && metrics.campaignHome ? '/war-room' : isGigsView ? '/dashboard/scouts' : '/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline whitespace-nowrap" style={{ color: 'var(--accent-primary)' }}>
+              {isPop && metrics.campaignHome ? 'War Room' : isGigsView ? 'View Scouts' : `View ${brandLabel('Lead') === 'Person' ? 'People' : 'Leads'}`} <MdArrowForward size={13} />
             </button>
           </div>
           {isPop && metrics.campaignHome ? (
