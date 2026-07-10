@@ -635,8 +635,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {navigation.map((item, index) => {
               // Feature toggle: hide Calls when this brand has voice switched off.
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
-              // Feature toggle: Scouts segment (lokazen) only for brands with scouts on.
-              if (item.href === '/dashboard/scouts' && !brandFeatures.scouts) return null
+              // Feature toggle: Scouts segment only for brands with scouts on.
+              // Lokazen folds it into the Leads page (Leads | Gigs toggle), so drop
+              // the standalone nav row there — the /dashboard/scouts route, widget
+              // scout mode, and KB scope all stay live via features.scouts.
+              if (item.href === '/dashboard/scouts' && (!brandFeatures.scouts || brandId === 'lokazen')) return null
               // Feature toggle: War Room only for brands with it on (pop).
               if (item.href === '/war-room' && !brandFeatures.warRoom) return null
               // POP is a campaign, not a sales org — keep the nav clear and
