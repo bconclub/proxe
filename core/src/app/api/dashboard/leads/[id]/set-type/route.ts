@@ -1,24 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/dashboard/leads/[id]/set-type
- * Body: { type: 'brand' | 'owner' | 'scout' }
+ * Body: { type: 'brand' | 'owner' | 'scout' | 'lead' }
  *
- * Manual override of a Lokazen lead's audience type. Auto-detection is solid
- * for brand/owner but scout is still being tuned, so operators need a one-click
- * way to move a lead to Scout (or correct any mis-tag). Writes ONLY to
- * unified_context.lokazen (+ a visible admin note) so it works even before the
- * activities/agent_tasks tables are migrated. Once set, LeadsTable routes the
- * lead into the right view (scouts drop out of the brand Leads list).
+ * Manual override of a lead's audience/segment type, written to the brand's
+ * unified_context namespace (+ a visible admin note) so it works without any
+ * table dependency. Once set, LeadsTable routes the lead into the right view.
+ *
+ * - lokazen types ('brand' / 'owner' / 'scout'): the original use — move a
+ *   lead between the Leads and Gigs views / correct a mis-tag. These write
+ *   to unified_context.lokazen (unchanged behavior).
+ * - 'lead' (windchasers "Move to Leads"): promotes a webinar registrant into
+ *   the main Leads view by CLEARING lead_type from unified_context[BRAND_ID].
  */
-const TYPE_MAP: Record<string, { user_type: string; lead_type: string; label: string }> = {
-  brand: { user_type: 'brand', lead_type: 'brand', label: 'Brand' },
-  owner: { user_type: 'owner', lead_type: 'property_owner', label: 'Property Owner' },
-  scout: { user_type: 'scout', lead_type: 'scout', label: 'Scout' },
+const TYPE_MAP: Record<string, { user_type: string; lead_type: string; label: string; brandKey?: string }> = {
+  brand: { user_type: 'brand', lead_type: 'brand', label: 'Brand', brandKey: 'lokazen' },
+  owner: { user_type: 'owner', lead_type: 'property_owner', label: 'Property Owner', brandKey: 'lokazen' },
+  scout: { user_type: 'scout', lead_type: 'scout', label: 'Scout', brandKey: 'lokazen' },
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
@@ -31,10 +35,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const leadId = params.id
     const { type } = (await request.json()) as { type?: string }
-    const mapped = type ? TYPE_MAP[type] : undefined
-    if (!mapped) {
+    const isPromoteToLead = type === 'lead'
+    const mapped = type && !isPromoteToLead ? TYPE_MAP[type] : undefined
+    if (!mapped && !isPromoteToLead) {
       return NextResponse.json(
-        { error: `Invalid type. Must be one of: ${Object.keys(TYPE_MAP).join(', ')}` },
+        { error: `Invalid type. Must be one of: ${[...Object.keys(TYPE_MAP), 'lead'].join(', ')}` },
         { status: 400 },
       )
     }
@@ -52,19 +57,44 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const ctx = lead.unified_context || {}
     const now = new Date().toISOString()
-    const nextLokazen = {
-      ...(ctx.lokazen || {}),
-      user_type: mapped.user_type,
-      lead_type: mapped.lead_type,
-      type_overridden_by: user.email || user.id,
-      type_overridden_at: now,
+
+    let brandKey: string
+    let nextBrandCtx: Record<string, any>
+    let label: string
+    let userType: string | null
+    if (isPromoteToLead) {
+      // "Move to Leads": clear the segment tag (webinar today; event later)
+      // so the lead re-enters the main Leads view. user_type (student/parent)
+      // stays — that's who they are, not which segment they're in.
+      brandKey = BRAND_ID
+      const prev = { ...(ctx[brandKey] || {}) }
+      const prevSegment = prev.lead_type || null
+      delete prev.lead_type
+      nextBrandCtx = {
+        ...prev,
+        type_overridden_by: user.email || user.id,
+        type_overridden_at: now,
+      }
+      label = prevSegment ? `Lead (moved from ${prevSegment})` : 'Lead'
+      userType = prev.user_type || null
+    } else {
+      brandKey = mapped!.brandKey || BRAND_ID
+      nextBrandCtx = {
+        ...(ctx[brandKey] || {}),
+        user_type: mapped!.user_type,
+        lead_type: mapped!.lead_type,
+        type_overridden_by: user.email || user.id,
+        type_overridden_at: now,
+      }
+      label = mapped!.label
+      userType = mapped!.user_type
     }
 
     // Visible audit note (kept in unified_context — no table dependency).
     const adminNotes: any[] = Array.isArray(ctx.admin_notes) ? ctx.admin_notes : []
     adminNotes.push({
       id: `type_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      text: `Lead type set to ${mapped.label} (manual)`,
+      text: `Lead type set to ${label} (manual)`,
       created_by: user.email || 'system',
       created_at: now,
       source: 'set_type',
@@ -72,13 +102,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const { error: updateErr } = await supabase
       .from('all_leads')
-      .update({ unified_context: { ...ctx, lokazen: nextLokazen, admin_notes: adminNotes } })
+      .update({ unified_context: { ...ctx, [brandKey]: nextBrandCtx, admin_notes: adminNotes } })
       .eq('id', leadId)
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, lead_id: leadId, user_type: mapped.user_type, label: mapped.label })
+    return NextResponse.json({ success: true, lead_id: leadId, user_type: userType, label })
   } catch (error) {
     console.error('[set-type] Error:', error)
     return NextResponse.json(

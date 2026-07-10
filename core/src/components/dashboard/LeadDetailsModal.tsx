@@ -483,6 +483,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   })
   const [previousScore, setPreviousScore] = useState<number | null>(null)
   const [freshLeadData, setFreshLeadData] = useState<Lead | null>(null)
+  // Webinar → Leads promotion (windchasers)
+  const [movingToLeads, setMovingToLeads] = useState(false)
   const [calculatedScore, setCalculatedScore] = useState<CalculatedScore | null>(null)
 
   // Admin notes state
@@ -2408,6 +2410,59 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           )}
                         </div>
                       )}
+                    </div>
+                  );
+                })()}
+
+                {/* WEBINAR registration (windchasers) — which webinar they
+                    registered for + one-click promotion into the main Leads
+                    list (clears lead_type via set-type). */}
+                {brandId === 'windchasers' && (() => {
+                  const wc: any = currentLead.unified_context?.windchasers || {};
+                  if (wc.lead_type !== 'webinar') return null;
+                  return (
+                    <div className="flex items-center flex-wrap gap-2 pt-2 mt-1.5 border-t border-[var(--border-primary)]">
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{ background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+                        title={[wc.webinar_name, wc.webinar_date].filter(Boolean).join(' · ') || 'Webinar registrant'}
+                      >
+                        Webinar{wc.webinar_name ? ` · ${wc.webinar_name}` : ''}{wc.webinar_date ? ` · ${wc.webinar_date}` : ''}
+                      </span>
+                      <button
+                        onClick={async () => {
+                          if (movingToLeads) return
+                          setMovingToLeads(true)
+                          try {
+                            const res = await fetch(`/api/dashboard/leads/${currentLead.id}/set-type`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'lead' }),
+                            })
+                            if (res.ok) {
+                              // Reflect locally so the modal updates without a reload;
+                              // the realtime leads feed moves the row out of the
+                              // Webinar tab on its own.
+                              const ctx: any = { ...(currentLead.unified_context || {}) }
+                              const bc: any = { ...(ctx.windchasers || {}) }
+                              delete bc.lead_type
+                              ctx.windchasers = bc
+                              setFreshLeadData({ ...(currentLead as any), unified_context: ctx })
+                            } else {
+                              console.error('[move-to-leads] failed:', await res.text())
+                            }
+                          } catch (e) {
+                            console.error('[move-to-leads] error:', e)
+                          }
+                          setMovingToLeads(false)
+                        }}
+                        disabled={movingToLeads}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors disabled:opacity-50 hover:bg-[var(--bg-hover)]"
+                        style={{ borderColor: 'var(--border-primary)', color: 'var(--accent-primary)', background: 'var(--bg-secondary)' }}
+                        title="Promote this webinar registrant into the main Leads list"
+                      >
+                        {movingToLeads ? 'Moving…' : 'Move to Leads'}
+                      </button>
                     </div>
                   );
                 })()}

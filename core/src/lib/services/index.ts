@@ -102,6 +102,8 @@ export {
   isPilotSource,
   isParentSource,
   sendParentWelcomeTemplate,
+  sendWebinarConfirm,
+  sendWebinarReminder,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';

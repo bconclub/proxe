@@ -178,6 +178,68 @@ Hi {{parent_name}}, welcome to Windchasers...
 
 ---
 
+## 2c. `windchasers_webinar_confirm_v1` 🔵 PLANNED (submit to Meta)
+
+**Trigger:** Webinar registration arrives (Zoom → Pabbly → `POST /api/agent/leads/inbound` with `form_type: "webinar"`).
+**Sender:** `sendWebinarConfirm()` in `src/lib/services/whatsappSender.ts`.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY |
+| Language | English |
+| Header | — |
+
+**Body (3 NAMED variables):**
+```
+Hi {{customer_name}}, you're registered for {{webinar_name}} on {{webinar_date}}.
+
+The join link will come from Zoom — keep an eye on your email. We'll also remind you here before we go live.
+
+- Team Windchasers
+```
+
+**Variables:**
+| Var | Meaning | Sample |
+|---|---|---|
+| `{{customer_name}}` | First name | `Rahul` |
+| `{{webinar_name}}` | Webinar title | `So You Want To Be A Pilot` |
+| `{{webinar_date}}` | Date/time string as registered | `2026-07-20 17:00 IST` |
+
+**Buttons:** none.
+
+---
+
+## 2d. `windchasers_webinar_reminder_v1` 🔵 PLANNED (submit to Meta)
+
+**Trigger:** ~24h and ~2h before `webinar_date`, fired by `GET /api/cron/webinar-reminder` (hourly, Bearer CRON_SECRET — schedule in the same external scheduler as booking-reminders).
+**Sender:** `sendWebinarReminder()` in `src/lib/services/whatsappSender.ts`.
+
+| Field | Value |
+|---|---|
+| Category | UTILITY |
+| Language | English |
+| Header | — |
+
+**Body (3 NAMED variables):**
+```
+Hi {{customer_name}}, reminder — {{webinar_name}} starts {{when}}.
+
+The Zoom link is in your registration email. See you there!
+
+- Team Windchasers
+```
+
+**Variables:**
+| Var | Meaning | Sample |
+|---|---|---|
+| `{{customer_name}}` | First name | `Rahul` |
+| `{{webinar_name}}` | Webinar title | `So You Want To Be A Pilot` |
+| `{{when}}` | Relative start time | `tomorrow at 5:00 PM` |
+
+**Buttons:** none.
+
+---
+
 ## 3. `windchasers_facebook_welcome` 🟡 PENDING
 
 **Trigger:** Lead submits a Facebook / Meta Lead Form (forwarded via Pabbly Connect).

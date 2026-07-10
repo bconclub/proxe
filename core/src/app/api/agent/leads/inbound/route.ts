@@ -17,6 +17,7 @@ import {
   TEMPLATE_BUTTON_TYPES,
   notifySlackLead,
   sendWhatsAppTemplate,
+  sendWebinarConfirm,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -192,14 +193,18 @@ export async function POST(request: NextRequest) {
       ads: 'ads',
       referral: 'referral',
       organic: 'organic',
+      webinar: 'webinar',
     }
     const normalizedSource = (source || '').toString().trim().toLowerCase()
-    const VALID_TOUCHPOINTS = new Set(['web','whatsapp','voice','social','facebook','google','form','manual','pabbly','ads','referral','organic','meta_forms'])
+    const VALID_TOUCHPOINTS = new Set(['web','whatsapp','voice','social','facebook','google','form','manual','pabbly','ads','referral','organic','meta_forms','webinar'])
     const mappedSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
+    const leadBrand = brand || BRAND_ID
     // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
     // The original raw source is preserved in agent_tasks.metadata.source below.
-    const leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
-    const leadBrand = brand || BRAND_ID
+    // 'webinar' exists only in windchasers' channel_type enum (migration 035) —
+    // other brands' inserts would 22P02, so they coerce to 'form'.
+    let leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
+    if (leadSource === 'webinar' && leadBrand !== 'windchasers') leadSource = 'form'
 
     // The lokazen all_leads.first_touchpoint CHECK constraint only permits the
     // base channels (web/whatsapp/voice/social). A form/ads/meta_forms/manual
@@ -264,6 +269,9 @@ export async function POST(request: NextRequest) {
     // have the data in custom_fields.
     const brandCtxData: Record<string, any> = {}
     const cf2 = (custom_fields || {}) as Record<string, any>
+    // Webinar registration flag (windchasers) — set in the brand block below,
+    // read later for task-skip + confirmation send.
+    let isWebinarReg = false
     const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
@@ -298,6 +306,24 @@ export async function POST(request: NextRequest) {
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
       const educationRaw = String(cf2.education || '').toLowerCase().trim()
       if (educationRaw) brandCtxData.education = educationRaw
+
+      // ── Webinar registration (Zoom → Pabbly) ──────────────────────────────
+      // Registrants are pre-leads: tagged lead_type='webinar' so the Leads
+      // page's Webinar tab can segment them out of the main list. user_type
+      // (student/parent) is NOT touched — that's who they are, this is why
+      // they came.
+      isWebinarReg =
+        normalizedSource === 'webinar' ||
+        String(cf2.form_type || (body as any).form_type || '').toLowerCase().trim() === 'webinar' ||
+        String(cf2.lead_type || (body as any).lead_type || '').toLowerCase().trim() === 'webinar'
+      if (isWebinarReg) {
+        brandCtxData.lead_type = 'webinar'
+        const webinarName = String(cf2.webinar_name || cf2.webinar_topic || cf2.event_name || '').trim()
+        if (webinarName) brandCtxData.webinar_name = webinarName
+        const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || '').trim()
+        if (webinarDate) brandCtxData.webinar_date = webinarDate
+        brandCtxData.webinar_registered_at = now
+      }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
       // total_score is 0–150. Tier is RE-DERIVED on the server from total_score
@@ -581,6 +607,14 @@ export async function POST(request: NextRequest) {
           mergedBrandCtx.scout_submissions_count =
             Number((existingCtx[leadBrand] as any)?.scout_submissions_count || 0) + 1
         }
+        // A webinar registration must never DEMOTE an existing real lead into
+        // the webinar segment: only keep the webinar tag if the lead was
+        // already webinar-tagged. The registration details (webinar_name/date/
+        // registered_at) still merge in either way.
+        if (mergedBrandCtx && brandCtxData.lead_type === 'webinar' &&
+            (existingCtx[leadBrand] as any)?.lead_type !== 'webinar') {
+          delete mergedBrandCtx.lead_type
+        }
         // Attribution is IMMUTABLE — never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
         const mergedAttribution = existingCtx.attribution ?? attribution
@@ -759,6 +793,10 @@ export async function POST(request: NextRequest) {
     const isScoutLead = leadBrand === 'lokazen' && brandCtxData.user_type === 'scout'
     if (isScoutLead) {
       console.log(`[inbound] Scout lead ${leadName} — no follow-up sequence (scout lifecycle only)`)
+    } else if (isWebinarReg) {
+      // Webinar registrants are pre-leads at volume — the confirm + reminder
+      // templates ARE the outreach; no counsellor first_outreach task.
+      console.log(`[inbound] Webinar registration ${leadName} — no first_outreach task`)
     } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
@@ -1057,6 +1095,48 @@ export async function POST(request: NextRequest) {
     const isPatSubmission =
       normalizedSource === 'pat' ||
       String(cfields.form_type || '').toLowerCase() === 'pilot_aptitude_test'
+
+    // ── Webinar registration → confirmation template ─────────────────────────
+    // Guarded: dedup window (re-submits / Pabbly retries), soft-fail while the
+    // template is still in Meta review (no needs_human_followup noise — the
+    // reminder cron + counsellors don't depend on this send).
+    if (phone && isWebinarReg) {
+      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const webinarName = String(cfields.webinar_name || cfields.webinar_topic || '').trim()
+      const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || '').trim()
+      const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, 'windchasers_webinar_confirm_v1')
+      if (confirmAlreadySent) {
+        console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
+      } else try {
+        const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
+        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (windchasers_webinar_confirm_v1 template)`
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: result.success ? bodyText : `[Template send FAILED: windchasers_webinar_confirm_v1]\n\n${bodyText}`,
+          message_type: 'template',
+          metadata: {
+            template_name: 'windchasers_webinar_confirm_v1',
+            template_language: 'en',
+            auto_sent: true,
+            trigger: 'webinar_registration',
+            sent_by: 'system (inbound webhook)',
+            webinar_name: webinarName || null,
+            webinar_date: webinarDate || null,
+            send_succeeded: !!result.success,
+            send_error: result.success ? null : (result.error || 'unknown'),
+          },
+        })
+        if (!result.success) {
+          console.error(`[inbound] Webinar confirm send FAILED lead=${leadId} phone=${phone} error=${result.error}`)
+        } else {
+          console.log(`[inbound] Webinar confirm OK lead=${leadId} phone=${phone} webinar=${webinarName}`)
+        }
+      } catch (err: any) {
+        console.error(`[inbound] Webinar confirm EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
+      }
+    }
 
     // ── PAT result → fires immediately (no calendar dependency) ──────────────
     // Demo confirmations are sent AFTER the calendar event below so we have

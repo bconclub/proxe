@@ -1,3 +1,12 @@
+## 2026-07-07 · feat(windchasers): webinar leads — Zoom intake, Webinar tab, confirm + reminder templates
+
+- leads/inbound recognizes webinar registrations (form_type/lead_type/source = 'webinar', windchasers-gated): tags unified_context.windchasers.lead_type='webinar' + webinar_name/date, touchpoint 'webinar' (migration 035 adds the enum value), fires windchasers_webinar_confirm_v1 (dedup-guarded, soft-fails until Meta approves). Re-registration never demotes an existing real lead; webinar regs skip the first_outreach counsellor task.
+- Leads page (windchasers): "Leads | Webinar" toggle — default view excludes registrants, Webinar view shows only them with a webinar name/date column.
+- Lead modal: webinar chip + "Move to Leads" button → set-type endpoint made brand-generic (new type 'lead' clears the segment tag; lokazen behavior unchanged and it was UI-less before).
+- New cron /api/cron/webinar-reminder (hourly, CRON_SECRET): 24h + 2h WhatsApp reminders before webinar_date, idempotent via per-step context markers. windchasers_webinar_reminder_v1 template spec added to templates.md (both templates need Meta submission).
+- User-facing: webinar registrants land in their own tab with confirm/remind automation; one click promotes them to real leads.
+- `(pending-sha)`
+
 ## 2026-07-07 · fix(dashboard): Activity Sources list no longer clips — scrolls, shows up to 10 sources
 
 - The ranked-source list used justify-center + overflow-hidden: with 6+ sources the stack centered and clipped BOTH ends (top row half-cut, bottom rows hidden). Now my-auto + overflow-y-auto — centered when it fits, scrolls from the top when not.

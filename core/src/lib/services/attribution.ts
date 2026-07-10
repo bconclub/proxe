@@ -66,6 +66,7 @@ const FIRST_TOUCH_LABELS: Record<string, string> = {
   'whatsapp pop up': 'WA Popup',
   meta_lead_form: 'Meta Lead Form',
   facebook_lead: 'Meta Lead Form',
+  webinar: 'Webinar',
   newsletter: 'Newsletter',
   contact: 'Contact Form',
   landing_page: 'Landing Page',

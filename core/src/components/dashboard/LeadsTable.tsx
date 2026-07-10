@@ -293,6 +293,10 @@ export default function LeadsTable({
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
   const showAviationColumns = brandId === 'windchasers'
+  // Webinar segment (windchasers): registrants are tagged
+  // unified_context.windchasers.lead_type='webinar' at intake. They get their
+  // own tab so webinar volume never floods the main Leads list.
+  const showWebinarTab = brandId === 'windchasers'
   // Gigs = lokazen's non-lead worker segment. Scout + Connector are its types;
   // both are kept out of the sales Leads view and counts. The Gigs page filters
   // to the 'gig' umbrella (scout OR connector).
@@ -316,6 +320,7 @@ export default function LeadsTable({
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
+  const [webinarView, setWebinarView] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -411,6 +416,16 @@ export default function LeadsTable({
       })
     }
 
+    // Webinar segment (windchasers): the Webinar tab shows ONLY registrants;
+    // the default Leads view excludes them. Orthogonal to the student/parent
+    // user-type filter, which still applies within either view.
+    if (showWebinarTab) {
+      filtered = filtered.filter((lead) => {
+        const isWebinar = lead.unified_context?.[brandId]?.lead_type === 'webinar'
+        return webinarView ? isWebinar : !isWebinar
+      })
+    }
+
     if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
@@ -454,7 +469,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores, webinarView])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -677,11 +692,33 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+            {webinarView ? 'Webinar' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
           </span>
+
+          {/* Leads | Webinar tab (windchasers) */}
+          {showWebinarTab && (
+            <div role="tablist" aria-label="Leads or Webinar" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+              {([{ key: false, label: 'Leads' }, { key: true, label: 'Webinar' }] as const).map((t) => (
+                <button
+                  key={t.label}
+                  role="tab"
+                  aria-selected={webinarView === t.key}
+                  onClick={() => setWebinarView(t.key)}
+                  className="px-2 py-0.5 text-xs font-medium transition-colors"
+                  style={{
+                    backgroundColor: webinarView === t.key ? 'var(--button-bg)' : 'var(--bg-primary)',
+                    color: webinarView === t.key ? 'var(--text-button)' : 'var(--text-secondary)',
+                    borderRight: '1px solid var(--border-primary)',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           {presetFilter !== 'all' && (
             <Link
               href="/dashboard/leads"
@@ -966,6 +1003,7 @@ export default function LeadsTable({
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
+            {webinarView && <col style={{ width: '11%' }} />}
             {scoutView && <col style={{ width: '9%' }} />}
             {scoutView && <col style={{ width: '8%' }} />}
             <col style={{ width: '9%' }} />
@@ -1000,6 +1038,9 @@ export default function LeadsTable({
                   { label: 'Course', align: 'center' as const },
                   { label: 'PAT',    align: 'center' as const },
                 ] : []),
+                ...(webinarView ? [
+                  { label: 'Webinar', align: 'center' as const },
+                ] : []),
                 ...(scoutView ? [
                   { label: 'Area Covered',     align: 'center' as const },
                   { label: 'Knows Properties', align: 'center' as const },
@@ -1020,11 +1061,11 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 12 : scoutView ? 11 : 9}
+                  colSpan={(showAviationColumns ? 12 : scoutView ? 11 : 9) + (webinarView ? 1 : 0)}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
+                  {webinarView ? 'No webinar registrations yet' : brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
                 </td>
               </tr>
             ) : (
@@ -1970,6 +2011,27 @@ export default function LeadsTable({
                             >
                               {patScore100}
                               <span className="text-[9px] opacity-70">/100</span>
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      )
+                    })()}
+
+                    {/* WEBINAR: which webinar + date (webinar view only) */}
+                    {webinarView && (() => {
+                      const wc = lead.unified_context?.[brandId] || {}
+                      return (
+                        <td className="px-3 py-2 text-xs text-center">
+                          {wc.webinar_name || wc.webinar_date ? (
+                            <span
+                              className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-normal break-words leading-snug max-w-[170px] align-middle"
+                              style={{ background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)' }}
+                              title={[wc.webinar_name, wc.webinar_date].filter(Boolean).join(' · ')}
+                            >
+                              {wc.webinar_name || 'Webinar'}
+                              {wc.webinar_date ? <span className="block text-[9px] font-medium opacity-80">{wc.webinar_date}</span> : null}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>-</span>
