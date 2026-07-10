@@ -1,3 +1,9 @@
+## 2026-07-10 · fix(brain+widget): mini-orb strobe + chat-widget open flicker
+
+- Brain mini-orb (docked): stopped the strobe — the airy small-canvas thinning was subsampling the per-frame depth-sorted array (different dots each frame). Now a fixed 1/airy subset by particle identity → sparse but smoothly rotating. (`ddf809cf`)
+- Chat widget open (embedded on brand sites): removed the flicker — a post-paint effect was repositioning the panel (centered) and killing the entry transform mid-animation. Now useLayoutEffect + the panel anchors above the launcher matching CSS (no jump), and slideUpBubble is transform-only (no opacity fade → no backdrop-filter repaint flash). Also fixed a hydration mismatch from apostrophes in the widget-layout `<style>` comment.
+- `(pending-sha)`
+
 ## 2026-07-07 · fix(widget): links in agent messages are now clickable
 
 - formatText() linkifies bare URLs and markdown [text](url) into <a target=_blank> anchors (underlined, bold), so "Register here: https://…" is tappable in the embedded widget instead of plain text.
