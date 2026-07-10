@@ -170,6 +170,10 @@ User's message: ${input.message}`
   // from re-litigating history it shouldn't assume.
   if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
 
+  // 5e. Never fabricate payout/submission/verification status (Lokazen). Kills
+  // the invented "your submission is in the queue for verification" line.
+  if (brandId === 'lokazen') systemPrompt += statusHonestyDirective();
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -331,6 +335,24 @@ User's message: ${input.message}`
   cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
   cleanedResponse = advanceLokazenBookingAfterEmail(cleanedResponse, input, brandId);
 
+  // ANTI-REPEAT GUARD (deterministic): the model sometimes re-sends a
+  // near-identical line turn after turn — e.g. the same "the team handles
+  // payouts... your submission is in the queue for verification" to both "Hey"
+  // and "Yes". That reads as broken and re-asserts status we don't know. If this
+  // reply is ~the same as any of the last few things we sent, don't parrot it —
+  // hand to a human once and stop. Compares against the last 3 assistant turns.
+  if (input.channel === 'whatsapp' && cleanedResponse && !needsBookingTools) {
+    const recentAssistant = (input.conversationHistory || [])
+      .filter((m) => m.role === 'assistant')
+      .slice(-3)
+      .map((m) => m.content);
+    if (recentAssistant.some((prev) => isNearDuplicate(cleanedResponse, prev))) {
+      console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" — suppressing the parrot, escalating to a human.`);
+      await flagForHumanFollowup(supabase, input, `Repeat-reply guard: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
+      cleanedResponse = "You've got it — I've looped the Lokazen team in directly so a person can pick this up. Anything specific you'd like me to add for them?";
+    }
+  }
+
   // EMPTY-RESPONSE GUARD: never hand the WhatsApp route an empty reply — it would
   // send the generic "Give me a moment, I'll have someone from the team get in
   // touch" holding line, which repeats turn after turn and reads as broken (the
@@ -484,6 +506,8 @@ User's message: ${input.message}`
     // Bare greeting → plain hello back, don't re-open the prior topic (see the
     // WhatsApp path). Appended last so it wins.
     if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
+    // Never fabricate payout/submission/verification status (see WhatsApp path).
+    if (brandId === 'lokazen') systemPrompt += statusHonestyDirective();
 
     // 4. Generate response — true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
@@ -714,6 +738,46 @@ The customer's latest message is JUST a greeting — nothing else. Treat it as a
 - Reply with ONE short, warm greeting and an open question like "how can I help?" / "what can I do for you today?"${first ? ` Open with their first name (${first}).` : ''}
 - Do NOT bring up payments, payouts, submissions, verification, bookings, site visits, or "the team is looking into it" — unless THEY raise it in THIS message. They didn't.
 - Do NOT assume anything is important, urgent, or unresolved. Let them tell you what they need. Keep it light and let them lead.`;
+}
+
+/**
+ * Appended for Lokazen. The model kept fabricating status it has no way to know
+ * ("your submission is in the queue for verification", "the team gets back the
+ * same day", "they have your number") and re-sending it verbatim. We have NO
+ * payout/submission/verification system to read, so any such claim is invented.
+ */
+function statusHonestyDirective(): string {
+  return `\n\n=================================================================================
+DO NOT INVENT STATUS (LOCKED)
+=================================================================================
+You have NO access to any payout, payment, submission, verification, application, KYC, or order system. You do NOT know the live status, queue position, or timeline of any of these — ever.
+- NEVER assert or imply a status you cannot see: e.g. "your submission is in the queue for verification", "the team usually gets back the same day", "they have your number", "it's being processed", "you'll hear back by <time>". These are fabrications — do not say them.
+- If they ask about status and the team is already handling it: say honestly you don't have the live status in front of you, confirm it's been passed to the Lokazen team, and ask if there's anything specific to add. ONE short line.
+- Do NOT re-send a reassurance you already gave. If you've said it once, either add something real or hand it to the team — never repeat the same line.`;
+}
+
+/** Normalize for near-duplicate detection: lowercase, collapse to word tokens. */
+function normalizeForCompare(s: string): string {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * True when `a` is essentially the same message as `b` — identical after
+ * normalization, or ≥80% token overlap (Jaccard). Catches the "same payout line
+ * sent to both 'Hey' and 'Yes'" parrot loop.
+ */
+function isNearDuplicate(a: string, b: string): boolean {
+  const na = normalizeForCompare(a);
+  const nb = normalizeForCompare(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const ta = new Set(na.split(' '));
+  const tb = new Set(nb.split(' '));
+  if (ta.size < 4 || tb.size < 4) return false; // too short to judge
+  let inter = 0;
+  ta.forEach((t) => { if (tb.has(t)) inter++; });
+  const union = ta.size + tb.size - inter;
+  return union > 0 && inter / union >= 0.8;
 }
 
 function isLokazenBookingAction(input: AgentInput): boolean {
