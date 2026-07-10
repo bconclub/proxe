@@ -1,3 +1,11 @@
+## 2026-07-10 · feat(core): v0.1 versioning system + release notes
+
+- Version reset to **0.1.0** — the mobile release. package.json / .build-info / generated-version.ts now agree (were 0.2.0 / 0.0.130 / 0.0.19).
+- Auto-versioning live: a pre-commit hook runs scripts/bump-version.js on every commit that writes core/ — 0.1.1, 0.1.2, … carry at 100 → 0.2.0. Manual version sets (commits staging .build-info) skip the auto-bump.
+- What's-new feed rewritten: newest "PROXe is live on mobile" (v0.1 chip), then Quick Action Brain (desktop), The Brain, Evals live for WhatsApp + call testing. Scrollbar entry removed.
+- User-facing: bell shows "PROXe is live on mobile"; sidebar footer reads v0.1.0.
+- `(pending-sha)`
+
 ## 2026-07-10 · feat(core): full mobile-responsive pass — every dashboard page usable at 375px
 
 - Shell: drawer nav polished — 44px tap targets, scroll-lock while open, safe-area padding, drawer always opens EXPANDED on phones (a desktop-collapsed rail used to open as a 56px sliver). New shared `useIsMobile` hook + opt-in CSS helpers (`.rgrid-4/.rgrid-2` grid collapse, `.safe-b`, `.touch-44`, `.mobile-below-topbar`); `viewport-fit=cover` for notched phones.
