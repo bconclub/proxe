@@ -278,7 +278,7 @@ export async function POST(request: NextRequest) {
     // Cabin-crew lead flag (windchasers) — set in the brand block below, read
     // later for the dedicated cabin-crew welcome + first_outreach skip.
     let isCabinCrewLead = false
-    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    const audienceRaw = String(cf2.audience || cf2.user_type || (body as any).audience || (body as any).user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
       audienceRaw === 'parent' ||
@@ -337,9 +337,9 @@ export async function POST(request: NextRequest) {
         String(cf2.lead_type || (body as any).lead_type || '').toLowerCase().trim() === 'webinar'
       if (isWebinarReg) {
         brandCtxData.lead_type = 'webinar'
-        const webinarName = String(cf2.webinar_name || cf2.webinar_topic || cf2.event_name || '').trim()
+        const webinarName = String(cf2.webinar_name || cf2.webinar_topic || cf2.event_name || (body as any).webinar_name || (body as any).event_name || '').trim()
         if (webinarName) brandCtxData.webinar_name = webinarName
-        const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || '').trim()
+        const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || (body as any).webinar_date || '').trim()
         if (webinarDate) brandCtxData.webinar_date = webinarDate
         brandCtxData.webinar_registered_at = now
       }
@@ -1126,8 +1126,8 @@ export async function POST(request: NextRequest) {
     // reminder cron + counsellors don't depend on this send).
     if (phone && isWebinarReg) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
-      const webinarName = String(cfields.webinar_name || cfields.webinar_topic || '').trim()
-      const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || '').trim()
+      const webinarName = String(cfields.webinar_name || cfields.webinar_topic || (body as any).webinar_name || (body as any).event_name || '').trim()
+      const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || (body as any).webinar_date || '').trim()
       // Parents vs students get a different welcome (user's ask) — routed by the
       // audience the landing page tagged (unified_context.windchasers.user_type).
       const isParentAudience = brandCtxData.user_type === 'parent'
