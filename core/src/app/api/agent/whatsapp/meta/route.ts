@@ -764,6 +764,21 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       await tagMetaFormClickThrough(leadId, messageText, supabase);
     }
 
+    // Webinar "Join WhatsApp Group" quick-reply tap (from the confirmation
+    // template) → send the webinar group link straight away, deterministically
+    // (never leave the LLM to guess or forget it). Windchasers only.
+    if (brand === 'windchasers' && /\bjoin\b[\s\S]*\bwhatsapp\b[\s\S]*\bgroup\b/i.test(messageText || '')) {
+      const WEBINAR_GROUP_URL = 'https://chat.whatsapp.com/IEi11O7U90T88K2d7YMOxx';
+      await sendAndLogReply(
+        supabase,
+        leadId,
+        customerPhone,
+        `You're in! Here's our webinar WhatsApp group for updates and session resources:\n\n${WEBINAR_GROUP_URL}\n\nSee you there.\n- Team Windchasers`,
+        { quickReplyTrigger: 'webinar_join_group' },
+      );
+      return;
+    }
+
     // A returning lokazen scout/owner/brand texting "Hi" has NO conversation
     // history in this session, so detectLokazenAudience() (which only reads the
     // live conversation) has nothing to detect — the generic brand/owner welcome
