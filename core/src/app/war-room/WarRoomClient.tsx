@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { CONSTITUENCIES, DISTRICTS, TOTAL_SEATS } from '@/lib/war-room/constituencies';
 import { INTENSITY_TIERS } from '@/lib/pop/intensity';
 import { type ColorMode } from './PunjabMap';
@@ -124,18 +125,6 @@ const EMPTY: Filters = { constituency: '', district: '', channel: '', language: 
 function mask(name: string | null, c: string | null) { if (name && name.trim().length > 1) { const f = name.trim().split(/\s+/)[0]; return f.length > 2 ? f[0] + '••••' : f; } return `Constituent, ${c || 'Punjab'}`; }
 function ago(iso: string) { const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000)); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`; }
 
-// War Room is used on phones a lot - switch from the fixed single-viewport
-// desktop grid to a stacked, scrolling layout below this width.
-function useIsMobile(bp = 820) {
-  const [m, setM] = useState(false);
-  useEffect(() => {
-    const check = () => setM(window.innerWidth < bp);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, [bp]);
-  return m;
-}
 
 export default function WarRoomClient() {
   const [data, setData] = useState<WarRoomData | null>(null);
@@ -143,7 +132,9 @@ export default function WarRoomClient() {
   const [mode, setMode] = useState<ColorMode>('heat');
   const [selected, setSelected] = useState<string | null>(null);
   const [pulse, setPulse] = useState<string | null>(null);
-  const mobile = useIsMobile();
+  // War Room is used on phones a lot - switch from the fixed single-viewport
+  // desktop grid to a stacked, scrolling layout below this width.
+  const mobile = useIsMobile(820);
   const sbRef = useRef<ReturnType<typeof createClient> | null>(null);
   // Live Feed panel tab: citizen feed vs leader directives
   const [feedTab, setFeedTab] = useState<'feed' | 'directives'>('feed');

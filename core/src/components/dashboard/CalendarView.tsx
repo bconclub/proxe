@@ -518,7 +518,17 @@ function getEventColor(booking: Booking): string {
                     >
                       {format(day, 'd')}
                     </div>
-                    <div className="flex-1 space-y-px overflow-y-auto">
+                    {/* Phone: text pills are unreadable in ~48px cells — show
+                        count dots instead; the tap-day agenda below lists them. */}
+                    <div className="md:hidden flex flex-wrap gap-0.5 items-start">
+                      {dayBookings.slice(0, 4).map((booking) => (
+                        <span key={booking.id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getEventColor(booking) }} />
+                      ))}
+                      {dayBookings.length > 4 && (
+                        <span className="text-[8px] leading-none" style={{ color: 'var(--text-secondary)' }}>+{dayBookings.length - 4}</span>
+                      )}
+                    </div>
+                    <div className="hidden md:block flex-1 space-y-px overflow-y-auto">
                       {dayBookings.map((booking) => {
                         const eventColor = getEventColor(booking)
                         return (
@@ -536,6 +546,34 @@ function getEventColor(booking: Booking): string {
                   </div>
                 )
               })}
+            </div>
+            {/* Phone: tap-day agenda — lists the selected day's bookings the
+                dot cells can't show. Tap → same booking modal. */}
+            <div className="md:hidden flex-shrink-0 max-h-[40%] overflow-y-auto border-t mt-1 pt-1" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="text-[10px] font-semibold uppercase tracking-wide px-1 py-1" style={{ color: 'var(--text-secondary)' }}>
+                {format(selectedDate, 'EEE, MMM d')}
+              </div>
+              {getBookingsForDate(selectedDate).length === 0 ? (
+                <div className="px-1 pb-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>No bookings</div>
+              ) : (
+                getBookingsForDate(selectedDate).map((booking) => (
+                  <button
+                    key={booking.id}
+                    type="button"
+                    onClick={(e) => handleBookingModalOpen(booking, e)}
+                    className="w-full text-left flex items-center gap-2 px-1 py-2 border-b"
+                    style={{ borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getEventColor(booking) }} />
+                    <span className="text-[12px] font-medium flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                      {booking.booking_time?.substring(0, 5)}
+                    </span>
+                    <span className="text-[12px] truncate" style={{ color: 'var(--text-primary)' }}>
+                      {booking.name || 'Unnamed'}
+                    </span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
         )}

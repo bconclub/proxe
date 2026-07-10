@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, isValidElement, cloneElement, type ReactNode } from 'react'
 import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
@@ -1024,7 +1024,7 @@ export default function FounderDashboard() {
             const lad = metrics.campaignHome.ladder!
             const pctOf = (n: number) => (lad.voters ? `${Math.round((100 * n) / lad.voters)}% of voters` : '')
             return (
-              <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-center sm:justify-between gap-0 sm:gap-1 py-2 sm:py-6">
                 <EngineNode icon={<MdPeople size={26} />} color="#3B82F6" count={engK(lad.voters)} label="Voters" sub="reached" />
                 <EngineNode icon={<MdFavorite size={26} />} color="#22c55e" count={engK(lad.supporters)} label="Supporters" sub={pctOf(lad.supporters)} />
                 <EngineNode icon={<MdLocalFireDepartment size={26} />} color="#f59e0b" count={engK(lad.volunteers)} label="Volunteers" sub={pctOf(lad.volunteers)} />
@@ -1033,7 +1033,7 @@ export default function FounderDashboard() {
               </div>
             )
           })() : (
-          <div className="flex-1 flex items-center justify-between gap-1 py-4 sm:py-6">
+          <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-center sm:justify-between gap-0 sm:gap-1 py-2 sm:py-6">
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label={brandLabel('Total Leads')} sub={engTopSub} />
             {isGigsView ? (
               <EngineNode icon={<MdAssignment size={28} />} color="#22c55e" count={engK(gigStages.kycStarted)} label="KYC Started" sub={engPct(gigStages.kycStarted)} />
@@ -1583,11 +1583,28 @@ function EngineNode({ icon, color, count, label, sub, last }: {
 }) {
   return (
     <>
-      <div className="flex flex-col items-center text-center flex-1 min-w-[64px]">
+      {/* Desktop: the funnel circle. Phone: a compact stat ROW instead — five
+          64px circles + big numbers never fit 375px, and larger counts (100/
+          1000) made it worse. Rows grow with the number, funnel reads
+          top→bottom. */}
+      <div className="hidden sm:flex flex-col items-center text-center flex-1 min-w-[64px]">
         <span className="flex h-16 w-16 items-center justify-center rounded-full mb-3" style={{ backgroundColor: `${color}1f`, color }}>{icon}</span>
         <span className="text-3xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{count}</span>
         <span className="text-xs mt-1.5 leading-tight" style={{ color: 'var(--text-secondary)' }}>{label}</span>
         {sub && <span className="text-[11px] mt-0.5 font-medium" style={{ color }}>{sub}</span>}
+      </div>
+      <div
+        className="flex sm:hidden items-center gap-3 py-2.5"
+        style={{ borderBottom: last ? 'none' : '1px solid var(--border-primary)' }}
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: `${color}1f`, color }}>
+          {isValidElement(icon) ? cloneElement(icon as React.ReactElement<{ size?: number }>, { size: 18 }) : icon}
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-xs font-medium leading-tight truncate" style={{ color: 'var(--text-primary)' }}>{label}</span>
+          {sub && <span className="block text-[10.5px] leading-tight truncate" style={{ color }}>{sub}</span>}
+        </span>
+        <span className="text-xl font-bold shrink-0" style={{ color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{count}</span>
       </div>
       {!last && <MdArrowForward className="shrink-0 mx-0.5 hidden sm:block" size={18} style={{ color: 'var(--text-muted)' }} />}
     </>

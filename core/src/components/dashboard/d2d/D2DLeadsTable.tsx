@@ -115,7 +115,48 @@ export default function D2DLeadsTable({ visits, onRowClick }: { visits: D2DVisit
 
   return (
     <div style={{ border: '1px solid var(--border-primary)', borderRadius: 12, overflow: 'hidden', backgroundColor: 'var(--bg-secondary)' }}>
-      <div style={{ overflowX: 'auto' }}>
+      {/* Mobile: card list — same visits, tap opens the same drawer */}
+      <div className="md:hidden">
+        {rows.length === 0 && (
+          <div style={{ padding: '32px 12px', textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>No visits match these filters.</div>
+        )}
+        {rows.map((v) => {
+          const o = D2D_OUTCOME[v.outcome]
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onRowClick(v)}
+              style={{
+                display: 'flex', flexDirection: 'column', gap: 6, width: '100%', textAlign: 'left',
+                padding: '12px', border: 'none', borderBottom: '1px solid var(--border-primary)',
+                backgroundColor: 'transparent', cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {v.householdHead}
+                </span>
+                <OutcomePill v={v} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 4, color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle, rgba(240,108,24,0.12))' }}>AC {v.acNo}</span>
+                <span style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{v.constituency}</span>
+                {v.survey?.grievanceCategory && <GrievancePill cat={v.survey.grievanceCategory} />}
+                <LeanCell lean={v.survey?.lean} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <WorkerAvatar name={v.workerName} size={20} />
+                <span style={{ fontSize: 11.5, color: 'var(--text-secondary)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.workerName}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: o.color }} />{timeAgo(v.visitedAt)}
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <div className="hidden md:block" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
           <colgroup>
             <col style={{ width: '17%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13%' }} />

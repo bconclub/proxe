@@ -869,44 +869,106 @@ export default function LeadsTable({
           (instead of the page scrolling), which is what makes the sticky <thead>
           actually stay put. Without min-h-0 the child grows to content height,
           the page scrolls, and the "sticky" header rides away with it. */}
-      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6">
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6 safe-b">
+        {/* Mobile: card list (below md) — same rows, tap opens the same
+            LeadDetailsModal. The full table stays desktop-only. */}
+        <div className="md:hidden">
+          {filteredLeads.length === 0 ? (
+            <div className="px-3 py-8 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
+              {loading ? 'Loading...' : 'No leads found'}
+            </div>
+          ) : (
+            filteredLeads.map((lead) => {
+              const calculatedScore = calculatedScores[lead.id]
+              const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
+              const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
+              const displayStage = brandLabel(stage || 'New')
+              const stageColor = getStageColor(stage || 'New')
+              const uc = lead.unified_context || {}
+              const resolvedName =
+                realName(uc?.whatsapp?.profile?.full_name) ||
+                realName(uc?.web?.profile?.full_name) ||
+                realName(lead.name)
+              const cleanEmail = realEmail(lead.email)
+              const displayName = resolvedName || cleanEmail || lead.phone || '-'
+              const lastActivity = lead.last_interaction_at || lead.timestamp
+              return (
+                <button
+                  key={lead.id}
+                  type="button"
+                  onClick={() => handleRowClick(lead)}
+                  className="w-full text-left px-3 py-3 border-b flex flex-col gap-1.5"
+                  style={{ borderColor: 'var(--border-primary)', background: 'transparent' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 min-w-0 truncate text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {displayName}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0" style={stageColor.style}>
+                      {displayStage}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    {lead.phone && <span className="truncate">{lead.phone}</span>}
+                    {score != null && <span className="flex-shrink-0">Score {score}</span>}
+                    {lastActivity && (
+                      <span className="ml-auto flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        {formatDateTime(lastActivity)}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            })
+          )}
+        </div>
         {/* min-width so the many columns keep readable widths and the wrapper
             scrolls horizontally on small screens, instead of squishing (and
             clipping) every column to fit a phone. */}
-        <table className="w-full" style={{ tableLayout: 'fixed', minWidth: 900 }}>
+        <table className="w-full hidden md:table" style={{ tableLayout: 'fixed', minWidth: 900 }}>
+          {/* Same-line trailing comments inside <colgroup> leave whitespace
+              text nodes React rejects as colgroup children (hydration warning)
+              — keep comments on their own lines. */}
           {brandId === 'pop' ? (
             <colgroup>
-              {/* POP constituent view - widths sum to 100% */}
-              <col style={{ width: '13%' }} />  {/* Constituent (name + captured) */}
-              <col style={{ width: '8%' }} />   {/* Type (intensity tier) */}
-              <col style={{ width: '10%' }} />  {/* Contact (phone) */}
-              <col style={{ width: '9%' }} />   {/* Came in via (magnet) */}
-              <col style={{ width: '9%' }} />   {/* Last Touch (channel + actor) */}
-              <col style={{ width: '12%' }} />  {/* Constituency (+ district·booth) */}
-              <col style={{ width: '17%' }} />  {/* Grievance (category + salience + text) */}
-              <col style={{ width: '8%' }} />   {/* Lean */}
-              <col style={{ width: '8%' }} />   {/* Intent */}
-              <col style={{ width: '6%' }} />   {/* Loop */}
+              {/* POP constituent view - widths sum to 100%:
+                  Constituent (name + captured) · Type (intensity tier) ·
+                  Contact (phone) · Came in via (magnet) · Last Touch
+                  (channel + actor) · Constituency (+ district·booth) ·
+                  Grievance (category + salience + text) · Lean · Intent · Loop */}
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '17%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '6%' }} />
             </colgroup>
           ) : (
           <colgroup>
             {/* Tightened column widths: Lead/Contact were oversized,
                 Booking was a wide text column (now a compact chip),
-                Type/Course are narrow chip columns. */}
-            <col style={{ width: '14%' }} />  {/* Lead */}
-            <col style={{ width: '14%' }} />  {/* Contact */}
-            <col style={{ width: '8%' }} />   {/* Source (origin, immutable) */}
-            <col style={{ width: '7%' }} />   {/* Last Touch */}
-            <col style={{ width: '6%' }} />   {/* Score */}
-            <col style={{ width: '10%' }} />  {/* Stage */}
-            <col style={{ width: '7%' }} />   {/* Active */}
-            <col style={{ width: '11%' }} />  {/* Booking (chip) */}
+                Type/Course are narrow chip columns.
+                Order: Lead · Contact · Source (origin, immutable) ·
+                Last Touch · Score · Stage · Active · Booking (chip) ·
+                [aviation ×3] · [scout: Area Covered · Knows Properties] · Owner */}
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '10%' }} />
+            <col style={{ width: '7%' }} />
+            <col style={{ width: '11%' }} />
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
-            {scoutView && <col style={{ width: '9%' }} />}  {/* Area Covered */}
-            {scoutView && <col style={{ width: '8%' }} />}  {/* Knows Properties */}
-            <col style={{ width: '9%' }} />   {/* Owner */}
+            {scoutView && <col style={{ width: '9%' }} />}
+            {scoutView && <col style={{ width: '8%' }} />}
+            <col style={{ width: '9%' }} />
           </colgroup>
           )}
           <thead className="sticky top-0 z-10" style={{ backgroundColor: 'var(--bg-secondary)' }}>

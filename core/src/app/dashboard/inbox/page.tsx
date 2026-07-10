@@ -21,7 +21,11 @@ import {
   MdFlightTakeoff,
   MdMessage,
   MdSchedule,
+  MdArrowBack,
+  MdInfoOutline,
+  MdClose,
 } from 'react-icons/md'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -534,6 +538,10 @@ export default function InboxPage() {
   const [formCardExpanded, setFormCardExpanded] = useState(false)
   const [plannedActions, setPlannedActions] = useState<any[]>([])
   const [loadingPlanned, setLoadingPlanned] = useState(false)
+  // Mobile: WhatsApp-style stack — list full-screen until a chat is picked,
+  // then the thread takes over. The details sidebar becomes an overlay.
+  const isMobile = useIsMobile()
+  const [showDetailsMobile, setShowDetailsMobile] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -556,8 +564,11 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
 
-  // Auto-select first conversation when loaded (if none selected via URL)
+  // Auto-select first conversation when loaded (if none selected via URL).
+  // On mobile the list IS the landing view — auto-selecting would skip
+  // straight into a thread, so only deep links (?lead=) open one there.
   useEffect(() => {
+    if (isMobile) return
     if (conversations.length > 0 && !selectedLeadId && !searchParams.get('lead')) {
       const first = conversations[0]
       setSelectedLeadId(first.lead_id)
@@ -565,7 +576,10 @@ export default function InboxPage() {
         setSelectedChannel(first.channels[0])
       }
     }
-  }, [conversations, selectedLeadId, searchParams])
+  }, [conversations, selectedLeadId, searchParams, isMobile])
+
+  // Mobile: close the details overlay whenever the thread changes
+  useEffect(() => { setShowDetailsMobile(false) }, [selectedLeadId])
 
   // bcon: collapse the form card again whenever a different lead is opened.
   useEffect(() => { setFormCardExpanded(false) }, [selectedLeadId])
@@ -1671,13 +1685,13 @@ export default function InboxPage() {
       />
 
       {/* Left Panel - Conversations List
-          Widened 320 → 352 (~10%) for breathing room per user feedback. */}
+          Widened 320 → 352 (~10%) for breathing room per user feedback.
+          Mobile: full-screen list; hidden once a thread is open (stack). */}
       <div
-        className="w-[352px] flex flex-col border-r flex-shrink-0 overflow-hidden"
+        className={`${selectedLeadId ? 'hidden md:flex' : 'flex'} w-full md:w-[352px] md:min-w-[300px] flex-col border-r flex-shrink-0 overflow-hidden`}
         style={{
           background: 'var(--bg-secondary)',
           borderColor: 'var(--border-primary)',
-          minWidth: '300px',
         }}
       >
         {/* Search + Filters - flush at top */}
@@ -1894,8 +1908,9 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+      {/* Right Panel - Messages. Mobile: takes over full-screen when a thread
+          is open (WhatsApp stack); hidden while browsing the list. */}
+      <div className={`${selectedLeadId ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-w-0 overflow-hidden`} style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -1905,6 +1920,40 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
+            {/* Mobile thread header — back to list, lead name, details toggle.
+                Desktop keeps its chrome-less thread (md:hidden). */}
+            <div
+              className="md:hidden flex items-center gap-2 px-2 border-b flex-shrink-0"
+              style={{ height: '52px', background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+            >
+              <button
+                onClick={() => {
+                  setSelectedLeadId(null)
+                  setSelectedChannel('')
+                  setMessageChannelFilter('all')
+                  setShowDetailsMobile(false)
+                  // Drop a stale ?lead= deep link so refresh lands on the list
+                  if (searchParams.get('lead')) router.replace('/dashboard/inbox')
+                }}
+                className="touch-44 flex items-center justify-center rounded-md"
+                style={{ color: 'var(--text-primary)' }}
+                aria-label="Back to conversations"
+              >
+                <MdArrowBack size={22} />
+              </button>
+              <span className="flex-1 min-w-0 truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {selectedConversation?.lead_name || selectedConversation?.lead_phone || 'Conversation'}
+              </span>
+              <button
+                onClick={() => setShowDetailsMobile(true)}
+                className="touch-44 flex items-center justify-center rounded-md"
+                style={{ color: 'var(--text-secondary)' }}
+                aria-label="Lead details"
+              >
+                <MdInfoOutline size={20} />
+              </button>
+            </div>
+
             {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
@@ -2092,7 +2141,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="w-[500px] max-w-[88%] rounded-xl px-3.5 py-2.5 border"
+                          className="md:w-[500px] max-w-[88%] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
@@ -2597,12 +2646,28 @@ export default function InboxPage() {
         )}
       </div>
 
-      {/* Right Panel - Lead Details Sidebar */}
+      {/* Right Panel - Lead Details Sidebar. Desktop: persistent 380px column.
+          Mobile: full-screen overlay toggled from the thread header's ⓘ. */}
       {selectedLeadId && (
         <div
-          className="flex w-[380px] flex-col border-l overflow-y-auto flex-shrink-0"
+          className={`${showDetailsMobile ? 'flex fixed inset-0 z-[80] w-full' : 'hidden'} md:flex md:static md:inset-auto md:z-auto md:w-[380px] flex-col border-l overflow-y-auto flex-shrink-0`}
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
+          {/* Mobile overlay header */}
+          <div
+            className="md:hidden flex items-center justify-between px-3 border-b flex-shrink-0 sticky top-0 z-10"
+            style={{ height: '52px', background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          >
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Lead details</span>
+            <button
+              onClick={() => setShowDetailsMobile(false)}
+              className="touch-44 flex items-center justify-center rounded-md"
+              style={{ color: 'var(--text-secondary)' }}
+              aria-label="Close details"
+            >
+              <MdClose size={20} />
+            </button>
+          </div>
           {isAnonymousSession ? (
             // Anonymous web visitor — no all_leads row to render. Show a
             // tiny stub so the panel doesn't sit on "Loading details..."

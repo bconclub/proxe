@@ -47,7 +47,10 @@ export default function BrainPage() {
 
   return (
     <>
-      <div style={{ height: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
+      {/* Phone: 100dvh (not vh — mobile URL bar) minus the 56px hamburger bar;
+          desktop keeps the original 100vh - 3rem. */}
+      <style>{`@media (max-width: 767px) { .brain-page-shell { height: calc(100dvh - var(--mobile-topbar-h, 56px) - 3rem) !important; } }`}</style>
+      <div className="brain-page-shell" style={{ height: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>
         {/* Header + tab rail */}
         <div style={{ padding: '14px 20px 10px', flexShrink: 0 }}>
           <a href="/dashboard/settings" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, color: 'var(--text-secondary)', textDecoration: 'none', marginBottom: 8 }}>

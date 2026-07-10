@@ -174,7 +174,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
               )}
             </div>
             {showErrors && syncStatus.errorList && syncStatus.errorList.length > 0 && (
-              <div className="absolute top-full left-0 mt-1 z-50 w-[360px] max-h-48 overflow-y-auto border rounded-lg shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
+              <div className="absolute top-full left-0 mt-1 z-50 w-[min(360px,calc(100vw-24px))] max-h-48 overflow-y-auto border rounded-lg shadow-xl p-2" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>Sync Errors ({syncStatus.errorList.length})</span>
                   <button onClick={() => setShowErrors(false)} className="text-[10px] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] rounded px-1" style={{ color: 'var(--text-secondary)' }}>✕</button>

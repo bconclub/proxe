@@ -138,8 +138,9 @@ export default function BrainHero() {
         <NeuralBrain firing={firing} hovered={hovered} intensity={intensity} onPick={setSelected} onHover={setHovered} />
       </div>
 
-      {/* left vitals */}
-      <div style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 10, width: 168, pointerEvents: 'none' }}>
+      {/* left vitals — hidden on phones: the two side panels would blanket the
+          brain canvas at 375px. Stats stay reachable via the click panel. */}
+      <div className="hidden md:flex" style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column', gap: 10, width: 168, pointerEvents: 'none' }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: 'var(--text-muted)' }}>TAKEN IN</div>
         {([['Knowledge items', ti?.kb_items ?? '—'], ['Leads (all time)', ti?.leads_total ?? '—'], ['Leads today', ti?.leads_today ?? '—'], ['Team notes', ti?.notes_total ?? '—'], ['Channels', ti ? Object.keys(ti.channels || {}).length : '—']] as Array<[string, number | string]>).map(([label, v]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-primary)', paddingBottom: 5 }}>
@@ -150,8 +151,8 @@ export default function BrainHero() {
         <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>Drag to rotate. Click a glowing region to see inside it.</div>
       </div>
 
-      {/* right vitals + feed */}
-      <div style={{ position: 'absolute', right: 22, top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: 10, width: 220, pointerEvents: 'none' }}>
+      {/* right vitals + feed — hidden on phones (see left vitals note) */}
+      <div className="hidden md:flex" style={{ position: 'absolute', right: 22, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column', gap: 10, width: 220, pointerEvents: 'none' }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: 'var(--text-muted)' }}>HANDLING NOW</div>
         {([['Chats today', hn?.chats_today ?? '—'], ['Active sequences', hn?.active_sequences ?? '—'], ['Awaiting approval', hn?.queued_approvals ?? '—'], ['Leads in flight', hn?.leads_in_flight ?? '—'], ['Bookings upcoming', hn?.bookings_upcoming ?? '—']] as Array<[string, number | string]>).map(([label, v]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-primary)', paddingBottom: 5 }}>

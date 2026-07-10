@@ -119,7 +119,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
+          className="mobile-below-topbar fixed z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shadow hover:opacity-90 transition"
           style={{
             top: '14px',
             right: '20px',

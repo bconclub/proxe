@@ -659,3 +659,57 @@ body:not(.dark) .channel-icon {
   border: 1px solid var(--border-primary);
   background: var(--bg-secondary);
 }
+
+/* ============================================================
+   Mobile-responsive helpers (opt-in classes only — never global)
+   ============================================================ */
+:root {
+  --mobile-topbar-h: 56px; /* height of the md:hidden hamburger bar in DashboardLayout */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* Bottom padding that clears the home-indicator on notched phones */
+.safe-b {
+  padding-bottom: max(var(--safe-b), 0px);
+}
+
+/* Minimum tap target (Apple HIG 44px) — apply manually to small controls */
+.touch-44 {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Collapse inline-style grids on small screens. !important beats the inline
+   gridTemplateColumns so the desktop value stays untouched in the JSX. */
+@media (max-width: 767px) {
+  .rgrid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .rgrid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Drawer nav rows: 20px content + 12px paddings = 44px tap height.
+     Desktop keeps the compact 7px rows (rule is scoped to <768px). */
+  .dashboard-layout-nav-item {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  /* Drawer footer clears the home indicator on notched phones */
+  .dashboard-layout-sidebar-footer {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+  }
+
+  /* Fixed chrome that hugs the top edge on desktop drops below the 56px
+     hamburger bar on phones */
+  .mobile-below-topbar {
+    top: calc(var(--mobile-topbar-h) + 8px) !important;
+  }
+}
+@media (max-width: 419px) {
+  .rgrid-4,
+  .rgrid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}

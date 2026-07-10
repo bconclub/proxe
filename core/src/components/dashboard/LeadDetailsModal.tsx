@@ -1959,7 +1959,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             setEditingNameValue(displayName(currentLead.name) || '')
                             setEditingName(true)
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                           title={currentLead.name ? 'Edit name' : 'Add a name'}
                         >
                           <MdEdit size={14} />
@@ -1976,7 +1976,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   setEditingNameValue(cleaned)
                                   setEditingName(true)
                                 }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
+                                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)]"
                                 title={`Clean up: "${currentLead.name}" → "${cleaned}"`}
                               >
                                 <MdAutoAwesome size={14} />
@@ -2746,7 +2746,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             <span className="flex-1">{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDeleteAdminNote(note) }}
-                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
+                              className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
                               title="Delete note"
                             >
                               <MdClose size={10} />
@@ -3719,7 +3719,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   </div>
                                   <button
                                     onClick={() => handleCancelTask(task.id)}
-                                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
+                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
                                     title="Cancel task"
                                   >
                                     <MdClose size={14} />

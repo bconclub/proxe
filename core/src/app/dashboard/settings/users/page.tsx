@@ -273,13 +273,13 @@ export default function UserManagementPage() {
             <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
               Pending invitations ({invites.length})
             </h2>
-            <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+            <div className="rounded-lg border border-[var(--border-primary)] overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-[var(--bg-secondary)]">
                   <tr>
                     <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Email</th>
                     <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Role</th>
-                    <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Expires</th>
+                    <th className="hidden sm:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Expires</th>
                     <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
                   </tr>
                 </thead>
@@ -295,7 +295,7 @@ export default function UserManagementPage() {
                           {inv.role}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[var(--text-secondary)]">
+                      <td className="hidden sm:table-cell px-4 py-3 text-xs text-[var(--text-secondary)]">
                         {new Date(inv.expires_at).toLocaleDateString()}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -328,7 +328,7 @@ export default function UserManagementPage() {
           <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] mb-3">
             Team members ({users.length})
           </h2>
-          <div className="rounded-lg border border-[var(--border-primary)] overflow-hidden">
+          <div className="rounded-lg border border-[var(--border-primary)] overflow-x-auto">
             <table className="w-full">
               <thead className="bg-[var(--bg-secondary)]">
                 <tr>
@@ -336,8 +336,8 @@ export default function UserManagementPage() {
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Role</th>
                   {isAdmin && (
                     <>
-                      <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
-                      <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
+                      <th className="hidden md:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
+                      <th className="hidden sm:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
                       <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
                     </>
                   )}
@@ -390,7 +390,7 @@ export default function UserManagementPage() {
                             {isAdmin && (
                               <button
                                 onClick={() => startEditName(u)}
-                                className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-[var(--bg-hover)] transition-opacity flex-shrink-0"
+                                className="p-0.5 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-[var(--bg-hover)] transition-opacity flex-shrink-0"
                                 title="Edit name"
                                 aria-label="Edit name"
                               >
@@ -421,7 +421,7 @@ export default function UserManagementPage() {
                         )}
                       </td>
                       {isAdmin && (<>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="hidden md:table-cell px-4 py-3 text-xs">
                         {(() => {
                           const { label, live } = formatLastActive(u.last_login)
                           if (live) {
@@ -446,7 +446,7 @@ export default function UserManagementPage() {
                           )
                         })()}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden sm:table-cell px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           u.is_active === false ? 'bg-red-500/15 text-red-400' : 'bg-green-500/15 text-green-400'
                         }`}>

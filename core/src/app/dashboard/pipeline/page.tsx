@@ -133,7 +133,7 @@ function Skeleton() {
         ))}
       </div>
       {/* Insight skeleton */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      <div className="rgrid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} style={{ height: 80, background: 'rgba(255,255,255,0.03)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
         ))}
@@ -335,7 +335,7 @@ export default function PipelinePage() {
 
       {/* ── SECTION 1: CHEVRON FLOW ── */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 2, paddingBottom: 2 }}>
-        <div className="chevron-scroll" style={{ display: 'flex', overflowX: 'auto', marginLeft: -4 }}>
+        <div className="chevron-scroll" style={{ display: 'flex', overflowX: 'auto', marginLeft: -4, WebkitOverflowScrolling: 'touch' }}>
           {STAGES.map((stage, i) => {
             const count = stageCounts[stage.id]
             const isActive = activeStage === stage.id
@@ -381,7 +381,7 @@ export default function PipelinePage() {
       </div>
 
       {/* ── SECTION 2: INSIGHTS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      <div className="rgrid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         <InsightCard label="Active Pipeline" value={String(insights.totalActive)} sub="in progress" />
         <InsightCard label="Avg Time to Close" value={insights.avgDays >= 0 ? `${insights.avgDays}d` : 'No data'} sub={insights.avgDays >= 0 ? 'days to win' : ''} />
         <InsightCard
@@ -513,8 +513,14 @@ export default function PipelinePage() {
         .chevron-btn:hover { filter: brightness(1.2) !important; }
         .pipeline-row:hover { background: rgba(255,255,255,0.02); }
         .table-grid { display: grid; grid-template-columns: 2.5fr 1fr 0.6fr 0.4fr 1fr 0.6fr 1fr; gap: 0; }
-        @media (max-width: 768px) {
-          .table-grid { grid-template-columns: 2fr 0.8fr 0.5fr 0.4fr 0.8fr 0.5fr 0.8fr; font-size: 11px; }
+        @media (max-width: 767px) {
+          /* Phone: keep Name · Stage · Last Activity, drop Score/Ch/Days/City —
+             7 squeezed columns were unreadable at 375px. */
+          .table-grid { grid-template-columns: 2fr 1fr 1fr; font-size: 11px; }
+          .table-grid > :nth-child(3),
+          .table-grid > :nth-child(4),
+          .table-grid > :nth-child(6),
+          .table-grid > :nth-child(7) { display: none; }
         }
       `}</style>
     </div>

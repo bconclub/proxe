@@ -350,6 +350,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Lock background scroll while the mobile drawer is open
+  useEffect(() => {
+    if (!mobileSidebarOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [mobileSidebarOpen])
+
   const toggleSidebar = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
@@ -409,8 +417,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     window.location.href = '/auth/login'
   }
 
-  // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand)
-  const showExpanded = !isCollapsed || isHovered
+  // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand).
+  // The mobile drawer is ALWAYS expanded — a collapsed 56px icon rail persisted
+  // from desktop (localStorage) would otherwise open as an unusable sliver.
+  const showExpanded = !isCollapsed || isHovered || (isMobile && mobileSidebarOpen)
   const sidebarWidth = showExpanded ? '184px' : '56px'
   // Content margin uses only the pinned state so the main area doesn't shift on hover
   const contentMarginWidth = isCollapsed ? '56px' : '220px'
@@ -560,7 +570,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {isMobile && (
                 <button
                   onClick={() => setMobileSidebarOpen(false)}
-                  className="dashboard-layout-sidebar-close-button p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+                  className="dashboard-layout-sidebar-close-button touch-44 flex items-center justify-center p-1 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
                   style={{ backgroundColor: 'transparent', color: 'var(--text-secondary)' }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
@@ -1040,7 +1050,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className="p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            className="touch-44 flex items-center justify-center p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
             style={{
               backgroundColor: 'var(--bg-secondary)',
               border: '1px solid var(--border-primary)',

@@ -498,8 +498,8 @@ export default function WebAgentSettingsClient() {
                   position: 'absolute',
                   bottom: '20px',
                   right: '20px',
-                  width: '420px',
-                  height: '580px',
+                  width: 'min(420px, calc(100vw - 40px))',
+                  height: 'min(580px, calc(100dvh - 160px))',
                   pointerEvents: 'none',
                 }}
               >
@@ -507,8 +507,8 @@ export default function WebAgentSettingsClient() {
                   ref={iframeRef}
                   src="/widget/bubble"
                   style={{
-                    width: '420px',
-                    height: '580px',
+                    width: '100%',
+                    height: '100%',
                     border: 'none',
                     pointerEvents: 'auto',
                   }}

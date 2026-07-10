@@ -1,3 +1,17 @@
+## 2026-07-10 · feat(core): full mobile-responsive pass — every dashboard page usable at 375px
+
+- Shell: drawer nav polished — 44px tap targets, scroll-lock while open, safe-area padding, drawer always opens EXPANDED on phones (a desktop-collapsed rail used to open as a 56px sliver). New shared `useIsMobile` hook + opt-in CSS helpers (`.rgrid-4/.rgrid-2` grid collapse, `.safe-b`, `.touch-44`, `.mobile-below-topbar`); `viewport-fit=cover` for notched phones.
+- Chats/Inbox: WhatsApp-style stack on mobile — conversation list full-screen, tap → thread full-screen with back arrow + lead name; ⓘ opens lead details as a full-screen overlay; no auto-jump into the first chat on phones (deep links still open the thread). Desktop three-pane unchanged.
+- Leads + D2D visits: tables become tappable card lists below 768px (name · stage chip · phone · score · last activity); tap opens the same lead modal / visit drawer. Settings→Users table unclipped + progressive columns.
+- Pipeline: insight tiles stack on phones; stage chevron bar swipes; lead list drops to Name · Stage · Last Activity.
+- Events: month view shows count dots per day + a tap-day agenda list under the grid (event text pills were unreadable in 48px cells); bookings filter popover clamped to viewport.
+- Engine Overview: on phones the 5 funnel circles become compact stat rows (icon · label + sub · right-aligned number) — survives 100/1000/10K counts on any brand; both variants (standard funnel + POP intensity ladder).
+- Brain settings: correct height via dvh (no URL-bar jump), Learning grid no longer overflows, BrainHero side vitals hidden on phones (they blanketed the canvas).
+- Touch: hover-hidden actions (lead modal edit/clean/delete) always visible below 768px; health chip drops below the mobile top bar; web-agent widget preview clamps to viewport.
+- Fixed in passing: hydration warning from whitespace text nodes in LeadsTable's colgroup (same-line JSX comments after `<col />`).
+- User-facing: the whole dashboard now works one-handed on a phone; desktop rendering is byte-identical.
+- `(pending-sha)`
+
 ## 2026-07-10 06:50 IST · polish(home): Activity Sources — ring moves to the LEFT of the card
 
 - The source-mix ring now sits on the left; ranked channel rows fill the right. Nothing else changed.
