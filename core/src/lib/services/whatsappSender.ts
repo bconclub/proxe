@@ -574,7 +574,9 @@ export function pickWelcomeTemplate(...signals: Array<string | null | undefined>
  */
 export function isCabinCrewSource(...signals: Array<string | null | undefined>): boolean {
   const hay = signals.filter(Boolean).join(' ').toLowerCase()
-  return /\bcabin\s?crew\b|\bcabincrew\b|air\s?hostess|flight\s?attendant/.test(hay)
+  // Separator-tolerant: matches "cabin crew", "cabin_crew", "cabin-crew",
+  // "cabincrew" (Pabbly static param + FB ad/adset naming all vary).
+  return /\bcabin[\s_-]?crew\b|air[\s_-]?hostess|flight[\s_-]?attendant/.test(hay)
 }
 
 /**

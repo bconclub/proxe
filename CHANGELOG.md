@@ -1,3 +1,10 @@
+## 2026-07-10 11:47 IST · fix(windchasers): deterministic cabin-crew routing via course_interest
+
+- Finished the `course` wiring in the FB Lead Ads path: a static Pabbly param `course_interest=cabin_crew` (or `interest`/`program`/`course`) now (a) stores on the lead as `unified_context.windchasers.course_interest` and (b) is the FIRST attribution signal, so the cabin-crew welcome fires deterministically regardless of ad/adset/form naming.
+- Broadened `isCabinCrewSource()` to be separator-tolerant — `cabin crew` / `cabin_crew` / `cabin-crew` / `cabincrew` all match (Pabbly static values and FB ad names use underscores/hyphens). Also applies to the website `leads/inbound` path, which already routed cabin-crew off `course_interest=Cabin`.
+- User-facing: a cabin-crew ad lead reliably gets the cabin-crew first WhatsApp message even when the ad isn't named "cabin crew".
+- `(pending-sha)`
+
 ## 2026-07-07 · feat(windchasers): dedicated cabin-crew welcome (FB ads + website)
 
 - Cabin-crew ads are live; cabin-crew leads now get their own welcome instead of the generic one. New isCabinCrewSource() detection + sendCabinCrewWelcome() (tries windchasers_cabin_crew_welcome_v1, falls back to the generic welcome until Meta approves — auto-upgrades, no redeploy).

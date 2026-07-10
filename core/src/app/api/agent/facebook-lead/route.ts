@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
     const startTimeline: string | null =
       body.start_timeline || body.when_looking_to_start || null;
     const age: string | null = body.age != null ? String(body.age) : null;
+    // Explicit course/interest the Pabbly workflow can set (e.g. "cabin_crew",
+    // "pilot", "cpl"). Drives welcome routing deterministically instead of
+    // relying on the ad/form name — set a static value per dedicated workflow.
+    const course: string | null =
+      body.course || body.course_interest || body.interest || body.program || null;
 
     // UTM attribution from Facebook Ads
     const utmData = {
@@ -125,6 +130,7 @@ export async function POST(request: NextRequest) {
     if (class12Pcm) windchasersProfile.class_12_pcm = class12Pcm;
     if (startTimeline) windchasersProfile.start_timeline = startTimeline;
     if (age) windchasersProfile.age = age;
+    if (course) windchasersProfile.course_interest = course;
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
     // real UTM (rare on lead forms) → placement platform (ig → Instagram,
@@ -216,7 +222,11 @@ export async function POST(request: NextRequest) {
       // ── 3. Fire the welcome template — parent enquiry gets its own template
       // (named param `parent_name`); otherwise pilot vs generic by the
       // ad/form/campaign the lead came from (a pilot ad/form/campaign → pilot welcome).
+      // `course` first: a dedicated Pabbly workflow sets a static
+      // course_interest (e.g. "cabin_crew") so routing is deterministic even
+      // when the ad/form/campaign names don't carry the audience keyword.
       const attributionSignals = [
+        course,
         facebookMeta.form_name,
         facebookMeta.campaign_name,
         facebookMeta.adset_name,
