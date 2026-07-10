@@ -26,6 +26,11 @@
 - User-facing: the whole dashboard now works one-handed on a phone; desktop rendering is byte-identical.
 - `(pending-sha)`
 
+## 2026-07-10 07:30 IST · polish(inbox): chat list drops the score — avatar only
+
+- No score ring/chip in the conversation list at all; the selected row shows the same plain avatar as every other row. The score lives in the right details panel, which is enough.
+- `(pending-sha)`
+
 ## 2026-07-10 07:10 IST · polish(inbox): selected row — one circle, not two
 
 - The selected conversation row was stacking TWO circles (avatar + score ring) and truncating the name. Now the score ring wraps the avatar itself, with the score as a small chip on the ring — one circle, name gets its space back.
