@@ -304,6 +304,11 @@ export default function LeadsTable({
   // Scout segment - gated by the brand's features.scouts toggle (lokazen) so
   // scout UI never leaks into brands that don't run scouts.
   const showScouts = Boolean(brandConfig.features?.scouts)
+  // Leads | Gigs toggle (lokazen): gigs (scout/connector) sit INSIDE the Leads
+  // page as a segment switch, mirroring windchasers' Leads | Webinar tab. Only
+  // on the main leads page — the locked /dashboard/scouts page (which passes
+  // initialUserTypeFilter) already forces gigs, so it hides the toggle.
+  const showGigsTab = showScouts && !initialUserTypeFilter
   const searchParams = useSearchParams()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
@@ -321,6 +326,7 @@ export default function LeadsTable({
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
+  const [gigsView, setGigsView] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -329,7 +335,7 @@ export default function LeadsTable({
   // Scout VIEW = the scouts feature is on AND the table is filtered to scouts
   // (either via the dropdown or the locked initialUserTypeFilter on /dashboard/scouts).
   // Swaps the brand/owner columns for scout-specific ones.
-  const scoutView = showScouts && (userTypeFilter === 'scout' || userTypeFilter === 'gig')
+  const scoutView = showScouts && (userTypeFilter === 'scout' || userTypeFilter === 'gig' || (showGigsTab && gigsView))
 
   useEffect(() => {
     if (initialLimit) {
@@ -408,11 +414,14 @@ export default function LeadsTable({
         return (brandData.user_type || brandData.business_type) === userTypeFilter
       })
     } else if (showScouts) {
-      // Gig workers (scout/connector) have their own page - keep them out of
-      // the general Leads view, which is brand + property-owner only.
+      // Gigs segment: the Gigs tab shows ONLY gig workers (scout/connector); the
+      // Leads view excludes them. The toggle drives it on the main leads page;
+      // where the toggle isn't shown (the locked scouts page), default to
+      // excluding gigs — that page filters to gigs via userTypeFilter above.
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
-        return !GIG_TYPES.includes(brandData.user_type)
+        const isGig = GIG_TYPES.includes(brandData.user_type)
+        return (showGigsTab && gigsView) ? isGig : !isGig
       })
     }
 
@@ -469,7 +478,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores, webinarView])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores, webinarView, gigsView, showGigsTab])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -692,7 +701,7 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {webinarView ? 'Webinar' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
@@ -711,6 +720,28 @@ export default function LeadsTable({
                   style={{
                     backgroundColor: webinarView === t.key ? 'var(--button-bg)' : 'var(--bg-primary)',
                     color: webinarView === t.key ? 'var(--text-button)' : 'var(--text-secondary)',
+                    borderRight: '1px solid var(--border-primary)',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Leads | Gigs tab (lokazen scouts) — same pattern as Webinar */}
+          {showGigsTab && (
+            <div role="tablist" aria-label="Leads or Gigs" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+              {([{ key: false, label: 'Leads' }, { key: true, label: 'Gigs' }] as const).map((t) => (
+                <button
+                  key={t.label}
+                  role="tab"
+                  aria-selected={gigsView === t.key}
+                  onClick={() => setGigsView(t.key)}
+                  className="px-2 py-0.5 text-xs font-medium transition-colors"
+                  style={{
+                    backgroundColor: gigsView === t.key ? 'var(--button-bg)' : 'var(--bg-primary)',
+                    color: gigsView === t.key ? 'var(--text-button)' : 'var(--text-secondary)',
                     borderRight: '1px solid var(--border-primary)',
                   }}
                 >
@@ -1065,7 +1096,7 @@ export default function LeadsTable({
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {webinarView ? 'No webinar registrations yet' : brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
+                  {gigsView ? 'No gigs yet' : webinarView ? 'No webinar registrations yet' : brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
                 </td>
               </tr>
             ) : (
