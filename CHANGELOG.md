@@ -1,3 +1,11 @@
+## 2026-07-07 · feat(windchasers): wire the new welcome templates (v3) with approved-version fallback
+
+- pickWelcomeTemplate now targets the latest copy — windchasers_generic_welcome_v3 / windchasers_pilot_welcome_v3 (both currently PENDING Meta review). sendWelcomeTemplate tries the preferred version and auto-falls-back to the last APPROVED one (generic_v1 / pilot_v2) so no welcome ever fails while v3 clears review — and v3 activates automatically on approval, no redeploy.
+- Cabin-crew fallback bumped to generic_v3 (→ v1). Parents welcome (windchasers_pilot_parents_welcome_v1) is already Active. Cabin-crew (windchasers_cabin_crew_welcome_v1) still PENDING; param customer_name + quick-reply buttons verified to match the sender.
+- inbound dedup guard also checks generic_v3.
+- User-facing: leads keep getting a welcome now (approved templates); the moment Meta approves v3/cabin-crew, the newer copy goes live automatically.
+- `(pending-sha)`
+
 ## 2026-07-10 · feat(brain): tap-to-talk mic on the docked orb
 
 - The docked mini-orb now has a mic button just below the light: tap to talk to the brain (starts listening via Web Speech), tap again to send; it turns accent + pulses while hearing you. Lets you speak to it directly without waiting on the spoken briefing.

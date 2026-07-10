@@ -564,8 +564,17 @@ export function isPilotSource(...signals: Array<string | null | undefined>): boo
   return /\bpilot\b|pilot[-_]|\bcpl\b|\bppl\b|\bchpl\b|\bphpl\b|\bdgca\b|flying/.test(hay)
 }
 
+// Latest welcome copy is v3 (generic + pilot). Those are still clearing Meta
+// review, so each maps to its last APPROVED version — sendWelcomeTemplate tries
+// the preferred one and auto-falls-back until the newer one is approved. Once v3
+// is live the fallback simply never fires; drop the entry then.
+const WELCOME_FALLBACK: Record<string, string> = {
+  windchasers_generic_welcome_v3: 'windchasers_generic_welcome_v1',
+  windchasers_pilot_welcome_v3: 'windchasers_pilot_welcome_v2',
+}
+
 export function pickWelcomeTemplate(...signals: Array<string | null | undefined>): string {
-  return isPilotSource(...signals) ? 'windchasers_pilot_welcome_v2' : 'windchasers_generic_welcome_v1'
+  return isPilotSource(...signals) ? 'windchasers_pilot_welcome_v3' : 'windchasers_generic_welcome_v3'
 }
 
 /**
@@ -600,10 +609,11 @@ export async function sendCabinCrewWelcome(
     return { success: true, templateUsed: 'windchasers_cabin_crew_welcome_v1' }
   }
   // Cabin-crew template not live yet (or send failed) → generic welcome so the
-  // lead still gets a first message. A 4xx template error sends nothing, so this
-  // fallback never double-messages.
-  const fallback = await sendWelcomeTemplate(to, name, 'windchasers_generic_welcome_v1')
-  return { success: fallback.success, error: fallback.error, templateUsed: 'windchasers_generic_welcome_v1' }
+  // lead still gets a first message (sendWelcomeTemplate itself falls back from
+  // v3 to the approved v1). A 4xx template error sends nothing, so this never
+  // double-messages.
+  const fallback = await sendWelcomeTemplate(to, name, 'windchasers_generic_welcome_v3')
+  return { success: fallback.success, error: fallback.error, templateUsed: 'windchasers_generic_welcome_v3' }
 }
 
 /**
@@ -736,12 +746,20 @@ export async function sendWelcomeTemplate(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, templateName, [
+  const components = [
     {
-      type: 'body',
+      type: 'body' as const,
       parameters: [{ type: 'text', parameter_name: 'customer_name', text: firstName }],
     },
-  ])
+  ]
+  const res = await sendWhatsAppTemplate(to, templateName, components)
+  // Preferred template (e.g. a not-yet-approved v3) failed → fall back to the
+  // last approved version so the lead is never left unwelcomed. A 4xx template
+  // error sends nothing, so this never double-messages.
+  if (!res.success && WELCOME_FALLBACK[templateName]) {
+    return sendWhatsAppTemplate(to, WELCOME_FALLBACK[templateName], components)
+  }
+  return res
 }
 
 // NOTE: sendFirstOutreach() was removed because the 'windchasers_followup'

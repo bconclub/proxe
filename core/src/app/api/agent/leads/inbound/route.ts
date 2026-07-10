@@ -1177,6 +1177,7 @@ export async function POST(request: NextRequest) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
       const ccAlready =
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_cabin_crew_welcome_v1')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v3')) ||
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v1'))
       if (ccAlready) {
         console.log(`[inbound] Cabin-crew welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
