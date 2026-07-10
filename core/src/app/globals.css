@@ -679,6 +679,37 @@ body:not(.dark) .channel-icon {
   min-width: 44px;
 }
 
+/* Container-query card helpers — home cards are HALF the viewport at xl, so
+   viewport breakpoints (md:/lg:) lie about how much room a card really has
+   (browser zoom shrinks the effective viewport into exactly that zone).
+   These collapse card innards by the CARD's own width instead. */
+.cq-card {
+  container-type: inline-size;
+}
+/* Priority queue: Next Step / Due columns need ~560 / ~620px of card */
+.pq-col-next,
+.pq-col-due {
+  display: none;
+}
+@container (min-width: 560px) {
+  .pq-col-next { display: table-cell; }
+}
+@container (min-width: 620px) {
+  .pq-col-due { display: table-cell; }
+}
+/* Activity Sources: the ring only fits beside the rows at ~460px+ of card */
+.as-donut {
+  display: none;
+}
+.as-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (min-width: 460px) {
+  .as-donut { display: flex; }
+  .as-split { grid-template-columns: minmax(112px, 148px) minmax(0, 1fr); }
+}
+
 /* Collapse inline-style grids on small screens. !important beats the inline
    gridTemplateColumns so the desktop value stays untouched in the JSX. */
 @media (max-width: 767px) {

@@ -38,6 +38,12 @@
 - User-facing: SOURCE badges show Instagram/Facebook for new FB leads; Activity Sources shows the real channel mix; home cards evenly sized.
 - `(pending-sha)`
 
+## 2026-07-10 · fix(home): cards no longer break on browser zoom
+
+- Priority Lead Queue and Activity Sources hid columns by VIEWPORT breakpoints, but home cards are half the viewport at xl — browser zoom (125-150%) shrinks the effective viewport into exactly that zone, so a ~586px card still rendered all five table columns and the donut, clipping at the card edge.
+- New container-query helpers (globals.css `.cq-card`/`.pq-col-*`/`.as-donut`/`.as-split`): the queue's Next Step / Due columns and the sources ring now collapse by the CARD's own width. Verified zero overflow at 375 / 1280 / 1366 / full width.
+- `(pending-sha)`
+
 ## 2026-07-10 · fix(core): prebuild no longer overwrites the version
 
 - set-build-time.js was recomputing the patch from the git commit count on every Vercel build — fighting the new hook-maintained version (and shallow clones made it plain wrong: live showed v0.1.10 from a depth-10 clone). It now stamps ONLY the build time; the committed package.json version is the single source of truth.

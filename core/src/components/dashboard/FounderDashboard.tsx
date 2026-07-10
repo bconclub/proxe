@@ -1248,7 +1248,7 @@ export default function FounderDashboard() {
         </section>
 
         {/* Priority Lead Queue — movable card (slot: queue) */}
-        <section {...cardDrag('queue')} className="wc-slot relative group rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ ...slotStyle('queue'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
+        <section {...cardDrag('queue')} className="cq-card wc-slot relative group rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ ...slotStyle('queue'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           {cardGrip('queue')}
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div className="flex items-center gap-3 min-w-0">
@@ -1331,8 +1331,8 @@ export default function FounderDashboard() {
                   <tr className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                     <th className="px-4 py-2 font-medium">{brandLabel('Lead')}</th>
                     <th className="px-3 py-2 font-medium">Intent</th>
-                    <th className="px-3 py-2 font-medium hidden md:table-cell">Recommended Next Step</th>
-                    <th className="px-3 py-2 font-medium hidden lg:table-cell">Due</th>
+                    <th className="pq-col-next px-3 py-2 font-medium">Recommended Next Step</th>
+                    <th className="pq-col-due px-3 py-2 font-medium">Due</th>
                     <th className="px-3 py-2 font-medium">Status</th>
                   </tr>
                 </thead>
@@ -1357,10 +1357,10 @@ export default function FounderDashboard() {
                         <td className="px-3 py-3">
                           <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-semibold whitespace-nowrap" style={{ backgroundColor: intent.bg, color: intent.color }}>{intent.label}</span>
                         </td>
-                        <td className="px-3 py-3 hidden md:table-cell">
+                        <td className="pq-col-next px-3 py-3">
                           <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nextStepFor(lead.stage)}</span>
                         </td>
-                        <td className="px-3 py-3 hidden lg:table-cell">
+                        <td className="pq-col-due px-3 py-3">
                           <span className="text-xs whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>{formatTimeAgo(lead.lastContact)}</span>
                         </td>
                         <td className="px-3 py-3">
@@ -1481,7 +1481,7 @@ export default function FounderDashboard() {
             <span className="inline-flex items-center justify-center rounded-lg shrink-0" style={{ width: size, height: size, background: `${magnetMeta(m).color}22`, color: magnetMeta(m).color }}>{magnetIcon(m)}</span>
           )
           return (
-            <section {...cardDrag('sources')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
+            <section {...cardDrag('sources')} className="cq-card wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden gap-3" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
               {cardGrip('sources')}
               {/* reference layout: title → stat strip → ranked bars + the ring */}
               <div className="shrink-0">
@@ -1505,9 +1505,10 @@ export default function FounderDashboard() {
 
               {/* the ring (LEFT) + ranked source rows. Every column shrinkable so
                   the card can NEVER clip its right edge at narrow xl widths. */}
-              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[minmax(112px,148px),minmax(0,1fr)] gap-3 overflow-hidden">
-                {/* the ring — source-mix donut with the total in the middle */}
-                <div className="hidden sm:flex items-center justify-center min-h-0 min-w-0">
+              <div className="as-split flex-1 min-h-0 gap-3 overflow-hidden">
+                {/* the ring — source-mix donut with the total in the middle.
+                    Shown/hidden by CARD width (@container), not viewport. */}
+                <div className="as-donut items-center justify-center min-h-0 min-w-0">
                   <div className="w-full" style={{ maxWidth: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
                 </div>
                 {/* overflow-y-auto + my-auto (not justify-center + hidden): with
