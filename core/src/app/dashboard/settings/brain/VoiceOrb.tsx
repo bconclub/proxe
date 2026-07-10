@@ -503,6 +503,36 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         </button>
       )}
 
+      {/* Compact (docked) mic — tap to TALK to the brain. Sits just below the
+          light, in the same cluster as the dock's close/fullscreen controls.
+          idle/thinking/speaking → start listening; listening → send now.
+          Turns accent + pulses while it's hearing you. */}
+      {compact && (
+        <button
+          onClick={(e) => { e.stopPropagation(); if (modeRef.current === 'listening') submitSpoken(); else beginListening() }}
+          onPointerMove={(e) => e.stopPropagation()}
+          aria-label={mode === 'listening' ? 'Stop listening' : 'Talk to the brain'}
+          title={mode === 'listening' ? 'Listening — tap to send' : 'Tap to talk'}
+          style={{
+            position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', zIndex: 5,
+            width: 34, height: 34, borderRadius: 999, cursor: 'pointer', padding: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: mode === 'listening' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+            color: mode === 'listening' ? '#fff' : 'var(--accent-primary)',
+            border: '1px solid var(--border-primary)',
+            boxShadow: mode === 'listening' ? '0 0 0 4px color-mix(in srgb, var(--accent-primary) 30%, transparent)' : '0 2px 8px rgba(0,0,0,0.3)',
+            animation: mode === 'listening' ? 'voMicPulse 1.2s ease infinite' : 'none',
+            transition: 'background .15s ease, box-shadow .15s ease',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="2" width="6" height="12" rx="3" />
+            <path d="M5 10a7 7 0 0 0 14 0" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </button>
+      )}
+
       {/* ONE line under the orb — short karaoke words while speaking (blob-wide),
           hint/steps otherwise (wider). Hidden in compact (the light says it all). */}
       {!compact && <div style={{
@@ -546,6 +576,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       <style>{`
         @keyframes voPulse { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
         @keyframes voFan { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes voMicPulse { 0%,100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 30%, transparent) } 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent-primary) 12%, transparent) } }
       `}</style>
     </div>
   )

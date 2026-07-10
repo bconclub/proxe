@@ -1,3 +1,8 @@
+## 2026-07-10 · feat(brain): tap-to-talk mic on the docked orb
+
+- The docked mini-orb now has a mic button just below the light: tap to talk to the brain (starts listening via Web Speech), tap again to send; it turns accent + pulses while hearing you. Lets you speak to it directly without waiting on the spoken briefing.
+- `(pending-sha)`
+
 ## 2026-07-10 · fix(brain+widget): mini-orb strobe + chat-widget open flicker
 
 - Brain mini-orb (docked): stopped the strobe — the airy small-canvas thinning was subsampling the per-frame depth-sorted array (different dots each frame). Now a fixed 1/airy subset by particle identity → sparse but smoothly rotating. (`ddf809cf`)
