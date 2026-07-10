@@ -261,12 +261,22 @@ export async function POST(request: NextRequest) {
       }
 
       // ── 4. Log the outbound message ──────────────────────────────────────────
+      // Log text mirrors the ACTUAL template that fired (welcomeTpl), so the
+      // dashboard conversation never shows a generic "Welcome to Windchasers"
+      // line under a cabin-crew / parent template. On a cabin-crew→generic
+      // fallback welcomeTpl is the generic template, so the generic line is right.
       if (whatsappSent) {
+        const first = (cleanName || name || 'there').split(' ')[0];
+        const logText = welcomeTpl.includes('cabin_crew')
+          ? `Hi ${first}, welcome to Windchasers cabin crew training.`
+          : welcomeTpl.includes('parents')
+          ? `Hi ${first}, welcome to Windchasers.`
+          : `Hey ${first}! Welcome to Windchasers.`;
         await logMessage(
           leadId,
           'whatsapp',
           'agent',
-          `Hey ${name.split(' ')[0]}! Welcome to Windchasers.`,
+          logText,
           'template',
           { source: 'facebook_lead', template_name: welcomeTpl, ...facebookMeta },
           supabase,
