@@ -1063,7 +1063,7 @@ export default function LeadsTable({
                 { label: 'Score',      align: 'center' as const },
                 { label: 'Stage',      align: 'center' as const },
                 { label: 'Active',     align: 'left'   as const },
-                { label: scoutView ? 'Properties' : 'Booking', align: 'center' as const },
+                { label: scoutView ? 'Properties' : webinarView ? 'Zoom' : 'Booking', align: 'center' as const },
                 ...(showAviationColumns ? [
                   { label: 'Type',   align: 'center' as const },
                   { label: 'Course', align: 'center' as const },
@@ -1923,7 +1923,7 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING (brand/owner) OR PROPERTIES SUBMITTED (scout) */}
+                    {/* BOOKING (brand/owner) · PROPERTIES (scout) · ZOOM STATUS (webinar) */}
                     <td className="px-3 py-2 text-xs text-center">
                       {isScoutRow ? (() => {
                         const n = Number(lkz.scout_submissions_count ?? (lkz.last_submission_area ? 1 : 0)) || 0
@@ -1934,6 +1934,20 @@ export default function LeadsTable({
                           >
                             {n > 0 ? `${n} submitted` : '0'}
                           </span>
+                        )
+                      })() : webinarView ? (() => {
+                        // Webinar view: did they COMPLETE Zoom registration (came back
+                        // via the Zoom → Pabbly webhook) vs just click Register?
+                        const wc = uc?.[brandId] || {}
+                        return wc.zoom_registered ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
+                          >
+                            <span aria-hidden="true">✓</span> Registered
+                          </span>
+                        ) : (
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
                         )
                       })() : bookingDate ? (() => {
                         // Resolve session type: explicit field wins, else infer from meet link presence.

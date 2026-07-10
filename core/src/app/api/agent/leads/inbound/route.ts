@@ -331,7 +331,16 @@ export async function POST(request: NextRequest) {
       // page's Webinar tab can segment them out of the main list. user_type
       // (student/parent) is NOT touched — that's who they are, this is why
       // they came.
+      // A COMPLETED Zoom registration (the Zoom → Pabbly webhook fires only after
+      // they finish registering on Zoom) carries a per-registrant join_url, or a
+      // static zoom_registered flag. That distinguishes "actually registered on
+      // Zoom" from "clicked Register on the landing page".
+      const zoomJoinUrl = String(cf2.zoom_join_url || (body as any).zoom_join_url || (body as any).join_url || '').trim()
+      const isZoomReg =
+        !!zoomJoinUrl ||
+        ['yes', 'true', '1'].includes(String(cf2.zoom_registered || (body as any).zoom_registered || '').toLowerCase().trim())
       isWebinarReg =
+        isZoomReg ||
         normalizedSource === 'webinar' ||
         String(cf2.form_type || (body as any).form_type || '').toLowerCase().trim() === 'webinar' ||
         String(cf2.lead_type || (body as any).lead_type || '').toLowerCase().trim() === 'webinar'
@@ -342,6 +351,11 @@ export async function POST(request: NextRequest) {
         const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || (body as any).webinar_date || '').trim()
         if (webinarDate) brandCtxData.webinar_date = webinarDate
         brandCtxData.webinar_registered_at = now
+        if (isZoomReg) {
+          brandCtxData.zoom_registered = true
+          brandCtxData.zoom_registered_at = now
+          if (zoomJoinUrl) brandCtxData.zoom_join_url = zoomJoinUrl
+        }
       }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
