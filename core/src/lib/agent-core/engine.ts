@@ -155,6 +155,13 @@ User's message: ${input.message}`
   // forbid the "your transaction was successful" hallucination.
   if (paymentSupportIssue) systemPrompt += paymentSupportDirective();
 
+  // When the person asks for the team / a human, hand off CLEANLY — the team has
+  // been pinged (flagForHumanFollowup below). Do NOT negotiate a call time back
+  // and forth (it loops and never books). Confirm the handoff and stop.
+  if (wantsHuman) {
+    systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): The Lokazen team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself — the team confirms the time directly. Never loop on times.`;
+  }
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -871,6 +878,12 @@ const HUMAN_HANDOFF_PATTERNS = [
   /\btalk\s+to\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
   /\bspeak\s+(?:to|with)\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
   /\bconnect\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|someone|agent|representative|rep)\b/i,
+  // "talk to the team" / "connect with the team" / "talk to Lokazen team" — a
+  // team handoff. Route it to a real human handoff (Slack ping) instead of the
+  // AI trying to negotiate a booking time (which loops). The team confirms.
+  /\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:(?:the|lokazen|your)\s+){0,2}team\b/i,
+  /\bconnect\s+(?:me\s+)?(?:to|with)\s+(?:(?:the|lokazen|your)\s+){0,2}team\b/i,
+  /\b(?:reach|contact|get\s+me\s+to)\s+(?:(?:the|lokazen|your)\s+){0,2}team\b/i,
   /\breal\s+(?:human|person)\b/i,
   /\bnot\s+(?:a\s+)?(?:bot|ai|robot|automated)\b/i,
   /\bstop\s+(?:the\s+)?(?:bot|ai)\b/i,
