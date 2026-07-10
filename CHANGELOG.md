@@ -1,3 +1,8 @@
+## 2026-07-10 06:50 IST · polish(home): Activity Sources — ring moves to the LEFT of the card
+
+- The source-mix ring now sits on the left; ranked channel rows fill the right. Nothing else changed.
+- `(pending-sha)`
+
 ## 2026-07-10 06:30 IST · polish(brain): docked orb clipped to a circle; "Type instead…" quick action
 
 - Docked voice orb is now clipped to a CIRCLE — the canvas glow no longer shows a faint square edge. Full-screen unclipped; same element across the toggle so the voice keeps playing.

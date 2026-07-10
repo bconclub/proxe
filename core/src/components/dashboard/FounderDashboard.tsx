@@ -1479,8 +1479,12 @@ export default function FounderDashboard() {
                 ))}
               </div>
 
-              {/* ranked source rows + Top source highlight */}
-              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[1fr,148px] gap-3 overflow-hidden">
+              {/* the ring (LEFT) + ranked source rows */}
+              <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-[148px,1fr] gap-3 overflow-hidden">
+                {/* the ring — source-mix donut with the total in the middle */}
+                <div className="hidden sm:flex items-center justify-center min-h-0">
+                  <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
+                </div>
                 <div className="flex flex-col gap-1 min-h-0 overflow-hidden justify-center">
                   {popMix.slice(0, 6).map((s, i) => (
                     <div key={s.magnet} className="grid items-center gap-2 rounded-lg border px-2.5 py-1.5" style={{ gridTemplateColumns: '14px 22px minmax(64px,0.9fr) 1.4fr 40px 46px 34px', borderColor: 'var(--border-primary)', background: 'var(--bg-tertiary)' }}>
@@ -1497,10 +1501,6 @@ export default function FounderDashboard() {
                       </span>
                     </div>
                   ))}
-                </div>
-                {/* the ring — source-mix donut with the total in the middle */}
-                <div className="hidden sm:flex items-center justify-center min-h-0">
-                  <div style={{ width: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
                 </div>
               </div>
             </section>
