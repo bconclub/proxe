@@ -983,6 +983,26 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
+    // HUMAN TAKEOVER PAUSE — if a teammate replied to this lead recently (from
+    // Slack thread or the dashboard inbox), stay quiet. The human is handling it;
+    // the bot jumping back in talks over them and re-litigates context it
+    // shouldn't. The window auto-expires so the bot resumes once the team goes
+    // quiet. The customer's message is already logged above, so the human sees
+    // it in the thread with full context.
+    {
+      const HUMAN_TAKEOVER_PAUSE_MIN = 45;
+      const { data: leadFlags } = await supabase
+        .from('all_leads').select('metadata').eq('id', leadId).maybeSingle();
+      const takeoverAt = leadFlags?.metadata?.human_takeover_at;
+      if (takeoverAt) {
+        const ageMin = (Date.now() - new Date(takeoverAt).getTime()) / 60000;
+        if (ageMin >= 0 && ageMin < HUMAN_TAKEOVER_PAUSE_MIN) {
+          console.log(`[meta/webhook] HUMAN TAKEOVER: teammate active ${ageMin.toFixed(1)}m ago for lead ${leadId} — bot paused, human handling it`);
+          return;
+        }
+      }
+    }
+
     const aiStartTime = Date.now();
     let result = await processMessage(agentInput, supabase);
 

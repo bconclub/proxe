@@ -121,7 +121,7 @@ export async function logSystemWhatsApp(
 export async function sendWhatsAppText(
   to: string,
   message: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const creds = getCredentials();
   if (!creds) return { success: false, error: 'Missing credentials' };
 
@@ -147,7 +147,11 @@ export async function sendWhatsAppText(
       return { success: false, error: errBody };
     }
 
-    return { success: true };
+    // Return Meta's wamid so callers can persist it as metadata.wa_message_id —
+    // that's the key handleStatusUpdates() matches on to attach delivered/read
+    // receipts. Without it, human/Slack replies never show a receipt.
+    const body = await res.json().catch(() => null);
+    return { success: true, messageId: body?.messages?.[0]?.id };
   } catch (err: any) {
     console.error('[whatsappSender] Text send error:', err.message);
     return { success: false, error: err.message };

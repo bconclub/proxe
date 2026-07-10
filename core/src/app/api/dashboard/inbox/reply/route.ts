@@ -31,14 +31,19 @@ export const dynamic = 'force-dynamic';
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
-/** Send a text message via Meta WhatsApp Cloud API */
-async function sendWhatsAppMessage(to: string, message: string): Promise<boolean> {
+/**
+ * Send a text message via Meta WhatsApp Cloud API.
+ * Returns Meta's wamid on success so the caller can persist it as
+ * metadata.wa_message_id — the key delivered/read receipts match on. A human
+ * reply with no wamid never gets a receipt.
+ */
+async function sendWhatsAppMessage(to: string, message: string): Promise<{ ok: boolean; messageId?: string }> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
     console.error('[inbox/reply] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
-    return false;
+    return { ok: false };
   }
 
   try {
@@ -60,13 +65,14 @@ async function sendWhatsAppMessage(to: string, message: string): Promise<boolean
     if (!res.ok) {
       const err = await res.text();
       console.error('[inbox/reply] WhatsApp API error:', res.status, err);
-      return false;
+      return { ok: false };
     }
 
-    return true;
+    const respBody = await res.json().catch(() => null);
+    return { ok: true, messageId: respBody?.messages?.[0]?.id };
   } catch (err) {
     console.error('[inbox/reply] Failed to send WhatsApp message:', err);
-    return false;
+    return { ok: false };
   }
 }
 
@@ -274,6 +280,7 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
+      let waMessageId: string | undefined;
 
       // Check 24-hour window for WhatsApp
       if (channel === 'whatsapp') {
@@ -317,15 +324,17 @@ export async function POST(request: NextRequest) {
         }
 
         const sent = await sendWhatsAppMessage(phone, message.trim());
-        if (!sent) {
+        if (!sent.ok) {
           return NextResponse.json(
             { error: 'Failed to send WhatsApp message. Check Meta API credentials.' },
             { status: 502 },
           );
         }
+        waMessageId = sent.messageId;
       }
 
-      // Log the message in the conversations table
+      // Log the message in the conversations table. wa_message_id lets delivered/
+      // read receipts attach to this human reply (same key the bot's replies use).
       await logMessage(
         leadId,
         channel,
@@ -336,9 +345,19 @@ export async function POST(request: NextRequest) {
           source: 'dashboard_inbox',
           sent_by: 'founder',
           sent_at: new Date().toISOString(),
+          wa_message_id: waMessageId,
+          human: true,
         },
         supabase,
       );
+
+      // A human replied → pause the bot briefly so it doesn't talk over the team.
+      if (channel === 'whatsapp') {
+        const { data: cur } = await supabase.from('all_leads').select('metadata').eq('id', leadId).maybeSingle();
+        await supabase.from('all_leads').update({
+          metadata: { ...(cur?.metadata || {}), human_takeover_at: new Date().toISOString(), human_takeover_by: 'dashboard' },
+        }).eq('id', leadId);
+      }
 
       // Replying = "I'm working this lead now" → become the owner.
       await reassignOwnerToActor(supabase, leadId);

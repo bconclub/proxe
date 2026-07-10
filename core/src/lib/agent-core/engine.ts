@@ -163,6 +163,13 @@ User's message: ${input.message}`
     systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): The Lokazen team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself — the team confirms the time directly. Never loop on times.`;
   }
 
+  // 5d. Bare greeting — a plain "Hey" is a fresh hello, not the customer
+  // re-opening yesterday's payout/support thread. Append LAST so it wins over
+  // any prior-topic pull. Handoff/payment directives above are gated on the
+  // CURRENT message, so they don't fire on "Hey" — this just stops the model
+  // from re-litigating history it shouldn't assume.
+  if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
+
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
 
@@ -474,6 +481,9 @@ User's message: ${input.message}`
     // Payment problem → force the support path, ban the "transaction successful"
     // hallucination (same as the WhatsApp path).
     if (paymentSupportIssue) systemPrompt += paymentSupportDirective();
+    // Bare greeting → plain hello back, don't re-open the prior topic (see the
+    // WhatsApp path). Appended last so it wins.
+    if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
 
     // 4. Generate response — true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
@@ -670,6 +680,40 @@ This person reported a payment or transaction problem (money debited but payment
 - Do NOT offer, suggest, or start a call/consultation/site-visit booking. Never ask "what day/time works for a call". There is nothing to book here.
 - Acknowledge the specific issue in one line, confirm the phone number we should use, then say plainly: "I've raised a support request with the Lokazen team with your number and details — they'll check this and get back to you shortly."
 - Do NOT claim the payment succeeded, was reversed, or is fixed. Do NOT invent a resolution, a reference number, or a timeline. You are only raising the request.`;
+}
+
+/**
+ * A message that is ONLY a greeting/opener with no real content — "hey", "hi",
+ * "hello", "good morning", "namaste", maybe with a name, "there", or an emoji.
+ * After a heavy prior thread (a payment/support issue, a booking), a bare "Hey"
+ * is NOT the customer re-raising that topic — it's a fresh hello. We must greet
+ * back and let them lead, never re-litigate yesterday's issue or assume urgency.
+ */
+function isBareGreeting(message: string): boolean {
+  const m = (message || '')
+    .replace(/[\p{Extended_Pictographic}‍️]/gu, '') // drop emoji
+    .replace(/[!.,…?]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+  if (!m || m.length > 40) return false;
+  return /^(?:hi+|hey+|he+llo+|hii+|helo+|yo+|hola|namaste|namaskar|salaam|assalam(?:u)?\s?alaikum|good\s+(?:morning|afternoon|evening|day)|g'?day|gm|heya|hiya|greetings|sup|wa?ssup|what'?s\s+up)(?:\s+(?:there|team|guys|folks|sir|maam|ma'?am|bro|boss|everyone|all))*$/i.test(m);
+}
+
+/**
+ * Appended to the system prompt when the customer's latest message is a bare
+ * greeting. Overrides the model's pull toward the prior heavy topic so a plain
+ * "Hey" gets a plain hello back, not "the team is looking into your payout".
+ */
+function greetingDirective(name?: string): string {
+  const first = name?.trim() ? name.trim().split(/\s+/)[0] : '';
+  return `\n\n=================================================================================
+BARE GREETING (LOCKED — the customer only said hello)
+=================================================================================
+The customer's latest message is JUST a greeting — nothing else. Treat it as a fresh hello, NOT a continuation of any earlier topic.
+- Reply with ONE short, warm greeting and an open question like "how can I help?" / "what can I do for you today?"${first ? ` Open with their first name (${first}).` : ''}
+- Do NOT bring up payments, payouts, submissions, verification, bookings, site visits, or "the team is looking into it" — unless THEY raise it in THIS message. They didn't.
+- Do NOT assume anything is important, urgent, or unresolved. Let them tell you what they need. Keep it light and let them lead.`;
 }
 
 function isLokazenBookingAction(input: AgentInput): boolean {

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
       if (!supabase) return;
       // Find the lead whose alert this thread belongs to.
       const { data: lead } = await supabase
-        .from('all_leads').select('id, phone')
+        .from('all_leads').select('id, phone, metadata')
         .filter('metadata->>slack_ts', 'eq', event.thread_ts)
         .maybeSingle();
       if (!lead?.phone) {
@@ -52,7 +52,12 @@ export async function POST(req: NextRequest) {
       if (!text) return;
       const res = await sendWhatsAppText(lead.phone, text);
       if (res.success) {
-        await logMessage(lead.id, 'whatsapp', 'agent', text, 'text', { source: 'slack_reply', slack_user: event.user }).catch(() => {});
+        // Persist the wamid so delivered/read receipts attach to this reply, and
+        // stamp human_takeover so the bot pauses and doesn't talk over the team.
+        await logMessage(lead.id, 'whatsapp', 'agent', text, 'text', { source: 'slack_reply', slack_user: event.user, wa_message_id: res.messageId, human: true }).catch(() => {});
+        await supabase.from('all_leads').update({
+          metadata: { ...(lead.metadata || {}), human_takeover_at: new Date().toISOString(), human_takeover_by: `slack:${event.user}` },
+        }).eq('id', lead.id);
         await slackPostMessage({ channel: event.channel, thread_ts: event.thread_ts, text: '✅ Sent to the customer on WhatsApp.' });
       } else {
         await slackPostMessage({ channel: event.channel, thread_ts: event.thread_ts, text: `⚠️ Could not send to WhatsApp: ${res.error || 'unknown error'}` });
