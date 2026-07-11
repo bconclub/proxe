@@ -1,3 +1,8 @@
+##  · fix(core): teammate-invite email uses the real brand name, not "Windchasers"
+
+- services/email.ts hardcoded "Windchasers PROXe" in the invite subject, body, text, and FROM_NAME default, so a teammate invite from ANY brand said "Windchasers". Now derives from getBrandConfig().name (BRAND_LABEL). Cross-brand bleed found in the brand audit.
+- `(pending-sha)`
+
 ##  · fix(core): agent no longer says "Lokazen team" on other brands
 
 - Three escalation guards in the SHARED engine hardcoded "the Lokazen team" and were NOT brand-gated, so bcon/windchasers/pop/proxe leaked "Lokazen" into live replies (seen on bcon WhatsApp: "flagged this straight to the Lokazen team").

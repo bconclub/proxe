@@ -16,9 +16,13 @@
  */
 
 import { Resend } from 'resend'
+import { getBrandConfig } from '@/configs'
 
+// Brand display name resolves at build time (BRAND_ID is fixed per build), so
+// invite emails never leak another brand's name (was hardcoded "Windchasers").
+const BRAND_LABEL = `${getBrandConfig().name} PROXe`
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
-const FROM_NAME = process.env.RESEND_FROM_NAME || 'Windchasers PROXe'
+const FROM_NAME = process.env.RESEND_FROM_NAME || BRAND_LABEL
 
 let _client: Resend | null = null
 function getClient(): Resend | null {
@@ -80,14 +84,14 @@ export async function sendInvitationEmail(opts: {
 }): Promise<SendResult> {
   const role = opts.role || 'viewer'
   const invitedBy = opts.invitedByEmail || 'a teammate'
-  const subject = `You're invited to the Windchasers PROXe dashboard`
+  const subject = `You're invited to the ${BRAND_LABEL} dashboard`
 
   const html = `
   <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#1a1a1a;line-height:1.6">
     <h2 style="margin:0 0 16px;font-size:22px;font-weight:700">You've been invited 👋</h2>
     <p style="margin:0 0 16px">
       ${escapeHtml(invitedBy)} has invited you to join the
-      <strong>Windchasers PROXe</strong> dashboard as a <strong>${escapeHtml(role)}</strong>.
+      <strong>${escapeHtml(BRAND_LABEL)}</strong> dashboard as a <strong>${escapeHtml(role)}</strong>.
     </p>
     <p style="margin:0 0 24px">
       Click the button below to set up your account. This invitation expires in 7 days.
@@ -111,7 +115,7 @@ export async function sendInvitationEmail(opts: {
   </div>`
 
   const text = [
-    `You've been invited to the Windchasers PROXe dashboard.`,
+    `You've been invited to the ${BRAND_LABEL} dashboard.`,
     ``,
     `${invitedBy} invited you as a ${role}.`,
     ``,
