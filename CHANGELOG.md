@@ -1,3 +1,9 @@
+##  · feat(inbox): Manual badge on human-sent replies + pop receipt migration
+
+- Inbox now shows a blue "Manual" badge on free-form replies a team member sent from the dashboard (metadata.human===true) so they are distinct from the bot auto-replies. Shared → all brands.
+- Added brands/pop/supabase/migrations/003_smart_timing_read_receipts.sql (read_at/delivered_at cols) — pop had no receipt migration; run it on pop + bcon Supabase to enable read receipts (windchasers/lokazen already have the cols).
+- `(pending-sha)`
+
 ##  · fix(core): teammate-invite email uses the real brand name, not "Windchasers"
 
 - services/email.ts hardcoded "Windchasers PROXe" in the invite subject, body, text, and FROM_NAME default, so a teammate invite from ANY brand said "Windchasers". Now derives from getBrandConfig().name (BRAND_LABEL). Cross-brand bleed found in the brand audit.
