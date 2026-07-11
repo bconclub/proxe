@@ -1,3 +1,8 @@
+##  · fix(core): agent no longer says "Lokazen team" on other brands
+
+- Three ungated escalation guards in the shared engine hardcoded "the Lokazen team"; now "our team" (wantsHuman handoff, anti-repeat, empty-response). Lokazen-gated directives keep their branding. Same fix as main (pop rides one-core).
+- `(pending-sha)`
+
 ## 2026-07-10 · feat(brain): tap-to-talk mic on the docked orb
 
 - The docked mini-orb now has a mic button just below the light: tap to talk to the brain (starts listening via Web Speech), tap again to send; it turns accent + pulses while hearing you. Lets you speak to it directly without waiting on the spoken briefing.
