@@ -2243,6 +2243,9 @@ export default function InboxPage() {
                   // smaller padding, distinct from the big chat bubbles. Matches
                   // the WhatsApp-style template feel (header strip + body + foot).
                   const isTemplate = !isCustomer && !!msg.metadata?.template_name
+                  // A human on the dashboard sent this (inbox/reply sets human:true) —
+                  // show a "Manual" badge so it's distinct from the bot's auto-replies.
+                  const isManual = !isCustomer && msg.metadata?.human === true
 
                   return (
                     <React.Fragment key={msg.id}>
@@ -2342,7 +2345,16 @@ export default function InboxPage() {
                             for outbound WhatsApp render just below via their own
                             delivery block). Templates carry their own footer. */}
                         {!isTemplate && !msg.metadata?.template_name && (
-                          <div className="flex justify-end mt-0.5 -mb-0.5">
+                          <div className="flex justify-end items-center gap-1.5 mt-0.5 -mb-0.5">
+                            {isManual && (
+                              <span
+                                className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(59,130,246,0.18)', color: '#93c5fd' }}
+                                title="Sent manually by a team member"
+                              >
+                                Manual
+                              </span>
+                            )}
                             <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                               {formatTime(msg.created_at)}
                             </span>

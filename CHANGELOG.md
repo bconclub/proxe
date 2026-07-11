@@ -1,3 +1,8 @@
+##  · feat(inbox): Manual badge on human-sent replies + pop receipt migration
+
+- Same as main (pop rides one-core). Inbox "Manual" badge on human-sent replies; brands/pop/supabase/migrations/003 read-receipt columns.
+- `(pending-sha)`
+
 ##  · fix(core): teammate-invite email uses the real brand name, not "Windchasers"
 
 - Same brand-bleed fix as main (pop rides one-core). services/email.ts now derives the label from getBrandConfig().name instead of hardcoded "Windchasers PROXe".
