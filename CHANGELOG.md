@@ -1,3 +1,8 @@
+##  · fix(core): teammate-invite email uses the real brand name, not "Windchasers"
+
+- Same brand-bleed fix as main (pop rides one-core). services/email.ts now derives the label from getBrandConfig().name instead of hardcoded "Windchasers PROXe".
+- `(pending-sha)`
+
 ##  · fix(core): agent no longer says "Lokazen team" on other brands
 
 - Three ungated escalation guards in the shared engine hardcoded "the Lokazen team"; now "our team" (wantsHuman handoff, anti-repeat, empty-response). Lokazen-gated directives keep their branding. Same fix as main (pop rides one-core).
