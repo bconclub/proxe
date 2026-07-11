@@ -1,3 +1,10 @@
+##  · fix(core): agent no longer says "Lokazen team" on other brands
+
+- Three escalation guards in the SHARED engine hardcoded "the Lokazen team" and were NOT brand-gated, so bcon/windchasers/pop/proxe leaked "Lokazen" into live replies (seen on bcon WhatsApp: "flagged this straight to the Lokazen team").
+- Fixed the wantsHuman handoff prompt (L163), the anti-repeat guard (L352), and the empty-response guard (L365) to say "our team". Lokazen-gated scout/payment/status directives keep their branding.
+- User-facing: escalation replies on non-Lokazen brands now say "our team" instead of naming Lokazen.
+- `(pending-sha)`
+
 ## 2026-07-07 · fix(webinar): wire the real confirmation template (windchasers_webinar_confirmation_v1)
 
 - The created Meta template is windchasers_webinar_confirmation_v1 (not _confirm_v1) with params customer_name / topic / date / time (date + time SEPARATE) + a Join-WhatsApp-Group quick reply. sendWebinarConfirm now targets it and splits the combined "18 July 2026 at 11:30 AM IST" label into date + time. sendWebinarConfirmParents delegates to it (no parent-specific template exists). inbound uses the single template name.

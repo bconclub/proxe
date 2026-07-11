@@ -160,7 +160,7 @@ User's message: ${input.message}`
   // been pinged (flagForHumanFollowup below). Do NOT negotiate a call time back
   // and forth (it loops and never books). Confirm the handoff and stop.
   if (wantsHuman) {
-    systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): The Lokazen team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself — the team confirms the time directly. Never loop on times.`;
+    systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): Our team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself — the team confirms the time directly. Never loop on times.`;
   }
 
   // 5d. Bare greeting — a plain "Hey" is a fresh hello, not the customer
@@ -349,7 +349,7 @@ User's message: ${input.message}`
     if (recentAssistant.some((prev) => isNearDuplicate(cleanedResponse, prev))) {
       console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" — suppressing the parrot, escalating to a human.`);
       await flagForHumanFollowup(supabase, input, `Repeat-reply guard: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
-      cleanedResponse = "You've got it — I've looped the Lokazen team in directly so a person can pick this up. Anything specific you'd like me to add for them?";
+      cleanedResponse = "You've got it — I've looped our team in directly so a person can pick this up. Anything specific you'd like me to add for them?";
     }
   }
 
@@ -362,7 +362,7 @@ User's message: ${input.message}`
   if (!cleanedResponse || !cleanedResponse.trim()) {
     console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" — escalating to a human instead of the generic holding line.`);
     await flagForHumanFollowup(supabase, input, `Empty AI response to: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
-    cleanedResponse = "Thanks for bearing with me — I've flagged this straight to the Lokazen team so a person can pick it up, and they have your number. Anything else you'd like me to pass along to them?";
+    cleanedResponse = "Thanks for bearing with me — I've flagged this straight to our team so a person can pick it up, and they have your number. Anything else you'd like me to pass along to them?";
   }
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
