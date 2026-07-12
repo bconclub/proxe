@@ -1,3 +1,9 @@
+##  · polish(brain): declutter the agent container — one "+", small frosted mic
+
+- At rest the container shows exactly TWO things: the mic chip (26px frosted, was a 34px solid disc that read as a white blob over the orb) and ONE "+". Tapping "+" reveals full-screen + close; tapping again hides them.
+- Removed the duplicate ×: VoiceOrb no longer renders its own close inside the overlay (unmount cleanup already stops audio/mic).
+- `(pending-sha)`
+
 ##  · feat(brain): docked agent lives in a CONTAINER — orb + words + controls in one panel
 
 - The docked agent was a naked orb with a floating answer card and loose buttons. Now one frosted panel (320w, rounded-18, blur) contains the orb circle (116px, centered), the ack/answer text below it, and hover controls (⤢ full screen, × close) on the container. The "+"-reveal is gone — the container has room for honest controls.

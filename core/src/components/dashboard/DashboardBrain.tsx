@@ -209,6 +209,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // extra controls (close / full screen) are revealed by the "+".
   const [orbAnswer, setOrbAnswer] = useState('')
   const [orbVoiceOn, setOrbVoiceOn] = useState(false)
+  const [orbCtlOpen, setOrbCtlOpen] = useState(false)
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
@@ -545,7 +546,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               <div style={{ position: 'absolute', inset: 0, borderRadius: orb.view === 'docked' ? 999 : 0, overflow: orb.view === 'docked' ? 'hidden' : 'visible' }}>
                 <VoiceOrb
                   autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational
-                  compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction}
+                  compact={orb.view === 'docked'} onAction={executeAction}
                   onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
                 />
               </div>
@@ -574,17 +575,28 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               style={{ position: 'absolute', top: 14, right: 14, zIndex: 6, width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
             >⤡</button>
           ) : (
-            <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6, opacity: orbHover ? 1 : 0, transition: 'opacity .15s ease' }}>
+            <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6, alignItems: 'center', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease' }}>
+              {/* revealed by the "+" — full screen + close */}
+              {orbCtlOpen && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOrbCtlOpen(false); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
+                    aria-label="Full screen" title="Full screen"
+                    style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                  >⤢</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOrb(null) }}
+                    aria-label="Close" title="Close"
+                    style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                  >×</button>
+                </>
+              )}
+              {/* the ONE control at rest */}
               <button
-                onClick={(e) => { e.stopPropagation(); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
-                aria-label="Full screen" title="Full screen"
-                style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-              >⤢</button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setOrb(null) }}
-                aria-label="Close" title="Close"
-                style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-              >×</button>
+                onClick={(e) => { e.stopPropagation(); setOrbCtlOpen((o) => !o) }}
+                aria-label={orbCtlOpen ? 'Hide controls' : 'More'} title={orbCtlOpen ? 'Hide' : 'More'}
+                style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 13, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', transform: orbCtlOpen ? 'rotate(45deg)' : 'none', transition: 'transform .15s ease' }}
+              >+</button>
             </div>
           )}
         </div>
