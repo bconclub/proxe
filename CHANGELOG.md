@@ -1,3 +1,10 @@
+##  · feat(brain): voice ON by default + SUBTITLES (2-3 words) instead of the text box
+
+- Voice now defaults ON (new storage key proxe-brain-voice2 — everyone stuck "off" from the dead-key era starts speaking). Mute stays one tap away.
+- The docked answer is no longer a bulk text card: a single subtitle pill under the orb shows 2-3 words at a time, coming and going — audio-synced when speaking, speech-paced (850ms) when muted. The card now appears ONLY for errors (voice-health failures).
+- Ack rides the same pill ("Okay Z, catching you up now.").
+- `(pending-sha)`
+
 ##  · feat(brain): answers STREAM word-by-word + health check tests real speech
 
 - Voice-off answers no longer land as one bulk block — the card types the answer out word by word (ack first, then the words stream in).

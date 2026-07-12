@@ -210,6 +210,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const [orbAnswer, setOrbAnswer] = useState('')
   const [orbVoiceOn, setOrbVoiceOn] = useState(false)
   const [orbCtlOpen, setOrbCtlOpen] = useState(false)
+  const [orbSubtitle, setOrbSubtitle] = useState('')
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
@@ -541,7 +542,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                 <VoiceOrb
                   autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational
                   compact={orb.view === 'docked'} onAction={executeAction}
-                  onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
+                  onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn} onSubtitle={setOrbSubtitle}
                 />
               </div>
               {/* controls: ONE "+" at the orb's top-right; tapping it drops a
@@ -582,11 +583,28 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
             </div>
 
             {/* the words — ack first, then the answer, INSIDE the container */}
-            {orb.view === 'docked' && !orbVoiceOn && orbAnswer && (
+            {/* SUBTITLES — 2-3 words at a time, coming and going under the orb */}
+            {orb.view === 'docked' && orbSubtitle && (
+              <div
+                style={{
+                  alignSelf: 'center', maxWidth: PANEL_W - 20, padding: '6px 14px',
+                  borderRadius: 999, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)',
+                  border: '1px solid var(--border-primary)',
+                  backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                  fontSize: 13, fontWeight: 500, color: 'var(--text-primary)',
+                  animation: 'wc-fade-in 140ms ease',
+                }}
+              >
+                {orbSubtitle}
+              </div>
+            )}
+            {/* the card only appears for ERRORS (e.g. voice health failures) */}
+            {orb.view === 'docked' && orbAnswer && !orbSubtitle && (
               <div
                 onClick={(e) => e.stopPropagation()}
                 style={{
-                  width: PANEL_W - 20, maxHeight: 260, overflowY: 'auto', padding: '10px 13px',
+                  width: PANEL_W - 20, maxHeight: 200, overflowY: 'auto', padding: '10px 13px',
                   borderRadius: 14,
                   background: 'color-mix(in srgb, var(--bg-secondary) 92%, transparent)',
                   border: '1px solid var(--border-primary)',
