@@ -119,6 +119,28 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
     }
     ctx.setLineDash([])
 
+    // ── THE COVERING — a glassy shell the particle cloud lives INSIDE: faint
+    // inner glass toward the rim + a breathing accent rim + a small specular
+    // highlight. Same radius the loading ring rides, so the ring reads as
+    // charge running along the shell.
+    {
+      const shellR = R * 1.22
+      const glass = ctx.createRadialGradient(cx, cy, shellR * 0.55, cx, cy, shellR)
+      glass.addColorStop(0, 'rgba(0,0,0,0)')
+      glass.addColorStop(0.85, `rgba(${ar},${ag},${ab},${0.03 + amp * 0.02})`)
+      glass.addColorStop(1, `rgba(${ar},${ag},${ab},${0.10 + amp * 0.05})`)
+      ctx.fillStyle = glass
+      ctx.beginPath(); ctx.arc(cx, cy, shellR, 0, Math.PI * 2); ctx.fill()
+      ctx.strokeStyle = `rgba(${ar},${ag},${ab},${(0.30 + amp * 0.25 + think * 0.1) * (isLight ? 1.3 : 1)})`
+      ctx.lineWidth = dpr2 * 1.4
+      ctx.beginPath(); ctx.arc(cx, cy, shellR, 0, Math.PI * 2); ctx.stroke()
+      ctx.strokeStyle = `rgba(255,255,255,${0.10 + amp * 0.06})`
+      ctx.lineWidth = dpr2 * 2.2
+      ctx.lineCap = 'round'
+      ctx.beginPath(); ctx.arc(cx, cy, shellR - dpr2 * 1.5, Math.PI * 1.05, Math.PI * 1.45); ctx.stroke()
+      ctx.lineCap = 'butt'
+    }
+
     // ── loading ring: fills while connecting, snaps closed when voice starts
     let ringP = -1, ringA = 0
     const thinkStart = env.getThinkStart()

@@ -1,3 +1,8 @@
+##  · polish(brain): the orb gets a permanent covering — a glassy shell the particles live inside
+
+- pulseOrb now draws a breathing glass shell at 1.22R (faint inner tint toward the rim, accent rim, small specular highlight). The loading ring rides the same radius, so connecting reads as charge running along the covering. Particle cloud reads as CONTAINED, matching the docked container look.
+- `(pending-sha)`
+
 ##  · polish(brain): declutter the agent container — one "+", small frosted mic
 
 - At rest the container shows exactly TWO things: the mic chip (26px frosted, was a 34px solid disc that read as a white blob over the orb) and ONE "+". Tapping "+" reveals full-screen + close; tapping again hides them.
