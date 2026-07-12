@@ -202,6 +202,11 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // double click → full.
   const [orb, setOrb] = useState<null | { q?: string; auto: boolean; listen?: boolean; view: 'docked' | 'full' }>(null)
   const [orbHover, setOrbHover] = useState(false)
+  // Voice-off answer + voice state bubbled up from VoiceOrb, and whether the
+  // extra controls (close / full screen) are revealed by the "+".
+  const [orbAnswer, setOrbAnswer] = useState('')
+  const [orbVoiceOn, setOrbVoiceOn] = useState(false)
+  const [orbCtlOpen, setOrbCtlOpen] = useState(false)
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
@@ -520,9 +525,34 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               edge; full = unclipped. Same wrapper element both ways, so toggling
               view never remounts the orb (voice keeps playing). */}
           <div style={{ position: 'absolute', inset: 0, borderRadius: orb.view === 'docked' ? 999 : 0, overflow: orb.view === 'docked' ? 'hidden' : 'visible' }}>
-            <VoiceOrb autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction} />
+            <VoiceOrb
+              autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational
+              compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction}
+              onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
+            />
           </div>
-          {/* controls: full → big collapse arrow; docked → tiny × + ⤢, only on hover */}
+
+          {/* Voice-OFF answer — a readable card beside the orb (the orb itself is
+              a tiny clipped circle, so the words live out here). */}
+          {orb.view === 'docked' && !orbVoiceOn && orbAnswer && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute', right: '100%', bottom: 0, marginRight: 12, width: 300,
+                maxHeight: 340, overflowY: 'auto', padding: '12px 14px', borderRadius: 14,
+                background: 'color-mix(in srgb, var(--bg-secondary) 94%, transparent)',
+                border: '1px solid var(--border-primary)', boxShadow: '0 16px 44px rgba(0,0,0,0.4)',
+                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+                fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+                animation: 'wc-fade-in 180ms ease',
+              }}
+            >
+              {orbAnswer}
+            </div>
+          )}
+
+          {/* Controls: full → collapse arrow; docked → ONE "+" that reveals
+              close / full-screen, so the resting orb is clean. */}
           {orb.view === 'full' ? (
             <button
               onClick={() => setOrb((o) => (o ? { ...o, view: 'docked' } : o))}
@@ -530,17 +560,27 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               style={{ position: 'absolute', top: 14, right: 14, zIndex: 6, width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
             >⤡</button>
           ) : (
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: orbHover ? 1 : 0, transition: 'opacity .15s ease' }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease' }}>
+              {/* the "+" — the only chrome at rest; tap to reveal the rest */}
               <button
-                onClick={(e) => { e.stopPropagation(); setOrb(null) }}
-                aria-label="Close" title="Close"
-                style={{ position: 'absolute', top: -4, left: -4, pointerEvents: 'auto', width: 18, height: 18, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-              >×</button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
-                aria-label="Full screen" title="Full screen"
-                style={{ position: 'absolute', top: -4, right: -4, pointerEvents: 'auto', width: 18, height: 18, borderRadius: 999, cursor: 'pointer', fontSize: 10, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-              >⤢</button>
+                onClick={(e) => { e.stopPropagation(); setOrbCtlOpen((o) => !o) }}
+                aria-label={orbCtlOpen ? 'Hide controls' : 'More'} title={orbCtlOpen ? 'Hide' : 'More'}
+                style={{ position: 'absolute', top: -4, right: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 13, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', transform: orbCtlOpen ? 'rotate(45deg)' : 'none', transition: 'transform .15s ease' }}
+              >+</button>
+              {orbCtlOpen && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOrb(null) }}
+                    aria-label="Close" title="Close"
+                    style={{ position: 'absolute', top: -4, left: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                  >×</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setOrbCtlOpen(false); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
+                    aria-label="Full screen" title="Full screen"
+                    style={{ position: 'absolute', bottom: -4, right: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                  >⤢</button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -674,7 +714,9 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                             onClick={() => executeAction(a)}
                             disabled={!!dialing && a.type === 'dial'}
                             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition disabled:opacity-60"
-                            style={{ backgroundColor: 'var(--button-bg)', color: 'var(--text-button)' }}
+                            // accent fill (not --button-bg — that var doesn't resolve in the
+                            // dashboard's brand-var scope). Filled = action, outline = followup.
+                            style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
                           >
                             {a.type === 'dial' ? <MdCall size={13} /> : <MdOpenInNew size={13} />}
                             <span>{isDialing ? 'Calling…' : a.label}</span>

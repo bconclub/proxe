@@ -84,13 +84,24 @@ export type VoiceOrbProps = {
   // (open lead / open page). The host (DashboardBrain) executes them — the page
   // loads behind the orb while it keeps speaking. Dial never comes via voice.
   onAction?: (a: BrainAction) => void
+  // Voice-OFF text answer emitted up to the host so it can render a readable
+  // panel (the docked orb is a tiny clipped circle — text won't fit inside it).
+  // '' means clear. onVoiceChange lets the host reflect the on/off state.
+  onAnswer?: (text: string) => void
+  onVoiceChange?: (on: boolean) => void
 }
 
-export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false, onAction }: VoiceOrbProps = {}) {
+export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false, onAction, onAnswer, onVoiceChange }: VoiceOrbProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mode, setMode] = useState<Mode>('idle')
   const [caption, setCaption] = useState('')
   const [subtitle, setSubtitle] = useState('')
+  // Voice toggle: OFF (default) = the brain READS its answer as text (no TTS,
+  // no mic — works without an ElevenLabs key); ON = it speaks + the mic listens
+  // so you can just talk. Persisted per browser.
+  const [voiceOn, setVoiceOn] = useState(false)
+  const voiceOnRef = useRef(false)
+  const [answer, setAnswer] = useState('') // the readable text answer (voice-off)
   const [lang, setLang] = useState<string>(LANGS[0]?.id || 'en')
   // null until mount → hydration-safe localStorage read, renderer mounts once
   const [variant, setVariant] = useState<VariantId | null>(null)
@@ -111,6 +122,23 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const waveBufRef = useRef(new Uint8Array(128))
 
   const setModeBoth = (m: Mode) => { modeRef.current = m; setMode(m) }
+
+  // Restore the voice-on/off preference once mounted (hydration-safe).
+  useEffect(() => {
+    try { const v = localStorage.getItem('proxe-brain-voice') === '1'; setVoiceOn(v); voiceOnRef.current = v } catch { /* storage */ }
+  }, [])
+  const setVoice = useCallback((on: boolean) => {
+    voiceOnRef.current = on
+    setVoiceOn(on)
+    try { localStorage.setItem('proxe-brain-voice', on ? '1' : '0') } catch { /* storage */ }
+  }, [])
+  // Bubble the readable answer + voice state up to the host (it renders the
+  // panel). Props ride in refs so the setters below fire the LATEST callback
+  // with no effect-timing games.
+  const onAnswerRef = useRef(onAnswer); onAnswerRef.current = onAnswer
+  const onVoiceRef = useRef(onVoiceChange); onVoiceRef.current = onVoiceChange
+  const emitAnswer = useCallback((t: string) => { setAnswer(t); onAnswerRef.current?.(t) }, [])
+  useEffect(() => { onVoiceRef.current?.(voiceOn) }, [voiceOn])
 
   // Conversation turns (voice loop) — sent with each mode:'text' request so the
   // brain can resolve "yes" / "that one" against what it just said. onAction
@@ -220,6 +248,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const engage = useCallback(async (question?: string) => {
     if (modeRef.current === 'thinking' || modeRef.current === 'speaking') { stop(); return }
     stop()
+    emitAnswer('')
     thinkStartRef.current = performance.now()
     ringDoneAtRef.current = null
     setModeBoth('thinking')
@@ -259,7 +288,8 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       // seamlessly once it's ready. greetDone resolves when the greeting audio
       // ends, so the briefing never overlaps it.
       let greetDone: Promise<void> = Promise.resolve()
-      const greetP = fetch('/api/dashboard/brain/briefing', {
+      // Voice-off → no spoken greeting at all (we only fetch + show the words).
+      const greetP = !voiceOnRef.current ? Promise.resolve() : fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'greet', ...(question ? { question } : {}) }), signal: ac.signal,
       }).then((r) => r.json())
@@ -293,10 +323,21 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       if (tr?.error) throw new Error(tr.error)
       const text: string = tr.text || 'Nothing to report yet.'
 
-      // Keep the spoken exchange as history for the next turn (capped).
+      // Keep the exchange as history for the next turn (capped).
       if (question) historyRef.current.push({ role: 'user', content: question })
       historyRef.current.push({ role: 'assistant', content: text })
       if (historyRef.current.length > 12) historyRef.current = historyRef.current.slice(-12)
+
+      // ── VOICE OFF: just READ the answer (no TTS, no mic). Works with no key. ──
+      if (!voiceOnRef.current) {
+        clearInterval(stepTimer); clearInterval(secTimer)
+        thinkStartRef.current = null
+        ringDoneAtRef.current = performance.now()
+        setCaption(''); setSubtitle('')
+        emitAnswer(text)
+        setModeBoth('idle')
+        return
+      }
 
       // Brain-drives-UI: execute the first validated nav action now — the page
       // opens BEHIND the orb while the voice keeps talking (the orb lives in
@@ -421,6 +462,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     resetTranscript()
     setSubtitle('')
     setCaption('')
+    emitAnswer('')
     setModeBoth('listening')
     startListening()
   }, [micSupported, stop, resetTranscript, startListening])
@@ -445,19 +487,20 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     return () => { if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null } }
   }, [heard, submitSpoken])
 
-  // Conversational loop: each time the brain finishes SPEAKING, reopen the mic.
+  // Conversational loop: only while VOICE IS ON — after it finishes speaking,
+  // reopen the mic for the next turn. Voice off never listens.
   useEffect(() => {
     const prev = prevModeRef.current
     prevModeRef.current = mode
-    if (conversational && prev === 'speaking' && mode === 'idle') beginListening()
+    if (conversational && voiceOnRef.current && prev === 'speaking' && mode === 'idle') beginListening()
   }, [mode, conversational, beginListening])
 
   // Overlay embed: on mount either start talking (briefing / a question) or, for
-  // "Ask something", go straight to listening. The dock click was the gesture.
+  // "Ask something", turn voice ON and go straight to listening.
   const didAutoStart = useRef(false)
   useEffect(() => {
     if (didAutoStart.current) return
-    if (listenFirst) { didAutoStart.current = true; beginListening() }
+    if (listenFirst) { didAutoStart.current = true; setVoice(true); beginListening() }
     else if (autoStart) { didAutoStart.current = true; engage(initialQuestion) }
   }, [autoStart, listenFirst, initialQuestion, engage, beginListening])
 
@@ -503,33 +546,46 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         </button>
       )}
 
-      {/* Compact (docked) mic — tap to TALK to the brain. Sits just below the
-          light, in the same cluster as the dock's close/fullscreen controls.
-          idle/thinking/speaking → start listening; listening → send now.
-          Turns accent + pulses while it's hearing you. */}
+      {/* VOICE TOGGLE — the one control on the docked orb. Just below the light.
+          OFF: the brain reads its answer as text, you click to get things (works
+          with no ElevenLabs key). ON: it speaks and the mic listens so you can
+          just talk. Accent + pulse while listening. */}
       {compact && (
         <button
-          onClick={(e) => { e.stopPropagation(); if (modeRef.current === 'listening') submitSpoken(); else beginListening() }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (voiceOnRef.current) { setVoice(false); stop(); stopListening(); setModeBoth('idle') }
+            else { setVoice(true); beginListening() }
+          }}
           onPointerMove={(e) => e.stopPropagation()}
-          aria-label={mode === 'listening' ? 'Stop listening' : 'Talk to the brain'}
-          title={mode === 'listening' ? 'Listening — tap to send' : 'Tap to talk'}
+          aria-label={voiceOn ? 'Voice on — tap to turn off' : 'Voice off — tap to talk'}
+          title={voiceOn ? (mode === 'listening' ? 'Listening… tap to turn voice off' : 'Voice on — tap to turn off') : 'Tap to talk (voice off — answers show as text)'}
           style={{
             position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', zIndex: 5,
             width: 34, height: 34, borderRadius: 999, cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: mode === 'listening' ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-            color: mode === 'listening' ? '#fff' : 'var(--accent-primary)',
+            background: voiceOn ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+            color: voiceOn ? '#fff' : 'var(--text-secondary)',
             border: '1px solid var(--border-primary)',
             boxShadow: mode === 'listening' ? '0 0 0 4px color-mix(in srgb, var(--accent-primary) 30%, transparent)' : '0 2px 8px rgba(0,0,0,0.3)',
             animation: mode === 'listening' ? 'voMicPulse 1.2s ease infinite' : 'none',
-            transition: 'background .15s ease, box-shadow .15s ease',
+            transition: 'background .15s ease, color .15s ease, box-shadow .15s ease',
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="9" y="2" width="6" height="12" rx="3" />
-            <path d="M5 10a7 7 0 0 0 14 0" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-          </svg>
+          {voiceOn ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="2" width="6" height="12" rx="3" />
+              <path d="M5 10a7 7 0 0 0 14 0" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="2" y1="2" x2="22" y2="22" />
+              <path d="M9 4.5a3 3 0 0 1 6 0V9m0 3a3 3 0 0 1-4.5 2.6" />
+              <path d="M5 10a7 7 0 0 0 10.7 6" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+          )}
         </button>
       )}
 
