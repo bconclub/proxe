@@ -1,3 +1,8 @@
+##  · polish(brain): no square around the orb — the glowing covering IS the container
+
+- Dropped the frosted rectangle that wrapped the docked agent. The orb floats as a clean circle (140px) with its glassy covering; the loading ring connects along it and it stays glowing once connected. Words render in their own small frosted card BELOW the orb; "+" and the mic chip hug the circle.
+- `(pending-sha)`
+
 ##  · polish(brain): the orb gets a permanent covering — a glassy shell the particles live inside
 
 - pulseOrb now draws a breathing glass shell at 1.22R (faint inner tint toward the rim, accent rim, small specular highlight). The loading ring rides the same radius, so connecting reads as charge running along the covering. Particle cloud reads as CONTAINED, matching the docked container look.
