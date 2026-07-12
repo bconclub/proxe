@@ -89,9 +89,11 @@ export type VoiceOrbProps = {
   // '' means clear. onVoiceChange lets the host reflect the on/off state.
   onAnswer?: (text: string) => void
   onVoiceChange?: (on: boolean) => void
+  // 2-3 word karaoke subtitle, mirrored up so the docked pill can show it
+  onSubtitle?: (text: string) => void
 }
 
-export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false, onAction, onAnswer, onVoiceChange }: VoiceOrbProps = {}) {
+export default function VoiceOrb({ autoStart = false, initialQuestion, conversational = false, listenFirst = false, onClose, compact = false, onAction, onAnswer, onVoiceChange, onSubtitle }: VoiceOrbProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mode, setMode] = useState<Mode>('idle')
   const [caption, setCaption] = useState('')
@@ -127,20 +129,24 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
 
   // Restore the voice-on/off preference once mounted (hydration-safe).
   useEffect(() => {
-    try { const v = localStorage.getItem('proxe-brain-voice') === '1'; setVoiceOn(v); voiceOnRef.current = v } catch { /* storage */ }
+    // Voice defaults ON — the brain speaks unless the user muted it. (New key
+    // so everyone's stored 'off' from the silent-key era resets to speaking.)
+    try { const st = localStorage.getItem('proxe-brain-voice2'); const v = st == null ? true : st === '1'; setVoiceOn(v); voiceOnRef.current = v } catch { setVoiceOn(true); voiceOnRef.current = true }
   }, [])
   const setVoice = useCallback((on: boolean) => {
     voiceOnRef.current = on
     setVoiceOn(on)
-    try { localStorage.setItem('proxe-brain-voice', on ? '1' : '0') } catch { /* storage */ }
+    try { localStorage.setItem('proxe-brain-voice2', on ? '1' : '0') } catch { /* storage */ }
   }, [])
   // Bubble the readable answer + voice state up to the host (it renders the
   // panel). Props ride in refs so the setters below fire the LATEST callback
   // with no effect-timing games.
   const onAnswerRef = useRef(onAnswer); onAnswerRef.current = onAnswer
   const onVoiceRef = useRef(onVoiceChange); onVoiceRef.current = onVoiceChange
+  const onSubtitleRef = useRef(onSubtitle); onSubtitleRef.current = onSubtitle
   const emitAnswer = useCallback((t: string) => { setAnswer(t); onAnswerRef.current?.(t) }, [])
   useEffect(() => { onVoiceRef.current?.(voiceOn) }, [voiceOn])
+  useEffect(() => { onSubtitleRef.current?.(subtitle) }, [subtitle])
 
   // Conversation turns (voice loop) — sent with each mode:'text' request so the
   // brain can resolve "yes" / "that one" against what it just said. onAction
@@ -305,13 +311,12 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         .then((g) => {
           if (!voiceOnRef.current) {
             if (g?.text && modeRef.current === 'thinking') {
-              // Full-screen: the ack becomes the first caption. Docked (compact)
-              // renders no captions — there the ack shows as the FIRST message
-              // in the answer card, replaced by the real answer when it lands.
+              // The ack is a one-line subtitle ("Okay Z, catching you up now.")
+              // that comes and goes — never a text box.
               clearInterval(stepTimer)
               setCaption(g.text)
               stepTimer = setInterval(stepTick, 1600)
-              emitAnswer(g.text)
+              setSubtitle(g.text)
             }
             return null
           }
@@ -355,18 +360,21 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         thinkStartRef.current = null
         ringDoneAtRef.current = performance.now()
         setCaption(''); setSubtitle('')
-        // STREAM the words in — the answer types itself out sentence by
-        // sentence instead of landing as one bulk block.
-        const tokens = text.split(/(\s+)/)
-        let shown = 0
+        // SUBTITLES, not a text box: 2-3 words at a time, coming and going,
+        // paced like speech. The big answer card is reserved for errors.
+        const subsList = chunkWords(text)
+        let ci = 0
         if (streamTimerRef.current) clearInterval(streamTimerRef.current)
+        setSubtitle(subsList[0] || '')
         streamTimerRef.current = setInterval(() => {
-          shown = Math.min(tokens.length, shown + 2) // ~one word per tick
-          emitAnswer(tokens.slice(0, shown).join(''))
-          if (shown >= tokens.length && streamTimerRef.current) {
-            clearInterval(streamTimerRef.current); streamTimerRef.current = null
+          ci += 1
+          if (ci >= subsList.length) {
+            if (streamTimerRef.current) { clearInterval(streamTimerRef.current); streamTimerRef.current = null }
+            setSubtitle('')
+            return
           }
-        }, 32)
+          setSubtitle(subsList[ci])
+        }, 850)
         setModeBoth('idle')
         return
       }
