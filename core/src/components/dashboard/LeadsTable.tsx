@@ -701,25 +701,32 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : (showWebinarTab && courseInterestFilter === 'Cabin Crew') ? 'Cabin Crew' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
           </span>
 
-          {/* Leads | Webinar tab (windchasers) */}
+          {/* Leads | Cabin Crew | Webinar segment (windchasers). Cabin Crew reuses
+             the courseInterestFilter so it stays in sync with the course dropdown;
+             the live Google-Ads /cabin-crew campaign floods the list, so a
+             one-click segment keeps those leads findable. */}
           {showWebinarTab && (
-            <div role="tablist" aria-label="Leads or Webinar" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
-              {([{ key: false, label: 'Leads' }, { key: true, label: 'Webinar' }] as const).map((t) => (
+            <div role="tablist" aria-label="Leads, Cabin Crew or Webinar" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+              {([
+                { label: 'Leads', selected: !webinarView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setCourseInterestFilter('all') } },
+                { label: 'Cabin Crew', selected: !webinarView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setCourseInterestFilter('Cabin Crew') } },
+                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setCourseInterestFilter('all') } },
+              ] as const).map((t) => (
                 <button
                   key={t.label}
                   role="tab"
-                  aria-selected={webinarView === t.key}
-                  onClick={() => setWebinarView(t.key)}
-                  className="px-2 py-0.5 text-xs font-medium transition-colors"
+                  aria-selected={t.selected}
+                  onClick={t.onSelect}
+                  className="px-2 py-0.5 text-xs font-medium transition-colors whitespace-nowrap"
                   style={{
-                    backgroundColor: webinarView === t.key ? 'var(--button-bg)' : 'var(--bg-primary)',
-                    color: webinarView === t.key ? 'var(--text-button)' : 'var(--text-secondary)',
+                    backgroundColor: t.selected ? 'var(--button-bg)' : 'var(--bg-primary)',
+                    color: t.selected ? 'var(--text-button)' : 'var(--text-secondary)',
                     borderRight: '1px solid var(--border-primary)',
                   }}
                 >
