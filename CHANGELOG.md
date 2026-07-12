@@ -1,3 +1,10 @@
+##  · feat(brain): orb acknowledges the ASK, by name, before thinking
+
+- mode:greet is now input-aware + varied: "Okay <name>, let me check on those leads for you" (leads/bookings/usage/inbox/follow-ups/catch-up topics, several phrasings each) instead of the same canned "One moment, let me look that up".
+- Voice-OFF now fetches the greet too: full-screen shows it as the first caption; the docked orb shows it as the FIRST message in the answer card, replaced by the real answer when it lands (compact mode renders no captions).
+- Verified on bcon worktree: card timeline = "Okay PROXe, let me check on those leads for you." → real briefing text.
+- `(pending-sha)`
+
 ##  · fix(brain): orb briefing survives StrictMode — dev "Catch me up" never completed
 
 - Dev-mode React StrictMode mounts→cleans→remounts VoiceOrb; the unmount cleanup stop() ABORTED the first briefing fetch while didAutoStart (a ref) survived, so the retry never fired — every dev briefing died as ERR_ABORTED (previously misattributed to multi-thread HMR churn). Autostart now defers one tick with a cancellable timer: StrictMode first pass cancels cleanly before any fetch, second pass runs once.

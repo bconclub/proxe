@@ -118,10 +118,31 @@ export async function POST(req: NextRequest) {
         .from('dashboard_users').select('full_name').eq('id', user.id).maybeSingle()
       const fullName = (profile?.full_name || user.email?.split('@')[0] || '').trim()
       const firstName = fullName.split(/\s+/)[0] || 'there'
-      const q = typeof body?.question === 'string' && body.question.trim()
-      const text = q
-        ? `One moment ${firstName}, let me look that up.`
-        : `Hi ${firstName}, let me pull together everything from today. One moment.`
+      const q = typeof body?.question === 'string' ? body.question.trim() : ''
+      // Input-aware acknowledgment — echo WHAT they asked about, by name, and
+      // vary the phrasing so it never reads as the same canned line every time.
+      const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+      const ql = q.toLowerCase()
+      const ack = !q
+        ? pick([
+            `Hi ${firstName}, let me pull together everything from today.`,
+            `Okay ${firstName}, catching you up on today now.`,
+            `${firstName}, give me a moment — gathering today's picture.`,
+          ])
+        : /catch (me )?up|what happened|what's new|brief me|today so far/.test(ql)
+          ? pick([`Okay ${firstName}, catching you up now.`, `${firstName}, pulling together everything from today.`, `On it ${firstName} — here's today coming up.`])
+        : /\blead|pipeline|prospect|hot\b/.test(ql)
+          ? pick([`Okay ${firstName}, let me check on those leads for you.`, `Pulling up the leads now, ${firstName}.`, `Let me see how the leads are doing, ${firstName}.`])
+        : /\bbook|demo|meeting|calendar|schedul/.test(ql)
+          ? pick([`Let me pull up the bookings, ${firstName}.`, `Checking the calendar now, ${firstName}.`])
+        : /\btoken|usage|cost|spend|bill/.test(ql)
+          ? pick([`Let me pull the usage numbers, ${firstName}.`, `Checking the spend now, ${firstName}.`])
+        : /\bconversation|chat|inbox|whatsapp|message|repl/.test(ql)
+          ? pick([`Let me scan the conversations, ${firstName}.`, `Checking the inbox now, ${firstName}.`])
+        : /\bfollow|task|pending|due|remind/.test(ql)
+          ? pick([`Let me check what's pending, ${firstName}.`, `Pulling up the follow-ups, ${firstName}.`])
+          : pick([`Okay ${firstName}, let me look into that for you.`, `On it, ${firstName} — one moment.`, `Let me dig that up, ${firstName}.`])
+      const text = ack
       // Voice the greeting with the FASTEST model (flash) — it's a fixed canned
       // line, so speed matters far more than expressiveness, and it must land in
       // well under a second to feel instant. The real briefing still uses v3.
