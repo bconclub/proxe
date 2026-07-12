@@ -24,6 +24,7 @@ import {
   logMessage,
 } from '@/lib/services';
 import { createClient } from '@/lib/supabase/server';
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership';
 
 export const dynamic = 'force-dynamic';
@@ -38,13 +39,12 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
  * reply with no wamid never gets a receipt.
  */
 async function sendWhatsAppMessage(to: string, message: string): Promise<{ ok: boolean; messageId?: string }> {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-
-  if (!phoneNumberId || !accessToken) {
-    console.error('[inbox/reply] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
+  const creds = await getWhatsAppCreds();
+  if (!creds) {
+    console.error('[inbox/reply] No WhatsApp credentials (no dashboard connection, no META_WHATSAPP_* env)');
     return { ok: false };
   }
+  const { phoneNumberId, accessToken } = creds;
 
   try {
     const res = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
@@ -88,11 +88,11 @@ async function sendWhatsAppTemplate(params: {
   bodyParams?: string[];                              // positional
   bodyParamsNamed?: { name: string; value: string }[]; // named
 }): Promise<{ ok: boolean; messageId?: string; error?: string }> {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) {
-    return { ok: false, error: 'Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN' };
+  const creds = await getWhatsAppCreds();
+  if (!creds) {
+    return { ok: false, error: 'No WhatsApp credentials (no dashboard connection, no META_WHATSAPP_* env)' };
   }
+  const { phoneNumberId, accessToken } = creds;
 
   // Meta requires EITHER positional or named param objects, never both.
   // Named templates (e.g. windchasers_demo_online with {{customer_name}}) MUST

@@ -1,4 +1,5 @@
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone } from '@/lib/services';
 
@@ -195,12 +196,13 @@ export async function POST(req: NextRequest) {
             }
 
             // Send WhatsApp Template for new web leads
+            const waCreds = await getWhatsAppCreds();
             const response = await fetch(
-              `https://graph.facebook.com/v21.0/${process.env.META_WHATSAPP_PHONE_NUMBER_ID}/messages`,
+              `https://graph.facebook.com/v21.0/${waCreds?.phoneNumberId}/messages`,
               {
                 method: 'POST',
                 headers: {
-                  'Authorization': `Bearer ${process.env.META_WHATSAPP_ACCESS_TOKEN}`,
+                  'Authorization': `Bearer ${waCreds?.accessToken}`,
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({

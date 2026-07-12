@@ -7,20 +7,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds'
 
 export const dynamic = 'force-dynamic'
 
 const GRAPH_API_VERSION = 'v21.0'
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`
 
-function getCredentials() {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN
-  const wabaId = process.env.META_WHATSAPP_WABA_ID
-  if (!phoneNumberId || !accessToken) {
-    return null
-  }
-  return { phoneNumberId, accessToken, wabaId }
+async function getCredentials() {
+  // Dashboard connection (embedded signup) first, META_WHATSAPP_* env fallback.
+  return getWhatsAppCreds()
 }
 
 /**
@@ -28,7 +24,7 @@ function getCredentials() {
  */
 export async function GET(request: NextRequest) {
   try {
-    const creds = getCredentials()
+    const creds = await getCredentials()
     if (!creds) {
       return NextResponse.json(
         { error: 'Missing META_WHATSAPP_ACCESS_TOKEN or META_WHATSAPP_PHONE_NUMBER_ID' },
@@ -191,7 +187,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const creds = getCredentials()
+    const creds = await getCredentials()
     if (!creds) {
       return NextResponse.json(
         { error: 'Missing WhatsApp credentials' },

@@ -1,20 +1,16 @@
 'use client';
 import { useState } from 'react';
 import { MdMic, MdSend } from 'react-icons/md';
-import { getBrandConfig, getCurrentBrandId } from '@/configs';
+import { getBrandConfig } from '@/configs';
+import ConnectWhatsAppCard from './ConnectWhatsAppCard';
 
 export default function WhatsAppAgentTab() {
-  // POP runs a brand-generic sender identity (fork parity: env-driven number,
-  // "Number pending" in the guardrailed pitch build). Other brands keep the
-  // original hardcoded BCON sender until their own migrate pass.
-  const isPop = getCurrentBrandId() === 'pop';
   const brandName = getBrandConfig().name;
-  const waNumber = isPop
-    ? (process.env.NEXT_PUBLIC_WA_NUMBER || 'Number pending')
-    : '+918046733388';
-  const waSenderLabel = isPop ? brandName : 'BCON Club';
-  const chatAgentName = isPop ? brandName : 'BCON AI';
-  const avatarLetter = isPop ? (brandName.charAt(0) || 'P') : 'B';
+  // Sender identity comes from the live connection (ConnectWhatsAppCard's
+  // status fetch) — no hardcoded numbers or brand names.
+  const [connection, setConnection] = useState<{ verifiedName?: string | null } | null>(null);
+  const chatAgentName = connection?.verifiedName || brandName;
+  const avatarLetter = chatAgentName.charAt(0).toUpperCase() || 'P';
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('');
@@ -49,17 +45,8 @@ export default function WhatsAppAgentTab() {
         gap: '20px',
         overflowY: 'auto',
       }}>
-        {/* Status */}
-        <div className="flex items-center gap-3 p-4 rounded-xl" style={{
-          backgroundColor: 'var(--bg-secondary)',
-          border: '1px solid var(--border-primary)',
-        }}>
-          <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
-          <div>
-            <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>WhatsApp Agent</p>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{waNumber} · {waSenderLabel}</p>
-          </div>
-        </div>
+        {/* Connection — live status + Meta embedded-signup connect */}
+        <ConnectWhatsAppCard onStatus={setConnection} />
 
         {/* Divider */}
         <div style={{ height: '1px', backgroundColor: 'var(--border-primary)' }} />

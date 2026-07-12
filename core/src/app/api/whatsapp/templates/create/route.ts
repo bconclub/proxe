@@ -25,6 +25,7 @@
  * }
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds'
 
 export const dynamic = 'force-dynamic'
 // Without this the route falls through to the ~10s catch-all and a cold start +
@@ -34,12 +35,9 @@ export const maxDuration = 30
 
 const GRAPH = 'https://graph.facebook.com/v21.0'
 
-function creds() {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN
-  const wabaId = process.env.META_WHATSAPP_WABA_ID || null
-  if (!phoneNumberId || !accessToken) return null
-  return { phoneNumberId, accessToken, wabaId }
+async function creds() {
+  // Dashboard connection (embedded signup) first, META_WHATSAPP_* env fallback.
+  return getWhatsAppCreds()
 }
 
 // WABA id: env first, else resolve from the phone-number edge.
@@ -59,7 +57,7 @@ async function resolveWaba(c: { phoneNumberId: string; accessToken: string; waba
 
 export async function POST(request: NextRequest) {
   try {
-    const c = creds()
+    const c = await creds()
     if (!c) {
       return NextResponse.json({ error: 'Missing META_WHATSAPP_ACCESS_TOKEN / META_WHATSAPP_PHONE_NUMBER_ID' }, { status: 500 })
     }

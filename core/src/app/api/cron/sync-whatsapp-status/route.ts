@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, getClient } from '@/lib/services';
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 
 export const dynamic = 'force-dynamic';
 
@@ -121,8 +122,9 @@ async function runStatusSync(
   };
 
   // Get credentials from environment
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-  const businessAccountId = process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID;
+  const waCreds = await getWhatsAppCreds();
+  const accessToken = waCreds?.accessToken;
+  const businessAccountId = waCreds?.wabaId || process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID;
 
   if (!accessToken || !businessAccountId) {
     stats.errors.push('Missing META_WHATSAPP_ACCESS_TOKEN or META_WHATSAPP_BUSINESS_ACCOUNT_ID');
