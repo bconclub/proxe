@@ -1,3 +1,11 @@
+##  · feat(brain): clean docked orb — voice toggle, readable answer card, "+" controls
+
+- Voice toggle on the orb: OFF (default) = brain answers as READABLE TEXT in a card beside the docked orb (works without ElevenLabs); ON = speaks + mic listens (conversational loop). Persisted per browser.
+- Docked orb chrome reduced to ONE "+" that reveals close / full-screen; "Ask something" starts the mic (listenFirst turns voice on).
+- VoiceOrb bubbles answer/voice state up via onAnswer/onVoiceChange (ref-based emit, no effect-timing races).
+- NOTE: browser-verify on live (local dev was churn-poisoned by parallel threads).
+- `(pending-sha)`
+
 ##  · fix(core): eliminate remaining cross-brand bleeds (audit sweep)
 
 - quickReplyMap: aviation pricing (pilot/DGCA/helicopter/drone) served to ALL brands via a generic cost/price trigger — gated the call to brand===windchasers (a BCON/Lokazen customer texting "how much?" no longer gets pilot pricing). HIGHEST severity.
