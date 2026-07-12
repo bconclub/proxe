@@ -8,8 +8,9 @@
  *
  * Required env vars:
  *   META_WHATSAPP_VERIFY_TOKEN      - custom string set in Meta Developer Console
- *   META_WHATSAPP_ACCESS_TOKEN      - permanent Graph API token
- *   META_WHATSAPP_PHONE_NUMBER_ID   - WhatsApp Business phone number ID
+ * Send credentials resolve via whatsappCreds: dashboard connection
+ * (embedded signup) first, then META_WHATSAPP_ACCESS_TOKEN /
+ * META_WHATSAPP_PHONE_NUMBER_ID env fallback.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -41,6 +42,7 @@ import {
   META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
+import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 
 export const dynamic = 'force-dynamic';
 // 60s (was 30s): long multi-part questions + tool calls were exceeding 30s and
@@ -71,13 +73,12 @@ function isMessageAlreadyProcessed(messageId: string): boolean {
 
 /** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
 async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-
-  if (!phoneNumberId || !accessToken) {
-    console.error('[meta/webhook] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
+  const creds = await getWhatsAppCreds();
+  if (!creds) {
+    console.error('[meta/webhook] No WhatsApp credentials (no dashboard connection, no META_WHATSAPP_* env)');
     return null;
   }
+  const { phoneNumberId, accessToken } = creds;
 
   try {
     const res = await fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
@@ -111,9 +112,9 @@ async function sendWhatsAppReply(to: string, message: string): Promise<string | 
 
 /** Mark a message as "read" so the customer sees blue ticks */
 async function markAsRead(messageId: string): Promise<void> {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) return;
+  const creds = await getWhatsAppCreds();
+  if (!creds) return;
+  const { phoneNumberId, accessToken } = creds;
 
   fetch(`${GRAPH_API_BASE}/${phoneNumberId}/messages`, {
     method: 'POST',
@@ -317,8 +318,8 @@ async function captureWhatsAppMedia(
   kind: 'image' | 'document',
   brand: string,
 ): Promise<void> {
-  const token = process.env.META_WHATSAPP_ACCESS_TOKEN;
-  if (!token) { console.warn('[meta/media] META_WHATSAPP_ACCESS_TOKEN not set — cannot download media'); return; }
+  const token = (await getWhatsAppCreds())?.accessToken;
+  if (!token) { console.warn('[meta/media] no WhatsApp credentials — cannot download media'); return; }
   const supabase = getServiceClient();
   if (!supabase) return;
 

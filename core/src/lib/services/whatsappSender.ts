@@ -12,6 +12,7 @@
 
 import { logMessage } from './conversationLogger';
 import { getServiceClient } from './supabase';
+import { getWhatsAppCreds } from './whatsappCreds';
 import { getBrandConfig } from '@/configs';
 
 // Brand display name, resolved per-build. Booking/reminder/missed-call bodies
@@ -21,14 +22,14 @@ const BRAND_NAME = getBrandConfig().name;
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
-function getCredentials() {
-  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
-  if (!phoneNumberId || !accessToken) {
-    console.error('[whatsappSender] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
+async function getCredentials() {
+  // Dashboard connection (embedded signup) first, META_WHATSAPP_* env fallback.
+  const creds = await getWhatsAppCreds();
+  if (!creds) {
+    console.error('[whatsappSender] No WhatsApp credentials (no dashboard connection, no META_WHATSAPP_* env)');
     return null;
   }
-  return { phoneNumberId, accessToken };
+  return creds;
 }
 
 /** Normalize phone: strip everything except digits */
@@ -127,7 +128,7 @@ export async function sendWhatsAppText(
   to: string,
   message: string,
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
-  const creds = getCredentials();
+  const creds = await getCredentials();
   if (!creds) return { success: false, error: 'Missing credentials' };
 
   try {
@@ -186,7 +187,7 @@ export async function sendWhatsAppTemplate(
   messageId?: string;  // Meta's wamid… — needed for delivery status tracking
   statusCode?: number; // HTTP status from Graph API (200, 400, 401, etc.)
 }> {
-  const creds = getCredentials();
+  const creds = await getCredentials();
   if (!creds) return { success: false, error: 'Missing credentials (META_WHATSAPP_PHONE_NUMBER_ID / META_WHATSAPP_ACCESS_TOKEN)' };
 
   try {
@@ -298,7 +299,7 @@ export async function sendWhatsAppInteractiveButtons(
   buttons: string[],
   options: { headerText?: string; footerText?: string } = {},
 ): Promise<{ success: boolean; error?: string; messageId?: string; statusCode?: number }> {
-  const creds = getCredentials();
+  const creds = await getCredentials();
   if (!creds) return { success: false, error: 'Missing credentials' };
 
   // Hard caps to satisfy Meta's validation
