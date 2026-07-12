@@ -582,7 +582,21 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
           onClick={(e) => {
             e.stopPropagation()
             if (voiceOnRef.current) { setVoice(false); stop(); stopListening(); setModeBoth('idle') }
-            else { setVoice(true); beginListening() }
+            else {
+              setVoice(true); beginListening()
+              // Can it actually SPEAK? If not, turn back off and say exactly why —
+              // a silently-dead voice toggle is the worst failure mode.
+              fetch('/api/dashboard/brain/briefing', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'voice-health' }),
+              }).then((r) => r.json()).then((h) => {
+                if (h && h.ok === false) {
+                  const bad = (h.checks || []).filter((c: any) => !c.ok).map((c: any) => `• ${c.name}: ${c.detail}`).join('\n')
+                  setVoice(false); stopListening(); setModeBoth('idle')
+                  emitAnswer(`Voice can't speak yet — needs fixing:\n${bad}`)
+                }
+              }).catch(() => { /* health check is advisory */ })
+            }
           }}
           onPointerMove={(e) => e.stopPropagation()}
           aria-label={voiceOn ? 'Voice on — tap to turn off' : 'Voice off — tap to talk'}
@@ -591,12 +605,18 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
             // small frosted chip — must never dominate the orb (was a solid
             // 34px disc that read as a big white blob over the light)
             position: 'absolute', left: '50%', bottom: 6, transform: 'translateX(-50%)', zIndex: 5,
-            width: 26, height: 26, borderRadius: 999, cursor: 'pointer', padding: 0,
+            width: 30, height: 30, borderRadius: 999, cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: voiceOn ? 'var(--accent-primary)' : 'color-mix(in srgb, var(--bg-secondary) 45%, transparent)',
+            // Never a SOLID accent fill — bcon's accent is near-white and the
+            // chip turned into a glowing blob. ON = accent ring + tinted glass.
+            background: voiceOn
+              ? 'color-mix(in srgb, var(--accent-primary) 18%, rgba(10,10,10,0.65))'
+              : 'color-mix(in srgb, var(--bg-secondary) 45%, transparent)',
             backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-            color: voiceOn ? '#fff' : 'var(--text-muted)',
-            border: '1px solid color-mix(in srgb, var(--border-primary) 60%, transparent)',
+            color: voiceOn ? 'var(--accent-primary)' : 'var(--text-muted)',
+            border: voiceOn
+              ? '1.5px solid var(--accent-primary)'
+              : '1px solid color-mix(in srgb, var(--border-primary) 60%, transparent)',
             boxShadow: mode === 'listening' ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 30%, transparent)' : 'none',
             animation: mode === 'listening' ? 'voMicPulse 1.2s ease infinite' : 'none',
             transition: 'background .15s ease, color .15s ease, box-shadow .15s ease',
