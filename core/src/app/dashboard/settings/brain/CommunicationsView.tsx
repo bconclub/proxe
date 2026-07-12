@@ -40,7 +40,7 @@ const CATEGORIES: Array<{ id: CoreCommunication['category']; title: string; sub:
 const DEFAULT_SAMPLE: Record<string, string> = {
   customer_name: 'Rahul',
   parent_name: 'Mrs. Sharma',
-  webinar_name: 'So You Want To Be A Pilot',
+  webinar_name: 'Our Webinar',
   webinar_date: 'Sun, Jul 20 · 5:00 PM',
 }
 

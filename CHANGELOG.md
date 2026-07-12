@@ -1,3 +1,8 @@
+##  · fix(core): eliminate remaining cross-brand bleeds (audit sweep)
+
+- Same as main (pop rides one-core): quickReplyMap gated to windchasers; whatsappSender/bookingManager/calendar de-BCON/de-aviation; TodaySnapshotButton + TeamMessagesView + BookingCalendarWidget + CommunicationsView brand-gated/neutralized.
+- `(pending-sha)`
+
 ##  · fix(inbox): "Property Owner" audience badge is Lokazen-only (bled onto BCON)
 
 - Same as main. Gated the owner/scout/brand inbox badge to IS_LOKAZEN.

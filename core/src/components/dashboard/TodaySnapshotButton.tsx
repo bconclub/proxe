@@ -3,6 +3,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MdVisibility, MdClose, MdRefresh } from 'react-icons/md'
+import { getCurrentBrandId } from '@/configs'
+
+// PAT / Parent / Student are Windchasers (aviation) concepts. Only that brand
+// gets the aviation snapshot; POP gets the campaign view; everyone else gets a
+// brand-neutral default so bcon/lokazen never see "PAT done" or "Student".
+const IS_WINDCHASERS = getCurrentBrandId() === 'windchasers'
 
 /**
  * TodaySnapshotButton — top-right floating button that opens a quick-glance
@@ -219,11 +225,18 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                         <KpiCell label="Volunteers" value={data.pop.volunteers} accent="#22c55e" />
                         <KpiCell label="Supporters" value={data.pop.supporters} accent="#06b6d4" />
                       </>
-                    ) : (
+                    ) : IS_WINDCHASERS ? (
                       <>
                         <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
                         <KpiCell label="PAT done" value={data.events.pat_submitted} accent="#a5b4fc" />
                         <KpiCell label="Demos booked" value={data.events.demo_booked} accent="#22c55e" />
+                        <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
+                      </>
+                    ) : (
+                      <>
+                        <KpiCell label="New leads" value={data.leads.total} accent="#C9A961" />
+                        <KpiCell label="Hot leads" value={data.scoreHistogram.hot} accent="#a5b4fc" />
+                        <KpiCell label="Bookings" value={data.events.demo_booked} accent="#22c55e" />
                         <KpiCell label="Agent replies" value={data.events.agent_replies} accent="#06b6d4" />
                       </>
                     )}
@@ -271,7 +284,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                             </div>
                           ))}
                         </div>
-                      ) : data.leads.byType ? (
+                      ) : (IS_WINDCHASERS && data.leads.byType) ? (
                         <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Lead type</p>
                           <div className="flex items-center justify-between">

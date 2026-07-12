@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
+import { getBrandConfig } from '@/configs'
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary'
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata'
+// Brand-derived so a calendar event never hardcodes another brand's name (was
+// "BCON AI Brand Audit" for every brand). Matches the widget's "<Brand> Consultation".
+const BOOKING_TITLE = `${getBrandConfig().name} Consultation`
 
 async function getAuthClient() {
   const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
@@ -151,13 +155,13 @@ export async function POST(request: NextRequest) {
     const endHour = hour + 1
     const eventEnd = `${date}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
-    const eventTitle = `BCON AI Brand Audit - ${name}`
+    const eventTitle = `${BOOKING_TITLE} - ${name}`
 
     const eventData = {
       summary: eventTitle,
       description:
         description ||
-        `BCON AI Brand Audit Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `${BOOKING_TITLE} Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
@@ -253,11 +257,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const eventData = {
-      summary: name ? `BCON AI Brand Audit - ${name}` : existingEvent.data.summary,
+      summary: name ? `${BOOKING_TITLE} - ${name}` : existingEvent.data.summary,
       description:
         description ||
         existingEvent.data.description ||
-        `BCON AI Brand Audit Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `${BOOKING_TITLE} Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
