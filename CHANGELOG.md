@@ -1,3 +1,9 @@
+##  · feat(brain): docked agent lives in a CONTAINER — orb + words + controls in one panel
+
+- The docked agent was a naked orb with a floating answer card and loose buttons. Now one frosted panel (320w, rounded-18, blur) contains the orb circle (116px, centered), the ack/answer text below it, and hover controls (⤢ full screen, × close) on the container. The "+"-reveal is gone — the container has room for honest controls.
+- Same element across docked↔full so the orb NEVER remounts (verified: same canvas across both toggles, answer preserved).
+- `(pending-sha)`
+
 ##  · feat(brain): orb acknowledges the ASK, by name, before thinking
 
 - mode:greet is now input-aware + varied: "Okay <name>, let me check on those leads for you" (leads/bookings/usage/inbox/follow-ups/catch-up topics, several phrasings each) instead of the same canned "One moment, let me look that up".
