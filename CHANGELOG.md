@@ -1,3 +1,9 @@
+##  · feat(brain): answers STREAM word-by-word + health check tests real speech
+
+- Voice-off answers no longer land as one bulk block — the card types the answer out word by word (ack first, then the words stream in).
+- voice-health now does a micro-TTS instead of pinging /v1/user: restricted ElevenLabs keys (TTS-only permission) can speak while 401-ing on /v1/user, which produced a false "key REJECTED" alarm. Verified with the fresh bcon key: all checks green, "speaking works", greet + eleven_v3 audio real.
+- `(pending-sha)`
+
 ##  · polish(brain): agent docks to the corner like the chat widget; "+" expands DOWN with real icons
 
 - Docked agent now anchors to the bottom-right edge (chat-widget style) instead of floating near wherever the dock bubble sits.
