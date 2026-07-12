@@ -1,3 +1,8 @@
+##  · fix(brain): the agent opens IN PLACE — exactly where the dock bubble sits
+
+- Reverted the forced bottom-right corner: clicking the bubble now blooms the orb centered ON the bubble (verified drift 0,0 px at mid-screen), wherever you dropped it. Near screen edges it shifts only the minimum needed to keep the subtitle pill on-screen.
+- `(pending-sha)`
+
 ##  · fix(brain): bcon brain stops talking about "gigs"/scouts — Lokazen taxonomy gated out of the prompt
 
 - The briefing SYSTEM PROMPT taught every brand the LEADS-vs-GIGS taxonomy (scouts, gig workers, property owners) — bcon literally said "no new leads or scouts came in today". The paragraph now only joins the prompt for scout-enabled brands (features.scouts).
