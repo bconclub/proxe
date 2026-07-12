@@ -725,10 +725,13 @@ export async function createCalendarEvent(booking: {
       drone: 'Drone Training',
       cabin: 'Cabin Crew Training',
     };
+    // Aviation names only apply when courseInterest is set (Windchasers). For
+    // every other brand there's no course → a brand-neutral "Consultation" title,
+    // never the old "Aviation Course Inquiry" leaking onto a BCON/Lokazen invite.
     const courseDisplayName =
       booking.courseInterest && courseNameMap[booking.courseInterest.toLowerCase()]
         ? courseNameMap[booking.courseInterest.toLowerCase()]
-        : booking.courseInterest || 'Aviation Course Inquiry';
+        : booking.courseInterest || 'Consultation';
 
     // Event title - use AI-generated title if provided, otherwise auto-generate
     let eventTitle: string;
@@ -750,7 +753,7 @@ export async function createCalendarEvent(booking: {
     let description = `${brandName} - Consultation Booking\n`;
     description += `BOOKING STATUS: CONFIRMED\n\n`;
     description += `Candidate Information:\nName: ${booking.name}\nEmail: ${booking.email || 'Not provided'}\nPhone: ${booking.phone}\n\n`;
-    if (courseDisplayName !== 'Aviation Course Inquiry') {
+    if (courseDisplayName !== 'Consultation') {
       description += `Course Interest: ${courseDisplayName}\n\n`;
     }
     const display = sessionType === 'offline' ? 'Offline / Facility Visit' : 'Online Session';

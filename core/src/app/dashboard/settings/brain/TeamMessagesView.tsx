@@ -27,14 +27,17 @@ type TeamMsg = {
   action: string | null
 }
 
-// The permutations, mirroring flagForHumanFollowup + notifySlackBooking triggers.
-const MESSAGES: TeamMsg[] = [
+// Brand-neutral sample cards (the audience-type labels + CRE details were
+// Lokazen-only and bled onto every brand's Eval → Team preview). The scout
+// card is a Lokazen-only alert type and is filtered out below for non-scout brands.
+const SCOUTS_ON: boolean = (() => { try { return !!(BRAND as any).features?.scouts } catch { return false } })()
+const ALL_MESSAGES: TeamMsg[] = [
   {
     id: 'needs_human',
     title: 'Needs human follow-up',
     when: 'A lead asks to reach the team / a human ("talk to the team", "connect with the team"), or the AI has nothing to say (empty response) — the lead is flagged and a task is created.',
-    who: 'Rahul Sharma', type: 'Property Owner',
-    detail: 'Wants to talk to the team about listing an office in Indiranagar.',
+    who: 'Priya Nair', type: null,
+    detail: 'Asked to speak with the team to move things forward.',
     fields: [['Phone', '+91 98xxxxxx12'], ['Channel', 'whatsapp']],
     footer: 'needs human', action: 'View lead in dashboard',
   },
@@ -50,22 +53,24 @@ const MESSAGES: TeamMsg[] = [
   {
     id: 'payment',
     title: 'Payment / transaction issue',
-    when: 'Any audience reports a money problem — "amount debited but failed", "refund not received", "not credited". Never becomes a booking.',
-    who: 'Anita Rao', type: 'Brand',
-    detail: 'Paid the onboarding fee but the amount was debited and the plan didn’t activate.',
+    when: 'A lead reports a money problem — "amount debited but failed", "refund not received", "not credited". Never becomes a booking.',
+    who: 'Arjun Rao', type: null,
+    detail: 'Paid but the amount was debited and it did not go through.',
     fields: [['Phone', '+91 99xxxxxx07'], ['Channel', 'web']],
     footer: 'needs human', action: 'View lead in dashboard',
   },
   {
     id: 'new_booking',
     title: 'New booking',
-    when: 'A call or site visit is successfully booked (the booking tool persisted a date + time).',
-    who: 'Bharath Prakash', type: 'Brand',
-    detail: 'Site visit for a restaurant space in Koramangala.',
+    when: 'A call or visit is successfully booked (the booking tool persisted a date + time).',
+    who: 'Karan Shah', type: null,
+    detail: 'Booked a consultation call.',
     fields: [['When', 'Thu, 9 Jul · 3:00 PM IST'], ['Channel', 'whatsapp']],
     footer: null, action: null,
   },
 ]
+// Scout support is a Lokazen-only alert type — drop it for non-scout brands.
+const MESSAGES: TeamMsg[] = ALL_MESSAGES.filter((m) => m.id !== 'scout_support' || SCOUTS_ON)
 
 function SlackCard({ m }: { m: TeamMsg }) {
   const preview = `${m.title} · ${BRAND.name}: ${m.who}`

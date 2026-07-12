@@ -1,3 +1,15 @@
+##  · fix(core): eliminate remaining cross-brand bleeds (audit sweep)
+
+- quickReplyMap: aviation pricing (pilot/DGCA/helicopter/drone) served to ALL brands via a generic cost/price trigger — gated the call to brand===windchasers (a BCON/Lokazen customer texting "how much?" no longer gets pilot pricing). HIGHEST severity.
+- whatsappSender: booking-reminder / missed-call / confirmation bodies hardcoded "BCON"/"The BCON Team" -> getBrandConfig().name (cross-brand cron + override route).
+- bookingManager: cross-brand calendar event title fell back to "Aviation Course Inquiry" -> brand-neutral "Consultation".
+- calendar/events route: "BCON AI Brand Audit" event title/desc -> "<Brand> Consultation".
+- BookingCalendarWidget (windchasers uses the core widget): "BCON Club Office" offline location + "BCON AI Brand Audit" fallback -> brand-derived.
+- TodaySnapshotButton: non-POP brands fell into a Windchasers branch (PAT done / Parent / Student) — added a windchasers gate + brand-neutral default (Hot leads / Bookings).
+- TeamMessagesView (Eval): Lokazen sample cards (Property Owner/Scout/Brand + CRE details) shown to every brand -> brand-neutral samples; scout card gated to scout brands.
+- CommunicationsView: pilot webinar DEFAULT_SAMPLE -> neutral (defensive).
+- `(pending-sha)`
+
 ##  · fix(inbox): "Property Owner" audience badge is Lokazen-only (was bleeding onto BCON)
 
 - The owner/scout/brand audience badge in the inbox right panel rendered for ALL brands off user_type. A BCON business "owner" (e.g. a school-software founder) showed the Lokazen label "Property Owner". Gated the badge to IS_LOKAZEN so it only shows for Lokazen. Data was correct (uc.bcon.user_type=owner); only the label mapping bled.

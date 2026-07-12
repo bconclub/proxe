@@ -924,7 +924,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    if (!isCustomerButtonTap) {
+    // Deterministic quick-replies (findQuickReplyFor) are ALL Windchasers aviation
+    // content (pilot/DGCA/helicopter/drone pricing). They must NEVER fire for other
+    // brands — a BCON/Lokazen customer texting "how much?" would get pilot pricing.
+    if (!isCustomerButtonTap && brand === 'windchasers') {
       const quickReply = findQuickReplyFor(messageText);
       if (quickReply) {
         console.log(`[meta/webhook] quick-reply trigger=${quickReply.triggerKey} lead=${leadId}`);

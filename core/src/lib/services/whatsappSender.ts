@@ -12,6 +12,11 @@
 
 import { logMessage } from './conversationLogger';
 import { getServiceClient } from './supabase';
+import { getBrandConfig } from '@/configs';
+
+// Brand display name, resolved per-build. Booking/reminder/missed-call bodies
+// were hardcoded "BCON" — this sends them under the actual brand instead.
+const BRAND_NAME = getBrandConfig().name;
 
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -405,7 +410,7 @@ export async function sendBookingConfirmation(
   meetLink: string,
 ): Promise<boolean> {
   const message =
-    `Hey ${name}! Your ${title} with the BCON team is confirmed.\n\n` +
+    `Hey ${name}! Your ${title} with the ${BRAND_NAME} team is confirmed.\n\n` +
     `📅 ${dateTimeDisplay} IST\n` +
     (meetLink ? `📍 ${meetLink}\n\n` : '\n') +
     `Talk soon!`;
@@ -474,17 +479,17 @@ export async function sendBookingReminder(
                      `today, starts in 30 minutes`;
 
   const message24h =
-    `Hey ${name}! Quick reminder, your ${title} with BCON is tomorrow at ${timeDisplay} IST.\n\n` +
+    `Hey ${name}! Quick reminder, your ${title} with ${BRAND_NAME} is tomorrow at ${timeDisplay} IST.\n\n` +
     (meetLink ? `📍 ${meetLink}\n\n` : '') +
     `See you there!`;
 
   const message1h =
-    `Hey ${name}! Your ${title} with BCON starts in 1 hour.\n\n` +
+    `Hey ${name}! Your ${title} with ${BRAND_NAME} starts in 1 hour.\n\n` +
     (meetLink ? `📍 ${meetLink}\n\n` : '') +
     `Ready when you are.`;
 
   const message30m =
-    `Hey ${name}! Your ${title} with BCON starts in 30 minutes!\n\n` +
+    `Hey ${name}! Your ${title} with ${BRAND_NAME} starts in 30 minutes!\n\n` +
     (meetLink ? `📍 Join here: ${meetLink}\n\n` : '') +
     `See you soon!`;
 
@@ -906,7 +911,7 @@ export async function sendMissedCallMessage(
   const message =
     `Hey ${name}, we tried calling you${timeRef} but weren't able to connect.\n\n` +
     `If you'd like to reschedule, just reply here and we'll set up a new time.\n\n` +
-    `- The BCON Team`;
+    `- The ${BRAND_NAME} Team`;
 
   // Try free-form text first (works if lead messaged within 24h)
   const textResult = await sendWhatsAppText(to, message);
