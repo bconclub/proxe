@@ -30,6 +30,8 @@ export default function LoginPage() {
   const [rateLimited, setRateLimited] = useState(false)
   const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(null)
   const [rateLimitCountdown, setRateLimitCountdown] = useState<number | null>(null)
+  const [resetSent, setResetSent] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
 
   // Effect 1: resolve dark mode from storage on mount (runs once, client-only)
   useEffect(() => {
@@ -228,9 +230,53 @@ export default function LoginPage() {
     }
   }
 
-  // Don't render anything until we've confirmed there's no active session.
-  // This prevents the login form from flashing before the redirect fires.
-  if (checking) return null
+  // Send a password-reset email. Uses whatever's in the email field; the
+  // recovery link routes through /auth/callback → /auth/reset-password where the
+  // user sets a new password.
+  const handleForgotPassword = async () => {
+    setError(null)
+    const emailEl = document.getElementById('email') as HTMLInputElement | null
+    const emailValue = emailEl?.value?.trim() || email
+    if (!emailValue) {
+      setError('Enter your email above first, then tap “Forgot password?”.')
+      return
+    }
+    setResetLoading(true)
+    try {
+      const supabase = createClient()
+      const redirectTo = `${window.location.origin}/auth/callback?next=/auth/reset-password`
+      const { error } = await supabase.auth.resetPasswordForEmail(emailValue, { redirectTo })
+      if (error) {
+        setError(error.message)
+        setResetLoading(false)
+        return
+      }
+      setResetSent(true)
+      setResetLoading(false)
+    } catch {
+      setError('Could not send the reset link. Please try again.')
+      setResetLoading(false)
+    }
+  }
+
+  // Don't render the form until we've confirmed there's no active session
+  // (prevents a flash before the redirect fires). Show a themed loader rather
+  // than a blank page — returning null here rendered a black screen while the
+  // session check / redirect was in flight.
+  if (checking) {
+    return (
+      <div
+        className="login-page min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: darkMode ? colors.primaryDark : '#f6f6f6' }}
+      >
+        <div
+          className="animate-spin rounded-full h-10 w-10 border-b-2"
+          style={{ borderColor: colors.primary }}
+          aria-label="Loading"
+        />
+      </div>
+    )
+  }
 
   return (
     <div
@@ -473,6 +519,25 @@ export default function LoginPage() {
                   : 'Log in'}
             </button>
           </form>
+
+          {/* Forgot password */}
+          <div className="login-page-forgot text-center -mt-2">
+            {resetSent ? (
+              <p className="text-xs" style={{ color: darkMode ? colors.primary : colors.primaryVibrant }}>
+                ✓ If an account exists for that email, a reset link is on its way. Check your inbox.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={resetLoading}
+                className="login-page-forgot-link text-xs hover:underline disabled:opacity-50"
+                style={{ color: darkMode ? colors.primary : colors.primaryVibrant }}
+              >
+                {resetLoading ? 'Sending reset link…' : 'Forgot password?'}
+              </button>
+            )}
+          </div>
 
           {/* Footer */}
           <div className="login-page-footer text-center">
