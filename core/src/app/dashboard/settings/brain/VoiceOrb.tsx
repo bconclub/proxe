@@ -255,11 +255,12 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     const steps = question ? BRAIN.thinkingSteps.question : BRAIN.thinkingSteps.briefing
     let stepIdx = 0
     setCaption(steps[0])
-    const stepTimer = setInterval(() => {
+    const stepTick = () => {
       stepIdx = Math.min(stepIdx + 1, steps.length - 1)
       if (modeRef.current === 'thinking') setCaption(steps[stepIdx])
       else clearInterval(stepTimer)
-    }, 1600)
+    }
+    let stepTimer = setInterval(stepTick, 1600)
     const ac = new AbortController()
     abortRef.current = ac
     const t0 = performance.now()
@@ -288,14 +289,31 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       // seamlessly once it's ready. greetDone resolves when the greeting audio
       // ends, so the briefing never overlaps it.
       let greetDone: Promise<void> = Promise.resolve()
-      // Voice-off → no spoken greeting at all (we only fetch + show the words).
-      const greetP = !voiceOnRef.current ? Promise.resolve() : fetch('/api/dashboard/brain/briefing', {
+      // ALWAYS fetch the greet — it's the fast, input-aware acknowledgment
+      // ("Okay <name>, let me check on those leads"). Voice ON → play it;
+      // voice OFF → it becomes the FIRST caption, held a beat before the
+      // generic thinking steps resume.
+      const greetP = fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'greet', ...(question ? { question } : {}) }), signal: ac.signal,
       }).then((r) => r.json())
         // mode:greet returns the audio itself (flash model); fall back to a tts
         // call only if the server couldn't voice it.
-        .then((g) => (g?.audio ? g : (g?.text ? tts(g.text) : null)))
+        .then((g) => {
+          if (!voiceOnRef.current) {
+            if (g?.text && modeRef.current === 'thinking') {
+              // Full-screen: the ack becomes the first caption. Docked (compact)
+              // renders no captions — there the ack shows as the FIRST message
+              // in the answer card, replaced by the real answer when it lands.
+              clearInterval(stepTimer)
+              setCaption(g.text)
+              stepTimer = setInterval(stepTick, 1600)
+              emitAnswer(g.text)
+            }
+            return null
+          }
+          return (g?.audio ? g : (g?.text ? tts(g.text) : null))
+        })
         .then((a) => {
           if (!a?.audio || modeRef.current !== 'thinking') return
           const ga = new Audio(`data:${a.mime};base64,${a.audio}`)
