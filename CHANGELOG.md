@@ -1,3 +1,8 @@
+##  · fix(inbox): "Property Owner" audience badge is Lokazen-only (was bleeding onto BCON)
+
+- The owner/scout/brand audience badge in the inbox right panel rendered for ALL brands off user_type. A BCON business "owner" (e.g. a school-software founder) showed the Lokazen label "Property Owner". Gated the badge to IS_LOKAZEN so it only shows for Lokazen. Data was correct (uc.bcon.user_type=owner); only the label mapping bled.
+- `(pending-sha)`
+
 ##  · feat(agent): bot is aware of human takeover, stays silent instead of talking over the team
 
 - Root cause of the "bot replied over Thanzeel" case: the 45-min takeover pause expired (customer replied 3h later) and the bot had no context that a HUMAN sent the prior turn, so it fired the generic "flagged to the team" escalation.

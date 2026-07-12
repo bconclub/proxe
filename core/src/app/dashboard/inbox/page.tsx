@@ -37,6 +37,10 @@ import { getCurrentBrandId } from '@/configs'
 // fork-specific UI (full Meta-form card, planned follow-ups timeline) and a
 // form parser tuned to its question-sentence Meta forms.
 const IS_BCON = getCurrentBrandId() === 'bcon'
+// The owner / scout / brand "audience" taxonomy is Lokazen's model. Gate any UI
+// that renders those labels to Lokazen so a BCON business "owner" never shows
+// as the Lokazen "Property Owner", etc.
+const IS_LOKAZEN = getCurrentBrandId() === 'lokazen'
 
 // Channel icons — plain SVG, no container. Tinted with the channel brand
 // colour via CSS filter (for img tags) or stroke (for inline SVG). The old
@@ -2902,6 +2906,9 @@ export default function InboxPage() {
                           scout / brand). So the agent knows the conversation type
                           at a glance instead of inferring it from the messages. */}
                       {(() => {
+                        // Lokazen-only taxonomy — never render it for other brands
+                        // (a BCON business "owner" is NOT a Lokazen "Property Owner").
+                        if (!IS_LOKAZEN) return null
                         const ut = String(userType || '').toLowerCase()
                         const aud = ut.includes('owner') ? { label: 'Property Owner', color: '#0EA5E9' }
                           : ut.includes('scout') ? { label: 'Scout', color: '#F59E0B' }
