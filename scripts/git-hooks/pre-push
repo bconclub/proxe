@@ -1,0 +1,78 @@
+#!/bin/sh
+# LIVE-BRAND PUSH GUARD — extra safety layer for production brands.
+#
+# LIVE brands (real customers):    bcon  windchasers  lokazen
+# TESTING brands (safe to break):  pop  proxe
+#
+# Any push to a production branch (main / migrate/one-core) whose commits
+# would DEPLOY to a live brand (same scoping rules as core/scripts/
+# vercel-ignore.sh) is BLOCKED unless explicitly acknowledged:
+#
+#     PUSH_LIVE=1 git push origin HEAD:main
+#
+# The ack is per-invocation, deliberate, and cheap — the point is that
+# touching a live brand can never happen by reflex. Pushes that only affect
+# testing brands (or no brand: docs, scripts) go straight through.
+# Worktrees share this hook via the common git dir — one install covers all.
+
+LIVE_BRANDS="bcon windchasers lokazen"
+
+[ "$PUSH_LIVE" = "1" ] && exit 0
+
+scope_to_brand() {
+  case "$1" in
+    lokazen) echo lokazen ;;
+    bcon) echo bcon ;;
+    proxe) echo proxe ;;
+    windchasers|windchaser) echo windchasers ;;
+    pop|pop-voice) echo pop ;;
+    *) echo "" ;;
+  esac
+}
+
+block=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/migrate/one-core) ;;
+    *) continue ;;
+  esac
+  # deleted ref → nothing deploys
+  case "$local_sha" in 0000000000*) continue ;; esac
+  # new remote branch → inspect just the tip commit; else the pushed range
+  case "$remote_sha" in
+    0000000000*) range="$local_sha -1" ;;
+    *) range="$remote_sha..$local_sha" ;;
+  esac
+  for sha in $(git rev-list $range 2>/dev/null); do
+    files=$(git show --name-only --format="" "$sha" 2>/dev/null)
+    [ -z "$files" ] && continue
+    for b in $LIVE_BRANDS; do
+      echo "$files" | grep -q "^brands/$b/" && block="$block $b"
+    done
+    if echo "$files" | grep -q "^core/"; then
+      subj=$(git show -s --format=%s "$sha" 2>/dev/null)
+      scope=$(printf '%s' "$subj" | sed -n 's/^[a-zA-Z][a-zA-Z]*(\([^)]*\)):.*/\1/p')
+      sb=$(scope_to_brand "$scope")
+      if [ -n "$sb" ]; then
+        for b in $LIVE_BRANDS; do [ "$sb" = "$b" ] && block="$block $b"; done
+      else
+        # generic/unknown scope touching core/ → deploys to ALL live brands
+        block="$block $LIVE_BRANDS"
+      fi
+    fi
+  done
+done
+
+if [ -n "$block" ]; then
+  uniq_brands=$(echo $block | tr ' ' '\n' | sort -u | tr '\n' ' ')
+  echo "" >&2
+  echo "==================== LIVE BRAND GUARD ====================" >&2
+  echo "  This push will DEPLOY to LIVE brand(s): $uniq_brands" >&2
+  echo "  (real customers — verify before shipping)" >&2
+  echo "" >&2
+  echo "  To proceed deliberately:" >&2
+  echo "      PUSH_LIVE=1 git push ..." >&2
+  echo "==========================================================" >&2
+  exit 1
+fi
+exit 0

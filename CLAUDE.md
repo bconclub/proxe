@@ -4,6 +4,19 @@ One shared Next.js app (`core/`) serves 5 brands: **bcon, windchasers, pop, loka
 Brand is fixed at build time: `BRAND_ID` env + `brands/<id>/config.ts` (+ optional `brands/<id>/widget` fork via `@brand`).
 There are NO per-brand code branches — brand separation is build-time gating, never branching.
 
+## Brand tiers — LIVE vs TESTING
+
+| Tier | Brands | Meaning |
+|---|---|---|
+| **LIVE** | bcon, windchasers, lokazen | Real customers. Extra care — see live guard below. |
+| **TESTING** | pop, proxe | Pilot/experimental. Safe to iterate fast. |
+
+**Live guard (mechanical):** a `pre-push` hook (`.git/hooks/pre-push`, versioned at `scripts/git-hooks/pre-push`) BLOCKS any push to a production branch that would deploy to a live brand. To ship deliberately after verifying:
+```
+PUSH_LIVE=1 git -c credential.helper= -c credential.helper=store push origin HEAD:main
+```
+Rules for live-brand changes: verify locally (or on a testing brand) BEFORE pushing; never batch experiments with live fixes; always confirm the deploy landed (step 4 below). Testing-brand and docs-only pushes pass the guard untouched. If the hook is missing (fresh clone), reinstall: `cp scripts/git-hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`.
+
 ## Branch model (verified 2026-07-12)
 
 | Branch | Production for |
