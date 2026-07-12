@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, getBrandConfig } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +56,7 @@ export async function GET() {
 
     const supabase = getServiceClient() || authClient
     const brand = BRAND_ID
+    const SCOUTS_ON = !!getBrandConfig().features?.scouts
     const brands = [brand, 'default']
 
     const istDate = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
@@ -217,8 +218,9 @@ export async function GET() {
         // leads = owners/brands only (gigs/scouts excluded). Reported separately.
         leads_total: leadsTotal,
         leads_today: leadsToday,
-        gigs_total: gigsTotal,
-        gigs_today: gigsToday,
+        // gig counts exist only where scouts do — keep the taxonomy out of
+        // every other brand's context so the model never learns the word
+        ...(SCOUTS_ON ? { gigs_total: gigsTotal, gigs_today: gigsToday } : {}),
         notes_total: notesTotal,
         notes_today: notesToday,
         channels,
