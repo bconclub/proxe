@@ -588,25 +588,28 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
           aria-label={voiceOn ? 'Voice on — tap to turn off' : 'Voice off — tap to talk'}
           title={voiceOn ? (mode === 'listening' ? 'Listening… tap to turn voice off' : 'Voice on — tap to turn off') : 'Tap to talk (voice off — answers show as text)'}
           style={{
-            position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', zIndex: 5,
-            width: 34, height: 34, borderRadius: 999, cursor: 'pointer', padding: 0,
+            // small frosted chip — must never dominate the orb (was a solid
+            // 34px disc that read as a big white blob over the light)
+            position: 'absolute', left: '50%', bottom: 6, transform: 'translateX(-50%)', zIndex: 5,
+            width: 26, height: 26, borderRadius: 999, cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: voiceOn ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-            color: voiceOn ? '#fff' : 'var(--text-secondary)',
-            border: '1px solid var(--border-primary)',
-            boxShadow: mode === 'listening' ? '0 0 0 4px color-mix(in srgb, var(--accent-primary) 30%, transparent)' : '0 2px 8px rgba(0,0,0,0.3)',
+            background: voiceOn ? 'var(--accent-primary)' : 'color-mix(in srgb, var(--bg-secondary) 45%, transparent)',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            color: voiceOn ? '#fff' : 'var(--text-muted)',
+            border: '1px solid color-mix(in srgb, var(--border-primary) 60%, transparent)',
+            boxShadow: mode === 'listening' ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 30%, transparent)' : 'none',
             animation: mode === 'listening' ? 'voMicPulse 1.2s ease infinite' : 'none',
             transition: 'background .15s ease, color .15s ease, box-shadow .15s ease',
           }}
         >
           {voiceOn ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="9" y="2" width="6" height="12" rx="3" />
               <path d="M5 10a7 7 0 0 0 14 0" />
               <line x1="12" y1="19" x2="12" y2="22" />
             </svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="2" y1="2" x2="22" y2="22" />
               <path d="M9 4.5a3 3 0 0 1 6 0V9m0 3a3 3 0 0 1-4.5 2.6" />
               <path d="M5 10a7 7 0 0 0 10.7 6" />
