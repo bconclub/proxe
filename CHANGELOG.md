@@ -1,3 +1,9 @@
+##  · polish(brain): agent docks to the corner like the chat widget; "+" expands DOWN with real icons
+
+- Docked agent now anchors to the bottom-right edge (chat-widget style) instead of floating near wherever the dock bubble sits.
+- "+" reveals its controls VERTICALLY below it, and the ⤢/× text glyphs (which read as "two x's") are now proper SVG icons: expand-arrows + one clean ×.
+- `(pending-sha)`
+
 ##  · feat(brain): mic is a real on/off toggle + voice health check says WHAT to fix
 
 - Mic toggle: ON state is an accent RING + tinted glass (was a solid accent fill — bcon accent is #FAFAFA so it rendered as a white blob). 30px target, clear on/off glyphs, pulse while listening.

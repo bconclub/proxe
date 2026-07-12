@@ -515,10 +515,9 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           style={orb.view === 'full'
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
-                // the CONTAINER panel, near the dock but clamped on-screen
-                left: dockPos ? Math.min(Math.max(8, dockPos.x + DOCK_SIZE / 2 - PANEL_W / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - PANEL_W - 8) : undefined,
-                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - PANEL_EST_H / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - PANEL_EST_H - 8) : undefined,
-                right: dockPos ? undefined : 10, bottom: dockPos ? undefined : 10,
+                // DOCKED to the bottom-right edge, chat-widget style — the agent
+                // slides out and lives at the corner, never floating over content
+                right: 16, bottom: 16,
                 width: PANEL_W, background: 'transparent', overflow: 'visible',
                 animation: 'wc-orb-pop 220ms cubic-bezier(0.2,0,0,1)',
               }}
@@ -530,7 +529,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               view never remounts the orb (voice keeps playing). */}
           <div
             style={orb.view === 'docked'
-              ? { display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }
+              ? { display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }
               : { position: 'absolute', inset: 0 }}
           >
             {/* orb slot — circle-clipped inside the panel; full-bleed in full view */}
@@ -545,28 +544,39 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
                 />
               </div>
-              {/* controls hug the circle — ONE "+" at rest, reveals ⤢ / × */}
+              {/* controls: ONE "+" at the orb's top-right; tapping it drops a
+                  VERTICAL stack below — expand + close, real icons (the old
+                  ⤢/× glyphs read as "two x's"). */}
               {orb.view === 'docked' && (
-                <div style={{ position: 'absolute', top: -2, right: -2, display: 'flex', gap: 5, alignItems: 'center', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease', zIndex: 6 }}>
-                  {orbCtlOpen && (
-                    <>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOrbCtlOpen(false); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
-                        aria-label="Full screen" title="Full screen"
-                        style={{ width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 10, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-                      >⤢</button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOrb(null) }}
-                        aria-label="Close" title="Close"
-                        style={{ width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-                      >×</button>
-                    </>
-                  )}
+                <div style={{ position: 'absolute', top: -2, right: -2, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease', zIndex: 6 }}>
                   <button
                     onClick={(e) => { e.stopPropagation(); setOrbCtlOpen((o) => !o) }}
                     aria-label={orbCtlOpen ? 'Hide controls' : 'More'} title={orbCtlOpen ? 'Hide' : 'More'}
                     style={{ width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', transform: orbCtlOpen ? 'rotate(45deg)' : 'none', transition: 'transform .15s ease' }}
                   >+</button>
+                  {orbCtlOpen && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOrbCtlOpen(false); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
+                        aria-label="Full screen" title="Full screen"
+                        style={{ width: 20, height: 20, borderRadius: 999, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+                          <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOrb(null) }}
+                        aria-label="Close" title="Close"
+                        style={{ width: 20, height: 20, borderRadius: 999, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--bg-secondary) 70%, transparent)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
