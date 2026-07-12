@@ -1,3 +1,9 @@
+##  · fix(brain): orb briefing survives StrictMode — dev "Catch me up" never completed
+
+- Dev-mode React StrictMode mounts→cleans→remounts VoiceOrb; the unmount cleanup stop() ABORTED the first briefing fetch while didAutoStart (a ref) survived, so the retry never fired — every dev briefing died as ERR_ABORTED (previously misattributed to multi-thread HMR churn). Autostart now defers one tick with a cancellable timer: StrictMode first pass cancels cleanly before any fetch, second pass runs once.
+- Verified on the bcon worktree server: voice-off dock click → text answer card renders with a real briefing.
+- `(pending-sha)`
+
 ##  · feat(brain): clean docked orb — voice toggle, readable answer card, "+" controls
 
 - Voice toggle on the orb: OFF (default) = brain answers as READABLE TEXT in a card beside the docked orb (works without ElevenLabs); ON = speaks + mic listens (conversational loop). Persisted per browser.

@@ -500,9 +500,18 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const didAutoStart = useRef(false)
   useEffect(() => {
     if (didAutoStart.current) return
-    if (listenFirst) { didAutoStart.current = true; setVoice(true); beginListening() }
-    else if (autoStart) { didAutoStart.current = true; engage(initialQuestion) }
-  }, [autoStart, listenFirst, initialQuestion, engage, beginListening])
+    // Deferred one tick: React StrictMode (dev) mounts -> cleans up -> mounts
+    // again, and the unmount cleanup calls stop() which ABORTS a briefing that
+    // started on the first pass — while didAutoStart (a ref) survives, so the
+    // second pass never retried. The timer makes the first pass cancellable
+    // BEFORE any fetch starts: cleanup clears it, the second pass runs once.
+    const t = setTimeout(() => {
+      didAutoStart.current = true
+      if (listenFirst) { setVoice(true); beginListening() }
+      else if (autoStart) engage(initialQuestion)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [autoStart, listenFirst, initialQuestion, engage, beginListening, setVoice])
 
   const hint =
     mode === 'idle' ? 'tap to hear today' :
