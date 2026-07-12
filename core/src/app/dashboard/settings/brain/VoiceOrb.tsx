@@ -117,6 +117,8 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   // loading ring: fills while the brain connects, completes when audio starts
   const thinkStartRef = useRef<number | null>(null)
   const ringDoneAtRef = useRef<number | null>(null)
+  // voice-off answers stream into the card word by word — this drives it
+  const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // shared per-frame buffers for the analyser reads (one alloc, all renderers)
   const ampBufRef = useRef(new Uint8Array(64))
   const waveBufRef = useRef(new Uint8Array(128))
@@ -228,7 +230,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     setSubtitle('')
     setModeBoth('idle')
   }, [])
-  useEffect(() => () => { stop(); stopListening(); audioCtxRef.current?.close().catch(() => {}) }, [stop, stopListening])
+  useEffect(() => () => { stop(); stopListening(); if (streamTimerRef.current) clearInterval(streamTimerRef.current); audioCtxRef.current?.close().catch(() => {}) }, [stop, stopListening])
 
   const wireAnalyser = useCallback(async (audio: HTMLAudioElement) => {
     try {
@@ -248,6 +250,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const engage = useCallback(async (question?: string) => {
     if (modeRef.current === 'thinking' || modeRef.current === 'speaking') { stop(); return }
     stop()
+    if (streamTimerRef.current) { clearInterval(streamTimerRef.current); streamTimerRef.current = null }
     emitAnswer('')
     thinkStartRef.current = performance.now()
     ringDoneAtRef.current = null
@@ -352,7 +355,18 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         thinkStartRef.current = null
         ringDoneAtRef.current = performance.now()
         setCaption(''); setSubtitle('')
-        emitAnswer(text)
+        // STREAM the words in — the answer types itself out sentence by
+        // sentence instead of landing as one bulk block.
+        const tokens = text.split(/(\s+)/)
+        let shown = 0
+        if (streamTimerRef.current) clearInterval(streamTimerRef.current)
+        streamTimerRef.current = setInterval(() => {
+          shown = Math.min(tokens.length, shown + 2) // ~one word per tick
+          emitAnswer(tokens.slice(0, shown).join(''))
+          if (shown >= tokens.length && streamTimerRef.current) {
+            clearInterval(streamTimerRef.current); streamTimerRef.current = null
+          }
+        }, 32)
         setModeBoth('idle')
         return
       }

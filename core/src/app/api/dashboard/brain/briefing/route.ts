@@ -117,12 +117,18 @@ export async function POST(req: NextRequest) {
       const checks: Array<{ name: string; ok: boolean; detail: string }> = []
       checks.push({ name: 'ElevenLabs API key', ok: !!key, detail: key ? 'present' : 'ELEVENLABS_API_KEY missing from this brand\'s env' })
       checks.push({ name: 'Voice ID', ok: !!voiceId, detail: voiceId ? 'configured' : 'no ELEVENLABS_VOICE_ID and no brain.voiceId in brand config' })
-      if (key) {
+      if (key && voiceId) {
+        // Test the ACTUAL capability (a micro TTS) — restricted keys can speak
+        // while still 401-ing on /v1/user, so pinging that gave false alarms.
         try {
-          const r = await fetch('https://api.elevenlabs.io/v1/user', { headers: { 'xi-api-key': key } })
-          checks.push({ name: 'ElevenLabs auth', ok: r.ok, detail: r.ok ? 'key valid' : `key REJECTED (${r.status}) — generate a new key at elevenlabs.io and update ELEVENLABS_API_KEY` })
+          const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_22050_32`, {
+            method: 'POST',
+            headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: 'ok', model_id: 'eleven_flash_v2_5' }),
+          })
+          checks.push({ name: 'ElevenLabs speech', ok: r.ok, detail: r.ok ? 'speaking works' : `TTS rejected (${r.status}) — check the key\'s TTS permission / quota at elevenlabs.io` })
         } catch {
-          checks.push({ name: 'ElevenLabs auth', ok: false, detail: 'could not reach api.elevenlabs.io' })
+          checks.push({ name: 'ElevenLabs speech', ok: false, detail: 'could not reach api.elevenlabs.io' })
         }
       }
       const ok = checks.every((c) => c.ok)
