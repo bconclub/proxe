@@ -20,6 +20,10 @@ import {
   sendWebinarConfirm,
   isCabinCrewSource,
   sendCabinCrewWelcome,
+  pickWelcomeTemplate,
+  sendWelcomeTemplate,
+  isParentSource,
+  sendParentWelcomeTemplate,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -800,6 +804,22 @@ export async function POST(request: NextRequest) {
     // (this was a latent ReferenceError once the function actually got called).
     let taskCreated = false
 
+    // Windchasers: a brand-new, non-webinar/cabin/PAT/demo lead gets an
+    // immediate pilot/generic/parent welcome (re-enabled below — the v3 welcome
+    // templates are Meta-approved). Mirrors the cabin-crew path: welcome now,
+    // skip the (dead) first_outreach task so the lead isn't double-handled.
+    const isNewLead = !existing
+    const isPatEarly =
+      leadBrand === 'windchasers' &&
+      (normalizedSource === 'pat' || String(cf2.form_type || '').toLowerCase() === 'pilot_aptitude_test')
+    const isDemoEarly =
+      String(notes || '').toLowerCase() === 'demo_booked' ||
+      String(cf2.event_name || '').toLowerCase() === 'demo_booked' ||
+      String(cf2.form_type || '').toLowerCase() === 'demo_booked'
+    const isWindchasersWelcomeLead =
+      leadBrand === 'windchasers' && !!phone && isNewLead &&
+      !isWebinarReg && !isCabinCrewLead && !isPatEarly && !isDemoEarly
+
     const { data: existingOutreach } = await supabase
       .from('agent_tasks')
       .select('id')
@@ -823,6 +843,10 @@ export async function POST(request: NextRequest) {
       // touch (mirrors the FB path) — no separate first_outreach task, so the
       // lead isn't messaged twice. The worker still follows up by scanning.
       console.log(`[inbound] Cabin-crew lead ${leadName} — cabin-crew welcome, no first_outreach task`)
+    } else if (isWindchasersWelcomeLead) {
+      // Pilot/generic/parent welcome fires below as the first touch — no dead
+      // first_outreach task (its worker never ran, so those leads were silent).
+      console.log(`[inbound] Windchasers lead ${leadName} — pilot/generic/parent welcome, no first_outreach task`)
     } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
@@ -1311,10 +1335,74 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    // NOTE: generic first-outreach for new non-PAT, non-demo leads is DISABLED.
-    // The 'windchasers_followup' template was never approved in Meta, so every
-    // send was failing silently. Path removed until we set up real responses.
-    // Re-enable by approving a template in Meta and restoring the branch.
+    // ── Pilot / generic / parent welcome (windchasers website + Res1/Pabbly) ──
+    // Re-enabled: the v3 welcome templates are Meta-approved. Fires immediately
+    // for a brand-NEW lead that isn't a webinar/cabin/PAT/demo submission — so
+    // pilot_training_hero, generic website forms, and meta_lead_form leads (incl.
+    // the Res1 Platform feed that lands as 'manual') get a first touch instead of
+    // sitting silent on a dead first_outreach task. Parent enquiries get the
+    // parent template (named param parent_name); everyone else pilot vs generic
+    // by source. Dedup-guarded against re-submits / retries.
+    if (isWindchasersWelcomeLead) {
+      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const welcomeAlready =
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v3')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v1')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_pilot_welcome_v3')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_pilot_welcome_v2')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_pilot_parents_welcome_v1')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_cabin_crew_welcome_v1'))
+      if (welcomeAlready) {
+        console.log(`[inbound] Welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
+      } else {
+        const signals = [
+          normalizedSource,
+          String(cf2.form_type || ''),
+          String(cf2.form_name || cf2.campaign || campaign || ''),
+          String(cf2.ad_name || ''),
+          String(cf2.utm_campaign || cf2.utm_content || ''),
+          String(brandCtxData.course_interest || ''),
+        ]
+        const isParentLead = brandCtxData.user_type === 'parent' || isParentSource(...signals)
+        let welcomeTpl: string
+        let sendResult: { success: boolean; error?: string }
+        if (isParentLead) {
+          welcomeTpl = 'windchasers_pilot_parents_welcome_v1'
+          sendResult = await sendParentWelcomeTemplate(phone, firstName)
+        } else {
+          welcomeTpl = pickWelcomeTemplate(...signals)
+          sendResult = await sendWelcomeTemplate(phone, firstName, welcomeTpl)
+        }
+        const bodyText = welcomeTpl.includes('parents')
+          ? `Hi ${firstName}, welcome to Windchasers.`
+          : `Hey ${firstName}! Welcome to Windchasers.`
+        try {
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: sendResult.success ? bodyText : `[Template send FAILED: ${welcomeTpl}]\n\n${bodyText}`,
+            message_type: 'template',
+            metadata: {
+              template_name: welcomeTpl,
+              template_language: 'en',
+              auto_sent: true,
+              trigger: isParentLead ? 'parent_lead' : 'new_lead_welcome',
+              sent_by: 'system (inbound webhook)',
+              send_succeeded: !!sendResult.success,
+              send_error: sendResult.success ? null : (sendResult.error || 'unknown'),
+            },
+          })
+        } catch (err: any) {
+          console.error(`[inbound] Welcome log EXCEPTION lead=${leadId}: ${err?.message || err}`)
+        }
+        if (!sendResult.success) {
+          console.error(`[inbound] Welcome FAILED lead=${leadId} phone=${phone} tpl=${welcomeTpl} error=${sendResult.error}`)
+        } else {
+          console.log(`[inbound] Welcome OK lead=${leadId} phone=${phone} tpl=${welcomeTpl}`)
+        }
+      }
+    }
 
     const preferredDate = cfields.preferred_date || cfields.preferredDate || null
     const preferredTime = cfields.preferred_time || cfields.preferredTime || null
