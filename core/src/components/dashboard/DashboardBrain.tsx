@@ -182,6 +182,9 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const DOCK_SIZE = 52
   const DOCK_MARGIN = 16
   const MINI = 144 // docked orb — roughly 2× the dock bubble; expressive but compact
+  const PANEL_W = 320    // docked CONTAINER width — orb + words + controls in one panel
+  const PANEL_EST_H = 440 // rough panel height for on-screen clamping
+  const ORB_IN_PANEL = 116 // orb circle size inside the panel
   const dockRef = useRef<HTMLButtonElement | null>(null)
   const [dockPos, setDockPos] = useState<{ x: number; y: number } | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -206,7 +209,6 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // extra controls (close / full screen) are revealed by the "+".
   const [orbAnswer, setOrbAnswer] = useState('')
   const [orbVoiceOn, setOrbVoiceOn] = useState(false)
-  const [orbCtlOpen, setOrbCtlOpen] = useState(false)
   const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wake = useCallback((on: boolean) => {
@@ -512,47 +514,59 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           style={orb.view === 'full'
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
-                // small floating orb, centered on the dock but clamped on-screen
-                left: dockPos ? Math.min(Math.max(8, dockPos.x + DOCK_SIZE / 2 - MINI / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - MINI - 8) : undefined,
-                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - MINI / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - MINI - 8) : undefined,
+                // the CONTAINER panel, near the dock but clamped on-screen
+                left: dockPos ? Math.min(Math.max(8, dockPos.x + DOCK_SIZE / 2 - PANEL_W / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - PANEL_W - 8) : undefined,
+                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - PANEL_EST_H / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - PANEL_EST_H - 8) : undefined,
                 right: dockPos ? undefined : 10, bottom: dockPos ? undefined : 10,
-                width: MINI, height: MINI, background: 'transparent', overflow: 'visible',
+                width: PANEL_W, background: 'transparent', overflow: 'visible',
                 animation: 'wc-orb-pop 220ms cubic-bezier(0.2,0,0,1)',
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
         >
-          {/* Docked = clipped to a CIRCLE so the canvas glow never shows a square
-              edge; full = unclipped. Same wrapper element both ways, so toggling
+          {/* THE CONTAINER — docked: one frosted panel holding the orb, the
+              words, and the controls (no more naked orb + floating card).
+              Full: transparent full-bleed. Same element both ways so toggling
               view never remounts the orb (voice keeps playing). */}
-          <div style={{ position: 'absolute', inset: 0, borderRadius: orb.view === 'docked' ? 999 : 0, overflow: orb.view === 'docked' ? 'hidden' : 'visible' }}>
-            <VoiceOrb
-              autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational
-              compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction}
-              onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
-            />
+          <div
+            style={orb.view === 'docked' ? {
+              display: 'flex', flexDirection: 'column', gap: 10, padding: 12,
+              borderRadius: 18,
+              background: 'color-mix(in srgb, var(--bg-secondary) 92%, transparent)',
+              border: '1px solid var(--border-primary)',
+              boxShadow: '0 18px 50px rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+            } : { position: 'absolute', inset: 0 }}
+          >
+            {/* orb slot — circle-clipped inside the panel; full-bleed in full view */}
+            <div style={orb.view === 'docked'
+              ? { position: 'relative', width: ORB_IN_PANEL, height: ORB_IN_PANEL, margin: '0 auto', flexShrink: 0 }
+              : { position: 'absolute', inset: 0 }}
+            >
+              <div style={{ position: 'absolute', inset: 0, borderRadius: orb.view === 'docked' ? 999 : 0, overflow: orb.view === 'docked' ? 'hidden' : 'visible' }}>
+                <VoiceOrb
+                  autoStart={orb.auto} initialQuestion={orb.q} listenFirst={orb.listen} conversational
+                  compact={orb.view === 'docked'} onClose={() => setOrb(null)} onAction={executeAction}
+                  onAnswer={setOrbAnswer} onVoiceChange={setOrbVoiceOn}
+                />
+              </div>
+            </div>
+
+            {/* the words — ack first, then the answer, INSIDE the container */}
+            {orb.view === 'docked' && !orbVoiceOn && orbAnswer && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  maxHeight: 280, overflowY: 'auto', padding: '0 4px 2px',
+                  fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)',
+                  whiteSpace: 'pre-wrap', animation: 'wc-fade-in 180ms ease',
+                }}
+              >
+                {orbAnswer}
+              </div>
+            )}
           </div>
 
-          {/* Voice-OFF answer — a readable card beside the orb (the orb itself is
-              a tiny clipped circle, so the words live out here). */}
-          {orb.view === 'docked' && !orbVoiceOn && orbAnswer && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute', right: '100%', bottom: 0, marginRight: 12, width: 300,
-                maxHeight: 340, overflowY: 'auto', padding: '12px 14px', borderRadius: 14,
-                background: 'color-mix(in srgb, var(--bg-secondary) 94%, transparent)',
-                border: '1px solid var(--border-primary)', boxShadow: '0 16px 44px rgba(0,0,0,0.4)',
-                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-                fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
-                animation: 'wc-fade-in 180ms ease',
-              }}
-            >
-              {orbAnswer}
-            </div>
-          )}
-
-          {/* Controls: full → collapse arrow; docked → ONE "+" that reveals
-              close / full-screen, so the resting orb is clean. */}
+          {/* Controls on the container: full → collapse; docked → × / ⤢ on hover */}
           {orb.view === 'full' ? (
             <button
               onClick={() => setOrb((o) => (o ? { ...o, view: 'docked' } : o))}
@@ -560,27 +574,17 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               style={{ position: 'absolute', top: 14, right: 14, zIndex: 6, width: 32, height: 32, borderRadius: 999, cursor: 'pointer', fontSize: 15, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
             >⤡</button>
           ) : (
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease' }}>
-              {/* the "+" — the only chrome at rest; tap to reveal the rest */}
+            <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 6, opacity: orbHover ? 1 : 0, transition: 'opacity .15s ease' }}>
               <button
-                onClick={(e) => { e.stopPropagation(); setOrbCtlOpen((o) => !o) }}
-                aria-label={orbCtlOpen ? 'Hide controls' : 'More'} title={orbCtlOpen ? 'Hide' : 'More'}
-                style={{ position: 'absolute', top: -4, right: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 13, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)', transform: orbCtlOpen ? 'rotate(45deg)' : 'none', transition: 'transform .15s ease' }}
-              >+</button>
-              {orbCtlOpen && (
-                <>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setOrb(null) }}
-                    aria-label="Close" title="Close"
-                    style={{ position: 'absolute', top: -4, left: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-                  >×</button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setOrbCtlOpen(false); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
-                    aria-label="Full screen" title="Full screen"
-                    style={{ position: 'absolute', bottom: -4, right: -4, pointerEvents: 'auto', width: 20, height: 20, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
-                  >⤢</button>
-                </>
-              )}
+                onClick={(e) => { e.stopPropagation(); setOrb((o) => (o ? { ...o, view: 'full' } : o)) }}
+                aria-label="Full screen" title="Full screen"
+                style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 11, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+              >⤢</button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setOrb(null) }}
+                aria-label="Close" title="Close"
+                style={{ width: 22, height: 22, borderRadius: 999, cursor: 'pointer', fontSize: 12, lineHeight: 1, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+              >×</button>
             </div>
           )}
         </div>
