@@ -32,6 +32,10 @@ export interface AgentOutput {
   updatedSummary?: string;
   intent: ExtractedIntent;
   leadId?: string | null;
+  // true when `response` is only a generic "nothing useful, flagged to the team"
+  // fallback (empty-AI / anti-repeat guard) rather than a real answer. Lets the
+  // caller stay silent instead of talking over a human who's already handling it.
+  escalated?: boolean;
 }
 
 export interface ExtractedIntent {

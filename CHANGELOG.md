@@ -1,3 +1,11 @@
+##  · feat(agent): bot is aware of human takeover, stays silent instead of talking over the team
+
+- Root cause of the "bot replied over Thanzeel" case: the 45-min takeover pause expired (customer replied 3h later) and the bot had no context that a HUMAN sent the prior turn, so it fired the generic "flagged to the team" escalation.
+- fetchRecentHistory now LABELS human teammate turns ("[A human teammate on our side replied to the customer]: ...") so the model knows a colleague stepped in.
+- Engine returns escalated=true when the reply is only the empty-AI / anti-repeat fallback. When a teammate is handling the lead (human_takeover within 24h) AND the bot only has that generic escalation, the WhatsApp webhook STAYS SILENT (no more talking over the human). Real, substantive answers still send.
+- Removed the blunt 45-min hard pause in favour of this awareness model.
+- `(pending-sha)`
+
 ##  · feat(inbox): Manual badge on human-sent replies + pop receipt migration
 
 - Inbox now shows a blue "Manual" badge on free-form replies a team member sent from the dashboard (metadata.human===true) so they are distinct from the bot auto-replies. Shared → all brands.

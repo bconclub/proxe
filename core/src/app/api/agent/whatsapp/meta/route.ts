@@ -998,23 +998,22 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
-    // HUMAN TAKEOVER PAUSE — if a teammate replied to this lead recently (from
-    // Slack thread or the dashboard inbox), stay quiet. The human is handling it;
-    // the bot jumping back in talks over them and re-litigates context it
-    // shouldn't. The window auto-expires so the bot resumes once the team goes
-    // quiet. The customer's message is already logged above, so the human sees
-    // it in the thread with full context.
+    // HUMAN HANDLING — is a teammate actively working this lead (replied from the
+    // dashboard inbox / Slack in the last day)? We no longer hard-pause the bot on
+    // a blunt timer. The bot still runs WITH the human's messages in context
+    // (labelled in fetchRecentHistory) so it's aware a colleague stepped in — and
+    // we only suppress its reply below if it has NOTHING useful to add (a generic
+    // escalation). That way it never talks over the human with a canned
+    // "flagged to the team" line, but a genuine, contextual answer still goes out.
+    let humanHandlingLead = false;
     {
-      const HUMAN_TAKEOVER_PAUSE_MIN = 45;
+      const HUMAN_HANDLING_WINDOW_MIN = 24 * 60;
       const { data: leadFlags } = await supabase
         .from('all_leads').select('metadata').eq('id', leadId).maybeSingle();
       const takeoverAt = leadFlags?.metadata?.human_takeover_at;
       if (takeoverAt) {
         const ageMin = (Date.now() - new Date(takeoverAt).getTime()) / 60000;
-        if (ageMin >= 0 && ageMin < HUMAN_TAKEOVER_PAUSE_MIN) {
-          console.log(`[meta/webhook] HUMAN TAKEOVER: teammate active ${ageMin.toFixed(1)}m ago for lead ${leadId} — bot paused, human handling it`);
-          return;
-        }
+        humanHandlingLead = ageMin >= 0 && ageMin < HUMAN_HANDLING_WINDOW_MIN;
       }
     }
 
@@ -1034,6 +1033,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
     const responseTimeMs = Date.now() - aiStartTime;
+
+    // A teammate is handling this lead and the bot only produced a generic
+    // "nothing useful → flagged to the team" fallback (or nothing at all). Stay
+    // SILENT and let the human run it — a redundant escalation talks over them.
+    // (The team was already pinged inside the engine, and the human is on it.)
+    // A real, substantive answer is not `escalated`, so it still sends below.
+    if (humanHandlingLead && (!result.response || result.escalated)) {
+      console.log(`[meta/webhook] Teammate handling lead ${leadId}; bot had no useful reply (escalated=${result.escalated}) — staying silent`);
+      return;
+    }
 
     if (!result.response) {
       console.error('[meta/webhook] Empty AI response after retry — sending fallback');
@@ -1264,7 +1273,7 @@ async function fetchRecentHistory(
   try {
     const { data, error } = await supabase
       .from('conversations')
-      .select('sender, content')
+      .select('sender, content, metadata')
       .eq('lead_id', leadId)
       .eq('channel', 'whatsapp')
       .order('created_at', { ascending: true })
@@ -1272,9 +1281,15 @@ async function fetchRecentHistory(
 
     if (error || !data) return [];
 
+    // A human teammate's manual reply (inbox/reply sets metadata.human) is stored
+    // as sender='agent', so without a marker the model reads it as its OWN prior
+    // turn. Label it so the bot KNOWS a colleague stepped in — it can then defer to
+    // them ("Rahul will confirm the time") or stay quiet, instead of re-answering.
     return data.map((row: any) => ({
       role: row.sender === 'customer' ? 'user' as const : 'assistant' as const,
-      content: row.content,
+      content: row.metadata?.human === true
+        ? `[A human teammate on our side replied to the customer]: ${row.content}`
+        : row.content,
     }));
   } catch {
     return [];
