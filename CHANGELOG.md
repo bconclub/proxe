@@ -1,3 +1,10 @@
+##  · fix(brain): bcon brain stops talking about "gigs"/scouts — Lokazen taxonomy gated out of the prompt
+
+- The briefing SYSTEM PROMPT taught every brand the LEADS-vs-GIGS taxonomy (scouts, gig workers, property owners) — bcon literally said "no new leads or scouts came in today". The paragraph now only joins the prompt for scout-enabled brands (features.scouts).
+- brain/overview: gigs_total/gigs_today only emitted for scout brands, so other brands never even see the fields. Also de-CRE-d "listings/activity" → "activity" in the highlights line.
+- Verified: fresh bcon briefing contains zero foreign taxonomy. brain/route.ts POP vocabulary confirmed isPop-gated (not a bleed).
+- `(pending-sha)`
+
 ##  · feat(brain): voice ON by default + SUBTITLES (2-3 words) instead of the text box
 
 - Voice now defaults ON (new storage key proxe-brain-voice2 — everyone stuck "off" from the dead-key era starts speaking). Mute stays one tap away.

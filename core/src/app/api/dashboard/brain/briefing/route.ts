@@ -339,10 +339,13 @@ export async function POST(req: NextRequest) {
       question
         ? `If the data genuinely doesn't cover the question, say so in one sentence and give the nearest useful signal instead.`
         : `Cover: what came in today and from where, what people are raising and responding to, what you're handling right now, and end with the single thing that most needs ${firstName}'s attention — or a calm all-quiet close. Skip zeros and missing data gracefully; never apologize for quiet days.`,
-      `If highlights.most_active_lead is present, name them and mention how engaged they've been (e.g. "X has been messaging a lot today"). If highlights.top_area is present, mention it as where most listings/activity are concentrated right now. Only mention a highlight if it's actually present in the data — never invent one.`,
-      // Scouts/gigs are a completely different population from sales leads — keep
-      // them distinct in the spoken briefing so the count and the story are right.
-      `LEADS vs GIGS: taken_in.leads_total counts real leads only — property owners and brands (the people who lease or list space). taken_in.gigs_total counts GIGS: scouts (gig workers who spot vacant shops and get paid) and connectors. These are NOT leads and must NEVER be lumped into a lead count. If gigs_total is present and non-zero, mention scouts as their own thing (e.g. "on the gig side, X scouts came in"), separate from leads. Never say "we got N leads" using a number that includes scouts.`,
+      `If highlights.most_active_lead is present, name them and mention how engaged they've been (e.g. "X has been messaging a lot today"). If highlights.top_area is present, mention it as where most activity is concentrated right now. Only mention a highlight if it's actually present in the data — never invent one.`,
+      // Scouts/gigs exist ONLY for scout-enabled brands (Lokazen). Teaching the
+      // model this taxonomy on other brands made bcon's brain talk about "scouts"
+      // and "gigs" — vocabulary its founder has never heard of.
+      ...(getBrandConfig().features?.scouts ? [
+        `LEADS vs GIGS: taken_in.leads_total counts real leads only — property owners and brands (the people who lease or list space). taken_in.gigs_total counts GIGS: scouts (gig workers who spot vacant shops and get paid) and connectors. These are NOT leads and must NEVER be lumped into a lead count. If gigs_total is present and non-zero, mention scouts as their own thing (e.g. "on the gig side, X scouts came in"), separate from leads. Never say "we got N leads" using a number that includes scouts.`,
+      ] : []),
       ...(actionsOn ? [actionsPromptSpec(true)] : []),
     ].join('\n')
 
