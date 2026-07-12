@@ -109,6 +109,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    // ── mode: voice-health — can the brain actually SPEAK? Reports exactly
+    // what's missing/broken so a silent orb is never a mystery. ──────────────
+    if (mode === 'voice-health') {
+      const key = process.env.ELEVENLABS_API_KEY
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || getBrainConfig().voiceId
+      const checks: Array<{ name: string; ok: boolean; detail: string }> = []
+      checks.push({ name: 'ElevenLabs API key', ok: !!key, detail: key ? 'present' : 'ELEVENLABS_API_KEY missing from this brand\'s env' })
+      checks.push({ name: 'Voice ID', ok: !!voiceId, detail: voiceId ? 'configured' : 'no ELEVENLABS_VOICE_ID and no brain.voiceId in brand config' })
+      if (key) {
+        try {
+          const r = await fetch('https://api.elevenlabs.io/v1/user', { headers: { 'xi-api-key': key } })
+          checks.push({ name: 'ElevenLabs auth', ok: r.ok, detail: r.ok ? 'key valid' : `key REJECTED (${r.status}) — generate a new key at elevenlabs.io and update ELEVENLABS_API_KEY` })
+        } catch {
+          checks.push({ name: 'ElevenLabs auth', ok: false, detail: 'could not reach api.elevenlabs.io' })
+        }
+      }
+      const ok = checks.every((c) => c.ok)
+      return NextResponse.json({ ok, checks })
+    }
+
     // ── mode: greet — an INSTANT personalized opener (no LLM) so the orb speaks
     // within ~1.5s (just a TTS round-trip) instead of waiting the full
     // text-gen + TTS (~5s) in silence. Client fires this in parallel with

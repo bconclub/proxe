@@ -1,3 +1,10 @@
+##  · feat(brain): mic is a real on/off toggle + voice health check says WHAT to fix
+
+- Mic toggle: ON state is an accent RING + tinted glass (was a solid accent fill — bcon accent is #FAFAFA so it rendered as a white blob). 30px target, clear on/off glyphs, pulse while listening.
+- New mode:voice-health on the briefing route: key present → ElevenLabs auth ping → voice id. Turning voice ON runs it; on failure the toggle reverts and the card says exactly what to fix (e.g. "key REJECTED (401) — generate a new key at elevenlabs.io"). A silent orb is never a mystery.
+- Root cause of "not talking": bcon ELEVENLABS_API_KEY is dead (401). User must paste a fresh key.
+- `(pending-sha)`
+
 ##  · polish(brain): no square around the orb — the glowing covering IS the container
 
 - Dropped the frosted rectangle that wrapped the docked agent. The orb floats as a clean circle (140px) with its glassy covering; the loading ring connects along it and it stays glowing once connected. Words render in their own small frosted card BELOW the orb; "+" and the mic chip hug the circle.
