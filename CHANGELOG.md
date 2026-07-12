@@ -1,3 +1,8 @@
+##  · feat(agent): bot aware of human takeover — stays silent vs talking over the team
+
+- Same as main (pop rides one-core). Labels human teammate turns in history; engine escalated flag; WhatsApp webhook stays silent when a teammate is handling the lead and the bot only has a generic escalation.
+- `(pending-sha)`
+
 ##  · feat(inbox): Manual badge on human-sent replies + pop receipt migration
 
 - Same as main (pop rides one-core). Inbox "Manual" badge on human-sent replies; brands/pop/supabase/migrations/003 read-receipt columns.

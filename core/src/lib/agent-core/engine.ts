@@ -334,6 +334,10 @@ User's message: ${input.message}`
   let cleanedResponse = cleanResponse(rawResponse, input.channel) || rawResponse.trim();
   cleanedResponse = suppressKnownContactReask(cleanedResponse, input, brandId);
   cleanedResponse = advanceLokazenBookingAfterEmail(cleanedResponse, input, brandId);
+  // Set when the reply below is only the generic "nothing useful → flagged to the
+  // team" fallback (anti-repeat / empty-AI guard), not a real answer. The caller
+  // uses it to stay silent when a human is already handling the lead.
+  let lowValueEscalation = false;
 
   // ANTI-REPEAT GUARD (deterministic): the model sometimes re-sends a
   // near-identical line turn after turn — e.g. the same "the team handles
@@ -350,6 +354,7 @@ User's message: ${input.message}`
       console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" — suppressing the parrot, escalating to a human.`);
       await flagForHumanFollowup(supabase, input, `Repeat-reply guard: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
       cleanedResponse = "You've got it — I've looped our team in directly so a person can pick this up. Anything specific you'd like me to add for them?";
+      lowValueEscalation = true;
     }
   }
 
@@ -363,6 +368,7 @@ User's message: ${input.message}`
     console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" — escalating to a human instead of the generic holding line.`);
     await flagForHumanFollowup(supabase, input, `Empty AI response to: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
     cleanedResponse = "Thanks for bearing with me — I've flagged this straight to our team so a person can pick it up, and they have your number. Anything else you'd like me to pass along to them?";
+    lowValueEscalation = true;
   }
 
   // 7. Schedule flow tasks (non-blocking - fires after response is ready)
@@ -390,6 +396,7 @@ User's message: ${input.message}`
     followUps,
     intent,
     leadId: null,
+    escalated: lowValueEscalation,
   };
 }
 
