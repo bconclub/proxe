@@ -1,3 +1,8 @@
+##  · fix(inbox): "Property Owner" audience badge is Lokazen-only (bled onto BCON)
+
+- Same as main. Gated the owner/scout/brand inbox badge to IS_LOKAZEN.
+- `(pending-sha)`
+
 ##  · feat(agent): bot aware of human takeover — stays silent vs talking over the team
 
 - Same as main (pop rides one-core). Labels human teammate turns in history; engine escalated flag; WhatsApp webhook stays silent when a teammate is handling the lead and the bot only has a generic escalation.
