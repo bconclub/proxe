@@ -26,6 +26,7 @@ import {
   sendNamedTemplate,
   isPilotSource,
   pickRnrTemplate,
+  resolveLeadFacts,
 } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
@@ -131,8 +132,11 @@ export async function GET(req: NextRequest) {
         // (missed_call_followup: first -> rnr_1, second -> rnr_2). The
         // scheduled day 1/3/5 retries send the STANDARD follow-up template,
         // and re_engage closes on the re-engagement template.
-        const serviceName = ctx.service_interest || ctx.bcon?.service_interest || ctx.form_data?.service_interest || 'our services'
-        const brandName = ctx.company || ctx.form_data?.brand_name || ctx.bcon?.company || 'your business'
+        // Fill variables from what the lead actually SAID (form answers, the
+        // campaign they responded to, their chat) — fallbacks are last resort.
+        const facts = resolveLeadFacts(lead as any)
+        const serviceName = facts.goal || 'our services'
+        const brandName = facts.brandName || 'your business'
         if (task.task_type === 're_engage') {
           tpl = 'bcon_proxe_reengagement_noengage'
           result = await sendWelcomeTemplate(phone, name, tpl)
@@ -153,7 +157,7 @@ export async function GET(req: NextRequest) {
             .eq('lead_id', task.lead_id)
             .eq('sender', 'customer')
           const engaged = (custCount || 0) > 0
-          const painPoint = ctx.pain_point || ctx.bcon?.pain_point || 'the challenge you mentioned'
+          const painPoint = facts.painPoint || 'the challenge you mentioned'
           const d = task.task_type
           let named: { name: string; value: string }[]
           if (engaged) {
