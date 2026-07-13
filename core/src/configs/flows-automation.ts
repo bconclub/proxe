@@ -24,13 +24,13 @@ const BCON_SEQUENCES: Sequence[] = [
   {
     id: 'rnr', segment: 'No response / cold', gated: true,
     who: 'Lead came in (or the call rang with no response) and isn’t replying.',
-    stop: 'Stops the moment they reply on WhatsApp · capped at 2 re-engagement sends · gated until a Meta-approved RNR template is set',
+    stop: 'Stops the moment they reply on WhatsApp · capped at 2 re-engagement sends',
     steps: [
-      { label: 'Missed-call follow-up', delay: '30 min after', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 1', delay: '+1 day', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 5', delay: '+5 days', template: 'bcon_proxe_reengagement_noengage' },
-      { label: 'Re-engage', delay: 'final', template: 'bcon_proxe_rnr' },
+      { label: 'Missed-call follow-up', delay: '30 min after', template: 'bcon_service_rnr_1_v1' },
+      { label: 'Day 1', delay: '+1 day', template: 'bcon_service_rnr_2_v1' },
+      { label: 'Day 3', delay: '+3 days', template: 'bcon_service_rnr_2_v1' },
+      { label: 'Day 5', delay: '+5 days', template: 'bcon_service_rnr_2_v1' },
+      { label: 'Re-engage', delay: 'final', template: 'bcon_proxe_reengagement_noengage' },
     ],
   },
   {

@@ -36,6 +36,12 @@
 - New `core/src/configs/whatsapp-template-bodies.ts`: the real Meta-approved windchasers template bodies + footer + buttons, keyed by name, + `renderWaTemplate(name, params)`. Unknown template → null → callers keep their old stub (other brands unchanged).
 - Wired the real rendered template at every send site: inbound (new-lead welcome, webinar confirm, cabin-crew), facebook-lead, dashboard add-lead. Inbox now renders the template footer (buttons were already rendered).
 - User-facing: the inbox timeline now shows the actual template WhatsApp delivered, with its quick-reply buttons and footer.
+##  · feat(bcon): RNR templates wired — missed-call + retries send the real approved pair
+
+- bcon_service_rnr_1_v1 ("just tried calling you") → missed_call_followup / no_show; bcon_service_rnr_2_v1 ("tried reaching you again") → rnr-sequence day 1/3/5. Wired in the worker (TEMPLATE_BODIES, param counts, routing, dup-guard), dashboard previews (template-bodies + resolveTaskTemplate now sequence-aware), and the flows/journeys pages (which previously pointed the final RNR step at the UNSUBMITTED bcon_proxe_rnr placeholder — a guaranteed Meta failure).
+- Welcomes verified wired: web form/chat → bcon_welcome_web_v1; Meta/AI Lead Machine → bcon_lead_machine_meta_welcome_v1_.
+- LIVE TEST PASSED: rnr_1 sent to a real lead via the new WABA (wamid returned), previews on all 5 of the lead's open tasks show the correct new copy.
+- NOTE: the VPS task-worker needs a pull + pm2 restart to pick up the routing for scheduled day-N sends.
 - `(pending-sha)`
 
 ##  · fix(core): ONE lead-stage taxonomy — dead "statuses" filter removed, all surfaces aligned

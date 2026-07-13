@@ -17,7 +17,7 @@ function renderPreview(t: any): string {
   if (BRAND_ID === 'bcon') {
     // Waiting nudges send a free-form, info-tiered message (not a fixed template).
     if (t.task_type === 'nudge_waiting') return buildNudgePreview(md)
-    const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket)
+    const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket, md.sequence)
     if (tmpl && TEMPLATE_BODIES[tmpl]) {
       // Fill what we actually KNOW (the lead's name, their goal when stored) —
       // chips are only for genuinely-unknown variables, not a broken-looking

@@ -2672,7 +2672,7 @@ async function executeTask(task) {
 
     // 2. Check conversations: was any template sent to this lead in the last 3 days?
     // Prevents same template being spammed across follow_up_day1/3/5 on different days
-    const FOLLOWUP_TEMPLATES = ['bcon_proxe_followup_engaged', 'bcon_proxe_followup_noengage'];
+    const FOLLOWUP_TEMPLATES = ['bcon_proxe_followup_engaged', 'bcon_proxe_followup_noengage', 'bcon_service_rnr_1_v1', 'bcon_service_rnr_2_v1'];
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
     const { data: recentConvo } = await supabase
       .from('conversations')
@@ -3871,7 +3871,9 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_post_call_followup': 1,    // name
   'bcon_proxe_followup_engaged': 2,      // name, service
   'bcon_proxe_followup_noengage': 2,     // name, service
-  'bcon_proxe_rnr': 1,                   // name
+  'bcon_proxe_rnr': 1,                   // name (unsubmitted placeholder — do not send)
+  'bcon_service_rnr_1_v1': 3,            // customer_name, service_name, brand_name
+  'bcon_service_rnr_2_v1': 3,            // customer_name, service_name, brand_name
   'bcon_lead_machine_meta_welcome_v1_': 2,     // customer_name, brand_name
   // Purpose-built cadence templates (approved on Meta 2026, previously unwired).
   // one_touch = ghost flow (never replied); low_touch = engaged/demo/proposal flow.
@@ -3904,6 +3906,10 @@ const TEMPLATE_BUTTONS = {
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
 const TEMPLATE_BODIES = {
+  // RNR pair — approved 13 Jul 2026. rnr_1 = right after the missed call,
+  // rnr_2 = the day-N retries. Params: customer_name, service_name, brand_name.
+  'bcon_service_rnr_1_v1': `Hi {{customer_name}},\n\nWe just tried calling you from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Couldn't reach you.\n\nHow would you like to continue?`,
+  'bcon_service_rnr_2_v1': `Hi {{customer_name}},\n\nTried reaching you again from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Still couldn't connect.\n\nHow would you like to continue?`,
   'bcon_proxe_booking_reminder_24h': `Hi {{customer_name}}, your call with the BCON Team is tomorrow at {{booking_time}}.\nWe'll be going over {{service_interest}} for your business.\nSee you there.`,
   'bcon_proxe_booking_reminder_30m': `Hi {{customer_name}}, 30 minutes to go. Your call with the BCON Team for {{service_interest}} is at {{booking_time}}.\nWe are getting things ready for you`,
   'bcon_proxe_reengagement_engaged': `Hi {{customer_name}}, you mentioned {{pain_point}} was a challenge. If that's still the case, we should chat.\nWe've been solving exactly that lately.`,
@@ -4006,6 +4012,31 @@ async function getTemplatePreview(task, lead) {
   } else if (taskType === 'nudge_waiting' || taskType === 'push_to_book' || taskType.startsWith('follow_up_day') || taskType === 'missed_call_followup' || taskType === 'human_callback' || taskType === 'follow_up_24h') {
     const bucket = task.metadata?.bucket || '';
     const businessName = det.businessName;
+
+    // ── RNR / missed-call: the human called and couldn't reach them. ──
+    // Purpose-built approved pair (rnr_1 right after the call, rnr_2 for the
+    // day-N retries) — replaces the generic follow-up copy on this path.
+    const seq = task.metadata?.sequence || '';
+    if (taskType === 'missed_call_followup' || seq === 'no_show') {
+      return {
+        name: 'bcon_service_rnr_1_v1',
+        params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Service', parameter_name: 'service_name', value: serviceInterest },
+          { label: 'Brand', parameter_name: 'brand_name', value: businessName },
+        ],
+      };
+    }
+    if (seq === 'rnr' && taskType.startsWith('follow_up_')) {
+      return {
+        name: 'bcon_service_rnr_2_v1',
+        params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Service', parameter_name: 'service_name', value: serviceInterest },
+          { label: 'Brand', parameter_name: 'brand_name', value: businessName },
+        ],
+      };
+    }
 
     // ONE_TOUCH (ghost, never replied) flow -> purpose-built day-N templates
     // with real personalization + STOP buttons, instead of the generic pair
