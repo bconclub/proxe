@@ -2542,7 +2542,11 @@ export default function InboxPage() {
                             )}
                           </div>
                         )}
-                        {!isCustomer && msg.channel === 'whatsapp' && (() => {
+                        {/* Template messages already render their delivery tick in
+                            the footer (next to the time), so skip this bottom block
+                            for them — otherwise the receipt shows TWICE (one by the
+                            time, one below the buttons). */}
+                        {!isCustomer && msg.channel === 'whatsapp' && !msg.metadata?.template_name && (() => {
                           // Real failure = the send itself failed (no message ID ever
                           // existed, e.g. Graph API rejected it) OR Meta's own delivery
                           // webhook reported 'failed'. NOT "no delivery/read receipt yet" —
