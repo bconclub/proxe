@@ -19,7 +19,13 @@ function renderPreview(t: any): string {
     if (t.task_type === 'nudge_waiting') return buildNudgePreview(md)
     const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket)
     if (tmpl && TEMPLATE_BODIES[tmpl]) {
-      return fillTemplateWithChips(TEMPLATE_BODIES[tmpl])
+      // Fill what we actually KNOW (the lead's name, their goal when stored) —
+      // chips are only for genuinely-unknown variables, not a broken-looking
+      // "Hi Name" on every card.
+      const known = TEMPLATE_BODIES[tmpl]
+        .replace(/\{\{\s*customer_name\s*\}\}/g, name)
+        .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || '{{service_interest}}')
+      return fillTemplateWithChips(known)
     }
   } else {
     const tmpl = md.template_name || md.template
@@ -159,6 +165,8 @@ export async function GET(request: NextRequest) {
       no_response: 'No Response Sequence',
       dynamic: 'Dynamic Sequence',
       first_outreach: 'First Outreach Sequence',
+      rnr: 'Re-try Sequence',
+      no_show: 'Missed-call Follow-up',
     }
     const tasks = allTasks.map((t: any) => {
       const seq = t.metadata?.sequence

@@ -79,6 +79,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  let noteSaved = false // once true, this route must never return an error
   try {
     const authClient = await createClient()
 
@@ -102,12 +103,12 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { outcome, notes } = body as { outcome: CallOutcome; notes?: string }
+    const { outcome: rawOutcome, notes } = body as { outcome: CallOutcome; notes?: string }
     const decision = body?.decision as HumanDecision | undefined
     const aiProposedPlan = body?.ai_proposed_plan || null
     const contextSnapshot = body?.context_snapshot || null
 
-    if (!outcome || !VALID_OUTCOMES.includes(outcome)) {
+    if (!rawOutcome || !VALID_OUTCOMES.includes(rawOutcome)) {
       return NextResponse.json(
         { error: `Invalid outcome. Must be one of: ${VALID_OUTCOMES.join(', ')}` },
         { status: 400 },
@@ -115,6 +116,11 @@ export async function POST(
     }
 
     const trimmedNotes = (notes || '').trim()
+    // "Connected" left selected while the note clearly says nobody answered
+    // (RNR etc.) is a mis-tap — normalize so the badge, note text, and the
+    // classifier all agree with what actually happened.
+    const RNR_TEXT = /\b(rnr|no answer|didn'?t pick|did ?not pick|no response|not responding|not replying|rang no|ring no|voicemail|busy|switched off|unreachable|not reachable|no show)\b/i
+    const outcome: CallOutcome = rawOutcome === 'Connected' && RNR_TEXT.test(trimmedNotes) ? 'No Answer' : rawOutcome
     const activityNote = trimmedNotes ? `[${outcome}] ${trimmedNotes}` : `[${outcome}]`
 
     // 1. Insert call activity (always, regardless of orchestration outcome).
@@ -124,7 +130,7 @@ export async function POST(
       note: activityNote,
       created_by: activityCreatedBy,
     })
-    if (activityError) throw activityError
+    if (activityError) console.error('[log-call] activity insert failed (continuing — note is primary):', activityError.message)
 
     const { data: leadRow, error: leadErr } = await supabase
       .from('all_leads')
@@ -160,7 +166,10 @@ export async function POST(
       })
       .eq('id', leadId)
 
-    if (noteUpdateError) throw noteUpdateError
+    if (noteUpdateError && activityError) throw noteUpdateError // nothing persisted — honest failure
+    if (noteUpdateError) console.error('[log-call] visible-note update failed (activity saved):', noteUpdateError.message)
+    // From here on the call IS logged — nothing below may surface as an error.
+    noteSaved = true
 
     // Logging a call = "I'm working this lead now" → become the owner.
     // Done BEFORE the orchestrator so its fresh context re-read keeps the owner.
@@ -316,6 +325,16 @@ export async function POST(
     return NextResponse.json({ success: true, outcome, mode: 'human', actions_taken: actionsTaken, new_stage: newStage, owned_by_human: !handBackToAi, agreement })
   } catch (error) {
     console.error('[log-call] Error:', error)
+    // The call note is already saved — surface a calm degraded result instead
+    // of an error. The founder's log must NEVER appear to fail after the fact.
+    if (noteSaved) {
+      return NextResponse.json({
+        success: true,
+        mode: 'logged_only',
+        actions_taken: ['Call note saved — follow-up automation hit a snag and was skipped'],
+        orchestration_error: error instanceof Error ? error.message : 'unknown',
+      })
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 },
