@@ -28,6 +28,14 @@ import { crawlBusiness } from '@/lib/services/businessCrawler';
 import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifier';
 import { slackBotConfigured, slackPostMessage, leadAlertBlocks } from '@/lib/services/slackApi';
 
+// `process` is SHADOWED in this module by the exported `async function process`
+// below — so a bare `process.env.X` reads `.env` off the FUNCTION (undefined)
+// and THROWS "Cannot read properties of undefined (reading 'X')". That silently
+// killed flagForHumanFollowup at the NEXT_PUBLIC_APP_URL read → the Slack "needs
+// a human" ping NEVER fired (and the Telegram alert too). Read env off
+// globalThis, which the local function name cannot shadow.
+const ENV: Record<string, string | undefined> = ((globalThis as any).process?.env) ?? {};
+
 /**
  * Lokazen has three separate audiences (brand/owner/scout) that must never
  * cross-contaminate — a brand's pricing question should never surface Scout
@@ -1089,8 +1097,8 @@ function escapeHtmlTg(text: string | null | undefined): string {
  * this never throws or bleeds a message to the wrong brand's group.
  */
 async function sendTelegramAlert(text: string): Promise<{ sent: boolean; error?: string }> {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  const token = ENV.TELEGRAM_BOT_TOKEN;
+  const chatId = ENV.TELEGRAM_ADMIN_CHAT_ID;
   if (!token || !chatId) return { sent: false };
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -1152,7 +1160,7 @@ async function flagForHumanFollowup(
     // channel reads "Scout support request" (with the number + issue) rather than
     // a generic lead follow-up.
     const isScout = input.lokazenAudience === 'scout';
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
+    const appUrl = ENV.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
     const title = isScout ? 'Scout support request' : 'Needs human follow-up';
     let slackResult: { success: boolean; skipped?: boolean; error?: string };
     if (slackBotConfigured()) {

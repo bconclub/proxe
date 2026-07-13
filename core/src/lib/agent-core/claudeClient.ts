@@ -210,10 +210,16 @@ export async function generateResponse(
       const { input, output, cacheRead, cacheWrite } = usageFrom(response);
       await recordTokenUsage(category, model, input, output, cacheRead, cacheWrite);
 
-      const content = response.content?.[0];
-      if (content && content.type === 'text') {
-        return content.text.trim();
+      // Find the first TEXT block. Newer models can lead with a NON-text block
+      // (e.g. a thinking block), so content[0] isn't reliably the text — reading
+      // only content[0] made EVERY reply come back empty whenever the model led
+      // with one, which the engine then papered over with a canned "flagged to
+      // the team" fallback (the "same message 4 times" bug). Scan for text.
+      const textBlock = (response.content || []).find((c: any) => c?.type === 'text' && typeof c.text === 'string');
+      if (textBlock && textBlock.text.trim()) {
+        return textBlock.text.trim();
       }
+      console.warn(`[ClaudeClient] generateResponse got no non-empty text block (stop_reason=${response.stop_reason}, blocks=[${(response.content || []).map((c: any) => c?.type).join(',')}], model=${model})`);
       return '';
     } catch (error: any) {
       lastError = error;
@@ -429,9 +435,10 @@ export async function generateFromImage(
       const { input, output, cacheRead, cacheWrite } = usageFrom(response);
       await recordTokenUsage('vision', model, input, output, cacheRead, cacheWrite);
 
-      const content = response.content?.[0];
-      if (content && content.type === 'text') {
-        return content.text.trim();
+      // First TEXT block (may not be content[0] if a non-text block leads).
+      const textBlock = (response.content || []).find((c: any) => c?.type === 'text' && typeof c.text === 'string');
+      if (textBlock && textBlock.text.trim()) {
+        return textBlock.text.trim();
       }
       return '';
     } catch (error: any) {
