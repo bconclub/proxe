@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 import { normalizeCourse } from '@/configs/courses';
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies';
 
 export const dynamic = 'force-dynamic';
 
@@ -267,18 +268,27 @@ export async function POST(request: NextRequest) {
       // fallback welcomeTpl is the generic template, so the generic line is right.
       if (whatsappSent) {
         const first = (cleanName || name || 'there').split(' ')[0];
-        const logText = welcomeTpl.includes('cabin_crew')
+        // Log the ACTUAL approved template body + buttons so the inbox shows the
+        // real welcome the customer received, not a one-line mirror.
+        const rendered = renderWaTemplate(welcomeTpl, { customer_name: first, parent_name: first });
+        const logText = rendered?.content || (welcomeTpl.includes('cabin_crew')
           ? `Hi ${first}, welcome to Windchasers cabin crew training.`
           : welcomeTpl.includes('parents')
           ? `Hi ${first}, welcome to Windchasers.`
-          : `Hey ${first}! Welcome to Windchasers.`;
+          : `Hey ${first}! Welcome to Windchasers.`);
         await logMessage(
           leadId,
           'whatsapp',
           'agent',
           logText,
           'template',
-          { source: 'facebook_lead', template_name: welcomeTpl, ...facebookMeta },
+          {
+            source: 'facebook_lead',
+            template_name: welcomeTpl,
+            ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+            ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            ...facebookMeta,
+          },
           supabase,
         );
       }

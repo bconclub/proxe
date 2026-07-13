@@ -2462,6 +2462,14 @@ export default function InboxPage() {
                             </div>
                           )
                         })()}
+                        {/* Meta-approved template FOOTER (e.g. "Team Windchasers") —
+                            small grey line under the body, above the buttons, mirroring
+                            how WhatsApp shows the real template. */}
+                        {isTemplate && msg.metadata?.template_footer && (
+                          <div className="px-2.5 pb-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            {msg.metadata.template_footer}
+                          </div>
+                        )}
                         {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
                           isTemplate ? (
                             // WhatsApp-style buttons — stacked, divided by hairlines.

@@ -1,3 +1,11 @@
+## 2026-07-13 · fix(windchasers): inbox shows the REAL WhatsApp template (body + buttons + footer)
+
+- Welcome/webinar/cabin sends logged a hand-written one-liner ("Hey X! Welcome to Windchasers.") as the conversation `content`, so the inbox showed a stub — not the real approved template the customer actually received.
+- New `core/src/configs/whatsapp-template-bodies.ts`: the real Meta-approved windchasers template bodies + footer + buttons, keyed by name, + `renderWaTemplate(name, params)`. Unknown template → null → callers keep their old stub (other brands unchanged).
+- Wired the real rendered template at every send site: inbound (new-lead welcome, webinar confirm, cabin-crew), facebook-lead, dashboard add-lead. Inbox now renders the template footer (buttons were already rendered).
+- User-facing: the inbox timeline now shows the actual template WhatsApp delivered, with its quick-reply buttons and footer.
+- `(pending-sha)`
+
 ##  · fix(core): ONE lead-stage taxonomy — dead "statuses" filter removed, all surfaces aligned
 
 - Audit: the leads table had THREE vocabularies. The "All statuses" filter filtered the legacy `status` column — null on every lead (selecting any status showed 0 rows). `lead_stage` is the only real field.

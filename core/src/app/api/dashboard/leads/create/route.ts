@@ -10,6 +10,7 @@ import {
   logMessage,
 } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 export const dynamic = 'force-dynamic'
 
@@ -238,17 +239,20 @@ export async function POST(request: NextRequest) {
           console.error('[leads/create] welcome send failed:', welcomeError)
         } else {
           const firstName = (cleanName || 'there').split(' ')[0]
+          const rendered = renderWaTemplate(welcomeTpl, { customer_name: firstName, parent_name: firstName })
           await logMessage(
             leadId,
             'whatsapp',
             'agent',
-            `Hey ${firstName}! Welcome to Windchasers.`,
+            rendered?.content || `Hey ${firstName}! Welcome to Windchasers.`,
             'template',
             {
               source: 'dashboard_add_lead',
               template_name: welcomeTpl,
               sent_by: createdBy,
               trigger: 'manual_welcome',
+              ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+              ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
             },
             supabase,
           )

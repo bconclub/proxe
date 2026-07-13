@@ -28,6 +28,7 @@ import {
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 import { normalizeCourse } from '@/configs/courses'
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 export const dynamic = 'force-dynamic'
 
@@ -1161,7 +1162,17 @@ export async function POST(request: NextRequest) {
         console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
-        const bodyText = `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}.`
+        // Log the ACTUAL approved template body + buttons (topic/date/time filled)
+        // so the inbox shows exactly what the customer received, not a one-liner.
+        const [wDatePart, wTimePart] = String(webinarDate || '').split(/\s+at\s+/i)
+        const rendered = renderWaTemplate(confirmTpl, {
+          customer_name: firstName,
+          topic: webinarName || 'our upcoming webinar',
+          date: (wDatePart || webinarDate || 'the scheduled date').trim(),
+          time: (wTimePart || 'the scheduled time').trim(),
+        })
+        const bodyText = rendered?.content
+          || `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
@@ -1177,6 +1188,8 @@ export async function POST(request: NextRequest) {
             audience: brandCtxData.user_type || null,
             webinar_name: webinarName || null,
             webinar_date: webinarDate || null,
+            ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+            ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
@@ -1205,7 +1218,8 @@ export async function POST(request: NextRequest) {
         console.log(`[inbound] Cabin-crew welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const result = await sendCabinCrewWelcome(phone, firstName)
-        const bodyText = `Hi ${firstName}, welcome to Windchasers cabin crew training.`
+        const rendered = renderWaTemplate(result.templateUsed, { customer_name: firstName, parent_name: firstName })
+        const bodyText = rendered?.content || `Hi ${firstName}, welcome to Windchasers cabin crew training.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
@@ -1218,6 +1232,8 @@ export async function POST(request: NextRequest) {
             auto_sent: true,
             trigger: 'cabin_crew_lead',
             sent_by: 'system (inbound webhook)',
+            ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+            ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
@@ -1373,9 +1389,10 @@ export async function POST(request: NextRequest) {
           welcomeTpl = pickWelcomeTemplate(...signals)
           sendResult = await sendWelcomeTemplate(phone, firstName, welcomeTpl)
         }
-        const bodyText = welcomeTpl.includes('parents')
+        const rendered = renderWaTemplate(welcomeTpl, { customer_name: firstName, parent_name: firstName })
+        const bodyText = rendered?.content || (welcomeTpl.includes('parents')
           ? `Hi ${firstName}, welcome to Windchasers.`
-          : `Hey ${firstName}! Welcome to Windchasers.`
+          : `Hey ${firstName}! Welcome to Windchasers.`)
         try {
           await supabase.from('conversations').insert({
             lead_id: leadId,
@@ -1388,6 +1405,8 @@ export async function POST(request: NextRequest) {
               template_language: 'en',
               auto_sent: true,
               trigger: isParentLead ? 'parent_lead' : 'new_lead_welcome',
+              ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+              ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
               sent_by: 'system (inbound webhook)',
               send_succeeded: !!sendResult.success,
               send_error: sendResult.success ? null : (sendResult.error || 'unknown'),
