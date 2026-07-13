@@ -74,7 +74,10 @@ export async function sendSlackMessage(payload: {
 type Pair = [label: string, value?: string | number | null];
 
 const clean = (v: unknown): string =>
-  v == null ? '' : String(Array.isArray(v) ? v.join(', ') : v).replace(/\s+/g, ' ').trim();
+  v == null ? '' : String(Array.isArray(v) ? v.join(', ') : v)
+    .replace(/[—–]/g, '-') // never em/en dashes in alerts — use a hyphen
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const section = (mrkdwn: string) => ({ type: 'section', text: { type: 'mrkdwn', text: mrkdwn } });
 const context = (mrkdwn: string) => ({ type: 'context', elements: [{ type: 'mrkdwn', text: mrkdwn.slice(0, 300) }] });
