@@ -774,22 +774,29 @@ You have NO access to any payout, payment, submission, verification, application
 }
 
 /**
- * Appended for Lokazen. There is NO self-serve call-scheduling system — the
- * agent was hallucinating one (inventing "3 PM / 4 PM / 5 PM" slots, claiming
- * "Booked, your call is set for 3 PM"), none of which persisted, so it re-opened
- * the booking flow on every later message — an endless "let's lock a time" loop.
- * A callback = the TEAM calls the customer at their stated time. Confirm once,
- * then stop.
+ * Appended for Lokazen. Fixes the earlier chaos where the agent invented random
+ * slots ("3/4/5 PM") and self-claimed "Booked" (nothing persisted → loop). The
+ * real rule: booking window is 11 AM–6 PM IST and every offered time must be at
+ * least 90 minutes out. The agent offers valid times but does NOT self-lock —
+ * the team confirms and attends. Current time is injected so slots are valid.
  */
 function callbackDirective(): string {
+  const now = new Date();
+  const opts: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true };
+  const istNow = now.toLocaleTimeString('en-IN', opts);
+  const earliest = new Date(now.getTime() + 90 * 60_000).toLocaleTimeString('en-IN', opts);
+  const istHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(now));
+  const todayNote = istHour >= 16
+    ? `It's late — the earliest valid time (${earliest}) may be past 6 PM. If so, offer times TOMORROW, 11 AM–6 PM.`
+    : `Offer 2–3 concrete times today between ${earliest} and 6:00 PM.`;
   return `\n\n=================================================================================
-CALLS / CALLBACKS — NO SELF-SERVE SCHEDULING (LOCKED)
+LOKAZEN CALL / SITE-VISIT TIMING (LOCKED)
 =================================================================================
-Lokazen has NO online call-booking system. You CANNOT book, lock, reschedule, or confirm a specific call time — a callback simply means the TEAM will phone the customer.
-- Do NOT offer or invent time slots ("3 PM / 4 PM / 5 PM", "online slots", "pick a slot"). There are none.
-- Do NOT say a call is "booked", "set", "locked", "scheduled", or "confirmed for <time>". You cannot do any of that.
-- When they want a call: if you don't already have it, ask ONCE for a rough preferred time window, then say plainly the team will call them around that time. One short line.
-- Once you've said the team will call, do NOT bring up scheduling again. If they message later, answer their actual question or briefly reassure the team has their number and time — NEVER restart "what time works / let's lock a slot".`;
+The booking window is FIXED: 11:00 AM to 6:00 PM IST, and every time you offer must be at least 90 minutes from now. It is currently ${istNow} IST, so the earliest time you may offer is ${earliest} IST.
+- ${todayNote}
+- NEVER offer a time outside 11:00 AM–6:00 PM IST, and never sooner than 90 minutes from now.
+- You do NOT self-lock bookings. Once they pick a time, confirm it in ONE line and say the Lokazen team will confirm and be there — do NOT say "Booked/locked/set" as if the system confirmed it, and do NOT re-open scheduling afterwards.
+- If they only want a phone callback, no slot is needed — say the team will call them, once, and stop.`;
 }
 
 /** Normalize for near-duplicate detection: lowercase, collapse to word tokens. */
