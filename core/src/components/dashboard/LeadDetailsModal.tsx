@@ -556,6 +556,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
   const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
   const [savingOwner, setSavingOwner] = useState(false)
+  // Caller identity for the release button (features.leadAccess): the current
+  // owner may release their own lead; only admins may reassign.
+  const [meUser, setMeUser] = useState<{ id: string; isAdmin: boolean } | null>(null)
+  const LEAD_ACCESS_ON = !!getBrandConfig().features?.leadAccess
 
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
@@ -845,12 +849,24 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       const res = await fetch('/api/dashboard/team-members')
       const data = await res.json()
       setTeamMembers(Array.isArray(data?.members) ? data.members : [])
+      if (data?.me?.id) setMeUser({ id: String(data.me.id), isAdmin: !!data.isAdmin })
     } catch {
       setTeamMembers([])
     } finally {
       setLoadingTeamMembers(false)
     }
   }
+
+  // features.leadAccess: resolve the caller early (not lazily on dropdown
+  // open) so the Release button can show for the lead's owner.
+  useEffect(() => {
+    if (!LEAD_ACCESS_ON || !isOpen || meUser) return
+    fetch('/api/dashboard/team-members')
+      .then((r) => r.json())
+      .then((d) => { if (d?.me?.id) setMeUser({ id: String(d.me.id), isAdmin: !!d.isAdmin }) })
+      .catch(() => { /* non-fatal */ })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   // Assign or clear the owner (optimistic), persisting via the owner route
   const assignOwner = async (member: { id: string; name: string; email: string | null } | null) => {
@@ -4309,6 +4325,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 ) : (
                   <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Unassigned</span>
                 )}
+                {/* features.leadAccess: the current owner can release their
+                    lead back to the open pool (server allows self-release). */}
+                {LEAD_ACCESS_ON && owner && meUser && owner.id === meUser.id && (
+                  <button
+                    onClick={() => assignOwner(null)}
+                    disabled={savingOwner}
+                    className="px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                    style={{ color: 'var(--text-muted)', borderColor: 'var(--border-primary)' }}
+                    title="Release this lead back to the open pool"
+                  >
+                    Release
+                  </button>
+                )}
+                {/* Reassign dropdown: admin-only under features.leadAccess
+                    (server enforces it regardless); unchanged elsewhere. */}
+                {(!LEAD_ACCESS_ON || meUser?.isAdmin) && (
                 <button
                   onClick={() => {
                     const next = !showOwnerDropdown
@@ -4324,6 +4356,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 >
                   <MdEdit size={12} className="text-[var(--text-muted)]" />
                 </button>
+                )}
 
                 {showOwnerDropdown && (
                   <div

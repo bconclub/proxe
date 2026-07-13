@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { MdPersonAdd, MdContentCopy, MdDelete, MdCheck, MdRefresh, MdEdit } from 'react-icons/md'
-import { getCurrentBrandId } from '@/configs'
+import { getCurrentBrandId, getBrandConfig } from '@/configs'
+import { COURSE_OPTIONS } from '@/configs/courses'
+
+// features.leadAccess: per-user allowed lead types (courses). Admin sets them
+// here (per row + at invite time); null/empty = all types.
+const LEAD_ACCESS_ON = !!getBrandConfig().features?.leadAccess
 
 // windchasers keeps its original hardcoded gold invite buttons; newer brands
 // (pop, bcon forks) use theme vars so windchasers gold doesn't leak into
@@ -21,6 +26,7 @@ interface DashboardUser {
   is_active: boolean | null
   created_at: string | null
   last_login: string | null
+  allowed_lead_types?: string[] | null
 }
 
 interface PendingInvite {
@@ -46,6 +52,9 @@ export default function UserManagementPage() {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<'admin' | 'viewer'>('viewer')
+  // Invite-time lead access (features.leadAccess): [] = all types.
+  const [inviteTypes, setInviteTypes] = useState<string[]>([])
+  const [savingTypesFor, setSavingTypesFor] = useState<string | null>(null)
   const [inviting, setInviting] = useState(false)
   const [inviteResult, setInviteResult] = useState<{ url: string; email: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -116,12 +125,17 @@ export default function UserManagementPage() {
       const res = await fetch('/api/dashboard/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          role: inviteRole,
+          ...(LEAD_ACCESS_ON ? { allowedLeadTypes: inviteTypes.length > 0 ? inviteTypes : null } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to invite')
       setInviteResult({ url: data.inviteUrl, email: inviteEmail.trim() })
       setInviteEmail('')
+      setInviteTypes([])
       load()
     } catch (e: any) {
       setError(e.message)
@@ -187,6 +201,32 @@ export default function UserManagementPage() {
       setError(e.message)
     } finally {
       setSavingName(false)
+    }
+  }
+
+  // Toggle one course on/off in a user's allowed_lead_types and save.
+  // Empty selection saves as null = all types.
+  const handleToggleLeadType = async (u: DashboardUser, course: string) => {
+    const current = Array.isArray(u.allowed_lead_types) ? u.allowed_lead_types : []
+    const next = current.includes(course)
+      ? current.filter((c) => c !== course)
+      : [...current, course]
+    setSavingTypesFor(u.id)
+    try {
+      const res = await fetch(`/api/dashboard/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowed_lead_types: next.length > 0 ? next : null }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update lead access')
+      }
+      load()
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setSavingTypesFor(null)
     }
   }
 
@@ -336,6 +376,9 @@ export default function UserManagementPage() {
                   <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Role</th>
                   {isAdmin && (
                     <>
+                      {LEAD_ACCESS_ON && (
+                        <th className="hidden lg:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Lead Access</th>
+                      )}
                       <th className="hidden md:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Last Active</th>
                       <th className="hidden sm:table-cell text-left text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Status</th>
                       <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-2 text-[var(--text-secondary)]">Actions</th>
@@ -345,9 +388,9 @@ export default function UserManagementPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={isAdmin ? 5 : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">Loading…</td></tr>
+                  <tr><td colSpan={isAdmin ? (LEAD_ACCESS_ON ? 6 : 5) : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">Loading…</td></tr>
                 ) : users.length === 0 ? (
-                  <tr><td colSpan={isAdmin ? 5 : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No users yet</td></tr>
+                  <tr><td colSpan={isAdmin ? (LEAD_ACCESS_ON ? 6 : 5) : 2} className="px-4 py-6 text-center text-sm text-[var(--text-muted)]">No users yet</td></tr>
                 ) : (
                   users.map((u) => (
                     <tr key={u.id} className="border-t border-[var(--border-primary)]">
@@ -421,6 +464,33 @@ export default function UserManagementPage() {
                         )}
                       </td>
                       {isAdmin && (<>
+                      {LEAD_ACCESS_ON && (
+                        <td className="hidden lg:table-cell px-4 py-3">
+                          <div className="flex flex-wrap gap-1" style={{ opacity: savingTypesFor === u.id ? 0.5 : 1 }}>
+                            {COURSE_OPTIONS.map((course) => {
+                              const active = Array.isArray(u.allowed_lead_types) && u.allowed_lead_types.includes(course)
+                              const unrestricted = !u.allowed_lead_types || u.allowed_lead_types.length === 0
+                              return (
+                                <button
+                                  key={course}
+                                  onClick={() => handleToggleLeadType(u, course)}
+                                  disabled={savingTypesFor === u.id}
+                                  className="px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-colors"
+                                  style={active
+                                    ? { background: 'rgba(59,130,246,0.18)', color: '#60a5fa', borderColor: 'rgba(59,130,246,0.4)' }
+                                    : { background: 'transparent', color: unrestricted ? 'var(--text-secondary)' : 'var(--text-muted)', borderColor: 'var(--border-primary)' }}
+                                  title={unrestricted ? 'No restriction — click to limit to this course' : active ? 'Allowed — click to remove' : 'Not allowed — click to add'}
+                                >
+                                  {course}
+                                </button>
+                              )
+                            })}
+                            {(!u.allowed_lead_types || u.allowed_lead_types.length === 0) && (
+                              <span className="text-[10px] text-[var(--text-muted)] self-center">All types</span>
+                            )}
+                          </div>
+                        </td>
+                      )}
                       <td className="hidden md:table-cell px-4 py-3 text-xs">
                         {(() => {
                           const { label, live } = formatLastActive(u.last_login)
@@ -535,6 +605,31 @@ export default function UserManagementPage() {
                       <option value="admin" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>Admin (can also invite users)</option>
                     </select>
                   </div>
+                  {LEAD_ACCESS_ON && inviteRole !== 'admin' && (
+                    <div>
+                      <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1">
+                        Lead access <span className="font-normal text-[var(--text-muted)]">(none selected = all types)</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {COURSE_OPTIONS.map((course) => {
+                          const active = inviteTypes.includes(course)
+                          return (
+                            <button
+                              type="button"
+                              key={course}
+                              onClick={() => setInviteTypes((prev) => active ? prev.filter((c) => c !== course) : [...prev, course])}
+                              className="px-2 py-1 rounded text-xs font-semibold border transition-colors"
+                              style={active
+                                ? { background: 'rgba(59,130,246,0.18)', color: '#60a5fa', borderColor: 'rgba(59,130,246,0.4)' }
+                                : { background: 'transparent', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)' }}
+                            >
+                              {course}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2 pt-2">
                     <button
                       type="submit"

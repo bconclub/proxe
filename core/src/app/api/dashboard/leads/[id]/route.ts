@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { getLeadAccess, canSeeLead } from '@/lib/services/leadAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +11,10 @@ export async function GET(
 ) {
   try {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { id } = params
 
     const { data, error } = await supabase
@@ -21,6 +26,13 @@ export async function GET(
     if (error) throw error
     if (!data) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Lead-type access: a restricted user cannot open leads outside their
+    // allowed courses.
+    const access = await getLeadAccess(supabase, user.id)
+    if (!canSeeLead(access, data)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     return NextResponse.json({

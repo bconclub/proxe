@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { getBrandConfig } from '@/configs'
+import { sanitizeAllowedLeadTypes } from '@/lib/services/leadAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,6 +71,14 @@ export async function PATCH(
     }
     if (body.is_active !== undefined) updates.is_active = !!body.is_active
     if (body.full_name !== undefined) updates.full_name = String(body.full_name).trim() || null
+    // features.leadAccess only — the column doesn't exist on other brands.
+    if (getBrandConfig().features?.leadAccess && body.allowed_lead_types !== undefined) {
+      const sanitized = sanitizeAllowedLeadTypes(body.allowed_lead_types)
+      if (sanitized === undefined) {
+        return NextResponse.json({ error: 'allowed_lead_types must be an array of course names or null' }, { status: 400 })
+      }
+      updates.allowed_lead_types = sanitized
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })

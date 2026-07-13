@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { canAccessLeadId } from '@/lib/services/leadAccess'
 
 // Allowed status values
 const ALLOWED_STATUSES = [
@@ -27,6 +28,11 @@ export async function PATCH(
     
     const { status } = await request.json()
     const leadId = params.id
+
+    // Lead-type access: restricted users can't act on leads outside their courses.
+    if (!(await canAccessLeadId(supabase, user.id, leadId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     // Validate status
     if (!status || !ALLOWED_STATUSES.includes(status)) {

@@ -1,11 +1,17 @@
 /**
  * Lead ownership on touch.
  *
- * Whoever takes an action on a lead — replies, sends a template, logs a call,
- * adds a note — becomes its owner. This intentionally REASSIGNS: the owner
- * follows whoever is actively working the lead (founder request: "owner should
- * change based on whoever is touching the lead"), rather than only claiming
- * when unowned.
+ * Default (flag off): whoever takes an action on a lead — replies, sends a
+ * template, logs a call, adds a note — becomes its owner. This intentionally
+ * REASSIGNS: the owner follows whoever is actively working the lead (founder
+ * request: "owner should change based on whoever is touching the lead").
+ *
+ * features.leadAccess (windchasers): STICKY FIRST TOUCH — the first user to
+ * touch an unowned lead claims it permanently; a later touch by someone else
+ * only refreshes last_actor, never steals ownership. Release/reassign go
+ * through the /owner route (self-release or admin). Ownership is dual-written:
+ * unified_context.owner (display: name/email) + the all_leads.owner_id column
+ * (SQL filtering — the column only exists on flagged brands, migration 036).
  *
  * No-ops when:
  *   • there is no authenticated user (system / automated paths must NEVER
@@ -15,6 +21,7 @@
  * Always non-fatal: ownership is a convenience, never a reason to fail the
  * action that triggered it.
  */
+import { getBrandConfig } from '@/configs'
 /**
  * Stamp PROXe (the AI) as the last actor on a lead. Call this right after the
  * agent auto-sends a WhatsApp/web reply, so the leads-table "Last Touch" badge
@@ -47,6 +54,8 @@ export async function assignOwnerOnTouch(
   try {
     if (!user?.id) return
 
+    const sticky = !!getBrandConfig().features?.leadAccess
+
     const { data: row } = await supabase
       .from('all_leads')
       .select('unified_context')
@@ -77,6 +86,16 @@ export async function assignOwnerOnTouch(
       return
     }
 
+    // Sticky mode: someone else already owns this lead — first touch locked
+    // it. Refresh last_actor only; ownership never moves on touch.
+    if (sticky && ctx.owner?.id) {
+      await supabase
+        .from('all_leads')
+        .update({ unified_context: { ...ctx, last_actor } })
+        .eq('id', leadId)
+      return
+    }
+
     const owner = {
       id: user.id,
       name: actorName,
@@ -86,9 +105,14 @@ export async function assignOwnerOnTouch(
       auto: true,
     }
 
+    // owner_id column exists only on flagged brands (migration 036) — writing
+    // it elsewhere would error the whole update.
+    const update: Record<string, any> = { unified_context: { ...ctx, owner, last_actor } }
+    if (sticky) update.owner_id = user.id
+
     await supabase
       .from('all_leads')
-      .update({ unified_context: { ...ctx, owner, last_actor } })
+      .update(update)
       .eq('id', leadId)
   } catch (e: any) {
     console.warn('[leadOwnership] assignOwnerOnTouch failed (non-fatal):', e?.message || e)

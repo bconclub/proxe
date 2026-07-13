@@ -26,6 +26,7 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership';
+import { canAccessLeadId } from '@/lib/services/leadAccess';
 
 export const dynamic = 'force-dynamic';
 
@@ -207,7 +208,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch lead info
-    const { data: lead, error: leadError } = await (await createClient())
+    const authClient = await createClient();
+    const { data: lead, error: leadError } = await authClient
       .from('all_leads')
       .select('id, customer_name, email, phone')
       .eq('id', leadId)
@@ -218,6 +220,12 @@ export async function POST(request: NextRequest) {
         { error: 'Lead not found' },
         { status: 404 },
       );
+    }
+
+    // Lead-type access: restricted users can't reply to leads outside their courses.
+    const { data: { user: actor } } = await authClient.auth.getUser();
+    if (actor?.id && !(await canAccessLeadId(supabase, actor.id, leadId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // ── ACTION: GENERATE ──────────────────────────────────────────────────

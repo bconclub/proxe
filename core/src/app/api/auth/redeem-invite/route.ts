@@ -29,8 +29,14 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
+import { getBrandConfig } from '@/configs'
+import { sanitizeAllowedLeadTypes } from '@/lib/services/leadAccess'
 
 export const dynamic = 'force-dynamic'
+
+// features.leadAccess: allowed_lead_types columns exist only on flagged
+// brands (migration 036) — selecting/writing them elsewhere would error.
+const LEAD_ACCESS_ON = !!getBrandConfig().features?.leadAccess
 
 // Same allowlist as the invite-create endpoint. Defence-in-depth — even if
 // the user_invitations row has a junk role somehow, we cap what gets applied.
@@ -62,11 +68,20 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 1. Validate the invitation ─────────────────────────────────────────
-    const { data: invitation, error: inviteErr } = await supabase
+    // Conditional column list (allowed_lead_types exists only on flagged
+    // brands) — typed as a plain string so PostgREST's literal-type parser
+    // doesn't choke on the union.
+    const inviteCols: string = LEAD_ACCESS_ON
+      ? 'id, email, role, expires_at, accepted_at, allowed_lead_types'
+      : 'id, email, role, expires_at, accepted_at'
+    const { data: invitationRow, error: inviteErr } = await supabase
       .from('user_invitations')
-      .select('id, email, role, expires_at, accepted_at')
+      .select(inviteCols)
       .eq('token', token)
       .maybeSingle()
+    // Dynamic column list defeats PostgREST's literal-type inference — the
+    // row shape is the invited-user record either way.
+    const invitation = invitationRow as any
 
     if (inviteErr) {
       console.error('[redeem-invite] Lookup error:', inviteErr.message)
@@ -177,6 +192,11 @@ export async function POST(request: NextRequest) {
     // from default. Also fill in full_name if we have one.
     const dashboardUserPatch: Record<string, any> = { role }
     if (fullName) dashboardUserPatch.full_name = fullName
+    // Carry the invite's lead-type restriction onto the user (null = all).
+    if (LEAD_ACCESS_ON) {
+      dashboardUserPatch.allowed_lead_types =
+        sanitizeAllowedLeadTypes((invitation as any).allowed_lead_types) ?? null
+    }
 
     // First try plain UPDATE (the row should exist from the trigger). If it
     // doesn't update any row, fall through to UPSERT.
@@ -201,6 +221,9 @@ export async function POST(request: NextRequest) {
             full_name: fullName,
             role,
             is_active: true,
+            ...(LEAD_ACCESS_ON
+              ? { allowed_lead_types: sanitizeAllowedLeadTypes((invitation as any).allowed_lead_types) ?? null }
+              : {}),
           },
           { onConflict: 'id' },
         )

@@ -9,7 +9,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient, sendInvitationEmail } from '@/lib/services'
 import { brandConfig } from '@/configs'
+import { sanitizeAllowedLeadTypes } from '@/lib/services/leadAccess'
 import crypto from 'crypto'
+
+// features.leadAccess: allowed_lead_types column (migration 036) — selecting
+// or writing it on brands without the migration would error.
+const LEAD_ACCESS_ON = !!brandConfig.features?.leadAccess
 
 export const dynamic = 'force-dynamic'
 
@@ -95,14 +100,24 @@ export async function GET() {
     // activity — no last_login, status, created_at, or pending invitations.
     // Founder: "Only the admin should be able to see all the users / active
     // time. The users can see other users, but not active time or anything."
-    const userColumns = isAdmin
+    const accessCols = LEAD_ACCESS_ON ? ', allowed_lead_types' : ''
+    const baseColumns = isAdmin
       ? 'id, email, full_name, role, is_active, created_at, last_login'
       : 'id, email, full_name, role'
 
-    const usersRes = await service
+    let usersRes = await service
       .from('dashboard_users')
-      .select(userColumns)
+      .select(`${baseColumns}${accessCols}`)
       .order(isAdmin ? 'created_at' : 'full_name', { ascending: isAdmin ? false : true })
+
+    if (usersRes.error && LEAD_ACCESS_ON) {
+      // Migration 036 not run yet (allowed_lead_types missing) — serve the
+      // roster without the access column rather than 500ing the page.
+      usersRes = await service
+        .from('dashboard_users')
+        .select(baseColumns)
+        .order(isAdmin ? 'created_at' : 'full_name', { ascending: isAdmin ? false : true })
+    }
 
     if (usersRes.error) throw usersRes.error
 
@@ -161,6 +176,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Role must be admin or viewer' }, { status: 400 })
     }
 
+    // features.leadAccess: allowed lead types set at invite time, carried onto
+    // dashboard_users when the invite is redeemed. null = all types.
+    let allowedLeadTypes: string[] | null = null
+    if (LEAD_ACCESS_ON && body.allowedLeadTypes !== undefined) {
+      const sanitized = sanitizeAllowedLeadTypes(body.allowedLeadTypes)
+      if (sanitized === undefined) {
+        return NextResponse.json({ error: 'allowedLeadTypes must be an array of course names' }, { status: 400 })
+      }
+      allowedLeadTypes = sanitized
+    }
+
     const trimmedEmail = email.trim().toLowerCase()
     const service = (auth as any).service
 
@@ -196,6 +222,7 @@ export async function POST(request: NextRequest) {
         role,
         invited_by: (auth as any).user.id,
         expires_at: expiresAt.toISOString(),
+        ...(LEAD_ACCESS_ON ? { allowed_lead_types: allowedLeadTypes } : {}),
       })
       .select()
       .single()

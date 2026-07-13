@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { canAccessLeadId } from '@/lib/services/leadAccess'
+import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 
 // Allowed lead stages
 const ALLOWED_STAGES = [
@@ -37,6 +39,12 @@ export async function PATCH(
     }
     
     const leadId = params.id
+
+    // Lead-type access: restricted users can't act on leads outside their courses.
+    if (!(await canAccessLeadId(supabase, user.id, leadId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { stage, sub_stage, override_reason } = body
 
@@ -103,6 +111,10 @@ export async function PATCH(
         { status: 500 }
       )
     }
+
+    // Stage change is a work action — it claims the lead (sticky first-touch
+    // under features.leadAccess, last-touch-wins otherwise). Non-fatal.
+    await assignOwnerOnTouch(supabase, leadId, user)
 
     // Log stage change
     const { data: stageChange, error: logError } = await supabase
