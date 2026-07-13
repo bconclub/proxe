@@ -165,6 +165,7 @@ export interface LeadNotice {
   source?: string | null;
   detail?: string | null;         // free-text (rendered italic)
   detailFields?: Pair[];          // structured detail (2-col bold-label fields)
+  leadUrl?: string;               // dashboard URL — renders the lead name as a clickable "tag"
   title?: string;                 // headline text, e.g. "New lead" / "Needs human follow-up"
   footer?: string;                // small italic footer suffix
   // URL buttons (work from an incoming webhook — no Slack app needed). Each
@@ -180,8 +181,12 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   const title = l.title || 'Lead';
 
   const who = clean(l.name) || clean(l.email) || clean(l.phone) || 'Lead';
+  // Render the lead name as a CLICKABLE tag (opens the lead in the dashboard)
+  // when a URL is given — the closest Slack allows to "tagging" a customer lead,
+  // since real @mentions only resolve for actual workspace members.
+  const whoTag = clean(l.leadUrl) ? `<${clean(l.leadUrl)}|${who}>` : `*${who}*`;
   const content: unknown[] = [
-    section(clean(l.leadType) ? `*${who}*  ·  _${clean(l.leadType)}_` : `*${who}*`),
+    section(clean(l.leadType) ? `${whoTag}  ·  _${clean(l.leadType)}_` : whoTag),
   ];
 
   // What the lead wants comes first (the glanceable line), then contact/meta.
