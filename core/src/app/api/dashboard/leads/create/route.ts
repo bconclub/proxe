@@ -253,9 +253,12 @@ export async function POST(request: NextRequest) {
               trigger: 'manual_welcome',
               ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
               ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+              // Store Meta's wamid so delivery/read receipts can match this row.
+              ...(result.messageId ? { wa_message_id: result.messageId, delivery_status: 'sent' } : {}),
             },
             supabase,
           )
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
         }
       } catch (err: any) {
         welcomeError = err?.message || String(err)

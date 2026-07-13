@@ -1190,10 +1190,16 @@ export async function POST(request: NextRequest) {
             webinar_date: webinarDate || null,
             ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
             ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            // Store Meta's wamid so delivery/read receipts can match this row.
+            ...(result.messageId ? { wa_message_id: result.messageId, delivery_status: 'sent' } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
         })
+        if (result.success) {
+          // The last touch is now WhatsApp (the confirm we just sent), not the form.
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
+        }
         if (!result.success) {
           console.error(`[inbound] Webinar confirm send FAILED lead=${leadId} phone=${phone} tpl=${confirmTpl} error=${result.error}`)
         } else {
@@ -1234,10 +1240,14 @@ export async function POST(request: NextRequest) {
             sent_by: 'system (inbound webhook)',
             ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
             ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            ...(result.messageId ? { wa_message_id: result.messageId, delivery_status: 'sent' } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
         })
+        if (result.success) {
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
+        }
         if (!result.success) {
           console.error(`[inbound] Cabin-crew welcome FAILED lead=${leadId} phone=${phone} tpl=${result.templateUsed} error=${result.error}`)
         } else {
@@ -1408,12 +1418,16 @@ export async function POST(request: NextRequest) {
               ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
               ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
               sent_by: 'system (inbound webhook)',
+              ...(sendResult.messageId ? { wa_message_id: sendResult.messageId, delivery_status: 'sent' } : {}),
               send_succeeded: !!sendResult.success,
               send_error: sendResult.success ? null : (sendResult.error || 'unknown'),
             },
           })
         } catch (err: any) {
           console.error(`[inbound] Welcome log EXCEPTION lead=${leadId}: ${err?.message || err}`)
+        }
+        if (sendResult.success) {
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
         }
         if (!sendResult.success) {
           console.error(`[inbound] Welcome FAILED lead=${leadId} phone=${phone} tpl=${welcomeTpl} error=${sendResult.error}`)

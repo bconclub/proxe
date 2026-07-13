@@ -1,3 +1,10 @@
+## 2026-07-13 · fix(windchasers): WhatsApp delivery receipts + last-touch on auto-templates
+
+- Auto-template sends (webinar confirm, cabin-crew, new-lead/parent welcome, FB-lead, dashboard add-lead) never stored Meta's message id, so the status webhook (matches on `metadata.wa_message_id`) could not attach delivery/read receipts — every row stuck on a single tick. Now the send wrappers propagate `messageId` and every log site stores `wa_message_id` + `delivery_status: 'sent'`, so ticks flow. (Forward-only — historical rows have no captured wamid.)
+- After a successful auto-welcome/confirm, `last_touchpoint` is bumped to `whatsapp` (+ `last_interaction_at`), so the pipeline LAST TOUCH column reflects the WhatsApp we sent instead of staying "Form".
+- `sendCabinCrewWelcome` / `sendWelcomeTemplate` / `sendParentWelcomeTemplate` / `sendWebinarConfirm` return types widened to carry `messageId`.
+- `(pending-sha)`
+
 ## 2026-07-13 · fix(windchasers): inbox shows the REAL WhatsApp template (body + buttons + footer)
 
 - Welcome/webinar/cabin sends logged a hand-written one-liner ("Hey X! Welcome to Windchasers.") as the conversation `content`, so the inbox showed a stub — not the real approved template the customer actually received.

@@ -605,21 +605,21 @@ export function isCabinCrewSource(...signals: Array<string | null | undefined>):
 export async function sendCabinCrewWelcome(
   to: string,
   name: string,
-): Promise<{ success: boolean; error?: string; templateUsed: string }> {
+): Promise<{ success: boolean; error?: string; templateUsed: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const primary = await sendWhatsAppTemplate(to, 'windchasers_cabin_crew_welcome_v1', [
     { type: 'body', parameters: [{ type: 'text', parameter_name: 'customer_name', text: firstName }] },
   ])
   if (primary.success) {
-    return { success: true, templateUsed: 'windchasers_cabin_crew_welcome_v1' }
+    return { success: true, templateUsed: 'windchasers_cabin_crew_welcome_v1', messageId: primary.messageId }
   }
   // Cabin-crew template not live yet (or send failed) → generic welcome so the
   // lead still gets a first message (sendWelcomeTemplate itself falls back from
   // v3 to the approved v1). A 4xx template error sends nothing, so this never
   // double-messages.
   const fallback = await sendWelcomeTemplate(to, name, 'windchasers_generic_welcome_v3')
-  return { success: fallback.success, error: fallback.error, templateUsed: 'windchasers_generic_welcome_v3' }
+  return { success: fallback.success, error: fallback.error, templateUsed: 'windchasers_generic_welcome_v3', messageId: fallback.messageId }
 }
 
 /**
@@ -642,7 +642,7 @@ export function isParentSource(...signals: Array<string | null | undefined>): bo
 export async function sendParentWelcomeTemplate(
   to: string,
   name: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   return sendWhatsAppTemplate(to, 'windchasers_pilot_parents_welcome_v1', [
@@ -668,7 +668,7 @@ export async function sendWebinarConfirm(
   name: string,
   webinarName: string,
   dateTime: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const [datePart, timePart] = String(dateTime || '').split(/\s+at\s+/i)
@@ -743,7 +743,7 @@ export async function sendWelcomeTemplate(
   to: string,
   name: string,
   templateName: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const components = [

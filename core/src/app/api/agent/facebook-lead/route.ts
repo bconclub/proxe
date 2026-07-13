@@ -243,14 +243,14 @@ export async function POST(request: NextRequest) {
       const isParentLead = isParentSource(...attributionSignals);
       const isCabinCrewLead = !isParentLead && isCabinCrewSource(...attributionSignals);
       let welcomeTpl: string;
-      let sendResult: { success: boolean; error?: string };
+      let sendResult: { success: boolean; error?: string; messageId?: string };
       if (isParentLead) {
         welcomeTpl = 'windchasers_pilot_parents_welcome_v1';
         sendResult = await sendParentWelcomeTemplate(phone, cleanName);
       } else if (isCabinCrewLead) {
         const r = await sendCabinCrewWelcome(phone, cleanName);
         welcomeTpl = r.templateUsed;
-        sendResult = { success: r.success, error: r.error };
+        sendResult = { success: r.success, error: r.error, messageId: r.messageId };
       } else {
         welcomeTpl = pickWelcomeTemplate(...attributionSignals);
         sendResult = await sendWelcomeTemplate(phone, cleanName, welcomeTpl);
@@ -287,10 +287,14 @@ export async function POST(request: NextRequest) {
             template_name: welcomeTpl,
             ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
             ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            // Store Meta's wamid so delivery/read receipts can match this row.
+            ...(sendResult.messageId ? { wa_message_id: sendResult.messageId, delivery_status: 'sent' } : {}),
             ...facebookMeta,
           },
           supabase,
         );
+        // Last touch is now WhatsApp (the welcome we just sent), not the form.
+        await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId);
       }
 
       // ── 5. Trigger AI scoring (fire-and-forget) ──────────────────────────────
