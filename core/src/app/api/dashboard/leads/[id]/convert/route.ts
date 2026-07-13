@@ -17,7 +17,7 @@ import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
  *   notes        — free text.
  *
  * Effects:
- *   - lead_stage = 'Converted' (stage_override=true)
+ *   - lead_stage = 'Closed Won' (stage_override=true)
  *   - converted_at column (soft-fail if a brand's DB lacks it — migration 037)
  *   - unified_context.conversion = { at, program, amount, currency, notes, by }
  *     (always stored, no migration needed — the durable source of truth)
@@ -68,7 +68,7 @@ export async function POST(
     const { error: updErr } = await supabase
       .from('all_leads')
       .update({
-        lead_stage: 'Converted',
+        lead_stage: 'Closed Won',
         stage_override: true,
         is_manual_override: true,
         unified_context: { ...(lead.unified_context || {}), conversion },
@@ -108,14 +108,14 @@ export async function POST(
       lead_id: leadId,
       activity_type: 'note',
       created_by: user.id || null,
-      note: `Converted on ${convertedAt.slice(0, 10)}${detailParts.length ? ' — ' + detailParts.join(' · ') : ''}`,
+      note: `Closed Won on ${convertedAt.slice(0, 10)}${detailParts.length ? ' — ' + detailParts.join(' · ') : ''}`,
     }).then(() => {}, () => {})
 
-    if (oldStage !== 'Converted') {
+    if (oldStage !== 'Closed Won') {
       await supabase.from('lead_stage_changes').insert({
         lead_id: leadId,
         old_stage: oldStage,
-        new_stage: 'Converted',
+        new_stage: 'Closed Won',
         changed_by: user.id,
         is_automatic: false,
         change_reason: `Converted via Convert action${detailParts.length ? ': ' + detailParts.join(' · ') : ''}`,

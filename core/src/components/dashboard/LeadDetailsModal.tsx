@@ -367,7 +367,7 @@ const STAGE_PROGRESSION = [
   { stage: 'Qualified', order: 2 },
   { stage: 'High Intent', order: 3 },
   { stage: 'Booking Made', order: 4 },
-  { stage: 'Converted', order: 5 },
+  { stage: 'Closed Won', order: 5 },
 ]
 
 function CopyIconButton({ value, label }: { value: string; label: string }) {
@@ -1349,7 +1349,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       'Qualified': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
       'High Intent': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
       'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+      'Closed Won': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
       'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
       'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
       'In Sequence': '', // Will use inline styles with CSS variables
@@ -1396,7 +1396,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       const categoryLabels: Record<string, string> = {
         BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
         HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
-        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Converted', MEETING_REQUEST: 'Meeting Request',
+        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Closed Won', MEETING_REQUEST: 'Meeting Request',
         SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', INFO_ONLY: 'Info Only',
       }
       const categoryLabel = categoryLabels[result.classification?.category] || result.classification?.category || 'Unknown'
@@ -1502,7 +1502,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       const categoryLabels: Record<string, string> = {
         BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
         HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
-        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Converted', MEETING_REQUEST: 'Meeting Request',
+        NOT_INTERESTED: 'Not Interested', CONVERTED: 'Closed Won', MEETING_REQUEST: 'Meeting Request',
         SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', DEMO_TAKEN: 'Demo Taken',
         PROPOSAL_SENT: 'Proposal Sent', INFO_ONLY: 'Info Only',
       }
@@ -4532,7 +4532,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 />
               </div>
               {convertError && <p className="text-xs text-red-500">{convertError}</p>}
-              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Marks the lead as Converted, records the date, and stops any pending follow-ups.</p>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Marks the lead as Closed Won, records the date, and stops any pending follow-ups.</p>
             </div>
             <div className="flex justify-end gap-2 px-5 py-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
               <button

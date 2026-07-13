@@ -20,7 +20,7 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Demo Taken', label: 'Demo Taken', description: 'Saw the product', scoreRange: 'Manual' },
   { value: 'Proposal Sent', label: 'Proposal Sent', description: 'Offer in their hands', scoreRange: 'Manual' },
   { value: 'Booking Made', label: 'Booking Made', description: '86-100 score', scoreRange: '86-100' },
-  { value: 'Converted', label: 'Converted', description: 'Manual close', scoreRange: 'Manual' },
+  { value: 'Closed Won', label: 'Closed Won', description: 'Manual close', scoreRange: 'Manual' },
   { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual', scoreRange: 'Manual' },
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Manual', scoreRange: 'Manual' },
   { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
@@ -42,7 +42,7 @@ const getStageColor = (stage: LeadStage | null): string => {
     'Qualified': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     'High Intent': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
     'Booking Made': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    'Converted': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+    'Closed Won': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
     'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
     'Not Qualified': 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
     'In Sequence': '', // Uses inline styles with CSS variables

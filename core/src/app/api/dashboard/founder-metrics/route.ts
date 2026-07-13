@@ -1302,7 +1302,7 @@ export async function GET(request: NextRequest) {
     // ENGAGED LEADS: People who actually showed real interest
     // Criteria: stage-based (Engaged or above) OR has a confirmed booking
     // Score alone is NOT sufficient -- many new leads get moderate scores from basic info
-    const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+    const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Closed Won']
     const engagedLeadsList = safeLeads.filter(lead => {
       // Has an engaged+ stage (set by scoring engine or manual override)
       if (engagedStages.includes(lead.lead_stage || '')) return true

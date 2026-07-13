@@ -343,7 +343,7 @@ export function proposePlan(c: NoteClassification): PlanProposal {
       return {
         category: c.category, action: 'close',
         reason: 'Deal closed. I\'d mark it won and clear pending tasks.',
-        next_steps: ['Cancel pending tasks', 'Stage → Converted'],
+        next_steps: ['Cancel pending tasks', 'Stage → Closed Won'],
       };
     case 'MEETING_REQUEST':
       return {
@@ -809,7 +809,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       actionsTaken.push(`Cancelled ${cancelCount} pending follow-up tasks`);
     }
 
-    newStage = 'Converted';
+    newStage = 'Closed Won';
     await supabase
       .from('all_leads')
       .update({ lead_stage: newStage, stage_override: true })
@@ -829,8 +829,8 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     } else {
       actionsTaken.push(`Recorded conversion date ${convertedAt.toISOString().slice(0, 10)}`);
     }
-    actions.push('stage_updated:Converted');
-    actionsTaken.push(`Stage changed to Converted`);
+    actions.push('stage_updated:Closed Won');
+    actionsTaken.push(`Stage changed to Closed Won`);
   }
 
   // ── DEMO_TAKEN ───────────────────────────────────────────────────────────

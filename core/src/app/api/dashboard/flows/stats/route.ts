@@ -35,7 +35,7 @@ const LEAD_STAGE_MAP: Record<string, string> = {
   'No Show': 'no_show',
   'Demo Taken': 'demo_taken',
   'Proposal Sent': 'proposal_sent',
-  'Converted': 'converted',
+  'Closed Won': 'converted',
   'Closed Won': 'converted',
   'Closed Lost': 'converted',
   'In Sequence': 'one_touch',

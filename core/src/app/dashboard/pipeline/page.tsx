@@ -46,7 +46,7 @@ const STAGES: Stage[] = [
   // Manual-only stages (set by the team — never auto): Call Done, Proposal Sent, Won, Lost.
   { id: 'call_done',     dbValues: ['Call Done'],        label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
   { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
-  { id: 'won',           dbValues: ['Converted', 'Won'], label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
+  { id: 'won',           dbValues: ['Closed Won', 'Converted', 'Won'], label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
   { id: 'lost',          dbValues: ['Cold', 'Closed Lost', 'Lost', 'Not Qualified'], label: 'Lost', bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
 ]
 

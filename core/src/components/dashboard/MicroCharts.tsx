@@ -377,7 +377,7 @@ export function ChannelActivityBars({ data }: { data: Array<{ channel: string; c
 
 // Stage Pipeline Indicator
 export function StagePipelineIndicator({ stage }: { stage: string }) {
-  const stages = ['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+  const stages = ['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Closed Won']
   const currentIndex = stages.indexOf(stage)
   const progress = currentIndex >= 0 ? ((currentIndex + 1) / stages.length) * 100 : 0
   

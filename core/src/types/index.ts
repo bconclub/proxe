@@ -4,7 +4,7 @@ export type LeadStage =
   | 'Qualified'
   | 'High Intent'
   | 'Booking Made'
-  | 'Converted'
+  | 'Closed Won'
   | 'Closed Lost'
   | 'Not Qualified'
   | 'In Sequence'

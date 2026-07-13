@@ -33,7 +33,7 @@ type Plan = { category: string; action: string; reason: string; next_steps: stri
 type HubAction = 'book' | 'move' | 'sequence' | 'task' | 'close' | 'none'
 
 const MOVE_STAGES = ['Engaged', 'High Intent', 'Demo Taken', 'Proposal Sent', 'Nurture']
-const CLOSE_STAGES = ['Converted', 'Closed Lost']
+const CLOSE_STAGES = ['Closed Won', 'Closed Lost']
 const SEQUENCES: Array<{ key: 'ghost' | 'engaged' | 'reengage'; label: string }> = [
   { key: 'ghost', label: 'Ghost — gentle nudges (day 1, 3, 7)' },
   { key: 'engaged', label: 'Engaged — follow-ups (day 1, 3, 5)' },

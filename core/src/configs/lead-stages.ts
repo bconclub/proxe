@@ -29,7 +29,7 @@ export const LEAD_STAGES: LeadStageDef[] = [
   { value: 'Booking Made',  label: 'Booking Made',  description: 'Call/demo scheduled',              color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
   { value: 'In Sequence',   label: 'In Sequence',   description: 'Automated follow-up running',      color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
   { value: 'Nurture',       label: 'Nurture',       description: 'Long-game — check in later',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
-  { value: 'Converted',     label: 'Converted',     description: 'Won',                              color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+  { value: 'Closed Won',     label: 'Closed Won',     description: 'Won',                              color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
   { value: 'Closed Lost',   label: 'Closed Lost',   description: 'Lost / disqualified by decision',  color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Wrong fit',                        color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
   { value: 'Cold',          label: 'Cold',          description: 'No engagement',                    color: '#6b7280', bg: 'rgba(107,114,128,0.15)' },

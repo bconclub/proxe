@@ -318,7 +318,7 @@ export default function LeadsTable({
 
     // Apply preset filter from URL (?filter=engaged or ?filter=warm)
     if (presetFilter === 'engaged') {
-      const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+      const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Closed Won']
       filtered = filtered.filter((lead) => {
         if (engagedStages.includes(lead.lead_stage || '')) return true
         const bookingDate = lead.booking_date ||

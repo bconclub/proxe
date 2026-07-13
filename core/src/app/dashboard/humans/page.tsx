@@ -37,7 +37,7 @@ const STAGE_GROUPS: Array<{ label: string; dbValues: string[]; color: string }> 
   { label: 'Key Events',    dbValues: ['Booking Made'],                                  color: '#534AB7' },
   { label: 'Call Done',     dbValues: ['Call Done'],                                     color: '#1D9E75' },
   { label: 'Proposal Sent', dbValues: ['Proposal Sent'],                                 color: '#BA7517' },
-  { label: 'Won',           dbValues: ['Converted', 'Won'],                              color: '#639922' },
+  { label: 'Won',           dbValues: ['Closed Won', 'Converted', 'Won'],                              color: '#639922' },
   { label: 'Lost',          dbValues: ['Cold', 'Closed Lost', 'Lost', 'Not Qualified'],  color: '#993C1D' },
 ]
 

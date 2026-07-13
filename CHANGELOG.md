@@ -1,3 +1,10 @@
+## 2026-07-13 · refactor(core): rename won stage 'Converted' → 'Closed Won'
+
+- The won stage is now 'Closed Won' (pairs with 'Closed Lost'), replacing 'Converted' across the taxonomy: stage/override/convert APIs, note classifier (CONVERTED category still triggers it), LeadStageSelector, stage dropdowns, colors, funnel/pipeline/humans groupings, metrics, types, lead-stages config. The 'Converted' classifier category name is unchanged.
+- Migration 038 drops the lead_stage CHECK (by definition, any name), migrates existing 'Converted' rows → 'Closed Won', and re-adds the constraint with the full current stage set. RUN THIS in each brand's Supabase before/with the deploy — until then the DB rejects 'Closed Won'.
+- Funnel/grouping arrays keep 'Converted' alongside 'Closed Won' so un-migrated brands' legacy rows still count as Won.
+- `(pending-sha)`
+
 ## 2026-07-13 · feat(core): "Convert lead" action + conversion-date tracking
 
 - New "Convert lead" option in the lead modal's + menu → a modal to enter conversion date (defaults today), program/batch, deal value ₹, and notes. Converting sets stage=Converted, records the date, stores the deal details in unified_context.conversion, cancels pending follow-ups, and logs a stage change + activity note. New endpoint POST /api/dashboard/leads/[id]/convert.

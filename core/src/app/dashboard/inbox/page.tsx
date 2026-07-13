@@ -2746,13 +2746,13 @@ export default function InboxPage() {
               'High Intent':  { bg: '#534AB7', text: '#EEEDFE' },
               'Booking Made': { bg: '#1D9E75', text: '#E1F5EE' },
               'In Sequence':  { bg: '#BA7517', text: '#FAEEDA' },
-              'Converted':    { bg: '#639922', text: '#EAF3DE' },
+              'Closed Won':    { bg: '#639922', text: '#EAF3DE' },
               'Closed Won':   { bg: '#639922', text: '#EAF3DE' },
               'Closed Lost':  { bg: '#993C1D', text: '#FAECE7' },
               'Cold':         { bg: '#993C1D', text: '#FAECE7' },
             }
             const stageAvatarColors: Record<string, string> = {
-              'Converted': '#22c55e', 'Booking Made': '#60a5fa', 'High Intent': '#f59e0b',
+              'Closed Won': '#22c55e', 'Booking Made': '#60a5fa', 'High Intent': '#f59e0b',
               'Qualified': '#a855f7', 'Engaged': '#6b7280', 'In Sequence': '#8b5cf6',
             }
             const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'

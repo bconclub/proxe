@@ -58,7 +58,7 @@ export async function POST(
       'Qualified',
       'High Intent',
       'Booking Made',
-      'Converted',
+      'Closed Won',
       'Closed Lost',
       'Not Qualified',
       'In Sequence',
@@ -144,7 +144,7 @@ export async function POST(
     }
 
     let cancelledTaskCount = 0
-    if (new_stage === 'Closed Lost' || new_stage === 'Not Qualified' || new_stage === 'Converted') {
+    if (new_stage === 'Closed Lost' || new_stage === 'Not Qualified' || new_stage === 'Closed Won') {
       const { data: cancelledTasks, error: cancelError } = await supabase
         .from('agent_tasks')
         .update({

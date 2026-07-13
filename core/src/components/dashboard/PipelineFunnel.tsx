@@ -20,7 +20,7 @@ const GROUPS = {
   demoBooked: ['Booking Made'],
   demoDone: ['Call Done', 'Demo Done'],
   offerMade: ['Proposal Sent', 'Offer Made'],
-  won: ['Converted', 'Won'],
+  won: ['Closed Won', 'Converted', 'Won'],
   noShow: ['No Show'],
   parked: ['Parked'],
   closedLost: ['Closed Lost', 'Lost', 'Cold', 'Not Qualified'],
