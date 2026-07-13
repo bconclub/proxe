@@ -122,7 +122,40 @@ export function detectLokazenAudience(
     scoutPhrase ||
     buttons.some((b) => b.includes('scout'));
 
-  if (buttons.some((b) => b.includes('list my property')) || answerLower.includes('list my property') || ownerQuestion) {
+  // Owner intent in the user's OWN words — anyone OFFERING / LISTING a property,
+  // not just the exact "List My Property" button. This was missing, so a clear
+  // owner ("I was not able to list the property on your site") went unclassified,
+  // then drifted to 'brand' the moment the agent asked a brand-flavoured question
+  // (size/area). Offering language only — a space-SEEKER ("looking to rent a
+  // shop") is a brand and is matched by the brand branch below.
+  const ownerIntent =
+    answerLower.includes('list my property') ||
+    answerLower.includes('list the property') ||
+    answerLower.includes('list a property') ||
+    answerLower.includes('listing a property') ||
+    answerLower.includes('listing my property') ||
+    answerLower.includes('property to list') ||
+    answerLower.includes('want to list') ||
+    answerLower.includes('i have a property') ||
+    answerLower.includes('i have a space') ||
+    answerLower.includes('i have a shop') ||
+    answerLower.includes('i own') ||
+    answerLower.includes("i'm the owner") ||
+    answerLower.includes('i am the owner') ||
+    answerLower.includes('property owner') ||
+    answerLower.includes('landlord') ||
+    answerLower.includes('rent out') ||
+    answerLower.includes('lease out') ||
+    answerLower.includes('give on rent') ||
+    answerLower.includes('give it on rent') ||
+    answerLower.includes('put up my property') ||
+    // "unable/trouble to list … (property/site/space/land/shop)"
+    (/(unable|not able|couldn'?t|can'?t|trouble|having trouble)\b[^.?!]*\blist\b/.test(answerLower)
+      && /(propert|site|website|platform|space|land|shop|building|plot)/.test(answerLower)) ||
+    // "list(ing) … property/land/space/shop/…"
+    /\blist(ing)?\b[^.?!]{0,20}\b(propert|land|space|shop|building|plot|premises)\b/.test(answerLower);
+
+  if (buttons.some((b) => b.includes('list my property')) || ownerIntent || ownerQuestion) {
     return 'owner';
   }
   if (buttons.some((b) => b.includes('find commercial space')) || answerLower.includes('find commercial space') || brandQuestion) {
