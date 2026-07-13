@@ -1,3 +1,10 @@
+##  · fix(core): inbox renders templates FULLY (body + buttons) + Lokazen chip leak killed + whole Meta form shown
+
+- Template sends from the dashboard now log the RENDERED body (server-side fill from the brand template map) + template_buttons metadata — the thread shows the real message with WhatsApp-style buttons, never "[Template: name]". RNR pair buttons (Book a call / Chat here) added to journeys + worker maps. Raaja's existing row backfilled.
+- LEAK: audienceOf() painted Lokazen's OWNER/SCOUT/BRAND chips on every brand — bcon B2B leads with user_type "business_owner" substring-matched "owner". Now lokazen-only (the detail-panel copy of this taxonomy was already gated; the list chip escaped the audit).
+- Meta Form Submission card shows EVERY answered field (was a cherry-picked subset — a form matching only "urgency" rendered one lonely field).
+- `(pending-sha)`
+
 ##  · feat(core): RNR cron sender is brand-aware — bcon ladder fires the real templates to real numbers
 
 - /api/cron/follow-up-sequence was windchasers-only (pilot/generic template names + single customer_name param) — on bcon every send would 4xx. Now brand-routed: bcon → bcon_service_rnr_1/2_v1 with 3 NAMED params (customer_name, service_name, brand_name from lead context), re_engage closes on the re-engagement template, cap 4 RNR sends (windchasers path unchanged, cap 2).

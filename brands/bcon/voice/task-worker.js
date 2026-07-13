@@ -3888,6 +3888,8 @@ const TEMPLATE_PARAM_COUNT = {
 
 // Template quick reply button labels matching Meta-approved templates
 const TEMPLATE_BUTTONS = {
+  'bcon_service_rnr_1_v1': ['Book a call', 'Chat here'],
+  'bcon_service_rnr_2_v1': ['Book a call', 'Chat here'],
   'bcon_proxe_followup_engaged': ['Yes, let\'s go'],
   'bcon_proxe_followup_noengage': ['Yes, tell me more', 'Just exploring'],
   'bcon_proxe_booking_reminder_24h': ['Yes, I\'ll be there', 'No, I need to reschedule'],

@@ -15,6 +15,8 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   bcon_proxe_reengagement_noengage: ['Yes Lets Talk'],
   bcon_lead_machine_meta_welcome_v1_: ['Yes, Book a Demo', 'Tell me more in chat'],
   bcon_welcome_web_v1: ['Book a Call', 'Tell Me More'],
+  bcon_service_rnr_1_v1: ['Book a call', 'Chat here'],
+  bcon_service_rnr_2_v1: ['Book a call', 'Chat here'],
   bcon_onetouch_d1_v1: ['Getting more leads', 'Managing follow-ups', 'Creating content', 'Ads not working', 'Website not converting', 'No time for marketing', 'Something else'],
   bcon_onetouch_d3_v1: ['Book a Call', 'Not Needed Now', 'STOP'],
   bcon_onetouch_d7_v1: ['Lets Talk', 'Not Needed Now', 'STOP'],
