@@ -1,3 +1,8 @@
+##  · fix(core): template messages get READ RECEIPTS — wa_message_id logged on every template send
+
+- Delivery/read ticks match conversations on metadata.wa_message_id; the dashboard send_template path logged only meta_message_id and the follow-up cron logged no id at all — template bubbles could never tick past "sent". Both now log wa_message_id + whatsapp_message_id (the worker already did). Raaja's sent row backfilled so late receipts still attach.
+- `(pending-sha)`
+
 ##  · feat(core): template variables extracted from what the lead SAID (leadFacts)
 
 - New resolveLeadFacts(): goal / brand / pain distilled from the lead's own words — their form answers (Company Name, current_system → human-phrased pain like "managing leads manually on WhatsApp"), the campaign they responded to (utm.campaign, e.g. "AI Lead Machine"), and chat-extracted profile fields. Fallbacks are last resort, never the default.

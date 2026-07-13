@@ -483,6 +483,10 @@ export async function POST(request: NextRequest) {
             ? bodyParamsNamed
             : (Array.isArray(bodyParams) ? bodyParams : []),
           meta_message_id: result.messageId || null,
+          // read receipts (sent → delivered → read ticks) match on this key —
+          // without it template bubbles never tick past sent.
+          wa_message_id: result.messageId || undefined,
+          whatsapp_message_id: result.messageId || undefined,
           test_mode: isTest,
           test_recipient: isTest ? phone : undefined,
         },

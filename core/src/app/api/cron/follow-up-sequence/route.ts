@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
         'agent',
         `Hi ${firstName}! (${tpl} template)`,
         'template',
-        { source: 'rnr_sequence', template_name: tpl, step, trigger: task.task_type },
+        { source: 'rnr_sequence', template_name: tpl, step, trigger: task.task_type, wa_message_id: (result as any).messageId || undefined, whatsapp_message_id: (result as any).messageId || undefined },
         supabase,
       )
       await markDone(supabase, task.id, nowIso)
