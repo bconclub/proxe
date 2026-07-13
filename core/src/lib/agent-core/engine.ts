@@ -1078,6 +1078,33 @@ function detectHumanHandoffRequest(message: string): boolean {
  * Flag a lead for human follow-up.
  * Sets needs_human_followup = true on all_leads and logs the reason.
  */
+// Minimal HTML escape for Telegram's parse_mode=HTML.
+function escapeHtmlTg(text: string | null | undefined): string {
+  return String(text ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
+ * Ping the team's Telegram group (TELEGRAM_ADMIN_CHAT_ID) via the brand's bot.
+ * No-op — returns {sent:false} — for any brand that hasn't set both env vars, so
+ * this never throws or bleeds a message to the wrong brand's group.
+ */
+async function sendTelegramAlert(text: string): Promise<{ sent: boolean; error?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+  if (!token || !chatId) return { sent: false };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true }),
+    });
+    if (!res.ok) return { sent: false, error: `${res.status} ${await res.text()}` };
+    return { sent: true };
+  } catch (e: any) {
+    return { sent: false, error: e?.message || String(e) };
+  }
+}
+
 async function flagForHumanFollowup(
   supabase: SupabaseClient,
   input: AgentInput,
@@ -1173,6 +1200,19 @@ async function flagForHumanFollowup(
     } else {
       console.log(`[Engine] Slack alert sent for lead ${lead.id}: "${reason}"`);
     }
+
+    // Telegram team-group alert (no-op unless TELEGRAM_BOT_TOKEN + _ADMIN_CHAT_ID
+    // are set for this brand). Mirrors the Slack ping so the team gets pinged on
+    // their Telegram group and a human can jump in — e.g. a booking the agent
+    // couldn't lock ("passed to our team"). Fire-and-soft-fail.
+    const tgText =
+      `🔔 <b>${escapeHtmlTg(title)}</b> · ${escapeHtmlTg(brandLabel)}\n` +
+      `${escapeHtmlTg(input.userProfile.name || 'Lead')} · ${escapeHtmlTg(input.userProfile.phone || '')}\n` +
+      `${escapeHtmlTg(reason)}\n` +
+      `${appUrl}/dashboard/inbox?lead=${lead.id}`;
+    const tg = await sendTelegramAlert(tgText);
+    if (tg.sent) console.log(`[Engine] Telegram alert sent for lead ${lead.id}: "${reason}"`);
+    else if (tg.error) console.error(`[Engine] Telegram alert FAILED for lead ${lead.id}: ${tg.error}`);
 
     // Create a real TASK so the handoff/support request is visible + actionable
     // on the Tasks page, not just a Slack ping + a flag. De-duped: skip if this

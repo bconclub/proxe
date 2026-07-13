@@ -1,3 +1,9 @@
+## 2026-07-13 · fix(windchasers): Telegram team alert on escalations + stop name-repetition spam
+
+- flagForHumanFollowup now also pings the team's Telegram group (TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID) alongside the existing Slack ping — so a booking the agent couldn't lock ("passed to our team"), an empty-response escalation, or a repeat-guard trip actually reaches a human on Telegram. Env-guarded no-op for brands without Telegram set; goes only to that brand's own group (no bleed). NOTE: needs TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID in the windchasers CORE/Vercel env (currently only in the worker).
+- Agent prompt: added NAME USAGE rule — use the first name at most once (first message), don't re-greet every reply ("Kartik… Kartik… Kartik") — fixes the repetitive/spammy feel.
+- `(pending-sha)`
+
 ## 2026-07-13 · fix(windchasers): TYPE column falls back to course (cabin-crew leads no longer blank)
 
 - The pipeline TYPE column only showed `user_type` (student/parent). Cabin-crew leads carry `course=Cabin Crew` but no user_type, so TYPE was blank. Now TYPE falls back to the course when user_type is empty, so cabin-crew (and other course-only) leads show their kind. Windchasers-gated (showAviationColumns); other brands unchanged.
