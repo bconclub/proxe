@@ -1193,24 +1193,11 @@ async function flagForHumanFollowup(
     const appUrl = ENV.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
     const title = isScout ? 'Scout support request' : 'Needs human follow-up';
 
-    // Business/brand name so the alert reads e.g. "NG Ventures · Arbaaz Khan" —
-    // the team recognises the LEAD, not just the contact. Best-effort across the
-    // places the name lands (brand block + web/whatsapp form fields + profile).
-    const brandKey = (() => { try { return getCurrentBrandId(); } catch { return 'lokazen'; } })();
-    const bn = ((): string => {
-      const uc: any = (lead as any).unified_context || {};
-      const b: any = uc[brandKey] || {};
-      const cand = [
-        b.business_name, b.brand_name, b.company, b.company_name,
-        uc.web?.what_is_your_brand_name, uc.whatsapp?.what_is_your_brand_name,
-        uc.whatsapp?.profile?.company, uc.web?.profile?.company,
-      ].map((v) => String(v || '').trim()).filter(Boolean);
-      return cand[0] || '';
-    })();
-    const personName = input.userProfile.name || (lead as any).customer_name || '';
-    const displayName = bn
-      ? (personName && personName.toLowerCase() !== bn.toLowerCase() ? `${bn} · ${personName}` : bn)
-      : (personName || null);
+    // Show just the lead's own name (e.g. "Arbaaz Khan") — nothing else. An
+    // earlier version prepended a guessed "business name" which mis-attached an
+    // unrelated value to the contact and duplicated the @mention handle. The
+    // @mention (SLACK_MENTION_USER_ID) is the ping; the name is just the lead.
+    const displayName = input.userProfile.name || (lead as any).customer_name || null;
     let slackResult: { success: boolean; skipped?: boolean; error?: string };
     if (slackBotConfigured()) {
       // INTERACTIVE app: post via bot token so the message carries Resolved /
