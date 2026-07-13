@@ -1234,6 +1234,7 @@ async function flagForHumanFollowup(
         leadType: audienceLabel,
         source: input.channel || null,
         detail: reason,
+        leadUrl: `${appUrl}/dashboard/inbox?lead=${lead.id}`,
         footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
         actions: [{ text: 'View lead in dashboard', url: `${appUrl}/dashboard/inbox?lead=${lead.id}`, style: 'primary' }],
       });
