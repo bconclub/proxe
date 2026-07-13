@@ -132,7 +132,12 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
   const classifierInput = outcome ? `[${outcome}] ${trimmed}` : trimmed;
 
   try {
+    // A hung LLM call must never freeze the log-call modal — 12s hard cap,
+    // then the safe EMPTY_CLASSIFICATION fallback takes over.
+    const abort = new AbortController();
+    const abortTimer = setTimeout(() => abort.abort(), 12_000);
     const response = await fetch('https://api.anthropic.com/v1/messages', {
+      signal: abort.signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -147,6 +152,7 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
       }),
     });
 
+    clearTimeout(abortTimer);
     if (!response.ok) {
       console.error('[noteOrchestrator] Claude API error:', response.status, await response.text());
       return EMPTY_CLASSIFICATION;
@@ -331,7 +337,7 @@ export function proposePlan(c: NoteClassification): PlanProposal {
       return {
         category: c.category, action: 'close',
         reason: 'Reads as a dead lead. I\'d close it and cancel everything pending.',
-        next_steps: ['Cancel pending tasks', 'Stage → Closed Lost', ...(c.category === 'NOT_POTENTIAL' ? ['90-day re-engagement check-in'] : [])],
+        next_steps: ['Cancel pending tasks', 'Stage → Closed Lost'],
       };
     case 'CONVERTED':
       return {
@@ -556,19 +562,10 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     actionsTaken.push(`Stage changed to Closed Lost`);
     actionsTaken.push(`Score updated to 0`);
 
-    await supabase.from('agent_tasks').insert({
-      task_type: 're_engage',
-      task_description: `Quarterly check-in for ${leadName} (marked not potential)`,
-      lead_id: leadId,
-      lead_phone: leadPhone,
-      lead_name: leadName,
-      status: 'pending',
-      scheduled_at: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-      metadata: { source: 'note_orchestrator', trigger: 'not_potential', quarterly: true },
-      created_at: now.toISOString(),
-    });
-    actions.push(`not_potential:cancelled_${cancelCount}_tasks,stage_Closed_Lost,score_0,re_engage_90d`);
-    actionsTaken.push(`Scheduled 90-day re-engagement check-in`);
+    // NO re-engagement here: the human explicitly said this is not a lead
+    // (spam / wrong audience / not a fit). Re-messaging disqualified contacts
+    // in 90 days wastes sends and pollutes the pipeline — closed means closed.
+    actions.push(`not_potential:cancelled_${cancelCount}_tasks,stage_Closed_Lost,score_0`);
   }
 
   // ── AFFORDABILITY ────────────────────────────────────────────────────────
@@ -715,6 +712,22 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       actions.push('rnr_sequence_skipped:already_actioned');
       actionsTaken.push(`Skipped auto follow-up — chaser already sent by the team`);
     } else {
+      // Supersede whatever plan was running before — a stale pending day-1
+      // from an old sequence would otherwise sit ABOVE the new re-try plan
+      // as the lead's "next action" (seen live: a 6-day-overdue dynamic-seq
+      // task shadowing a fresh RNR plan).
+      const { data: superseded } = await supabase
+        .from('agent_tasks')
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: 'Superseded: RNR re-try sequence' })
+        .eq('lead_id', leadId)
+        .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 'follow_up_day7', 'follow_up_day30', 'follow_up_day90', 're_engage', 'nudge_waiting', 'push_to_book', 'missed_call_followup', 'human_callback', 'post_call_followup', 'follow_up_24h'])
+        .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
+        .select('id');
+      if ((superseded?.length || 0) > 0) {
+        actions.push(`superseded_${superseded!.length}_prior_tasks`);
+        actionsTaken.push(`Cancelled ${superseded!.length} task(s) from the previous sequence`);
+      }
+
       await supabase.from('agent_tasks').insert({
         task_type: 'missed_call_followup',
         task_description: `Missed call follow-up: ${trimmedNote || outcome || 'no answer'}`,

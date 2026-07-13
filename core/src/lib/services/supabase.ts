@@ -66,6 +66,10 @@ export function getServiceClient(): SupabaseClient | null {
 
   serviceClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
+    // Next patches global fetch and can serve Supabase GETs from its Data
+    // Cache — the source of "cancelled task still shows as pending" ghosts
+    // seen in Next Actions. Reads through this client must NEVER be cached.
+    global: { fetch: (input: any, init?: any) => fetch(input, { ...init, cache: 'no-store' }) },
   });
 
   return serviceClient;
@@ -108,6 +112,7 @@ export function getAnonClient(): SupabaseClient | null {
 
   anonClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false },
+    global: { fetch: (input: any, init?: any) => fetch(input, { ...init, cache: 'no-store' }) },
   });
 
   return anonClient;

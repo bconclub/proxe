@@ -1,3 +1,12 @@
+##  · fix(core): call-log flow never breaks + obeys the human + no more ghost tasks
+
+- NEVER BREAKS: once the call note is saved, log-call can no longer return an error — orchestration failures degrade to "note saved, automation deferred". Activity-insert failure no longer kills the note; classifier LLM call gets a 12s hard timeout (a hung API froze the modal).
+- STALE-READ GHOSTS (root cause of "cancelled task still shows in Next Actions", seen in the wild): Supabase clients now force cache:no-store on their fetches — Next was serving Supabase GETs from its Data Cache. Verified live: a cancelled ghost that kept rendering as pending disappeared immediately.
+- OBEY THE HUMAN: NOT_POTENTIAL ("not a lead, close it off") no longer schedules a 90-day re-engagement — closed means closed. Plan preview updated to match.
+- RNR supersedes the previous sequence (stale pending day-1 from an old plan no longer shadows the new re-try plan); mis-tapped "Connected" with an RNR note normalizes to No Answer; task previews fill the real lead name; rnr/no_show sequences get proper labels.
+- Data cleanup: Raaja ghost dynamic day-1 cancelled; Saravanan quarterly re-engage cancelled (human closed the lead).
+- `(pending-sha)`
+
 ##  · polish(brain): orb hugs the bubble even at screen corners
 
 - Open-in-place clamp now bounds the ORB (what must stay visible), not the full 320px panel — the subtitle pill is fit-content and stays on-screen anyway. Corner drift shrank from (-110,-79)px to (-12,-49)px, the geometric minimum; mid-screen remains exact (0,0).
