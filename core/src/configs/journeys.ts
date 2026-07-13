@@ -102,8 +102,8 @@ export const JOURNEYS: Journey[] = [
     tone: '#f59e0b',
     steps: [
       { label: 'Missed-call follow-up', delay: '+30 min', template: 'bcon_service_rnr_1_v1' },
-      { label: 'Day 1', delay: '+1 day', template: 'bcon_service_rnr_2_v1' },
-      { label: 'Day 3', delay: '+3 days', template: 'bcon_service_rnr_2_v1' },
+      { label: 'Day 1', delay: '+1 day', template: 'bcon_proxe_followup_noengage' },
+      { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
       { label: 'Day 5', delay: '+5 days', template: 'bcon_proxe_reengagement_noengage' },
       { label: 'Re-engage', delay: '+7 days', template: 'bcon_proxe_reengagement_noengage' },
     ],

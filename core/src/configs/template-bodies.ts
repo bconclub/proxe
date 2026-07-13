@@ -89,9 +89,9 @@ export function buildNudgePreview(md: Record<string, any>): string {
 
 export function resolveTaskTemplate(taskType: string, bucket?: string | null, sequence?: string | null): string | null {
   const t = taskType || ''
-  // RNR pair (approved 13 Jul 2026): the missed-call chaser + its retries.
+  // RNR pair (approved 13 Jul 2026) fires ONLY on the call-miss touches —
+  // the scheduled day 1/3/5 retries preview the standard cadence below.
   if (t === 'missed_call_followup') return 'bcon_service_rnr_1_v1'
-  if (sequence === 'rnr' && t.startsWith('follow_up_')) return 'bcon_service_rnr_2_v1'
   if (t === 'booking_reminder_24h' || t === 'reminder_24h') return 'bcon_proxe_booking_reminder_24h'
   if (t === 'booking_reminder_30m' || t === 'reminder_30m') return 'bcon_proxe_booking_reminder_30m'
   if (t === 'first_outreach') return 'bcon_lead_machine_meta_welcome_v1_'
