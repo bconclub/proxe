@@ -1145,10 +1145,12 @@ async function flagForHumanFollowup(
 
     const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
-    // Fetch the lead
+    // Fetch the lead (customer_name + unified_context so the Slack alert can
+    // name the BUSINESS, e.g. "NG Ventures", not just the person — the team
+    // identifies a lead by its business/brand, not the contact's first name).
     const { data: lead } = await supabase
       .from('all_leads')
-      .select('id, metadata')
+      .select('id, customer_name, metadata, unified_context')
       .eq('customer_phone_normalized', normalizedPhone)
       .maybeSingle();
 
@@ -1183,18 +1185,37 @@ async function flagForHumanFollowup(
     const isScout = input.lokazenAudience === 'scout';
     const appUrl = ENV.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
     const title = isScout ? 'Scout support request' : 'Needs human follow-up';
+
+    // Business/brand name so the alert reads e.g. "NG Ventures · Arbaaz Khan" —
+    // the team recognises the LEAD, not just the contact. Best-effort across the
+    // places the name lands (brand block + web/whatsapp form fields + profile).
+    const brandKey = (() => { try { return getCurrentBrandId(); } catch { return 'lokazen'; } })();
+    const bn = ((): string => {
+      const uc: any = (lead as any).unified_context || {};
+      const b: any = uc[brandKey] || {};
+      const cand = [
+        b.business_name, b.brand_name, b.company, b.company_name,
+        uc.web?.what_is_your_brand_name, uc.whatsapp?.what_is_your_brand_name,
+        uc.whatsapp?.profile?.company, uc.web?.profile?.company,
+      ].map((v) => String(v || '').trim()).filter(Boolean);
+      return cand[0] || '';
+    })();
+    const personName = input.userProfile.name || (lead as any).customer_name || '';
+    const displayName = bn
+      ? (personName && personName.toLowerCase() !== bn.toLowerCase() ? `${bn} · ${personName}` : bn)
+      : (personName || null);
     let slackResult: { success: boolean; skipped?: boolean; error?: string };
     if (slackBotConfigured()) {
       // INTERACTIVE app: post via bot token so the message carries Resolved /
       // Reopen buttons AND a thread the team can reply in (→ WhatsApp the lead).
       const blocks = leadAlertBlocks({
         brandLabel, leadId: lead.id, title,
-        name: input.userProfile.name || null, leadType: audienceLabel,
+        name: displayName, leadType: audienceLabel,
         phone: input.userProfile.phone || null, detail: reason,
         footer: isScout ? 'scout support · reach out on the number above' : 'needs human',
         dashboardUrl: `${appUrl}/dashboard/inbox?lead=${lead.id}`, reply: true,
       });
-      const posted = await slackPostMessage({ text: `${title} · ${brandLabel}: ${input.userProfile.name || input.userProfile.phone || 'Lead'}`, blocks });
+      const posted = await slackPostMessage({ text: `${title} · ${brandLabel}: ${displayName || input.userProfile.phone || 'Lead'}`, blocks });
       slackResult = { success: posted.ok, skipped: false, error: posted.error };
       // Store the Slack thread ts on the lead so a reply in that thread maps back
       // to this customer's WhatsApp (see /api/integrations/slack/events).
@@ -1207,7 +1228,7 @@ async function flagForHumanFollowup(
       // Fallback: incoming webhook (one-way, URL buttons only).
       slackResult = await notifySlackLead({
         brandLabel, title,
-        name: input.userProfile.name || null,
+        name: displayName,
         phone: input.userProfile.phone || null,
         email: input.userProfile.email || null,
         leadType: audienceLabel,
@@ -1236,7 +1257,7 @@ async function flagForHumanFollowup(
     // couldn't lock ("passed to our team"). Fire-and-soft-fail.
     const tgText =
       `🔔 <b>${escapeHtmlTg(title)}</b> · ${escapeHtmlTg(brandLabel)}\n` +
-      `${escapeHtmlTg(input.userProfile.name || 'Lead')} · ${escapeHtmlTg(input.userProfile.phone || '')}\n` +
+      `${escapeHtmlTg(displayName || 'Lead')} · ${escapeHtmlTg(input.userProfile.phone || '')}\n` +
       `${escapeHtmlTg(reason)}\n` +
       `${appUrl}/dashboard/inbox?lead=${lead.id}`;
     const tg = await sendTelegramAlert(tgText);
