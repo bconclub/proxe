@@ -353,7 +353,7 @@ User's message: ${input.message}`
     if (recentAssistant.some((prev) => isNearDuplicate(cleanedResponse, prev))) {
       console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" — suppressing the parrot, escalating to a human.`);
       await flagForHumanFollowup(supabase, input, `Repeat-reply guard: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
-      cleanedResponse = "You've got it — I've looped our team in directly so a person can pick this up. Anything specific you'd like me to add for them?";
+      cleanedResponse = await composeTeamHandoffLine(supabase, input, brandId);
       lowValueEscalation = true;
     }
   }
@@ -367,7 +367,7 @@ User's message: ${input.message}`
   if (!cleanedResponse || !cleanedResponse.trim()) {
     console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" — escalating to a human instead of the generic holding line.`);
     await flagForHumanFollowup(supabase, input, `Empty AI response to: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
-    cleanedResponse = "Thanks for bearing with me — I've flagged this straight to our team so a person can pick it up, and they have your number. Anything else you'd like me to pass along to them?";
+    cleanedResponse = await composeTeamHandoffLine(supabase, input, brandId);
     lowValueEscalation = true;
   }
 
@@ -785,6 +785,55 @@ function isNearDuplicate(a: string, b: string): boolean {
   ta.forEach((t) => { if (tb.has(t)) inter++; });
   const union = ta.size + tb.size - inter;
   return union > 0 && inter / union >= 0.8;
+}
+
+/**
+ * A warm, CONTEXTUAL "the team is on it" line for the escalation fallbacks
+ * (empty AI reply / anti-repeat). Replaces the fixed canned strings that fired
+ * verbatim turn after turn ("Thanks for bearing with me — I've flagged this to
+ * our team…" sent to both "Any updates??" and "call me back"). It:
+ *   - greets by first name,
+ *   - names what they're actually about (their property area/type, pulled from
+ *     the lead's stored context — e.g. "your Jainagar property"),
+ *   - offers a callback,
+ *   - and picks a phrasing that ISN'T a near-duplicate of what we just said, so
+ *     a second/third escalation never parrots the first.
+ */
+async function composeTeamHandoffLine(
+  supabase: SupabaseClient,
+  input: AgentInput,
+  brandId: string,
+): Promise<string> {
+  const first = input.userProfile.name?.trim()?.split(/\s+/)[0] || '';
+  const hi = first ? `Hi ${first}, ` : '';
+
+  // Best-effort: what are they about? Area/type from their stored context.
+  let about = '';
+  try {
+    const digits = (input.userProfile.phone || '').replace(/\D/g, '').slice(-10);
+    if (digits) {
+      const { data: lead } = await supabase
+        .from('all_leads').select('unified_context')
+        .eq('customer_phone_normalized', digits).maybeSingle();
+      const lkz = (lead as any)?.unified_context?.[brandId] || {};
+      const area = String(lkz.property_zone || lkz.property_area || lkz.area || lkz.locality || '').trim();
+      const type = String(lkz.property_type || '').trim();
+      about = area ? `your ${area} property` : type ? `your ${type.toLowerCase()} requirement` : '';
+    }
+  } catch { /* non-critical — fall back to a generic reference */ }
+  const on = about ? ` on ${about}` : '';
+  const ref = about || 'this';
+
+  // Three phrasings so repeats never read identically; pick the first that
+  // isn't a near-duplicate of a recent assistant turn.
+  const lines = [
+    `${hi}our team is already working on ${ref}. Want someone from the team to call you back?`,
+    `${hi}the team has your number and details${on} — I'll make sure they call you back. What time works best for you?`,
+    `${hi}I've passed this to the team${on} and they have your number; they'll reach out directly. Anything you'd like me to add for them?`,
+  ];
+  const recent = (input.conversationHistory || [])
+    .filter((m) => m.role === 'assistant').slice(-4).map((m) => m.content);
+  return lines.find((l) => !recent.some((r) => isNearDuplicate(l, r))) || lines[0];
 }
 
 function isLokazenBookingAction(input: AgentInput): boolean {
