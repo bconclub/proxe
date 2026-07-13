@@ -1,3 +1,8 @@
+##  · polish(brain): orb hugs the bubble even at screen corners
+
+- Open-in-place clamp now bounds the ORB (what must stay visible), not the full 320px panel — the subtitle pill is fit-content and stays on-screen anyway. Corner drift shrank from (-110,-79)px to (-12,-49)px, the geometric minimum; mid-screen remains exact (0,0).
+- `(pending-sha)`
+
 ##  · fix(brain): the agent opens IN PLACE — exactly where the dock bubble sits
 
 - Reverted the forced bottom-right corner: clicking the bubble now blooms the orb centered ON the bubble (verified drift 0,0 px at mid-screen), wherever you dropped it. Near screen edges it shifts only the minimum needed to keep the subtitle pill on-screen.

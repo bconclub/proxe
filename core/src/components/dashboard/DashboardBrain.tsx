@@ -519,8 +519,11 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                 // Open IN PLACE: the orb blooms exactly where the dock bubble
                 // sits (its center on the bubble's center) — never jumping to a
                 // corner. Clamped only so the pill/controls stay on-screen.
-                left: dockPos ? Math.min(Math.max(8, dockPos.x + DOCK_SIZE / 2 - PANEL_W / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - PANEL_W - 8) : undefined,
-                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - ORB_IN_PANEL / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - (ORB_IN_PANEL + 70)) : undefined,
+                // Clamp by the ORB (what must stay visible), not the full panel
+                // width — the subtitle pill is fit-content and narrow, so the
+                // orb can hug the bubble even at the screen corner.
+                left: dockPos ? Math.min(Math.max(8 - (PANEL_W - ORB_IN_PANEL) / 2, dockPos.x + DOCK_SIZE / 2 - PANEL_W / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - PANEL_W - 8 + (PANEL_W - ORB_IN_PANEL) / 2) : undefined,
+                top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - ORB_IN_PANEL / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - (ORB_IN_PANEL + 52)) : undefined,
                 right: dockPos ? undefined : 16, bottom: dockPos ? undefined : 16,
                 width: PANEL_W, background: 'transparent', overflow: 'visible',
                 animation: 'wc-orb-pop 220ms cubic-bezier(0.2,0,0,1)',
