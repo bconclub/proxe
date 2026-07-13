@@ -18,6 +18,13 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 // per-deployment so another brand's channel can reuse this notifier.
 const SLACK_BRAND_COLOR = process.env.SLACK_BRAND_COLOR || '#E4002B'; // matches the logo (red)
 const SLACK_LOGO_URL = process.env.SLACK_LOGO_URL || 'https://proxe.lokazen.in/logo.png';
+// Real Slack member/user-group ID to @-ping on every escalation (e.g. the team's
+// handler or a Slack workflow). Set SLACK_MENTION_USER_ID="U0..." per deployment.
+// Empty = no mention (no cross-brand ping). Group IDs use "!subteam^S...".
+const SLACK_MENTION_ID = (process.env.SLACK_MENTION_USER_ID || '').trim();
+const SLACK_MENTION = SLACK_MENTION_ID
+  ? (SLACK_MENTION_ID.startsWith('!subteam^') ? `<${SLACK_MENTION_ID}>` : `<@${SLACK_MENTION_ID}>`)
+  : '';
 
 export interface SlackResult {
   success: boolean;
@@ -174,41 +181,54 @@ export interface LeadNotice {
   actions?: { text: string; url: string; style?: 'primary' | 'danger' }[];
 }
 
-/** A lead alert — new lead, hot lead, or a needs-human escalation. */
+/** Compact channel chip — an icon + the channel name (WhatsApp / Web / …). */
+function channelBadge(source?: string | null): string {
+  const s = clean(source).toLowerCase();
+  if (!s) return '';
+  if (s.includes('whatsapp')) return '🟢 WhatsApp';
+  if (s.includes('web')) return '🌐 Web';
+  if (s.includes('voice') || s.includes('call')) return '📞 Voice';
+  if (s.includes('instagram') || s.includes('ig')) return '📸 Instagram';
+  if (s.includes('facebook') || s === 'fb') return '📘 Facebook';
+  return `💬 ${clean(source)}`;
+}
+
+/**
+ * A lead alert — new lead, hot lead, or a needs-human escalation. Compact by
+ * design: a short attachment (5 blocks max) so Slack never collapses it behind
+ * "show more" and the action button stays on the first view. Phone + channel
+ * render as icon chips, not a fields grid. If SLACK_MENTION_USER_ID is set, the
+ * alert @-pings that member/group so it actually notifies someone.
+ */
 export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   if (!SLACK_WEBHOOK_URL) return { success: false, skipped: true };
-  const brand = l.brandLabel || 'PROXe';
   const title = l.title || 'Lead';
 
   const who = clean(l.name) || clean(l.email) || clean(l.phone) || 'Lead';
-  // Render the lead name as a CLICKABLE tag (opens the lead in the dashboard)
-  // when a URL is given — the closest Slack allows to "tagging" a customer lead,
-  // since real @mentions only resolve for actual workspace members.
+  // Clickable "tag" for the lead (opens it in the dashboard).
   const whoTag = clean(l.leadUrl) ? `<${clean(l.leadUrl)}|${who}>` : `*${who}*`;
-  const content: unknown[] = [
-    section(clean(l.leadType) ? `${whoTag}  ·  _${clean(l.leadType)}_` : whoTag),
+
+  const blocks: unknown[] = [
+    header(title),
+    // Mention (real ping) + lead tag + type on the first line.
+    section(`${SLACK_MENTION ? `${SLACK_MENTION}  ` : ''}${whoTag}${clean(l.leadType) ? `   ·   _${clean(l.leadType)}_` : ''}`),
   ];
 
-  // What the lead wants comes first (the glanceable line), then contact/meta.
-  const detail = fieldsSection(l.detailFields || []);
-  if (detail) content.push(detail);
-  else if (clean(l.detail)) content.push(section(`_${clean(l.detail).slice(0, 500)}_`));
+  // The issue, one glanceable italic line.
+  if (clean(l.detail)) blocks.push(section(`_${clean(l.detail).slice(0, 400)}_`));
 
-  content.push(fieldsSection([
-    ['Phone', l.phone],
-    ['Email', l.email],
-    ['Source', l.source],
-    ['Stage', l.stage],
-  ]));
+  // Compact meta: phone chip + channel chip on ONE line (no fields grid).
+  const meta: string[] = [];
+  if (clean(l.phone)) meta.push(`📞 ${clean(l.phone)}`);
+  const cb = channelBadge(l.source);
+  if (cb) meta.push(cb);
+  if (meta.length) blocks.push(section(meta.join('       ')));
 
-  if (l.footer) content.push(context(`_${clean(l.footer)}_`));
-
-  // Action buttons (URL buttons — open the lead in the dashboard so a human can
-  // act / mark it resolved there). Rendered when actions are supplied.
+  // Action button — kept inside the short attachment so it shows on first view.
   if (l.actions?.length) {
-    content.push({
+    blocks.push({
       type: 'actions',
-      elements: l.actions.slice(0, 5).map((a) => ({
+      elements: l.actions.slice(0, 3).map((a) => ({
         type: 'button',
         text: { type: 'plain_text', text: a.text.slice(0, 75), emoji: false },
         url: a.url,
@@ -217,6 +237,7 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
     });
   }
 
-  const text = `${title} · ${brand}: ${who}${l.score != null ? ` · score ${l.score}` : ''}`;
-  return brandedSend(title, brand, content, text, colorForLeadType(l.leadType));
+  // Mention also in the top-level notification text so the ping fires reliably.
+  const text = `${SLACK_MENTION ? `${SLACK_MENTION} ` : ''}${title}: ${who}`;
+  return sendSlackMessage({ text, attachments: [{ color: colorForLeadType(l.leadType), blocks }] });
 }
