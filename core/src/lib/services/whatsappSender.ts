@@ -731,6 +731,25 @@ export function pickRnrTemplate(isPilot: boolean, step: 1 | 2): string {
 }
 
 /**
+ * Send an approved template with NAMED body params (Meta parameter_name form).
+ * Used by templates that take more than the single customer_name (e.g. bcon's
+ * RNR pair: customer_name + service_name + brand_name).
+ */
+export async function sendNamedTemplate(
+  to: string,
+  templateName: string,
+  params: { name: string; value: string }[],
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  const components = [
+    {
+      type: 'body' as const,
+      parameters: params.map((p) => ({ type: 'text', parameter_name: p.name, text: p.value || 'there' })),
+    },
+  ]
+  return sendWhatsAppTemplate(to, templateName, components)
+}
+
+/**
  * Send a welcome template (generic or pilot) with the customer's first name.
  * Both Meta-approved welcome templates use a single NAMED body param
  * `customer_name` (the form preview reads "Hi {{customer_name}}, welcome to …").
