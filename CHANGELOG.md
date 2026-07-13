@@ -1,3 +1,8 @@
+## 2026-07-13 · fix(windchasers): inbox shows the REAL WhatsApp template (body + buttons + footer)
+
+- Mirror of the main-branch fix onto one-core (windchasers-only behavior; pop unaffected). New `core/src/configs/whatsapp-template-bodies.ts` (real Meta-approved windchasers template bodies + footer + buttons + `renderWaTemplate`). Inbound webinar-confirm + new-lead welcome now log the real rendered template; inbox renders the template footer. Other send sites (cabin/facebook-lead/dashboard-add) land when one-core catches up to main.
+- `(pending-sha)`
+
 ##  · fix(core): eliminate remaining cross-brand bleeds (audit sweep)
 
 - Same as main (pop rides one-core): quickReplyMap gated to windchasers; whatsappSender/bookingManager/calendar de-BCON/de-aviation; TodaySnapshotButton + TeamMessagesView + BookingCalendarWidget + CommunicationsView brand-gated/neutralized.
