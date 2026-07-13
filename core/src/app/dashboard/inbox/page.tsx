@@ -231,6 +231,10 @@ interface Message {
 // first, windchasers fallback for legacy rows, then channel contexts. Shown in
 // the conversation list so the agent knows who each chat is with at a glance.
 function audienceOf(uc: Record<string, any> | null | undefined): { label: string; color: string } | null {
+  // Lokazen-only taxonomy (Owner/Scout/Brand). On other brands a user_type
+  // like "business_owner" substring-matched 'owner' and painted OWNER chips
+  // all over the bcon inbox — never render this outside lokazen.
+  if (getCurrentBrandId() !== 'lokazen') return null
   if (!uc) return null
   const bc = { ...(uc.windchasers || {}), ...(uc[getCurrentBrandId()] || {}) }
   const profile = uc.web?.profile || uc.whatsapp?.profile || {}
@@ -2041,14 +2045,21 @@ export default function InboxPage() {
                 {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
                 {messageChannelFilter === 'all' && selectedConversation?.form_data && !parseFormFields(filteredMessages[0]?.content) && (() => {
                   const fd = selectedConversation.form_data!
+                  // Show the WHOLE submission — every question they answered,
+                  // not a cherry-picked subset (a form that only matched
+                  // "urgency" used to render a card with one lonely field).
+                  const NICE: Record<string, string> = {
+                    brand_name: 'Brand', has_website: 'Website', monthly_leads: 'Volume',
+                    urgency: 'Urgency', has_ai_systems: 'AI Systems', service_interest: 'Interest',
+                  }
+                  const SKIP = new Set(['full_name', 'phone', 'phone_number', 'email', 'raw'])
                   const formFields: { label: string; value: string }[] = []
-                  if (fd.brand_name) formFields.push({ label: 'Brand', value: fd.brand_name })
-                  if (fd.has_website === true) formFields.push({ label: 'Website', value: 'Yes' })
-                  else if (fd.has_website === false) formFields.push({ label: 'Website', value: 'No' })
-                  if (fd.monthly_leads) formFields.push({ label: 'Volume', value: fd.monthly_leads })
-                  if (fd.urgency) formFields.push({ label: 'Urgency', value: fd.urgency.replace(/_/g, ' ') })
-                  if (fd.has_ai_systems === true) formFields.push({ label: 'AI Systems', value: 'Yes' })
-                  else if (fd.has_ai_systems === false) formFields.push({ label: 'AI Systems', value: 'No' })
+                  for (const [k, v] of Object.entries(fd)) {
+                    if (v == null || v === '' || SKIP.has(k)) continue
+                    const label = NICE[k] || k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+                    const value = v === true ? 'Yes' : v === false ? 'No' : String(v).replace(/_/g, ' ')
+                    formFields.push({ label, value })
+                  }
                   if (formFields.length === 0) return null
                   return (
                     <div className="flex justify-start mb-2">

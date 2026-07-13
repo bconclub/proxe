@@ -13,7 +13,9 @@
  *   { leadId, channel, action: 'generate' | 'send', message?, conversationHistory? }
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { TEMPLATE_BODIES } from '@/configs/template-bodies'
+import { TEMPLATE_BUTTONS } from '@/configs/journeys';
 import { process as processMessage } from '@/lib/agent-core/engine';
 import { AgentInput } from '@/lib/agent-core/types';
 import {
@@ -446,8 +448,22 @@ export async function POST(request: NextRequest) {
       // send happened. They're tagged with `test_mode: true` + `test_recipient`
       // so the dashboard renders a yellow "TEST" pill on the row, making it
       // obvious this didn't go to the lead.
-      const logBody = (typeof renderedText === 'string' && renderedText.trim())
-        ? (isTest ? `[TEST → ${phone}] ${renderedText.trim()}` : renderedText.trim())
+      // No client-supplied preview? Render the real body ourselves from the
+      // brand's template map + the params we just sent — the operator must see
+      // the actual message in the thread, never "[Template: name]".
+      let selfRendered: string | null = null
+      if (TEMPLATE_BODIES[templateName]) {
+        selfRendered = TEMPLATE_BODIES[templateName]
+        const pairs: { name: string; value: string }[] = Array.isArray(bodyParamsNamed) && bodyParamsNamed.length
+          ? bodyParamsNamed
+          : []
+        for (const p of pairs) {
+          selfRendered = selfRendered.replace(new RegExp(`\\{\\{\\s*${p.name}\\s*\\}\\}`, 'g'), p.value || 'there')
+        }
+      }
+      const bestText = (typeof renderedText === 'string' && renderedText.trim()) ? renderedText.trim() : selfRendered
+      const logBody = bestText
+        ? (isTest ? `[TEST → ${phone}] ${bestText}` : bestText)
         : `[Template: ${templateName}]`;
 
       await logMessage(
@@ -461,6 +477,7 @@ export async function POST(request: NextRequest) {
           sent_by: 'founder',
           sent_at: new Date().toISOString(),
           template_name: templateName,
+          template_buttons: TEMPLATE_BUTTONS[templateName] || undefined,
           template_language: languageCode || 'en',
           template_params: Array.isArray(bodyParamsNamed)
             ? bodyParamsNamed
