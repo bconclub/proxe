@@ -124,6 +124,11 @@ export async function* streamResponse(
 
       stream = await (anthropic.messages.stream as any)({
         model,
+        // Disable extended thinking. Thinking-capable models (e.g. sonnet-5)
+        // otherwise spend the whole max_tokens budget on a thinking block and
+        // hit max_tokens BEFORE emitting any reply → empty response. We want a
+        // fast, direct chat reply, not a reasoning trace.
+        thinking: { type: 'disabled' },
         max_tokens: maxTokens,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
@@ -202,6 +207,7 @@ export async function generateResponse(
 
       const response = await (anthropic.messages.create as any)({
         model,
+        thinking: { type: 'disabled' }, // see streamResponse: thinking eats max_tokens → empty reply
         max_tokens: maxTokens,
         system: cacheable(systemPrompt),
         messages: [{ role: 'user', content: userPrompt }],
@@ -288,6 +294,7 @@ export async function generateResponseWithTools(
 
         response = await (anthropic.messages.create as any)({
           model,
+          thinking: { type: 'disabled' }, // thinking eats max_tokens → empty reply (see streamResponse)
           max_tokens: maxTokens,
           system: cacheable(systemPrompt),
           messages,
@@ -416,6 +423,7 @@ export async function generateFromImage(
 
       const response = await (anthropic.messages.create as any)({
         model,
+        thinking: { type: 'disabled' }, // thinking eats max_tokens → empty reply (see streamResponse)
         max_tokens: maxTokens,
         system: cacheable(systemPrompt),
         messages: [

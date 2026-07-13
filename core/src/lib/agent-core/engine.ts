@@ -295,7 +295,7 @@ User's message: ${input.message}`
     // "Your booking is recorded …" / "You're all set …" — the old regex only
     // caught "is locked" / "booking confirmed", so failed bookings were sailing
     // through with a false "recorded" claim and nothing saved.
-    const claimsBooked = /\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way)\b/i
+    const claimsBooked = /\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way|booked,?\b|your (call|visit|callback) is (set|booked|scheduled|confirmed)|(call|callback|visit) is set for)\b/i
       .test(rawResponse);
     if (claimsBooked) {
       console.error('[Engine] FALSE BOOKING CLAIM — response confirms a booking but book_consultation did not succeed this turn. Overwriting + flagging lead.');
