@@ -181,6 +181,7 @@ User's message: ${input.message}`
   // 5e. Never fabricate payout/submission/verification status (Lokazen). Kills
   // the invented "your submission is in the queue for verification" line.
   if (brandId === 'lokazen') systemPrompt += statusHonestyDirective();
+  if (brandId === 'lokazen') systemPrompt += callbackDirective();
 
   // 6. Generate response (with retry + graceful fallback)
   let rawResponse: string;
@@ -523,6 +524,7 @@ User's message: ${input.message}`
     if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
     // Never fabricate payout/submission/verification status (see WhatsApp path).
     if (brandId === 'lokazen') systemPrompt += statusHonestyDirective();
+  if (brandId === 'lokazen') systemPrompt += callbackDirective();
 
     // 4. Generate response — true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
@@ -769,6 +771,25 @@ You have NO access to any payout, payment, submission, verification, application
 - NEVER assert or imply a status you cannot see: e.g. "your submission is in the queue for verification", "the team usually gets back the same day", "they have your number", "it's being processed", "you'll hear back by <time>". These are fabrications — do not say them.
 - If they ask about status and the team is already handling it: say honestly you don't have the live status in front of you, confirm it's been passed to the Lokazen team, and ask if there's anything specific to add. ONE short line.
 - Do NOT re-send a reassurance you already gave. If you've said it once, either add something real or hand it to the team — never repeat the same line.`;
+}
+
+/**
+ * Appended for Lokazen. There is NO self-serve call-scheduling system — the
+ * agent was hallucinating one (inventing "3 PM / 4 PM / 5 PM" slots, claiming
+ * "Booked, your call is set for 3 PM"), none of which persisted, so it re-opened
+ * the booking flow on every later message — an endless "let's lock a time" loop.
+ * A callback = the TEAM calls the customer at their stated time. Confirm once,
+ * then stop.
+ */
+function callbackDirective(): string {
+  return `\n\n=================================================================================
+CALLS / CALLBACKS — NO SELF-SERVE SCHEDULING (LOCKED)
+=================================================================================
+Lokazen has NO online call-booking system. You CANNOT book, lock, reschedule, or confirm a specific call time — a callback simply means the TEAM will phone the customer.
+- Do NOT offer or invent time slots ("3 PM / 4 PM / 5 PM", "online slots", "pick a slot"). There are none.
+- Do NOT say a call is "booked", "set", "locked", "scheduled", or "confirmed for <time>". You cannot do any of that.
+- When they want a call: if you don't already have it, ask ONCE for a rough preferred time window, then say plainly the team will call them around that time. One short line.
+- Once you've said the team will call, do NOT bring up scheduling again. If they message later, answer their actual question or briefly reassure the team has their number and time — NEVER restart "what time works / let's lock a slot".`;
 }
 
 /** Normalize for near-duplicate detection: lowercase, collapse to word tokens. */
