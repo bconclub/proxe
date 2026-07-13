@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
 // Brand-private template-body map (the board's outgoing-message preview).
 import { TEMPLATE_BODIES, resolveTaskTemplate, fillTemplateWithChips, buildNudgePreview } from '@/configs/template-bodies'
+import { resolveLeadFacts } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * template the worker WILL send is resolved per task_type + bucket — so the
  * timeline shows the actual outgoing message per planned step. Other brands
  * keep the value-substituted preview their forks shipped. */
-function renderPreview(t: any): string {
+function renderPreview(t: any, facts?: { goal: string | null; brandName: string | null; painPoint: string | null }): string {
   const name = (t.lead_name || 'there').split(' ')[0]
   const md = t.metadata || {}
   if (BRAND_ID === 'bcon') {
@@ -19,12 +20,18 @@ function renderPreview(t: any): string {
     if (t.task_type === 'nudge_waiting') return buildNudgePreview(md)
     const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket, md.sequence)
     if (tmpl && TEMPLATE_BODIES[tmpl]) {
-      // Fill what we actually KNOW (the lead's name, their goal when stored) —
-      // chips are only for genuinely-unknown variables, not a broken-looking
-      // "Hi Name" on every card.
+      // Fill from what the lead actually SAID (facts resolved from their form
+      // answers / campaign / chat) — chips only for genuinely-unknown values.
+      const goal = md.service_interest || facts?.goal
+      const brand = facts?.brandName
+      const pain = facts?.painPoint
       const known = TEMPLATE_BODIES[tmpl]
         .replace(/\{\{\s*customer_name\s*\}\}/g, name)
-        .replace(/\{\{\s*service_interest\s*\}\}/g, md.service_interest || '{{service_interest}}')
+        .replace(/\{\{\s*service_interest\s*\}\}/g, goal || '{{service_interest}}')
+        .replace(/\{\{\s*service_name\s*\}\}/g, goal || '{{service_name}}')
+        .replace(/\{\{\s*business_name\s*\}\}/g, brand || '{{business_name}}')
+        .replace(/\{\{\s*brand_name\s*\}\}/g, brand || '{{brand_name}}')
+        .replace(/\{\{\s*pain_point\s*\}\}/g, pain || '{{pain_point}}')
       return fillTemplateWithChips(known)
     }
   } else {
@@ -159,6 +166,18 @@ export async function GET(request: NextRequest) {
 
     const allTasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
 
+    // Resolve per-lead FACTS (goal/brand/pain from what the lead said) once,
+    // so every preview fills real values instead of variable chips.
+    const factIds = Array.from(new Set(allTasks.map((t: any) => t.lead_id).filter(Boolean))).slice(0, 200)
+    const factsByLead = new Map<string, ReturnType<typeof resolveLeadFacts>>()
+    if (factIds.length) {
+      const { data: factLeads } = await supabase
+        .from('all_leads')
+        .select('id, customer_name, unified_context')
+        .in('id', factIds)
+      for (const l of factLeads || []) factsByLead.set((l as any).id, resolveLeadFacts(l as any))
+    }
+
     // Enrich tasks with sequence info, temperature, and angle for frontend display
     const SEQUENCE_LABELS: Record<string, string> = {
       post_call: 'Post Call Sequence',
@@ -205,7 +224,7 @@ export async function GET(request: NextRequest) {
       // Outgoing-message preview: the actual template (filled with lead details)
       // this task will send. The inbox lead-panel timeline shows this when you
       // click a step, so you can see exactly what's going out per follow-up.
-      enriched.preview = renderPreview(t)
+      enriched.preview = renderPreview(t, factsByLead.get(t.lead_id))
 
       return enriched
     })
@@ -269,7 +288,7 @@ export async function GET(request: NextRequest) {
     const slim = (t: any) => ({
       id: t.id, lead_id: t.lead_id, lead_name: t.lead_name, task_type: t.task_type,
       status: t.status, scheduled_at: t.scheduled_at, channel: t.metadata?.channel || 'whatsapp',
-      preview: renderPreview(t), actor: deriveActor(t), reason: deriveStatusReason(t),
+      preview: renderPreview(t, factsByLead.get(t.lead_id)), actor: deriveActor(t), reason: deriveStatusReason(t),
       sequence_label: t.metadata?.sequence ? `Step ${t.metadata.step} of ${t.metadata.total_steps || 4}` : null,
     })
 

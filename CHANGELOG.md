@@ -1,3 +1,10 @@
+##  · feat(core): template variables extracted from what the lead SAID (leadFacts)
+
+- New resolveLeadFacts(): goal / brand / pain distilled from the lead's own words — their form answers (Company Name, current_system → human-phrased pain like "managing leads manually on WhatsApp"), the campaign they responded to (utm.campaign, e.g. "AI Lead Machine"), and chat-extracted profile fields. Fallbacks are last resort, never the default.
+- Wired into the follow-up cron sender AND the Tasks-board previews (batch lead fetch → real values instead of [[goal]]/[[brand]] chips). Verified live: "saw nilamahal looking into AI Lead Machine", "saw NS Credit Consultant Pvt Ltd looking into Marketing / Ads".
+- Fixed en route: selects referenced a nonexistent all_leads.service_interest column, silently zeroing the lead fetch.
+- `(pending-sha)`
+
 ##  · feat(bcon): day 1/3/5 retries use the DAY-WISE template ladders (onetouch/lowtouch)
 
 - The RNR-sequence day tasks repeated the generic follow-up 3×. Meta already holds day-specific approved copy: onetouch_d1/d3/d7 (ghost — never replied) and lowtouch_d1/d3/d7 (engaged — has replied). Day tasks now route by engagement: engaged→lowtouch, ghost→onetouch; day 5 borrows the d7 body (existing convention). Wired in the worker, the cron sender (with per-template named params), dashboard previews, and the flows/journeys ladders.

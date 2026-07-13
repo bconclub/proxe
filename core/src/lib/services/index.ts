@@ -166,3 +166,5 @@ export {
   notifySlackBooking,
   notifySlackLead,
 } from './slackNotifier';
+export { resolveLeadFacts } from './leadFacts';
+export type { LeadFacts } from './leadFacts';
