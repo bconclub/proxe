@@ -111,6 +111,12 @@ export function resolveTaskTemplate(taskType: string, bucket?: string | null, se
     if (t === 'follow_up_day3') return 'bcon_lowtouch_d3_v1'
     if (t === 'follow_up_day5') return 'bcon_lowtouch_d7_v1'
   }
+  // Unbucketed day-N tasks (rnr retries etc.) preview the day-wise ladder —
+  // onetouch as the representative variant (engaged leads get lowtouch at
+  // send time; we can't know engagement here).
+  if (t === 'follow_up_day1') return 'bcon_onetouch_d1_v1'
+  if (t === 'follow_up_day3') return 'bcon_onetouch_d3_v1'
+  if (t === 'follow_up_day5') return 'bcon_onetouch_d7_v1'
   // Everything else (singleton nudges, ungrouped follow-ups) → generic followup.
   if (t.startsWith('follow_up_') || t === 'nudge_waiting' || t === 'push_to_book' || t === 'missed_call_followup' || t === 'human_callback') {
     return 'bcon_proxe_followup_noengage'

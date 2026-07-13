@@ -144,12 +144,34 @@ export async function GET(req: NextRequest) {
             { name: 'brand_name', value: brandName },
           ])
         } else {
-          // follow_up_day1 / day3 / day5 — the standard cadence
-          tpl = 'bcon_proxe_followup_noengage'
-          result = await sendNamedTemplate(phone, tpl, [
-            { name: 'customer_name', value: firstOnly },
-            { name: 'service_interest', value: serviceName },
-          ])
+          // follow_up_day1 / day3 / day5 — the DAY-WISE ladders (each day has
+          // its own approved copy). Engaged (replied before) -> lowtouch;
+          // ghost -> onetouch. Day 5 borrows the d7 body (no day-5 template).
+          const { count: custCount } = await supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('lead_id', task.lead_id)
+            .eq('sender', 'customer')
+          const engaged = (custCount || 0) > 0
+          const painPoint = ctx.pain_point || ctx.bcon?.pain_point || 'the challenge you mentioned'
+          const d = task.task_type
+          let named: { name: string; value: string }[]
+          if (engaged) {
+            if (d === 'follow_up_day1') { tpl = 'bcon_lowtouch_d1_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'service_interest', value: serviceName }, { name: 'pain_point', value: painPoint }] }
+            else if (d === 'follow_up_day3') { tpl = 'bcon_lowtouch_d3_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'service_interest', value: serviceName }, { name: 'business_name', value: brandName }] }
+            else { tpl = 'bcon_lowtouch_d7_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'service_interest', value: serviceName }, { name: 'business_name', value: brandName }, { name: 'pain_point', value: painPoint }] }
+          } else {
+            if (d === 'follow_up_day1') { tpl = 'bcon_onetouch_d1_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'business_name', value: brandName }, { name: 'service_interest', value: serviceName }] }
+            else if (d === 'follow_up_day3') { tpl = 'bcon_onetouch_d3_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'business_name', value: brandName }, { name: 'service_interest', value: serviceName }] }
+            else { tpl = 'bcon_onetouch_d7_v1'; named = [
+              { name: 'customer_name', value: firstOnly }, { name: 'service_interest', value: serviceName }, { name: 'pain_point', value: painPoint }] }
+          }
+          result = await sendNamedTemplate(phone, tpl, named)
         }
       } else {
         const isPilot = isPilotSource(
