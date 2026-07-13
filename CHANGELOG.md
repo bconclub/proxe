@@ -1,3 +1,10 @@
+##  · fix(core): ONE lead-stage taxonomy — dead "statuses" filter removed, all surfaces aligned
+
+- Audit: the leads table had THREE vocabularies. The "All statuses" filter filtered the legacy `status` column — null on every lead (selecting any status showed 0 rows). `lead_stage` is the only real field.
+- New single source of truth `core/src/configs/lead-stages.ts` (14 stages, funnel-ordered, with chip colors): table filter (now "All stages", actually works — verified: In Sequence → 18 rows), stage chips, modal stage editor (was missing In Sequence/Demo Taken/Proposal Sent/Nurture — DB even held a Proposal Sent lead the editor could not display), LeadStageSelector, and the /stage API (which used to REJECT stages the orchestrator itself writes).
+- Legacy /status route marked deprecated (kept so old clients do not 404); dead STATUS_OPTIONS + status color map removed.
+- `(pending-sha)`
+
 ##  · fix(core): call-log flow never breaks + obeys the human + no more ghost tasks
 
 - NEVER BREAKS: once the call note is saved, log-call can no longer return an error — orchestration failures degrade to "note saved, automation deferred". Activity-insert failure no longer kills the note; classifier LLM call gets a 12s hard timeout (a hung API froze the modal).
