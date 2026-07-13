@@ -56,6 +56,15 @@
   --accent-subtle: #8B5CF620;
   --text-primary: #1a1a1a;
   --text-secondary: #666666;
+  /* These four were MISSING from light — components using them (active tabs,
+     segmented controls, buttons, muted labels) rendered a near-white dark-mode
+     value → invisible on the light background. Defining them here fixes the
+     whole class at once. --button-bg tracks the active accent so bw-light stays
+     black and brand-light stays purple, both with legible white --text-button. */
+  --text-muted: rgba(0, 0, 0, 0.45);
+  --text-tertiary: rgba(0, 0, 0, 0.4);
+  --text-button: #ffffff;
+  --button-bg: var(--accent-primary);
 }
 
 @media (prefers-color-scheme: dark) {
