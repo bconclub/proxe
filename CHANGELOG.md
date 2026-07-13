@@ -1,3 +1,8 @@
+## 2026-07-13 · fix(windchasers): TYPE column falls back to course (cabin-crew leads no longer blank)
+
+- The pipeline TYPE column only showed `user_type` (student/parent). Cabin-crew leads carry `course=Cabin Crew` but no user_type, so TYPE was blank. Now TYPE falls back to the course when user_type is empty, so cabin-crew (and other course-only) leads show their kind. Windchasers-gated (showAviationColumns); other brands unchanged.
+- `(pending-sha)`
+
 ## 2026-07-13 · fix(windchasers): WhatsApp delivery receipts + last-touch on auto-templates
 
 - Auto-template sends (webinar confirm, cabin-crew, new-lead/parent welcome, FB-lead, dashboard add-lead) never stored Meta's message id, so the status webhook (matches on `metadata.wa_message_id`) could not attach delivery/read receipts — every row stuck on a single tick. Now the send wrappers propagate `messageId` and every log site stores `wa_message_id` + `delivery_status: 'sent'`, so ticks flow. (Forward-only — historical rows have no captured wamid.)

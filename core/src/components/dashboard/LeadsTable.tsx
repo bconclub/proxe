@@ -1968,20 +1968,27 @@ export default function LeadsTable({
 
                     {/* Aviation columns - chip styling so the row reads as a
                         scannable set of tags rather than mixed text + chips */}
-                    {showAviationColumns && (
+                    {showAviationColumns && (() => {
+                      const bd = lead.unified_context?.[brandId] || {}
+                      // TYPE shows the lead KIND: user_type (student/parent) when
+                      // known, otherwise fall back to the course (e.g. "Cabin Crew")
+                      // so cabin-crew / course-only leads aren't left blank.
+                      const kind = bd.user_type || (bd.course_interest ? normalizeCourse(bd.course_interest) : '')
+                      return (
                       <td className="px-3 py-2 text-xs text-center">
-                        {lead.unified_context?.[brandId]?.user_type ? (
+                        {kind ? (
                           <span
                             className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize whitespace-nowrap"
                             style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.3)' }}
                           >
-                            {lead.unified_context[brandId].user_type}
+                            {kind}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
-                    )}
+                      )
+                    })()}
                     {showAviationColumns && (
                       <td className="px-3 py-2 text-xs text-center">
                         {lead.unified_context?.[brandId]?.course_interest ? (
