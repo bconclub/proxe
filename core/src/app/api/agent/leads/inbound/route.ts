@@ -314,6 +314,12 @@ export async function POST(request: NextRequest) {
           String(cf2.form_name || cf2.campaign || campaign || ''),
           String(cf2.ad_name || ''),
         )
+      // Cabin-crew detected from the source/form/campaign but no explicit course
+      // captured → tag the course so the COURSE column shows "Cabin Crew".
+      // (TYPE stays user_type: student/parent; cabin crew belongs in COURSE.)
+      if (isCabinCrewLead && !brandCtxData.course_interest) {
+        brandCtxData.course_interest = 'Cabin Crew'
+      }
       const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
       const educationRaw = String(cf2.education || '').toLowerCase().trim()

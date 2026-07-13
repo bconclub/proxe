@@ -133,6 +133,14 @@ export async function POST(request: NextRequest) {
     if (startTimeline) windchasersProfile.start_timeline = startTimeline;
     if (age) windchasersProfile.age = age;
     if (course) windchasersProfile.course_interest = normalizeCourse(course);
+    // Cabin-crew ad/form with no explicit course field → tag the course so the
+    // COURSE column shows "Cabin Crew" (TYPE stays user_type: student/parent).
+    if (!windchasersProfile.course_interest && isCabinCrewSource(
+      course, facebookMeta.form_name, facebookMeta.campaign_name,
+      facebookMeta.adset_name, facebookMeta.ad_name, facebookMeta.utm_campaign, facebookMeta.utm_content,
+    )) {
+      windchasersProfile.course_interest = 'Cabin Crew';
+    }
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
     // real UTM (rare on lead forms) → placement platform (ig → Instagram,
