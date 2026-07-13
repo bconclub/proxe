@@ -18,13 +18,23 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 // per-deployment so another brand's channel can reuse this notifier.
 const SLACK_BRAND_COLOR = process.env.SLACK_BRAND_COLOR || '#E4002B'; // matches the logo (red)
 const SLACK_LOGO_URL = process.env.SLACK_LOGO_URL || 'https://proxe.lokazen.in/logo.png';
-// Real Slack member/user-group ID to @-ping on every escalation (e.g. the team's
-// handler or a Slack workflow). Set SLACK_MENTION_USER_ID="U0..." per deployment.
-// Empty = no mention (no cross-brand ping). Group IDs use "!subteam^S...".
-const SLACK_MENTION_ID = (process.env.SLACK_MENTION_USER_ID || '').trim();
-const SLACK_MENTION = SLACK_MENTION_ID
-  ? (SLACK_MENTION_ID.startsWith('!subteam^') ? `<${SLACK_MENTION_ID}>` : `<@${SLACK_MENTION_ID}>`)
-  : '';
+// Who to @-ping on every escalation. Set SLACK_MENTION_USER_ID per deployment;
+// comma-separate for several. Each token maps to a real Slack mention:
+//   channel / here / everyone  → <!channel> / <!here> / <!everyone>
+//   U0ABC123 (member id)        → <@U0ABC123>
+//   !subteam^S0ABC123 (group)   → <!subteam^S0ABC123>
+// Empty = no ping (and no cross-brand bleed — only the brand whose env sets it).
+const SLACK_MENTION = (process.env.SLACK_MENTION_USER_ID || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((id) => {
+    const low = id.toLowerCase();
+    if (low === 'channel' || low === 'here' || low === 'everyone') return `<!${low}>`;
+    if (id.startsWith('!subteam^')) return `<${id}>`;
+    return `<@${id}>`;
+  })
+  .join(' ');
 
 export interface SlackResult {
   success: boolean;
