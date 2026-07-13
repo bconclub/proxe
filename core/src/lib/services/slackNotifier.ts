@@ -99,9 +99,21 @@ const brandRow = (brand: string) => ({
  * stripe, with the logo/header on top. Falls back to plain blocks if Slack ever
  * rejects the attachment. `text` is the notification/preview line.
  */
-function brandedSend(title: string, brand: string, content: unknown[], text: string): Promise<SlackResult> {
+function brandedSend(title: string, brand: string, content: unknown[], text: string, color: string = SLACK_BRAND_COLOR): Promise<SlackResult> {
   const blocks = [header(title), brandRow(brand), ...content.filter(Boolean)];
-  return sendSlackMessage({ text, attachments: [{ color: SLACK_BRAND_COLOR, blocks }] });
+  return sendSlackMessage({ text, attachments: [{ color, blocks }] });
+}
+
+/**
+ * Distinct left-stripe colour per Lokazen audience so the team can tell an
+ * owner / brand / scout apart at a glance — not one uniform red for everything.
+ */
+function colorForLeadType(leadType?: string | null): string {
+  const t = (leadType || '').toLowerCase();
+  if (t.includes('scout')) return '#16A34A'; // green  — scouts
+  if (t.includes('owner')) return '#2563EB'; // blue   — property owners
+  if (t.includes('brand')) return '#7C3AED'; // purple — brands
+  return SLACK_BRAND_COLOR;                   // brand red — fallback / unknown
 }
 
 // ── Booking notification ─────────────────────────────────────────────────────
@@ -201,5 +213,5 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   }
 
   const text = `${title} · ${brand}: ${who}${l.score != null ? ` · score ${l.score}` : ''}`;
-  return brandedSend(title, brand, content, text);
+  return brandedSend(title, brand, content, text, colorForLeadType(l.leadType));
 }
