@@ -124,16 +124,22 @@ function brandedSend(title: string, brand: string, content: unknown[], text: str
   return sendSlackMessage({ text, attachments: [{ color, blocks }] });
 }
 
-/**
- * Distinct left-stripe colour per Lokazen audience so the team can tell an
- * owner / brand / scout apart at a glance — not one uniform red for everything.
- */
-function colorForLeadType(leadType?: string | null): string {
-  const t = (leadType || '').toLowerCase();
-  if (t.includes('scout')) return '#16A34A'; // green  — scouts
-  if (t.includes('owner')) return '#2563EB'; // blue   — property owners
-  if (t.includes('brand')) return '#7C3AED'; // purple — brands
-  return SLACK_BRAND_COLOR;                   // brand red — fallback / unknown
+// Alert stripe palette, by MEANING not audience, so the team reads the colour
+// at a glance: booking = green, scout = orange, high-intensity issue = red,
+// standard issue = amber.
+const ALERT_GREEN = '#16A34A';  // booking confirmed
+const ALERT_ORANGE = '#F97316'; // scout notification
+const ALERT_RED = '#DC2626';    // high-intensity issue
+const ALERT_AMBER = '#F59E0B';  // standard issue
+
+/** Colour for an escalation/issue alert: scout = orange, else red (high
+ *  intensity) or amber (standard), judged from the title + reason text. */
+function alertColor(leadType?: string | null, title?: string | null, detail?: string | null): string {
+  const who = `${leadType || ''} ${title || ''}`.toLowerCase();
+  if (who.includes('scout')) return ALERT_ORANGE;
+  const blob = `${title || ''} ${detail || ''}`.toLowerCase();
+  const HIGH = /(payment|debit|deducted|refund|charged|chargeback|not received|angry|urgent|complaint|legal|fraud|failed|false booking|could not|couldn'?t|escalat|not working|stuck|double|abuse|threat)/;
+  return HIGH.test(blob) ? ALERT_RED : ALERT_AMBER;
 }
 
 // ── Booking notification ─────────────────────────────────────────────────────
@@ -148,6 +154,7 @@ export interface BookingNotice {
   title?: string | null;    // call topic
   channel?: string | null;  // web / whatsapp / voice
   summary?: string | null;  // short conversation summary
+  leadUrl?: string;         // dashboard URL -> renders a "View lead" action button
 }
 
 /** A call/demo has just been booked. */
@@ -168,8 +175,16 @@ export async function notifySlackBooking(b: BookingNotice): Promise<SlackResult>
   ]));
   if (clean(b.summary)) content.push(context(`_${clean(b.summary).slice(0, 500)}_`));
 
+  // Direct-action button on the lead (green = a confirmed booking).
+  if (clean(b.leadUrl)) {
+    content.push({
+      type: 'actions',
+      elements: [{ type: 'button', text: { type: 'plain_text', text: 'View lead in dashboard', emoji: false }, url: clean(b.leadUrl), style: 'primary' }],
+    });
+  }
+
   const text = `New booking · ${brand}: ${who}${b.dateTime ? ` · ${clean(b.dateTime)}` : ''}`;
-  return brandedSend('New booking', brand, content, text);
+  return brandedSend('New booking', brand, content, text, ALERT_GREEN);
 }
 
 // ── Lead notification (new lead / hot lead / needs-human) ────────────────────
@@ -252,5 +267,5 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
 
   // Mention also in the top-level notification text so the ping fires reliably.
   const text = `${SLACK_MENTION ? `${SLACK_MENTION} ` : ''}${title}: ${who}`;
-  return sendSlackMessage({ text, attachments: [{ color: colorForLeadType(l.leadType), blocks }] });
+  return sendSlackMessage({ text, attachments: [{ color: alertColor(l.leadType, l.title, l.detail), blocks }] });
 }

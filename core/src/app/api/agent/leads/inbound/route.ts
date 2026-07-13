@@ -18,7 +18,6 @@ import {
   notifySlackLead,
   sendWhatsAppTemplate,
   sendWebinarConfirm,
-  sendWebinarConfirmParents,
   isCabinCrewSource,
   sendCabinCrewWelcome,
   pickWelcomeTemplate,
@@ -28,6 +27,7 @@ import {
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { normalizeCourse } from '@/configs/courses'
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 export const dynamic = 'force-dynamic'
@@ -48,8 +48,9 @@ const NAME_PLACEHOLDER_BLOCKLIST = new Set([
   'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
   'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
 ])
-function cleanName(raw?: string | null): string {
-  const trimmed = (raw || '').trim()
+function cleanName(raw?: string | number | null): string {
+  // Coerce first — inbound payloads sometimes send name/number fields non-string.
+  const trimmed = (raw == null ? '' : String(raw)).trim()
   if (!trimmed) return ''
   // Synthetic account ids / placeholder emails the owner & scout apps stamp on a
   // brand-new account BEFORE a real name exists — never a person's name. e.g.
@@ -283,7 +284,7 @@ export async function POST(request: NextRequest) {
     // Cabin-crew lead flag (windchasers) — set in the brand block below, read
     // later for the dedicated cabin-crew welcome + first_outreach skip.
     let isCabinCrewLead = false
-    const audienceRaw = String(cf2.audience || cf2.user_type || '').toLowerCase().trim()
+    const audienceRaw = String(cf2.audience || cf2.user_type || (body as any).audience || (body as any).user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
       audienceRaw === 'parent' ||
@@ -293,32 +294,19 @@ export async function POST(request: NextRequest) {
       brandCtxData.user_type = audienceRaw
     }
     if (leadBrand === 'windchasers') {
-      // Map the interest value the form sends to the short course label the
-      // dashboard's filter dropdown uses (DGCA / Flight / Heli / Cabin / Drone).
+      // Normalize the interest to one canonical course label
+      // (Pilot / DGCA / Helicopter / Cabin Crew / Drone) — no abbreviated variations.
       const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
-      const courseMap: Record<string, string> = {
-        dgca_ground: 'DGCA',
-        dgca: 'DGCA',
-        pilot_training_abroad: 'Flight',
-        flight: 'Flight',
-        helicopter_license: 'Heli',
-        helicopter: 'Heli',
-        heli: 'Heli',
-        cabin_crew: 'Cabin',
-        cabin: 'Cabin',
-        drone: 'Drone',
-      }
-      if (interestRaw && courseMap[interestRaw]) {
-        brandCtxData.course_interest = courseMap[interestRaw]
-      } else if (interestRaw && interestRaw !== 'other') {
-        brandCtxData.course_interest = interestRaw.charAt(0).toUpperCase() + interestRaw.slice(1)
+      const normalizedCourse = normalizeCourse(interestRaw)
+      if (normalizedCourse && interestRaw !== 'other') {
+        brandCtxData.course_interest = normalizedCourse
       }
       // Cabin-crew lead: from the mapped course interest OR any cabin-crew
       // signal in the source/form/campaign. Gets the dedicated cabin-crew
       // welcome below (with generic fallback) instead of the counsellor
       // first_outreach task.
       isCabinCrewLead =
-        brandCtxData.course_interest === 'Cabin' ||
+        brandCtxData.course_interest === 'Cabin Crew' ||
         isCabinCrewSource(
           normalizedSource,
           interestRaw,
@@ -326,6 +314,12 @@ export async function POST(request: NextRequest) {
           String(cf2.form_name || cf2.campaign || campaign || ''),
           String(cf2.ad_name || ''),
         )
+      // Cabin-crew detected from the source/form/campaign but no explicit course
+      // captured → tag the course so the COURSE column shows "Cabin Crew".
+      // (TYPE stays user_type: student/parent; cabin crew belongs in COURSE.)
+      if (isCabinCrewLead && !brandCtxData.course_interest) {
+        brandCtxData.course_interest = 'Cabin Crew'
+      }
       const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
       const educationRaw = String(cf2.education || '').toLowerCase().trim()
@@ -336,17 +330,31 @@ export async function POST(request: NextRequest) {
       // page's Webinar tab can segment them out of the main list. user_type
       // (student/parent) is NOT touched — that's who they are, this is why
       // they came.
+      // A COMPLETED Zoom registration (the Zoom → Pabbly webhook fires only after
+      // they finish registering on Zoom) carries a per-registrant join_url, or a
+      // static zoom_registered flag. That distinguishes "actually registered on
+      // Zoom" from "clicked Register on the landing page".
+      const zoomJoinUrl = String(cf2.zoom_join_url || (body as any).zoom_join_url || (body as any).join_url || '').trim()
+      const isZoomReg =
+        !!zoomJoinUrl ||
+        ['yes', 'true', '1'].includes(String(cf2.zoom_registered || (body as any).zoom_registered || '').toLowerCase().trim())
       isWebinarReg =
+        isZoomReg ||
         normalizedSource === 'webinar' ||
         String(cf2.form_type || (body as any).form_type || '').toLowerCase().trim() === 'webinar' ||
         String(cf2.lead_type || (body as any).lead_type || '').toLowerCase().trim() === 'webinar'
       if (isWebinarReg) {
         brandCtxData.lead_type = 'webinar'
-        const webinarName = String(cf2.webinar_name || cf2.webinar_topic || cf2.event_name || '').trim()
+        const webinarName = String(cf2.webinar_name || cf2.webinar_topic || cf2.event_name || (body as any).webinar_name || (body as any).event_name || '').trim()
         if (webinarName) brandCtxData.webinar_name = webinarName
-        const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || '').trim()
+        const webinarDate = String(cf2.webinar_date || cf2.webinar_datetime || cf2.event_date || (body as any).webinar_date || '').trim()
         if (webinarDate) brandCtxData.webinar_date = webinarDate
         brandCtxData.webinar_registered_at = now
+        if (isZoomReg) {
+          brandCtxData.zoom_registered = true
+          brandCtxData.zoom_registered_at = now
+          if (zoomJoinUrl) brandCtxData.zoom_join_url = zoomJoinUrl
+        }
       }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
@@ -1074,7 +1082,15 @@ export async function POST(request: NextRequest) {
         // repeatable (a scout's 2nd/3rd property, a later payout) so they keep
         // the 5-minute window — only true back-to-back duplicates are squashed.
         const ONE_TIME_SCOUT_EVENTS = new Set(['signup', 'kyc_received', 'kyc_approved', 'upi_saved'])
-        const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity : undefined
+        // "submission received" was firing on EVERY property a scout sent (seen
+        // live: 5 identical "we received your submission" in 90 min = spam). One
+        // acknowledgement per scouting session is enough; the Scout Portal lists
+        // every submission. Squash repeats within 3h. payout stays repeatable on
+        // the default short window (each payout is distinct and important).
+        const SUBMISSION_DEDUP_MS = 3 * 60 * 60 * 1000
+        const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity
+          : canonicalEvent === 'submission' ? SUBMISSION_DEDUP_MS
+          : undefined
         const recentDuplicate = mapped
           ? await wasTemplateRecentlySent(supabase, leadId, mapped.template, dedupWindowMs)
           : false
@@ -1151,19 +1167,15 @@ export async function POST(request: NextRequest) {
     // reminder cron + counsellors don't depend on this send).
     if (phone && isWebinarReg) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
-      const webinarName = String(cfields.webinar_name || cfields.webinar_topic || '').trim()
-      const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || '').trim()
-      // Parents vs students get a different welcome (user's ask) — routed by the
-      // audience the landing page tagged (unified_context.windchasers.user_type).
-      const isParentAudience = brandCtxData.user_type === 'parent'
-      const confirmTpl = isParentAudience ? 'windchasers_webinar_confirm_parents_v1' : 'windchasers_webinar_confirm_v1'
+      const webinarName = String(cfields.webinar_name || cfields.webinar_topic || (body as any).webinar_name || (body as any).event_name || '').trim()
+      const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || (body as any).webinar_date || '').trim()
+      // Single confirmation template for all audiences (windchasers_webinar_confirmation_v1).
+      const confirmTpl = 'windchasers_webinar_confirmation_v1'
       const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
         console.log(`[inbound] Webinar confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
-        const result = isParentAudience
-          ? await sendWebinarConfirmParents(phone, firstName, webinarName, webinarDate)
-          : await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
+        const result = await sendWebinarConfirm(phone, firstName, webinarName, webinarDate)
         // Log the ACTUAL approved template body + buttons (topic/date/time filled)
         // so the inbox shows exactly what the customer received, not a one-liner.
         const [wDatePart, wTimePart] = String(webinarDate || '').split(/\s+at\s+/i)
@@ -1174,7 +1186,7 @@ export async function POST(request: NextRequest) {
           time: (wTimePart || 'the scheduled time').trim(),
         })
         const bodyText = rendered?.content
-          || `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}. (${confirmTpl} template)`
+          || `Hi ${firstName}, you're registered for ${webinarName || 'our upcoming webinar'} on ${webinarDate || 'the scheduled date'}.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
@@ -1192,10 +1204,16 @@ export async function POST(request: NextRequest) {
             webinar_date: webinarDate || null,
             ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
             ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            // Store Meta's wamid so delivery/read receipts can match this row.
+            ...(result.messageId ? { wa_message_id: result.messageId, delivery_status: 'sent' } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
         })
+        if (result.success) {
+          // The last touch is now WhatsApp (the confirm we just sent), not the form.
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
+        }
         if (!result.success) {
           console.error(`[inbound] Webinar confirm send FAILED lead=${leadId} phone=${phone} tpl=${confirmTpl} error=${result.error}`)
         } else {
@@ -1214,12 +1232,14 @@ export async function POST(request: NextRequest) {
       const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
       const ccAlready =
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_cabin_crew_welcome_v1')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v3')) ||
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v1'))
       if (ccAlready) {
         console.log(`[inbound] Cabin-crew welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const result = await sendCabinCrewWelcome(phone, firstName)
-        const bodyText = `Hi ${firstName}, welcome to Windchasers cabin crew training. (${result.templateUsed} template)`
+        const rendered = renderWaTemplate(result.templateUsed, { customer_name: firstName, parent_name: firstName })
+        const bodyText = rendered?.content || `Hi ${firstName}, welcome to Windchasers cabin crew training.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
@@ -1232,10 +1252,16 @@ export async function POST(request: NextRequest) {
             auto_sent: true,
             trigger: 'cabin_crew_lead',
             sent_by: 'system (inbound webhook)',
+            ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+            ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            ...(result.messageId ? { wa_message_id: result.messageId, delivery_status: 'sent' } : {}),
             send_succeeded: !!result.success,
             send_error: result.success ? null : (result.error || 'unknown'),
           },
         })
+        if (result.success) {
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
+        }
         if (!result.success) {
           console.error(`[inbound] Cabin-crew welcome FAILED lead=${leadId} phone=${phone} tpl=${result.templateUsed} error=${result.error}`)
         } else {
@@ -1403,15 +1429,19 @@ export async function POST(request: NextRequest) {
               template_language: 'en',
               auto_sent: true,
               trigger: isParentLead ? 'parent_lead' : 'new_lead_welcome',
-              sent_by: 'system (inbound webhook)',
               ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
               ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+              sent_by: 'system (inbound webhook)',
+              ...(sendResult.messageId ? { wa_message_id: sendResult.messageId, delivery_status: 'sent' } : {}),
               send_succeeded: !!sendResult.success,
               send_error: sendResult.success ? null : (sendResult.error || 'unknown'),
             },
           })
         } catch (err: any) {
           console.error(`[inbound] Welcome log EXCEPTION lead=${leadId}: ${err?.message || err}`)
+        }
+        if (sendResult.success) {
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
         }
         if (!sendResult.success) {
           console.error(`[inbound] Welcome FAILED lead=${leadId} phone=${phone} tpl=${welcomeTpl} error=${sendResult.error}`)
