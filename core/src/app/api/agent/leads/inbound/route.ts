@@ -1082,7 +1082,15 @@ export async function POST(request: NextRequest) {
         // repeatable (a scout's 2nd/3rd property, a later payout) so they keep
         // the 5-minute window — only true back-to-back duplicates are squashed.
         const ONE_TIME_SCOUT_EVENTS = new Set(['signup', 'kyc_received', 'kyc_approved', 'upi_saved'])
-        const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity : undefined
+        // "submission received" was firing on EVERY property a scout sent (seen
+        // live: 5 identical "we received your submission" in 90 min = spam). One
+        // acknowledgement per scouting session is enough; the Scout Portal lists
+        // every submission. Squash repeats within 3h. payout stays repeatable on
+        // the default short window (each payout is distinct and important).
+        const SUBMISSION_DEDUP_MS = 3 * 60 * 60 * 1000
+        const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity
+          : canonicalEvent === 'submission' ? SUBMISSION_DEDUP_MS
+          : undefined
         const recentDuplicate = mapped
           ? await wasTemplateRecentlySent(supabase, leadId, mapped.template, dedupWindowMs)
           : false
