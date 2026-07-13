@@ -24,6 +24,7 @@ export const windchasersConfig: BrandConfig = {
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
     pipelineFunnel: true,
     followUpSequence: false,
+    leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
   },
   // Brain content: the CORE COMMUNICATIONS checklist (Eval → Communications).
   // evalJourneys is deliberately omitted ('none') — the journeys bench renders

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { classifyAndAct, getServiceClient } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
+import { canAccessLeadId } from '@/lib/services/leadAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,12 @@ export async function POST(
     const supabase = getServiceClient() || authClient
 
     const leadId = params.id
+
+    // Lead-type access: restricted users can't act on leads outside their courses.
+    if (user?.id && !(await canAccessLeadId(supabase, user.id, leadId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { note } = body
 

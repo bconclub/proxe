@@ -151,6 +151,11 @@ function Skeleton() {
 
 // --- Main Page ---
 
+// features.leadAccess: the pipeline becomes per-user — non-admins see their
+// own claimed leads ("My Pipeline") plus the unclaimed open pool; admins get a
+// selector to view any team member's pipeline (deep-linkable via ?user=<id>).
+const LEAD_ACCESS_ON = !!brandConfig.features?.leadAccess
+
 export default function PipelinePage() {
   const [leads, setLeads] = useState<Lead[]>([])
   // Same client-side score the leads table + lead detail show. The stored
@@ -167,9 +172,41 @@ export default function PipelinePage() {
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
 
+  // Owner scope (features.leadAccess). null = still resolving who the caller
+  // is; 'me' | 'unassigned' | 'all' | <user uuid>. Flag off → 'all' (today's
+  // behavior, no owner param sent).
+  const [viewOwner, setViewOwner] = useState<string | null>(LEAD_ACCESS_ON ? null : 'all')
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [members, setMembers] = useState<Array<{ id: string; name: string; email: string | null }>>([])
+
+  // Resolve caller role + team list, then pick the default scope: admins land
+  // on the all-leads view (or the ?user=<id> deep link from Humans), everyone
+  // else lands on their own pipeline.
+  useEffect(() => {
+    if (!LEAD_ACCESS_ON) return
+    let cancelled = false
+    fetch('/api/dashboard/team-members')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return
+        setIsAdmin(!!d.isAdmin)
+        setMembers(Array.isArray(d.members) ? d.members : [])
+        const urlUser = new URLSearchParams(window.location.search).get('user')
+        setViewOwner(d.isAdmin ? (urlUser || 'all') : 'me')
+      })
+      .catch(() => { if (!cancelled) setViewOwner('me') })
+    return () => { cancelled = true }
+  }, [])
+
   const fetchLeads = useCallback(async () => {
+    // Wait for the owner scope to resolve so the first fetch is already scoped
+    // (avoids flashing everyone's leads at a restricted user).
+    if (LEAD_ACCESS_ON && !viewOwner) return
     try {
-      const res = await fetch('/api/dashboard/leads?limit=1000')
+      const ownerParam = LEAD_ACCESS_ON && viewOwner && viewOwner !== 'all'
+        ? `&owner=${encodeURIComponent(viewOwner)}`
+        : ''
+      const res = await fetch(`/api/dashboard/leads?limit=1000${ownerParam}`)
       const data = await res.json()
       const rawLeads: Lead[] = data.leads || []
       // Gig workers (scout + connector) are not sales leads — keep them out of
@@ -180,12 +217,12 @@ export default function PipelinePage() {
           ? rawLeads.filter((l) => !GIG_TYPES.includes(l?.unified_context?.[BRAND_ID]?.user_type as string))
           : rawLeads,
       )
+      setLoading(false)
     } catch (err) {
       console.error('Failed to fetch leads:', err)
-    } finally {
       setLoading(false)
     }
-  }, [])
+  }, [viewOwner])
 
   // Compute the displayed score the same way the leads table does (async,
   // message-aware). Falls back to the stored lead_score on error.
@@ -323,12 +360,79 @@ export default function PipelinePage() {
   const totalPages = Math.max(1, Math.ceil(tableLeads.length / perPage))
   const pagedLeads = tableLeads.slice((page - 1) * perPage, page * perPage)
 
+  useEffect(() => { setPage(1); setActiveStage(null) }, [viewOwner])
   useEffect(() => { setPage(1) }, [activeStage, search, sortBy])
+
+  // "You've touched N leads — X New, Y Engaged…" summary for scoped views.
+  const ownerSummary = useMemo(() => {
+    if (!LEAD_ACCESS_ON || !viewOwner || viewOwner === 'all') return null
+    const total = leads.length
+    const breakdown = STAGES
+      .filter((s) => stageCounts[s.id] > 0)
+      .map((s) => `${stageCounts[s.id]} ${s.label}`)
+      .join(' · ')
+    if (viewOwner === 'unassigned') {
+      return total === 0
+        ? 'Open pool is empty — every lead is claimed.'
+        : `${total} unclaimed lead${total !== 1 ? 's' : ''} in the open pool${breakdown ? ` — ${breakdown}` : ''}. First touch claims it.`
+    }
+    const who = viewOwner === 'me' ? "You've touched" : `${members.find((m) => m.id === viewOwner)?.name || 'This user'} has touched`
+    return total === 0
+      ? `${viewOwner === 'me' ? "You haven't" : `${members.find((m) => m.id === viewOwner)?.name || 'This user'} hasn't`} touched any leads yet — claim one from the open pool.`
+      : `${who} ${total} lead${total !== 1 ? 's' : ''}${breakdown ? ` — ${breakdown}` : ''}.`
+  }, [viewOwner, leads, stageCounts, members])
 
   if (loading) return <Skeleton />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+      {/* ── OWNER SCOPE (features.leadAccess) ── */}
+      {LEAD_ACCESS_ON && viewOwner && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            {(isAdmin
+              ? [{ id: 'all', label: 'All Leads' }, { id: 'unassigned', label: 'Open Pool' }, { id: 'me', label: 'My Pipeline' }]
+              : [{ id: 'me', label: 'My Pipeline' }, { id: 'unassigned', label: 'Open Pool' }]
+            ).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setViewOwner(tab.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: viewOwner === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  color: viewOwner === tab.id ? 'var(--text-primary)' : '#7a7a7a',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+            {isAdmin && members.length > 0 && (
+              <select
+                value={members.some((m) => m.id === viewOwner) ? viewOwner : ''}
+                onChange={(e) => { if (e.target.value) setViewOwner(e.target.value) }}
+                style={{
+                  padding: '6px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: members.some((m) => m.id === viewOwner) ? 'rgba(255,255,255,0.1)' : 'var(--bg-secondary)',
+                  color: members.some((m) => m.id === viewOwner) ? 'var(--text-primary)' : '#7a7a7a',
+                }}
+              >
+                <option value="">Team member…</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          {ownerSummary && (
+            <div style={{ padding: '9px 13px', borderRadius: 7, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.5 }}>
+              {ownerSummary}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── SECTION 0: FUNNEL SUMMARY (pre-key / key event / post-key / exit + rates) ── */}
       <PipelineFunnel />

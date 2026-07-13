@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { getBrandConfig } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,9 +9,13 @@ export const dynamic = 'force-dynamic'
  * POST /api/dashboard/leads/[id]/owner
  *
  * Set (or clear) the owner of a lead. Owner lives in
- * unified_context.owner = { id, name, email, assigned_at, assigned_by }.
+ * unified_context.owner = { id, name, email, assigned_at, assigned_by },
+ * dual-written to the all_leads.owner_id column on brands running
+ * features.leadAccess (migration 036).
  *
  * Body: { owner: { id, name, email } } to assign, or { owner: null } to clear.
+ * Assignment is admin-only. Clearing is admin — or, under features.leadAccess,
+ * the current owner releasing their own lead back to the open pool.
  * Auth: logged-in session. Write via service role.
  */
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
@@ -26,16 +31,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const supabase = getServiceClient() || authClient
 
-    // Owner assignment is ADMIN-ONLY — the dropdown is hidden for non-admins,
-    // but enforce it here too so the API can't be called directly to bypass it.
+    const leadAccessOn = !!getBrandConfig().features?.leadAccess
+
     const { data: me } = await supabase
       .from('dashboard_users')
       .select('role')
       .eq('id', user.id)
       .maybeSingle()
-    if (me?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden — owner assignment is admin-only' }, { status: 403 })
-    }
+    const isAdmin = me?.role === 'admin'
 
     const { data: lead, error: readErr } = await supabase
       .from('all_leads')
@@ -47,6 +50,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const ctx = lead.unified_context || {}
+
+    // Owner ASSIGNMENT is admin-only — the dropdown is hidden for non-admins,
+    // but enforce it here too so the API can't be called directly to bypass it.
+    // CLEARING ({owner:null}) is admin — or, under features.leadAccess, the
+    // current owner releasing their own lead back to the open pool.
+    const isSelfRelease = leadAccessOn && !owner && ctx.owner?.id === user.id
+    if (!isAdmin && !isSelfRelease) {
+      return NextResponse.json({ error: 'Forbidden — owner assignment is admin-only' }, { status: 403 })
+    }
     let nextOwner: any = null
     if (owner && owner.id) {
       nextOwner = {
@@ -59,9 +71,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const newCtx = { ...ctx, owner: nextOwner }
+    // Dual-write owner_id only on flagged brands — the column doesn't exist
+    // elsewhere and would error the whole update.
+    const update: Record<string, any> = { unified_context: newCtx }
+    if (leadAccessOn) update.owner_id = nextOwner ? nextOwner.id : null
     const { error: updErr } = await supabase
       .from('all_leads')
-      .update({ unified_context: newCtx })
+      .update(update)
       .eq('id', params.id)
     if (updErr) {
       console.error('[leads/owner] update failed:', updErr.message)

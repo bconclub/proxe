@@ -19,6 +19,7 @@ export interface Database {
           updated_at: string
           last_login: string | null
           is_active: boolean
+          allowed_lead_types: string[] | null
         }
         Insert: {
           id: string
@@ -29,6 +30,7 @@ export interface Database {
           updated_at?: string
           last_login?: string | null
           is_active?: boolean
+          allowed_lead_types?: string[] | null
         }
         Update: {
           id?: string
@@ -39,6 +41,7 @@ export interface Database {
           updated_at?: string
           last_login?: string | null
           is_active?: boolean
+          allowed_lead_types?: string[] | null
         }
       }
       user_invitations: {
@@ -51,6 +54,7 @@ export interface Database {
           expires_at: string
           accepted_at: string | null
           created_at: string
+          allowed_lead_types: string[] | null
         }
         Insert: {
           id?: string
@@ -61,6 +65,7 @@ export interface Database {
           expires_at: string
           accepted_at?: string | null
           created_at?: string
+          allowed_lead_types?: string[] | null
         }
         Update: {
           id?: string
@@ -71,6 +76,7 @@ export interface Database {
           expires_at?: string
           accepted_at?: string | null
           created_at?: string
+          allowed_lead_types?: string[] | null
         }
       }
       dashboard_settings: {

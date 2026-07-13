@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { getBrandConfig } from '@/configs'
+import { getLeadAccess, filterLeads } from '@/lib/services/leadAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +28,12 @@ export async function GET(request: NextRequest) {
     // Free-text search across customer_name, phone, email — used by the
     // merge-leads picker in the lead modal.
     const search = searchParams.get('search')?.trim() || null
+    // Owner scope (features.leadAccess only): me | unassigned | <user uuid> |
+    // all (default). The owner_id column exists only in brands running the
+    // flag, so the SQL filter is applied strictly behind it.
+    const owner = searchParams.get('owner')
+    const leadAccessOn = !!getBrandConfig().features?.leadAccess
+    const access = await getLeadAccess(supabase, user.id)
 
     let query = supabase
       .from('all_leads')
@@ -50,6 +58,20 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       query = query.eq('status', status)
+    }
+
+    if (leadAccessOn && owner && owner !== 'all') {
+      if (owner === 'me') {
+        query = query.eq('owner_id', user.id)
+      } else if (owner === 'unassigned') {
+        query = query.is('owner_id', null)
+      } else {
+        // Viewing another user's pipeline is admin-only.
+        if (!access.isAdmin) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+        query = query.eq('owner_id', owner)
+      }
     }
 
     if (startDate) {
@@ -86,6 +108,10 @@ export async function GET(request: NextRequest) {
         (lead: any) => lead.unified_context?.web?.form_submission?.form_type !== 'newsletter'
       )
     }
+
+    // Lead-type access: restricted users only see leads of their allowed
+    // courses (JS post-filter — same NULL-safety rationale as newsletter).
+    leads = filterLeads(access, leads)
 
     return NextResponse.json({
       leads,
