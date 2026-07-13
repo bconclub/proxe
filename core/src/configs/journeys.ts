@@ -27,6 +27,8 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
 // Bodies the agent configs don't carry (worker/Meta-side) — shown honestly.
 const EXTRA_BODIES: Record<string, string> = {
   bcon_welcome_web_v1: `Hey {{customer_name}}, got your enquiry about {{service_interest}} for {{brand_name}}.\n\n{{probe_question}}, Lets get on call to discuss this.`,
+  bcon_service_rnr_1_v1: `Hi {{customer_name}},\n\nWe just tried calling you from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Couldn't reach you.\n\nHow would you like to continue?`,
+  bcon_service_rnr_2_v1: `Hi {{customer_name}},\n\nTried reaching you again from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Still couldn't connect.\n\nHow would you like to continue?`,
 }
 
 export function bodyFor(template: string | null): string | null {
@@ -97,9 +99,9 @@ export const JOURNEYS: Journey[] = [
     stop: 'Stops the moment they reply. Cancels any prior ladder first (no double-enrolment).',
     tone: '#f59e0b',
     steps: [
-      { label: 'Missed-call follow-up', delay: '+30 min', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 1', delay: '+1 day', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
+      { label: 'Missed-call follow-up', delay: '+30 min', template: 'bcon_service_rnr_1_v1' },
+      { label: 'Day 1', delay: '+1 day', template: 'bcon_service_rnr_2_v1' },
+      { label: 'Day 3', delay: '+3 days', template: 'bcon_service_rnr_2_v1' },
       { label: 'Day 5', delay: '+5 days', template: 'bcon_proxe_reengagement_noengage' },
       { label: 'Re-engage', delay: '+7 days', template: 'bcon_proxe_reengagement_noengage' },
     ],

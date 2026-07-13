@@ -5,6 +5,8 @@
 // KEEP IN SYNC with this brand's worker (task-worker.js TEMPLATE_BODIES +
 // getTemplatePreview routing).
 export const TEMPLATE_BODIES: Record<string, string> = {
+  bcon_service_rnr_1_v1: `Hi {{customer_name}},\n\nWe just tried calling you from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Couldn't reach you.\n\nHow would you like to continue?`,
+  bcon_service_rnr_2_v1: `Hi {{customer_name}},\n\nTried reaching you again from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Still couldn't connect.\n\nHow would you like to continue?`,
   bcon_lead_machine_meta_welcome_v1_: `Hi {{customer_name}}, thanks for your interest in AI Lead Machine for {{brand_name}}. We help businesses like yours capture, qualify and convert more leads on autopilot. Want to see it in action?`,
   bcon_proxe_followup_engaged: `Hi {{customer_name}}, we were talking about {{service_interest}} for your business. Let's continue where we left off?`,
   bcon_proxe_followup_noengage: `Hi {{customer_name}}, you reached out recently about {{service_interest}}. Would you like to know how we can help?`,
@@ -35,6 +37,7 @@ export const TEMPLATE_BODIES: Record<string, string> = {
 export const VAR_LABELS: Record<string, string> = {
   customer_name: 'Name',
   service_interest: 'goal',
+  service_name: 'service',
   brand_name: 'brand',
   business_name: 'brand',
   booking_time: 'time',
@@ -54,6 +57,7 @@ export function fillTemplateWithChips(body: string): string {
     .replace(/\{\{\s*brand_name\s*\}\}/g, chip('brand_name'))
     .replace(/\{\{\s*business_name\s*\}\}/g, chip('business_name'))
     .replace(/\{\{\s*service_interest\s*\}\}/g, chip('service_interest'))
+    .replace(/\{\{\s*service_name\s*\}\}/g, chip('service_name'))
     .replace(/\{\{\s*booking_time\s*\}\}/g, chip('booking_time'))
     .replace(/\{\{\s*pain_point\s*\}\}/g, chip('pain_point'))
 }
@@ -83,8 +87,11 @@ export function buildNudgePreview(md: Record<string, any>): string {
   return `Hey ${chip('customer_name')}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?`
 }
 
-export function resolveTaskTemplate(taskType: string, bucket?: string | null): string | null {
+export function resolveTaskTemplate(taskType: string, bucket?: string | null, sequence?: string | null): string | null {
   const t = taskType || ''
+  // RNR pair (approved 13 Jul 2026): the missed-call chaser + its retries.
+  if (t === 'missed_call_followup') return 'bcon_service_rnr_1_v1'
+  if (sequence === 'rnr' && t.startsWith('follow_up_')) return 'bcon_service_rnr_2_v1'
   if (t === 'booking_reminder_24h' || t === 'reminder_24h') return 'bcon_proxe_booking_reminder_24h'
   if (t === 'booking_reminder_30m' || t === 'reminder_30m') return 'bcon_proxe_booking_reminder_30m'
   if (t === 'first_outreach') return 'bcon_lead_machine_meta_welcome_v1_'
