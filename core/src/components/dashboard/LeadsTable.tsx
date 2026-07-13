@@ -28,45 +28,14 @@ import {
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
+import { LEAD_STAGES, getStageColor as getStageColorShared } from '@/configs/lead-stages'
 
-const STATUS_OPTIONS = [
-  'New Lead',
-  'Follow Up',
-  'RNR (No Response)',
-  'Interested',
-  'Wrong Enquiry',
-  'Call Booked',
-  'Closed'
-]
-
-const getStatusColor = (status: string | null) => {
-  const statusColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New Lead': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
-    'Follow Up': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
-    'RNR (No Response)': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
-    'Interested': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
-    'Wrong Enquiry': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
-    'Call Booked': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
-    'Closed': { bg: '', text: '', style: { backgroundColor: 'rgba(100,116,139,0.15)', color: '#94a3b8' } },
-  }
-  return statusColors[status || 'New Lead'] || statusColors['New Lead']
-}
+// The legacy `status` taxonomy (New Lead / Follow Up / Wrong Enquiry…) is DEAD
+// — the column is null on every lead. The filter below now filters the STAGE
+// column, using the one canonical list from @/configs/lead-stages.
 
 const getStageColor = (stage: string | null) => {
-  const stageColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
-    'Engaged': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
-    'Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(168,85,247,0.15)', color: '#a855f7' } },
-    'High Intent': { bg: '', text: '', style: { backgroundColor: 'rgba(249,115,22,0.15)', color: '#f97316' } },
-    'Booking Made': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
-    'Converted': { bg: '', text: '', style: { backgroundColor: 'rgba(16,185,129,0.15)', color: '#10b981' } },
-    'Closed Lost': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
-    'Not Qualified': { bg: '', text: '', style: { backgroundColor: 'rgba(244,63,94,0.15)', color: '#f43f5e' } },
-    'In Sequence': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#3b82f6' } },
-    'Cold': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#6b7280' } },
-    'R&R': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
-  }
-  return stageColors[stage || 'New'] || stageColors['New']
+  return getStageColorShared(stage)
 }
 
 // Scouts have their OWN lifecycle - they don't run brand/owner follow-up
@@ -397,7 +366,7 @@ export default function LeadsTable({
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter((lead) => lead.status === statusFilter)
+      filtered = filtered.filter((lead) => (lead.lead_stage || 'New') === statusFilter)
     }
 
     if (userTypeFilter !== 'all') {
@@ -864,9 +833,9 @@ export default function LeadsTable({
               })()}
 
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={filterClass} style={filterStyle}>
-                <option value="all">All statuses</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>{status}</option>
+                <option value="all">All stages</option>
+                {LEAD_STAGES.map((st) => (
+                  <option key={st.value} value={st.value}>{st.label}</option>
                 ))}
               </select>
 

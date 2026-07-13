@@ -17,6 +17,8 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Engaged', label: 'Engaged', description: '0-30 score, active chat', scoreRange: '0-30' },
   { value: 'Qualified', label: 'Qualified', description: '31-60 score', scoreRange: '31-60' },
   { value: 'High Intent', label: 'High Intent', description: '61-85 score', scoreRange: '61-85' },
+  { value: 'Demo Taken', label: 'Demo Taken', description: 'Saw the product', scoreRange: 'Manual' },
+  { value: 'Proposal Sent', label: 'Proposal Sent', description: 'Offer in their hands', scoreRange: 'Manual' },
   { value: 'Booking Made', label: 'Booking Made', description: '86-100 score', scoreRange: '86-100' },
   { value: 'Converted', label: 'Converted', description: 'Manual close', scoreRange: 'Manual' },
   { value: 'Closed Lost', label: 'Closed Lost', description: 'Manual', scoreRange: 'Manual' },
@@ -24,6 +26,7 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
   { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
   { value: 'In Sequence', label: 'In Sequence', description: 'Automated follow-up', scoreRange: 'Manual' },
+  { value: 'Nurture', label: 'Nurture', description: 'Long-game — check in later', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [

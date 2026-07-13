@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { LEAD_STAGE_VALUES } from '@/configs/lead-stages'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
@@ -3023,7 +3024,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   role="menu"
                   aria-label="Select lead stage"
                 >
-                  {['New', 'Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted', 'Closed Lost', 'Not Qualified', 'Cold', 'R&R'].map((stage) => (
+                  {LEAD_STAGE_VALUES.map((stage) => (
                     <li key={stage} role="none">
                       <button
                         onClick={() => handleStageChange(stage as LeadStage)}

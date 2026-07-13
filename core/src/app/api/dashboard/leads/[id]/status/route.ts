@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 
+// DEPRECATED — the `status` column is a dead legacy taxonomy (null on every
+// lead; no UI writes it since 2026-07-13). Lead pipeline state lives in
+// `lead_stage` via the /stage route. Kept only so old clients don't 404.
 // Allowed status values
 const ALLOWED_STATUSES = [
   'New Lead',

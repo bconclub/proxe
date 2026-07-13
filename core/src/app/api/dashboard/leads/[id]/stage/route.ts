@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { LEAD_STAGE_VALUES } from '@/configs/lead-stages'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 
 // Allowed lead stages
-const ALLOWED_STAGES = [
-  'New',
-  'Engaged',
-  'Qualified',
-  'High Intent',
-  'Booking Made',
-  'Converted',
-  'Closed Lost',
-  'Not Qualified',
-  'In Sequence',
-  'Cold',
-  'R&R'
-]
+// The canonical list lives in @/configs/lead-stages — the API accepts exactly
+// what the UI offers (incl. Demo Taken / Proposal Sent / Nurture, which the
+// orchestrator was already writing but this route used to reject).
+const ALLOWED_STAGES = LEAD_STAGE_VALUES
 
 // Sub-stages for High Intent
 const HIGH_INTENT_SUB_STAGES = [
