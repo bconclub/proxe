@@ -98,6 +98,7 @@ export {
   sendPATResult,
   sendFacebookLeadWelcome,
   sendWelcomeTemplate,
+  sendNamedTemplate,
   pickWelcomeTemplate,
   isPilotSource,
   isParentSource,

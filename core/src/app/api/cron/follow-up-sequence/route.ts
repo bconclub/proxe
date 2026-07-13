@@ -23,15 +23,19 @@ import {
   getServiceClient,
   logMessage,
   sendWelcomeTemplate,
+  sendNamedTemplate,
   isPilotSource,
   pickRnrTemplate,
 } from '@/lib/services'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const RNR_TASK_TYPES = ['missed_call_followup', 'follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage']
-const MAX_RNR_SENDS = 2 // we have two approved steps per segment
+// windchasers has two approved steps; bcon's ladder is rnr_1 + 3x rnr_2 (day
+// 1/3/5) with re_engage on the non-RNR re-engagement template.
+const MAX_RNR_SENDS = BRAND_ID === 'bcon' ? 4 : 2
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -94,7 +98,7 @@ export async function GET(req: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(40)
       const rnrSends = (priorMsgs || []).filter((m: any) =>
-        String(m?.metadata?.template_name || '').startsWith('rnr_'),
+        /(^|_)rnr_/.test(String(m?.metadata?.template_name || '')), // rnr_* (windchasers) + bcon_service_rnr_* (bcon)
       ).length
 
       if (rnrSends >= MAX_RNR_SENDS) {
@@ -114,17 +118,38 @@ export async function GET(req: NextRequest) {
       if (!phone) { await markDone(supabase, task.id, nowIso); results.skipped++; continue }
 
       const ctx: any = lead?.unified_context || {}
-      const isPilot = isPilotSource(
-        ctx.raw_form_fields?.page_url,
-        ctx.attribution?.source_label,
-        ctx.windchasers?.course_interest,
-        ctx.course_interest,
-      )
-      const step: 1 | 2 = rnrSends === 0 ? 1 : 2
-      const tpl = pickRnrTemplate(isPilot, step)
       const name = task.lead_name || lead?.customer_name || ''
+      const firstOnly = ((/\d/.test(name) ? '' : name) || 'there').split(' ')[0]
+      const step: 1 | 2 = rnrSends === 0 ? 1 : 2
+      let tpl: string
+      let result: { success: boolean; error?: string; messageId?: string }
 
-      const result = await sendWelcomeTemplate(phone, name, tpl) // sends template with customer_name param
+      if (BRAND_ID === 'bcon') {
+        // bcon: approved pair with 3 NAMED params. re_engage closes the ladder
+        // on the (single-param) re-engagement template instead of a third RNR.
+        const serviceName = ctx.service_interest || ctx.bcon?.service_interest || ctx.form_data?.service_interest || 'our services'
+        const brandName = ctx.company || ctx.form_data?.brand_name || ctx.bcon?.company || 'your business'
+        if (task.task_type === 're_engage') {
+          tpl = 'bcon_proxe_reengagement_noengage'
+          result = await sendWelcomeTemplate(phone, name, tpl)
+        } else {
+          tpl = step === 1 ? 'bcon_service_rnr_1_v1' : 'bcon_service_rnr_2_v1'
+          result = await sendNamedTemplate(phone, tpl, [
+            { name: 'customer_name', value: firstOnly },
+            { name: 'service_name', value: serviceName },
+            { name: 'brand_name', value: brandName },
+          ])
+        }
+      } else {
+        const isPilot = isPilotSource(
+          ctx.raw_form_fields?.page_url,
+          ctx.attribution?.source_label,
+          ctx.windchasers?.course_interest,
+          ctx.course_interest,
+        )
+        tpl = pickRnrTemplate(isPilot, step)
+        result = await sendWelcomeTemplate(phone, name, tpl) // single customer_name param
+      }
       if (!result.success) {
         await markDone(supabase, task.id, nowIso) // don't retry a failing send forever
         results.errors++

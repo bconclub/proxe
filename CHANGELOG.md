@@ -1,3 +1,11 @@
+##  · feat(core): RNR cron sender is brand-aware — bcon ladder fires the real templates to real numbers
+
+- /api/cron/follow-up-sequence was windchasers-only (pilot/generic template names + single customer_name param) — on bcon every send would 4xx. Now brand-routed: bcon → bcon_service_rnr_1/2_v1 with 3 NAMED params (customer_name, service_name, brand_name from lead context), re_engage closes on the re-engagement template, cap 4 RNR sends (windchasers path unchanged, cap 2).
+- New sendNamedTemplate() in whatsappSender for multi-named-param templates.
+- Verified: authorized local ping → due:0 errors:0; no TEST_RECIPIENT gates in the core send path (real numbers only).
+- REMAINING (user): add the bcon URL to the external cron scheduler — nothing pings it on prod yet.
+- `(pending-sha)`
+
 ## 2026-07-13 · refactor(core): rename won stage 'Converted' → 'Closed Won'
 
 - The won stage is now 'Closed Won' (pairs with 'Closed Lost'), replacing 'Converted' across the taxonomy: stage/override/convert APIs, note classifier (CONVERTED category still triggers it), LeadStageSelector, stage dropdowns, colors, funnel/pipeline/humans groupings, metrics, types, lead-stages config. The 'Converted' classifier category name is unchanged.
