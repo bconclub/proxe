@@ -27,9 +27,9 @@ const BCON_SEQUENCES: Sequence[] = [
     stop: 'Stops the moment they reply on WhatsApp · capped at 2 re-engagement sends',
     steps: [
       { label: 'Missed-call follow-up', delay: '30 min after', template: 'bcon_service_rnr_1_v1' },
-      { label: 'Day 1', delay: '+1 day', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
-      { label: 'Day 5', delay: '+5 days', template: 'bcon_proxe_followup_noengage' },
+      { label: 'Day 1', delay: '+1 day', template: 'bcon_onetouch_d1_v1' },
+      { label: 'Day 3', delay: '+3 days', template: 'bcon_onetouch_d3_v1' },
+      { label: 'Day 5', delay: '+5 days', template: 'bcon_onetouch_d7_v1' },
       { label: 'Re-engage', delay: 'final', template: 'bcon_proxe_reengagement_noengage' },
     ],
   },

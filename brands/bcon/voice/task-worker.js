@@ -4119,6 +4119,54 @@ async function getTemplatePreview(task, lead) {
       }
     }
 
+    // Unbucketed day-N tasks (e.g. the RNR retry ladder) use the purpose-built
+    // DAY-WISE templates — never the same generic follow-up three times.
+    // Engaged (they've replied before) -> lowtouch; ghost -> onetouch.
+    // Day 5 borrows the d7 body in both ladders (no dedicated day-5 template).
+    if (taskType === 'follow_up_day1' || taskType === 'follow_up_day3' || taskType === 'follow_up_day5') {
+      if (engaged) {
+        if (taskType === 'follow_up_day1') {
+          return { name: 'bcon_lowtouch_d1_v1', params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+          ] };
+        }
+        if (taskType === 'follow_up_day3') {
+          return { name: 'bcon_lowtouch_d3_v1', params: [
+            { label: 'Name', parameter_name: 'customer_name', value: leadName },
+            { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+            { label: 'Business', parameter_name: 'business_name', value: businessName },
+          ] };
+        }
+        return { name: 'bcon_lowtouch_d7_v1', params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+          { label: 'Business', parameter_name: 'business_name', value: businessName },
+          { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+        ] };
+      }
+      if (taskType === 'follow_up_day1') {
+        return { name: 'bcon_onetouch_d1_v1', params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Business', parameter_name: 'business_name', value: businessName },
+          { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+        ] };
+      }
+      if (taskType === 'follow_up_day3') {
+        return { name: 'bcon_onetouch_d3_v1', params: [
+          { label: 'Name', parameter_name: 'customer_name', value: leadName },
+          { label: 'Business', parameter_name: 'business_name', value: businessName },
+          { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+        ] };
+      }
+      return { name: 'bcon_onetouch_d7_v1', params: [
+        { label: 'Name', parameter_name: 'customer_name', value: leadName },
+        { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
+        { label: 'Pain Point', parameter_name: 'pain_point', value: painPoint },
+      ] };
+    }
+
     // Everything else — singleton nudges (ENGAGED/HIGH_INTENT follow_up_24h,
     // nudge_waiting, push_to_book, missed_call_followup, human_callback) —
     // keeps the existing generic engaged/noengage rotation; no day-N ladder fits.

@@ -1,3 +1,9 @@
+##  · feat(bcon): day 1/3/5 retries use the DAY-WISE template ladders (onetouch/lowtouch)
+
+- The RNR-sequence day tasks repeated the generic follow-up 3×. Meta already holds day-specific approved copy: onetouch_d1/d3/d7 (ghost — never replied) and lowtouch_d1/d3/d7 (engaged — has replied). Day tasks now route by engagement: engaged→lowtouch, ghost→onetouch; day 5 borrows the d7 body (existing convention). Wired in the worker, the cron sender (with per-template named params), dashboard previews, and the flows/journeys ladders.
+- Verified: each day previews DIFFERENT copy on a live lead.
+- `(pending-sha)`
+
 ##  · fix(core): RNR model corrected — pair fires ONLY on call-miss touches; day 1/3/5 stay standard cadence
 
 - Founder model: first RNR call → rnr_1, a second logged RNR → rnr_2, and the scheduled day 1/3/5 retries send the STANDARD follow-up templates that were already set up (NOT RNR copy). Corrected across the worker (day retries fall through to normal rotation; missed-call picks rnr_1/rnr_2 by last-sent), the cron sender (cap 2 applies only to RNR touches; day steps flow the standard template), dashboard previews, and the flows/journeys ladders.
