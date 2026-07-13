@@ -239,7 +239,9 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   const blocks: unknown[] = [
     header(title),
     // Mention (real ping) + lead tag + type on the first line.
-    section(`${SLACK_MENTION ? `${SLACK_MENTION}  ` : ''}${whoTag}${clean(l.leadType) ? `   ·   _${clean(l.leadType)}_` : ''}`),
+    // NOTE: the @mention lives ONLY in the top-level notification text below (it
+    // fires the ping there). Do NOT repeat it here or it shows twice.
+    section(`${whoTag}${clean(l.leadType) ? `   ·   _${clean(l.leadType)}_` : ''}`),
   ];
 
   // The issue, one glanceable italic line.
