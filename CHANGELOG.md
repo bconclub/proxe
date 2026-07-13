@@ -1,3 +1,10 @@
+## 2026-07-13 · feat(core): "Convert lead" action + conversion-date tracking
+
+- New "Convert lead" option in the lead modal's + menu → a modal to enter conversion date (defaults today), program/batch, deal value ₹, and notes. Converting sets stage=Converted, records the date, stores the deal details in unified_context.conversion, cancels pending follow-ups, and logs a stage change + activity note. New endpoint POST /api/dashboard/leads/[id]/convert.
+- New `converted_at` column (migration 037, windchasers) — the conversion date is written there (soft-fail if the column isn't present yet) AND always into unified_context.conversion so it works before the migration runs.
+- The auto-convert path (note/call classified CONVERTED) now ALSO records converted_at (was only flipping the stage, losing the date).
+- `(pending-sha)`
+
 ## 2026-07-13 · fix(windchasers): Telegram team alert on escalations + stop name-repetition spam
 
 - flagForHumanFollowup now also pings the team's Telegram group (TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID) alongside the existing Slack ping — so a booking the agent couldn't lock ("passed to our team"), an empty-response escalation, or a repeat-guard trip actually reaches a human on Telegram. Env-guarded no-op for brands without Telegram set; goes only to that brand's own group (no bleed). NOTE: needs TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID in the windchasers CORE/Vercel env (currently only in the worker).

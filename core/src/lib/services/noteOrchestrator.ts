@@ -814,6 +814,21 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .from('all_leads')
       .update({ lead_stage: newStage, stage_override: true })
       .eq('id', leadId);
+    // Record WHEN it converted — from the note's date if given, else now.
+    // Separate, soft-failing update so a brand whose DB lacks converted_at
+    // (migration 037 not yet run) still gets the stage change without erroring.
+    const convertedAt = classification.booking_date
+      ? resolveBookingDate(classification.booking_date, classification.booking_time)
+      : now;
+    const { error: convErr } = await supabase
+      .from('all_leads')
+      .update({ converted_at: convertedAt.toISOString() })
+      .eq('id', leadId);
+    if (convErr) {
+      console.warn(`[noteOrchestrator] converted_at not saved for ${leadId} (column missing? run migration 037): ${convErr.message}`);
+    } else {
+      actionsTaken.push(`Recorded conversion date ${convertedAt.toISOString().slice(0, 10)}`);
+    }
     actions.push('stage_updated:Converted');
     actionsTaken.push(`Stage changed to Converted`);
   }

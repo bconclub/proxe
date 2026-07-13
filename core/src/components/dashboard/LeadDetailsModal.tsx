@@ -513,6 +513,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
+
+  // Convert lead state — explicit conversion with details (date/program/amount/notes)
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [convertDate, setConvertDate] = useState<string>('')
+  const [convertProgram, setConvertProgram] = useState('')
+  const [convertAmount, setConvertAmount] = useState('')
+  const [convertNotes, setConvertNotes] = useState('')
+  const [savingConvert, setSavingConvert] = useState(false)
+  const [convertError, setConvertError] = useState<string | null>(null)
   // bcon: the decision hub opens after the draft (outcome + notes) is entered.
   // It shows the AI's proposed plan and lets the human confirm or override.
   const [showLogCallHub, setShowLogCallHub] = useState(false)
@@ -1529,6 +1538,36 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       })
     } finally {
       setSavingLogCall(false)
+    }
+  }
+
+  const handleConvertLead = async () => {
+    if (savingConvert || !lead) return
+    setSavingConvert(true)
+    setConvertError(null)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${lead.id}/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          converted_at: convertDate || undefined,
+          program: convertProgram.trim() || undefined,
+          amount: convertAmount.trim() || undefined,
+          notes: convertNotes.trim() || undefined,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Failed to convert lead')
+      setShowConvertModal(false)
+      setConvertProgram(''); setConvertAmount(''); setConvertNotes(''); setConvertDate('')
+      setActiveTab('notes')
+      loadActivities()
+      loadLeadTasks()
+      loadFreshLeadData()
+    } catch (err: any) {
+      setConvertError(err?.message || 'Failed to convert lead')
+    } finally {
+      setSavingConvert(false)
     }
   }
 
@@ -3002,6 +3041,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdShare size={16} className="text-purple-500 rotate-90" /> Merge with another lead
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowActionDropdown(false)
+                        setConvertError(null)
+                        // Default the conversion date to today (YYYY-MM-DD).
+                        setConvertDate(new Date().toISOString().slice(0, 10))
+                        setShowConvertModal(true)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors focus:outline-none"
+                    >
+                      <MdCheckCircle size={16} className="text-emerald-500" /> Convert lead
+                    </button>
                   </div>
                 </>
               )}
@@ -4418,6 +4469,90 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             newStage: pendingStageChange.newStage
           }}
         />
+      )}
+
+      {/* ── CONVERT LEAD MODAL ────────────────────────────────────────── */}
+      {showConvertModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => !savingConvert && setShowConvertModal(false)}>
+          <div
+            className="w-full max-w-md rounded-xl border shadow-2xl"
+            style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <MdCheckCircle size={20} className="text-emerald-500" />
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Convert lead</h3>
+              <span className="text-xs ml-1" style={{ color: 'var(--text-muted)' }}>{lead?.name || ''}</span>
+              <button onClick={() => !savingConvert && setShowConvertModal(false)} className="ml-auto" style={{ color: 'var(--text-muted)' }}>
+                <MdClose size={18} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Conversion date</label>
+                <input
+                  type="date"
+                  value={convertDate}
+                  onChange={(e) => setConvertDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                  style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Program / batch <span style={{ color: 'var(--text-muted)' }}>(optional)</span></label>
+                <input
+                  type="text"
+                  value={convertProgram}
+                  onChange={(e) => setConvertProgram(e.target.value)}
+                  placeholder="e.g. October CPL batch"
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                  style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Deal value ₹ <span style={{ color: 'var(--text-muted)' }}>(optional)</span></label>
+                <input
+                  type="number"
+                  value={convertAmount}
+                  onChange={(e) => setConvertAmount(e.target.value)}
+                  placeholder="e.g. 250000"
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none"
+                  style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Notes <span style={{ color: 'var(--text-muted)' }}>(optional)</span></label>
+                <textarea
+                  value={convertNotes}
+                  onChange={(e) => setConvertNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Anything worth recording about the conversion…"
+                  className="w-full px-3 py-2 rounded-lg border text-sm outline-none resize-none"
+                  style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+              {convertError && <p className="text-xs text-red-500">{convertError}</p>}
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Marks the lead as Converted, records the date, and stops any pending follow-ups.</p>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+              <button
+                onClick={() => setShowConvertModal(false)}
+                disabled={savingConvert}
+                className="px-3 py-1.5 rounded-lg text-sm border"
+                style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConvertLead}
+                disabled={savingConvert}
+                className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-1.5"
+              >
+                <MdCheckCircle size={16} /> {savingConvert ? 'Converting…' : 'Convert lead'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── MERGE DIALOG ──────────────────────────────────────────────── */}
