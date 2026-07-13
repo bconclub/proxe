@@ -4015,23 +4015,15 @@ async function getTemplatePreview(task, lead) {
     const bucket = task.metadata?.bucket || '';
     const businessName = det.businessName;
 
-    // ── RNR / missed-call: the human called and couldn't reach them. ──
-    // Purpose-built approved pair (rnr_1 right after the call, rnr_2 for the
-    // day-N retries) — replaces the generic follow-up copy on this path.
+    // ── RNR / missed-call: ONLY the call-miss touches use the RNR pair.
+    // First RNR -> rnr_1, a second logged RNR -> rnr_2. The scheduled day
+    // 1/3/5 retries fall through to the STANDARD follow-up cadence below —
+    // they are NOT RNR messages (founder's model, 13 Jul).
     const seq = task.metadata?.sequence || '';
     if (taskType === 'missed_call_followup' || seq === 'no_show') {
+      const priorRnr = String(lead?.last_follow_up_template || '') === 'bcon_service_rnr_1_v1';
       return {
-        name: 'bcon_service_rnr_1_v1',
-        params: [
-          { label: 'Name', parameter_name: 'customer_name', value: leadName },
-          { label: 'Service', parameter_name: 'service_name', value: serviceInterest },
-          { label: 'Brand', parameter_name: 'brand_name', value: businessName },
-        ],
-      };
-    }
-    if (seq === 'rnr' && taskType.startsWith('follow_up_')) {
-      return {
-        name: 'bcon_service_rnr_2_v1',
+        name: priorRnr ? 'bcon_service_rnr_2_v1' : 'bcon_service_rnr_1_v1',
         params: [
           { label: 'Name', parameter_name: 'customer_name', value: leadName },
           { label: 'Service', parameter_name: 'service_name', value: serviceInterest },

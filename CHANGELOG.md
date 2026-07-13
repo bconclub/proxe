@@ -1,3 +1,10 @@
+##  · fix(core): RNR model corrected — pair fires ONLY on call-miss touches; day 1/3/5 stay standard cadence
+
+- Founder model: first RNR call → rnr_1, a second logged RNR → rnr_2, and the scheduled day 1/3/5 retries send the STANDARD follow-up templates that were already set up (NOT RNR copy). Corrected across the worker (day retries fall through to normal rotation; missed-call picks rnr_1/rnr_2 by last-sent), the cron sender (cap 2 applies only to RNR touches; day steps flow the standard template), dashboard previews, and the flows/journeys ladders.
+- Verified live: both open leads preview missed-call = "We just tried calling you", day 1/3/5 = "you reached out recently…", re-engage = re-engagement.
+- Removed the "Latest note" card from the lead summary (notes live in the Notes tab).
+- `(pending-sha)`
+
 ##  · fix(core): inbox renders templates FULLY (body + buttons) + Lokazen chip leak killed + whole Meta form shown
 
 - Template sends from the dashboard now log the RENDERED body (server-side fill from the brand template map) + template_buttons metadata — the thread shows the real message with WhatsApp-style buttons, never "[Template: name]". RNR pair buttons (Book a call / Chat here) added to journeys + worker maps. Raaja's existing row backfilled.
