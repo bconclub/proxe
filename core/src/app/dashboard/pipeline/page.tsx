@@ -129,19 +129,19 @@ function Skeleton() {
       {/* Chevron skeleton */}
       <div style={{ display: 'flex', gap: -4, overflow: 'hidden' }}>
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} style={{ flex: '1 0 100px', height: 56, background: 'rgba(255,255,255,0.04)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+          <div key={i} style={{ flex: '1 0 100px', height: 56, background: 'var(--bg-hover)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
         ))}
       </div>
       {/* Insight skeleton */}
       <div className="rgrid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} style={{ height: 80, background: 'rgba(255,255,255,0.03)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
+          <div key={i} style={{ height: 80, background: 'var(--bg-hover)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
         ))}
       </div>
       {/* Table skeleton */}
-      <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-hover)', borderRadius: 8, overflow: 'hidden' }}>
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} style={{ height: 44, borderBottom: '1px solid rgba(255,255,255,0.03)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }} />
+          <div key={i} style={{ height: 44, borderBottom: '1px solid var(--border-primary)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }} />
         ))}
       </div>
       <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
@@ -400,8 +400,8 @@ export default function PipelinePage() {
                 onClick={() => setViewOwner(tab.id)}
                 style={{
                   padding: '6px 12px', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: viewOwner === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  border: '1px solid var(--border-primary)',
+                  background: viewOwner === tab.id ? 'var(--bg-hover)' : 'transparent',
                   color: viewOwner === tab.id ? 'var(--text-primary)' : '#7a7a7a',
                 }}
               >
@@ -414,8 +414,8 @@ export default function PipelinePage() {
                 onChange={(e) => { if (e.target.value) setViewOwner(e.target.value) }}
                 style={{
                   padding: '6px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: members.some((m) => m.id === viewOwner) ? 'rgba(255,255,255,0.1)' : 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  background: members.some((m) => m.id === viewOwner) ? 'var(--bg-hover)' : 'var(--bg-secondary)',
                   color: members.some((m) => m.id === viewOwner) ? 'var(--text-primary)' : '#7a7a7a',
                 }}
               >
@@ -427,7 +427,7 @@ export default function PipelinePage() {
             )}
           </div>
           {ownerSummary && (
-            <div style={{ padding: '9px 13px', borderRadius: 7, background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.06)', color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.5 }}>
+            <div style={{ padding: '9px 13px', borderRadius: 7, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.5 }}>
               {ownerSummary}
             </div>
           )}
@@ -469,7 +469,7 @@ export default function PipelinePage() {
                   padding: `0 ${NOTCH + 4}px`,
                   transition: 'filter 0.15s',
                   filter: isActive ? 'brightness(1.15)' : 'brightness(1)',
-                  borderBottom: isActive ? `3px solid rgba(255,255,255,0.9)` : '3px solid transparent',
+                  borderBottom: isActive ? `3px solid var(--text-primary)` : '3px solid transparent',
                 }}
               >
                 <span style={{ fontSize: 10, fontWeight: 500, color: stage.sub, lineHeight: 1.2, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
@@ -497,9 +497,9 @@ export default function PipelinePage() {
       </div>
 
       {/* ── SECTION 3: LEAD TABLE ── */}
-      <div style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 8, overflow: 'hidden' }}>
         {/* Toolbar */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border-primary)' }}>
           <div style={{ position: 'relative', flex: '1 1 180px', maxWidth: 260 }}>
             <MdSearch size={15} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#525252' }} />
             <input
@@ -507,7 +507,7 @@ export default function PipelinePage() {
               placeholder="Search name or phone…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '6px 10px 6px 30px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
+              style={{ width: '100%', padding: '6px 10px 6px 30px', borderRadius: 5, border: '1px solid var(--border-primary)', background: 'var(--bg-hover)', color: 'var(--text-primary)', fontSize: 12, outline: 'none' }}
             />
           </div>
           <div style={{ display: 'flex', gap: 3 }}>
@@ -516,8 +516,8 @@ export default function PipelinePage() {
                 key={s}
                 onClick={() => setSortBy(s)}
                 style={{
-                  padding: '4px 9px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)',
-                  background: sortBy === s ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  padding: '4px 9px', borderRadius: 4, border: '1px solid var(--border-primary)',
+                  background: sortBy === s ? 'var(--bg-hover)' : 'transparent',
                   color: sortBy === s ? 'var(--text-primary)' : '#525252',
                   fontSize: 11, fontWeight: 500, cursor: 'pointer',
                 }}
@@ -541,7 +541,7 @@ export default function PipelinePage() {
         </div>
 
         {/* Header */}
-        <div className="table-grid" style={{ padding: '7px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 600, color: '#525252', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="table-grid" style={{ padding: '7px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 10, fontWeight: 600, color: '#525252', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           <span>Name</span>
           <span>Stage</span>
           <span>Score</span>
@@ -562,7 +562,7 @@ export default function PipelinePage() {
               <div
                 key={lead.id}
                 className="table-grid pipeline-row"
-                style={{ padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
+                style={{ padding: '9px 14px', borderBottom: '1px solid var(--border-primary)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div
@@ -590,12 +590,12 @@ export default function PipelinePage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid var(--border-primary)' }}>
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'var(--text-muted)' : '#525252', padding: 2 }}>
               <MdChevronLeft size={18} />
             </button>
             <span style={{ color: '#525252', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{page} / {totalPages}</span>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'var(--text-muted)' : '#525252', padding: 2 }}>
               <MdChevronRight size={18} />
             </button>
           </div>
@@ -615,7 +615,7 @@ export default function PipelinePage() {
         .chevron-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .chevron-scroll::-webkit-scrollbar { display: none; }
         .chevron-btn:hover { filter: brightness(1.2) !important; }
-        .pipeline-row:hover { background: rgba(255,255,255,0.02); }
+        .pipeline-row:hover { background: var(--bg-hover); }
         .table-grid { display: grid; grid-template-columns: 2.5fr 1fr 0.6fr 0.4fr 1fr 0.6fr 1fr; gap: 0; }
         @media (max-width: 767px) {
           /* Phone: keep Name · Stage · Last Activity, drop Score/Ch/Days/City —

@@ -130,7 +130,7 @@ const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-primary)" strokeWidth="2" />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="2.5"
         strokeDasharray={`${dashLen} ${circumference}`}
         strokeLinecap="round"
@@ -1671,7 +1671,7 @@ export default function InboxPage() {
           white-space: nowrap;
           background: #1a1a1a;
           color: #e0e0e0;
-          border: 1px solid rgba(255,255,255,0.12);
+          border: 1px solid var(--border-primary);
           opacity: 0;
           pointer-events: none;
           transition: opacity 0.15s;
@@ -2555,7 +2555,7 @@ export default function InboxPage() {
                           )
                         )}
                         {!msg.metadata?.template_name && taskTag && (
-                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'var(--border-primary)' }}>
                             <span
                               className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded"
                               style={{ background: taskTag.bg, color: taskTag.color }}

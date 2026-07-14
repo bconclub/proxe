@@ -192,7 +192,7 @@ function HumansOverview() {
                     ))
                   ) : (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }}>
+                      style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                       All lead types
                     </span>
                   )}
@@ -208,7 +208,7 @@ function HumansOverview() {
                   </div>
                   {groups.length > 0 && (
                     <>
-                      <div className="flex h-1.5 rounded-full overflow-hidden mt-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <div className="flex h-1.5 rounded-full overflow-hidden mt-2" style={{ background: 'var(--bg-hover)' }}>
                         {groups.map((g) => (
                           <div key={g.label} style={{ width: `${(g.count / h.ownedCount) * 100}%`, background: g.color }} />
                         ))}

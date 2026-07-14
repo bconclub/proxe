@@ -1,3 +1,8 @@
+## 2026-07-14 · fix(core): light-mode sweep — hardcoded white borders/bg → theme tokens
+
+- Follow-up to the light-mode token fix: swept the top-traffic dashboards (inbox, pipeline, LeadDetailsModal, humans, Skeleton, TodaySnapshotButton, MicroCharts) for hardcoded `rgba(255,255,255,x)` borders / dividers / backgrounds / skeleton fills / a progress-ring track / disabled-pager color that were invisible on the light background. Replaced with `var(--border-primary)` / `var(--bg-hover)` / `var(--text-muted)` / `var(--text-primary)`. Left the `var(--x, rgba(...))` fallbacks alone (the var is always defined; fallback never used). Text-white on colored avatars/badges/buttons left as-is (correct in both themes).
+- `(pending-sha)`
+
 ## 2026-07-14 · fix(windchasers): flight-school leads + agent time/fee bugs
 
 - COURSE: flight-school leads no longer mislabelled "Pilot". `normalizeCourse` now maps flight-school/study-abroad → "Flight School" (before the generic "flight"→Pilot rule); inbound route forces COURSE="Flight School" for flight_school form/source/school fields and stores school + country. New COURSE option "Flight School".

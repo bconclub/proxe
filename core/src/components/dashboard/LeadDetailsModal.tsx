@@ -1796,7 +1796,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             height: '88vh',
             maxHeight: '88vh',
             // Visible outline so the modal lifts off the dark backdrop.
-            border: '1px solid rgba(255, 255, 255, 0.22)',
+            border: '1px solid var(--border-primary)',
             boxShadow:
               '0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 32px rgba(255, 255, 255, 0.04), 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 8px 24px -8px rgba(0, 0, 0, 0.5)',
           }}
@@ -1850,7 +1850,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <div
                     className="mb-3 p-2.5 rounded-lg border text-[12px] leading-snug text-[var(--text-primary)] italic"
                     style={{
-                      background: 'rgba(255,255,255,0.04)',
+                      background: 'var(--bg-hover)',
                       borderColor: 'var(--border-primary)',
                     }}
                   >
@@ -2131,7 +2131,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </span>
                       )}
                       {pp && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] max-w-[200px] truncate" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)' }}>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] max-w-[200px] truncate" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>
                           {pp}
                         </span>
                       )}

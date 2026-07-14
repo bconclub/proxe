@@ -263,7 +263,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                               return (
                                 <li key={src} className="flex items-center gap-2">
                                   <span className="text-[11px] font-medium flex-1 truncate" style={{ color: 'var(--text-primary)' }}>{src}</span>
-                                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-hover)' }}>
                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#a5b4fc' }} />
                                   </div>
                                   <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{n}</span>
@@ -372,7 +372,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                                   router.push(`/dashboard/inbox?lead=${l.id}`)
                                 }}
                                 className="w-full text-left p-1.5 rounded-md hover:opacity-90 transition flex items-center gap-2"
-                                style={{ background: 'rgba(255,255,255,0.03)' }}
+                                style={{ background: 'var(--bg-hover)' }}
                               >
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[11px] font-semibold truncate">{l.name}</div>
@@ -434,7 +434,7 @@ function ScoreRow({ label, n, color, total }: { label: string; n: number; color:
   return (
     <div className="flex items-center gap-2">
       <span className="text-[11px] font-medium w-[80px] shrink-0" style={{ color }}>{label}</span>
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-hover)' }}>
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
       </div>
       <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>{n}</span>
@@ -446,7 +446,7 @@ function EventCell({ label, value }: { label: string; value: number }) {
   return (
     <div
       className="px-2.5 py-1.5 rounded-md flex items-center justify-between"
-      style={{ background: 'rgba(255,255,255,0.03)' }}
+      style={{ background: 'var(--bg-hover)' }}
     >
       <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{label}</span>
       <span className="text-[13px] font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{value}</span>
@@ -513,7 +513,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
   const SkelBox = ({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
     <div
       className={`animate-pulse rounded ${className}`}
-      style={{ background: 'rgba(255,255,255,0.06)', ...style }}
+      style={{ background: 'var(--bg-hover)', ...style }}
     />
   )
 
@@ -526,7 +526,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
             key={i}
             className="px-2.5 py-2 rounded-lg border flex flex-col items-start"
             style={{
-              background: 'rgba(255,255,255,0.02)',
+              background: 'var(--bg-hover)',
               borderColor: 'var(--border-primary)',
             }}
           >

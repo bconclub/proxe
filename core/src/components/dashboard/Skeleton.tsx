@@ -29,7 +29,7 @@ export function SkeletonBlock({
           width,
           height,
           borderRadius: rounded ? 9999 : 8,
-          background: 'rgba(255,255,255,0.05)',
+          background: 'var(--bg-hover)',
           animation: 'skeleton-pulse 1.5s ease-in-out infinite',
         }}
       />
@@ -63,7 +63,7 @@ export function SkeletonCard({ children }: { children?: React.ReactNode }) {
         background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
         borderRadius: 'var(--border-radius-lg, 8px)',
         padding: '1rem',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: '1px solid var(--border-primary)',
       }}
     >
       {children || (
@@ -88,7 +88,7 @@ export function SkeletonTable({
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ display: 'flex', gap: 16, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{ display: 'flex', gap: 16, padding: '10px 14px', borderBottom: '1px solid var(--border-primary)' }}>
         {Array.from({ length: cols }).map((_, i) => (
           <SkeletonBlock key={i} width={`${60 + Math.round(Math.sin(i + 1) * 20 + 20)}px`} height="12px" />
         ))}
@@ -101,7 +101,7 @@ export function SkeletonTable({
             display: 'flex',
             gap: 16,
             padding: '12px 14px',
-            borderBottom: '1px solid rgba(255,255,255,0.03)',
+            borderBottom: '1px solid var(--border-primary)',
             animationDelay: `${r * 0.08}s`,
           }}
         >
@@ -151,7 +151,7 @@ export function ConversationsSkeleton() {
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
       {/* Left - conversation list */}
-      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--border-primary)', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <SkeletonBlock width="100%" height="32px" />
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -172,7 +172,7 @@ export function ConversationsSkeleton() {
         ))}
       </div>
       {/* Right - lead detail */}
-      <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid rgba(255,255,255,0.06)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 300, flexShrink: 0, borderLeft: '1px solid var(--border-primary)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <SkeletonBlock width="80px" height="80px" rounded />
         <SkeletonBlock width="60%" height="14px" />
         <SkeletonBlock width="40%" height="12px" />
@@ -190,7 +190,7 @@ export function LeadsSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <SkeletonBlock width="260px" height="36px" />
-      <div style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.02))', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.02))', borderRadius: 8, border: '1px solid var(--border-primary)', overflow: 'hidden' }}>
         <SkeletonTable rows={8} cols={6} />
       </div>
     </div>
@@ -211,9 +211,9 @@ export function TasksSkeleton() {
           </SkeletonCard>
         ))}
       </div>
-      <div style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.02))', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', padding: 16 }}>
+      <div style={{ background: 'var(--bg-secondary, rgba(255,255,255,0.02))', borderRadius: 8, border: '1px solid var(--border-primary)', padding: 16 }}>
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
+          <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--border-primary)', alignItems: 'center' }}>
             <SkeletonBlock width="16px" height="16px" rounded />
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
               <SkeletonBlock width={`${60 + (i % 3) * 15}%`} height="13px" />

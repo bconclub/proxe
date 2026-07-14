@@ -55,7 +55,7 @@ export function ActivityHeatmap({ data }: { data: Array<{ date: string; count: n
                     height: CELL_H, borderRadius: 5,
                     background: cell.count <= 0 ? 'var(--bg-tertiary)' : `linear-gradient(135deg, ${bg}, ${heatColor(Math.min(1, f + 0.12))})`,
                     boxShadow: f > 0.6 ? `0 0 10px ${bg}88` : 'none',
-                    border: '1px solid rgba(255,255,255,0.04)',
+                    border: '1px solid var(--border-primary)',
                     transition: 'transform 120ms',
                   }}
                 />
@@ -132,7 +132,7 @@ export function WeekHourHeatmap({ weekHour }: { weekHour: number[][] }) {
                     flex: 1, minWidth: 0, height: 18, borderRadius: 4,
                     background: count <= 0 ? 'var(--bg-tertiary)' : `linear-gradient(135deg, ${bg}, ${heatColor(Math.min(1, f + 0.12))})`,
                     boxShadow: f > 0.66 ? `0 0 9px ${bg}99` : 'none',
-                    border: '1px solid rgba(255,255,255,0.04)',
+                    border: '1px solid var(--border-primary)',
                   }}
                 />
               )
