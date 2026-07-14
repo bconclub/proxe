@@ -1002,15 +1002,47 @@ export async function POST(request: NextRequest) {
           && isLikelyRealPersonName(leadName)
           && leadName.trim().toLowerCase() !== lkzBrand
         const firstName = (nameIsPerson ? leadName : 'there').split(' ')[0]
-        const templateName = 'lokazen_lead_confirm'
-        const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
-        const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
-        const waRes = await sendWhatsAppTemplate(
-          normalizedPhone,
-          templateName,
-          [{ type: 'body', parameters: params }],
-          'en',
-        )
+        const isBrandLead = brandCtxData.user_type === 'brand'
+
+        // Approved (POSITIONAL {{1}}=name) confirm template — the brand+owner
+        // default AND the fallback if the richer brand-welcome is not yet live.
+        const confirmName = 'lokazen_lead_confirm'
+        const confirmComponents = [{ type: 'body' as const, parameters: [{ type: 'text', text: firstName }] }]
+        const confirmBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
+
+        // Chosen send. Brand leads try the richer brand-welcome (NAMED params)
+        // first; everyone else gets the confirm.
+        let templateName = confirmName
+        let renderedBody = confirmBody
+        let components: Array<{ type: 'body'; parameters: Array<any> }> = confirmComponents
+
+        if (isBrandLead) {
+          const brandName = String(brandCtxData.brand_name || '').trim() || 'your brand'
+          const rentRange = String(brandCtxData.budget_monthly_rent || '').trim() || 'your budget'
+          const sizeRange = String(brandCtxData.required_size_sqft || '').trim() || 'your requirement'
+          const locations = String(brandCtxData.target_zones || '').trim() || 'your preferred areas'
+          templateName = 'lokazen_brand_welcome_v1'
+          components = [{ type: 'body', parameters: [
+            { type: 'text', parameter_name: 'contact_name', text: firstName },
+            { type: 'text', parameter_name: 'brand_name', text: brandName },
+            { type: 'text', parameter_name: 'rent_range', text: rentRange },
+            { type: 'text', parameter_name: 'size_range', text: sizeRange },
+            { type: 'text', parameter_name: 'locations', text: locations },
+          ] }]
+          renderedBody = `Hi ${firstName}, Loka here from Lokazen\n\nGot your brief for ${brandName}:\n\nBudget: ₹${rentRange}/mo\nSize: ${sizeRange} sq ft\nAreas: ${locations}\n\nWe are pulling matched spaces that fit your requirement.\n\nTeam Lokazen`
+        }
+
+        let waRes = await sendWhatsAppTemplate(normalizedPhone, templateName, components, 'en')
+
+        // lokazen_brand_welcome_v1 is still In review on Meta. Until it is
+        // approved the send fails — fall back to the approved confirm template so
+        // the brand still gets a welcome. Drop this fallback once v1 is live.
+        if (!waRes.success && isBrandLead) {
+          console.warn(`[inbound] Lokazen brand-welcome (${templateName}) failed (${waRes.error}) — falling back to ${confirmName}`)
+          templateName = confirmName
+          renderedBody = confirmBody
+          waRes = await sendWhatsAppTemplate(normalizedPhone, confirmName, confirmComponents, 'en')
+        }
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
