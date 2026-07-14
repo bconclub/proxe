@@ -1164,7 +1164,21 @@ export default function InboxPage() {
           booking_date: bookingDateFromCtx,
           booking_time: bookingTimeFromCtx,
           next_touchpoint: nextTouchpoint,
-          form_data: uc?.form_data || null,
+          // Surface the FULL captured submission in the inbox card. The rich CRE
+          // fields (category, areas, size, budget, outlets / property type, rent,
+          // floor) live in unified_context.lokazen, not form_data — merge them in
+          // so the card shows the real requirement, not just the brand name.
+          form_data: (() => {
+            const base: Record<string, any> = (uc as any)?.form_data && typeof (uc as any).form_data === 'object' ? { ...(uc as any).form_data } : {}
+            const lkz: any = (uc as any)?.lokazen || {}
+            if (Object.keys(lkz).length) {
+              const cre: Record<string, any> = lkz.user_type === 'owner'
+                ? { property_type: lkz.property_type, size_sqft: lkz.property_size_sqft, rent: lkz.asking_rent_monthly, floor: lkz.floor, area: lkz.property_zone, deposit: lkz.deposit, map: lkz.google_maps_url }
+                : { brand: lkz.brand_name, category: lkz.brand_category, areas: lkz.target_zones, format: lkz.preferred_format, size_sqft: lkz.required_size_sqft, budget: lkz.budget_monthly_rent, outlets: lkz.current_outlets }
+              for (const [k, v] of Object.entries(cre)) if (v != null && v !== '') base[k] = v
+            }
+            return Object.keys(base).length ? base : null
+          })(),
           first_touchpoint: (lead as any)?.first_touchpoint || null,
           unified_context: uc || null,
           last_interaction_at: (lead as any)?.last_interaction_at || null,
@@ -2070,7 +2084,7 @@ export default function InboxPage() {
                               {selectedConversation?.lead_name || 'Lead'}
                             </span>
                             <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'rgba(24,119,242,0.15)', color: '#1877F2' }}>
-                              Meta Form Submission
+                              Form submission
                             </span>
                           </div>
                         </div>
