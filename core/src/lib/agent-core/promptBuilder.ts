@@ -273,7 +273,17 @@ function buildUserPrompt(params: {
         }
         const dateRef = `Upcoming dates — resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
-        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule} ${closedRule}\n\n${dateRef}`;
+        const upcomingRule = `TIME AWARENESS — a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
+        const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. Online slots are 3:00 PM, 4:00 PM, 5:00 PM. The moment the user taps or states a specific time (for example "3:00 PM"), that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns (for example the user tapped "3:00 PM" and then "Tomorrow"), do NOT ask anything else: call book_consultation right away with that day and time, then confirm. Never switch to the 11 AM to 7 PM offline window after offering the 3/4/5 PM slots, because mixing windows is what restarts the loop.`;
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule} ${closedRule}\n\n${bookingSequenceRule}\n\n${upcomingRule}\n\n${dateRef}`;
+      })()
+    : channel === 'voice'
+    ? (() => {
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const isoDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. A call or booking scheduled for later today is UPCOMING, not missed — never apologize for a missed call for a time that has not passed yet.`;
       })()
     : '';
 
