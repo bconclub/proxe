@@ -1,3 +1,9 @@
+##  · fix(core): "Friday" books FRIDAY — bare weekday names parse in booking dates
+
+- resolveBookingDate understood "tomorrow"/"next friday"/"25 june" but a BARE weekday ("Friday", "this Friday", "coming Monday") fell to new Date("friday") = Invalid and silently booked TOMORROW — a founder's "he gave me Friday" note booked Tue 10am. Bare/this/coming weekday now maps to the next occurrence; "day after tomorrow" added too.
+- Data repaired for lead R: booking moved to Fri 17 Jul 10:00, reminders re-aimed (24h Thu 10:00, 30m Fri 09:30), and the note's "Thursday evening call him back" now exists as a human_followup (Thu 6pm).
+- `(pending-sha)`
+
 ##  · fix(core): template messages get READ RECEIPTS — wa_message_id logged on every template send
 
 - Delivery/read ticks match conversations on metadata.wa_message_id; the dashboard send_template path logged only meta_message_id and the follow-up cron logged no id at all — template bubbles could never tick past "sent". Both now log wa_message_id + whatsapp_message_id (the worker already did). Raaja's sent row backfilled so late receipts still attach.
