@@ -519,7 +519,11 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
         booking_created_at: now.toISOString(),
         ...(sessionType ? { session_type: sessionType } : {}),
       };
-      await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', leadId);
+      // ALSO refresh the top-level booking columns — the Key Event card (and
+      // anything else) reads lead.booking_date FIRST, so a stale column here
+      // shadows the fresh context booking (seen live: a rebooked Fri 17th
+      // still displayed the old Wed 15th).
+      await supabase.from('all_leads').update({ unified_context: ctx, booking_date: istDate, booking_time: istTime }).eq('id', leadId);
       actions.push(`booking_stored:${sessionType || 'unspecified'}`);
       actionsTaken.push(
         sessionType === 'offline' ? 'Recorded as an in-person (offline) visit'

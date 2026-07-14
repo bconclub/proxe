@@ -1,3 +1,9 @@
+##  · fix(core): Key Event updates on rebooking — top-level booking columns refreshed
+
+- Rebooking via a call note updated unified_context.voice.booking_* but NOT the top-level all_leads.booking_date/booking_time columns — which the Key Event card reads FIRST, so the stale old slot shadowed the new one ("Friday 17th July 11am" logged, card stuck on Wed 15th 10:00). The BOOKING_MADE branch now refreshes the columns in the same update.
+- Data: R's columns corrected to Fri 17 Jul 11:00; duplicate 10:00-era reminders cancelled (kept: 24h Thu 11:00, 30m Fri 10:30, Thursday-evening callback).
+- `(pending-sha)`
+
 ##  · fix(core): lead-modal name edit no longer explodes the header layout
 
 - Clicking the name-edit pencil grew the contact card +90px (input's intrinsic size=20 min-width at text-xl) and crushed the Quick Stats column into tall slivers. Fix: size={1} on the edit input + min-w-0 on the contact-card section. Verified: header widths byte-identical before/after entering edit mode. Core modal — applies to every brand's dashboard.
