@@ -96,13 +96,18 @@ const TRIGGERS: QuickReplyTrigger[] = [
       buttons: ['Book a demo', 'Talk to counsellor', 'Eligibility'],
     },
   },
-  // ── Cost ────────────────────────────────────────────────────────────────
+  // ── Cost ──────────────────────────────────────────────────────────────────
+  // A bare "fees"/"cost" has NO course context here (findQuickReplyFor only sees
+  // the message, not the lead's course_interest) — so it must NOT assert Pilot
+  // ₹60–70L, which was quoting pilot fees to cabin-crew / flight-school leads.
+  // Keep the programs' fees separate: ask which one, or offer a counsellor.
+  // Course-specific fee questions still fast-path via the CPL/DGCA triggers above.
   {
     match: /\b(cost|fees?|price|pricing|how much|charges?)\b/i,
     config: {
       triggerKey: 'cost',
-      body: 'Pilot training *investment* is *around ₹60–70 lakh* on average, end to end. What would help?',
-      buttons: ['Full breakdown', 'Talk to counsellor', 'Financing'],
+      body: 'Happy to share fees — they differ by program (pilot training, DGCA ground classes, cabin crew, flight schools abroad). Which are you looking at, or shall I have a counsellor call you with the exact numbers?',
+      buttons: ['Pilot training', 'Cabin crew', 'Talk to counsellor'],
     },
   },
   // ── Demo / Booking ──────────────────────────────────────────────────────

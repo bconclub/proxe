@@ -1,3 +1,11 @@
+## 2026-07-14 · fix(windchasers): flight-school leads + agent time/fee bugs
+
+- COURSE: flight-school leads no longer mislabelled "Pilot". `normalizeCourse` now maps flight-school/study-abroad → "Flight School" (before the generic "flight"→Pilot rule); inbound route forces COURSE="Flight School" for flight_school form/source/school fields and stores school + country. New COURSE option "Flight School".
+- WELCOME: flight-school leads get the generic welcome (has a "Flight Schools" button) instead of the pilot-training welcome. (Dedicated windchasers_flight_school_welcome_v1 can replace it once Meta-approved + param names confirmed.)
+- FEES (live bug): the bare-"fees"/"cost" quick-reply asserted Pilot ₹60–70L to everyone (no course context) — cabin-crew/flight-school leads got pilot fees. Now course-neutral: asks which program or offers a counsellor callback. Course-specific fee questions still fast-path via the CPL/DGCA triggers.
+- TIME (live bug): agent apologized for a "missed" 5PM call at 2PM. Added a TIME AWARENESS rule (future slot = upcoming, not missed) to the per-turn IST context, and gave the voice channel a current-IST + upcoming line (it had none).
+- `(pending-sha)`
+
 ##  · fix(core): Key Event updates on rebooking — top-level booking columns refreshed
 
 - Rebooking via a call note updated unified_context.voice.booking_* but NOT the top-level all_leads.booking_date/booking_time columns — which the Key Event card reads FIRST, so the stale old slot shadowed the new one ("Friday 17th July 11am" logged, card stuck on Wed 15th 10:00). The BOOKING_MADE branch now refreshes the columns in the same update.

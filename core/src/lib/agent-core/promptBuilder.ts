@@ -273,7 +273,16 @@ function buildUserPrompt(params: {
         }
         const dateRef = `Upcoming dates — resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
-        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule} ${closedRule}\n\n${dateRef}`;
+        const upcomingRule = `TIME AWARENESS — a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM. ${todayRule} ${closedRule}\n\n${upcomingRule}\n\n${dateRef}`;
+      })()
+    : channel === 'voice'
+    ? (() => {
+        const now = new Date();
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
+        const isoDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. A call or booking scheduled for later today is UPCOMING, not missed — never apologize for a missed call for a time that has not passed yet.`;
       })()
     : '';
 

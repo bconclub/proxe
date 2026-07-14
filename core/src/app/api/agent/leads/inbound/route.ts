@@ -285,6 +285,10 @@ export async function POST(request: NextRequest) {
     // Cabin-crew lead flag (windchasers) — set in the brand block below, read
     // later for the dedicated cabin-crew welcome + first_outreach skip.
     let isCabinCrewLead = false
+    // Flight-school lead flag (windchasers) — set below, read at the welcome
+    // block so these get the generic welcome (which has a "Flight Schools"
+    // button) rather than the pilot-training welcome.
+    let isFlightSchoolLead = false
     const audienceRaw = String(cf2.audience || cf2.user_type || (body as any).audience || (body as any).user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
@@ -320,6 +324,21 @@ export async function POST(request: NextRequest) {
       // (TYPE stays user_type: student/parent; cabin crew belongs in COURSE.)
       if (isCabinCrewLead && !brandCtxData.course_interest) {
         brandCtxData.course_interest = 'Cabin Crew'
+      }
+      // Flight-school lead (study/train abroad) — from the flight-school form/
+      // source or a school-name field. Force COURSE = 'Flight School' so it is
+      // NOT remapped to 'Pilot' (normalizeCourse treats "flight" as Pilot).
+      isFlightSchoolLead =
+        brandCtxData.course_interest === 'Flight School' ||
+        String(cf2.form_type || (body as any).form_type || '').toLowerCase().trim() === 'flight_school' ||
+        String(normalizedSource || '').toLowerCase() === 'flight_school' ||
+        !!(cf2.school_interested || cf2.school_country || (body as any).school_interested)
+      if (isFlightSchoolLead) {
+        brandCtxData.course_interest = 'Flight School'
+        const school = cf2.school_interested || (body as any).school_interested
+        const country = cf2.school_country || (body as any).school_country
+        if (school) brandCtxData.school_interested = String(school)
+        if (country) brandCtxData.school_country = String(country)
       }
       const demoTypeRaw = String(cf2.demo_type || '').toLowerCase().trim()
       if (demoTypeRaw) brandCtxData.session_type = demoTypeRaw
@@ -1418,6 +1437,12 @@ export async function POST(request: NextRequest) {
         if (isParentLead) {
           welcomeTpl = 'windchasers_pilot_parents_welcome_v1'
           sendResult = await sendParentWelcomeTemplate(phone, firstName)
+        } else if (isFlightSchoolLead) {
+          // Flight-school leads get the generic welcome — it carries a "Flight
+          // Schools" button — rather than the pilot-training welcome. (A dedicated
+          // windchasers_flight_school_welcome_v1 can replace this once approved.)
+          welcomeTpl = 'windchasers_generic_welcome_v3'
+          sendResult = await sendWelcomeTemplate(phone, firstName, welcomeTpl)
         } else {
           welcomeTpl = pickWelcomeTemplate(...signals)
           sendResult = await sendWelcomeTemplate(phone, firstName, welcomeTpl)
