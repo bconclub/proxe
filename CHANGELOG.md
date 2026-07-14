@@ -1,3 +1,8 @@
+##  · fix(core): lead-modal name edit no longer explodes the header layout
+
+- Clicking the name-edit pencil grew the contact card +90px (input's intrinsic size=20 min-width at text-xl) and crushed the Quick Stats column into tall slivers. Fix: size={1} on the edit input + min-w-0 on the contact-card section. Verified: header widths byte-identical before/after entering edit mode. Core modal — applies to every brand's dashboard.
+- `(pending-sha)`
+
 ##  · feat(bcon): tasks are INTERACTION-DRIVEN only — autonomous scanners retired
 
 - Founder model: a task exists because a human interaction created it (call logged → brain plans next steps per person; booking → reminders). The worker's autonomous creators — createFollowUpTasks, createColdLeadTasks, and the morning-briefing "proactive intelligence" inserts (push_to_book / stale-lead day-1s / cold re-engagement) — are now gated behind AUTO_CREATE_TASKS=true (default OFF). Booking reminders + task execution + Telegram briefings stay.
