@@ -156,6 +156,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+    // Diagnostic: log exactly what each lead arrives with (name vs brand + which
+    // form fields came through) so we can confirm the website is forwarding the
+    // full submission. Names/fields only — no secrets.
+    console.log('[inbound] received:', JSON.stringify({
+      name: name || null,
+      brand_name: brand_name || null,
+      source: source || null,
+      city: city || null,
+      cf_keys: Object.keys((custom_fields as Record<string, unknown>) || {}),
+    }))
 
     // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
     let notes: string | null = null
