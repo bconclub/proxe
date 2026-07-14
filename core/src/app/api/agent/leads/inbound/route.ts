@@ -941,6 +941,7 @@ export async function POST(request: NextRequest) {
             ? [
                 ['Brand', lkz.brand_name],
                 ['Category', lkz.brand_category],
+                ['From', city?.trim() || null],
                 ['Areas', lkz.target_zones],
                 ['Format', lkz.preferred_format],
                 ['Size', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
@@ -1003,15 +1004,16 @@ export async function POST(request: NextRequest) {
           && leadName.trim().toLowerCase() !== lkzBrand
         const firstName = (nameIsPerson ? leadName : 'there').split(' ')[0]
         const isBrandLead = brandCtxData.user_type === 'brand'
+        const isOwnerLead = brandCtxData.user_type === 'owner'
 
-        // Approved (POSITIONAL {{1}}=name) confirm template — the brand+owner
-        // default AND the fallback if the richer brand-welcome is not yet live.
+        // Approved (POSITIONAL {{1}}=name) confirm template — the default AND the
+        // fallback if the richer audience welcome is not yet live on Meta.
         const confirmName = 'lokazen_lead_confirm'
         const confirmComponents = [{ type: 'body' as const, parameters: [{ type: 'text', text: firstName }] }]
         const confirmBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
 
-        // Chosen send. Brand leads try the richer brand-welcome (NAMED params)
-        // first; everyone else gets the confirm.
+        // Chosen send. Brand and owner leads try their richer welcome (NAMED
+        // params) first; everyone else gets the confirm.
         let templateName = confirmName
         let renderedBody = confirmBody
         let components: Array<{ type: 'body'; parameters: Array<any> }> = confirmComponents
@@ -1030,15 +1032,27 @@ export async function POST(request: NextRequest) {
             { type: 'text', parameter_name: 'locations', text: locations },
           ] }]
           renderedBody = `Hi ${firstName}, Loka here from Lokazen\n\nGot your brief for ${brandName}:\n\nBudget: ₹${rentRange}/mo\nSize: ${sizeRange} sq ft\nAreas: ${locations}\n\nWe are pulling matched spaces that fit your requirement.\n\nTeam Lokazen`
+        } else if (isOwnerLead) {
+          const location = String(brandCtxData.property_zone || '').trim() || 'your area'
+          const size = String(brandCtxData.property_size_sqft || '').trim() || 'your space'
+          const rent = String(brandCtxData.asking_rent_monthly || '').trim() || 'your expected rent'
+          templateName = 'lokazen_property_owner_welcome_v1'
+          components = [{ type: 'body', parameters: [
+            { type: 'text', parameter_name: 'contact_name', text: firstName },
+            { type: 'text', parameter_name: 'location', text: location },
+            { type: 'text', parameter_name: 'size', text: size },
+            { type: 'text', parameter_name: 'rent', text: rent },
+          ] }]
+          renderedBody = `Hi ${firstName}, Loka here from Lokazen.\n\nGot your property listing brief:\n\n📍 Location: ${location}\n\nSize: ${size} sq ft\nExpected rent: ₹${rent}/mo\n\nWe are matching it against active brands looking to expand.\n\nTeam Lokazen`
         }
 
         let waRes = await sendWhatsAppTemplate(normalizedPhone, templateName, components, 'en')
 
-        // lokazen_brand_welcome_v1 is still In review on Meta. Until it is
-        // approved the send fails — fall back to the approved confirm template so
-        // the brand still gets a welcome. Drop this fallback once v1 is live.
-        if (!waRes.success && isBrandLead) {
-          console.warn(`[inbound] Lokazen brand-welcome (${templateName}) failed (${waRes.error}) — falling back to ${confirmName}`)
+        // The richer audience welcomes (brand / owner) are still In review on
+        // Meta. Until approved the send fails — fall back to the approved confirm
+        // so the lead still gets a welcome. Drop once both are live.
+        if (!waRes.success && (isBrandLead || isOwnerLead)) {
+          console.warn(`[inbound] Lokazen ${templateName} failed (${waRes.error}) — falling back to ${confirmName}`)
           templateName = confirmName
           renderedBody = confirmBody
           waRes = await sendWhatsAppTemplate(normalizedPhone, confirmName, confirmComponents, 'en')
