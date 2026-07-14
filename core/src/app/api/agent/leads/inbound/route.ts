@@ -24,6 +24,7 @@ import {
   sendWelcomeTemplate,
   isParentSource,
   sendParentWelcomeTemplate,
+  isLikelyRealPersonName,
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
@@ -963,7 +964,7 @@ export async function POST(request: NextRequest) {
       : null
     if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
       try {
-        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
         const templateName = 'lokazen_lead_confirm'
         const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
         const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
@@ -1166,7 +1167,7 @@ export async function POST(request: NextRequest) {
     // template is still in Meta review (no needs_human_followup noise — the
     // reminder cron + counsellors don't depend on this send).
     if (phone && isWebinarReg) {
-      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
       const webinarName = String(cfields.webinar_name || cfields.webinar_topic || (body as any).webinar_name || (body as any).event_name || '').trim()
       const webinarDate = String(cfields.webinar_date || cfields.webinar_datetime || (body as any).webinar_date || '').trim()
       // Single confirmation template for all audiences (windchasers_webinar_confirmation_v1).
@@ -1229,7 +1230,7 @@ export async function POST(request: NextRequest) {
     // welcome until the cabin-crew template is Meta-approved, so a cabin-crew
     // lead is never left unwelcomed. Dedup-guarded against re-submits/retries.
     if (phone && isCabinCrewLead && !isWebinarReg && !isPatSubmission && !isDemoBooking) {
-      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
       const ccAlready =
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_cabin_crew_welcome_v1')) ||
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v3')) ||
@@ -1291,7 +1292,7 @@ export async function POST(request: NextRequest) {
         // AWAIT (not fire-and-forget) — Vercel kills in-flight promises after
         // NextResponse.json() returns. Also always log to conversations,
         // success OR failure, so the dashboard reflects reality.
-        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
         const tierKey = (derivedTier || tier || '').toLowerCase().trim()
         const tierLabel = TIER_LABELS[tierKey] || (tier || 'Pending')
         const tierMessage = TIER_MESSAGES[tierKey] || 'A counsellor can walk you through the next steps.'
@@ -1384,7 +1385,7 @@ export async function POST(request: NextRequest) {
     // parent template (named param parent_name); everyone else pilot vs generic
     // by source. Dedup-guarded against re-submits / retries.
     if (isWindchasersWelcomeLead) {
-      const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+      const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
       const welcomeAlready =
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v3')) ||
         (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_generic_welcome_v1')) ||
@@ -1572,7 +1573,7 @@ export async function POST(request: NextRequest) {
           : 'windchasers_demo_offline_v2'
 
         // AWAIT (not fire-and-forget) — see PAT block above for rationale.
-        const firstName = (leadName !== 'Lead' ? leadName : 'there').split(' ')[0]
+        const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
         const renderedBody = demoFormat === 'online'
           ? renderDemoOnlineBody(firstName, dateDisplay, timeDisplay)
           : renderDemoOfflineBody(firstName, dateDisplay, timeDisplay)
