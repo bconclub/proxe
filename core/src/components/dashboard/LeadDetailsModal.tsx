@@ -2181,6 +2181,42 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     types the details in chat. */}
                 {(() => {
                   const lkz: any = currentLead.unified_context?.lokazen || {};
+
+                  // Two distinct Lokazen audiences, two distinct detail sets:
+                  //   OWNER  -> PROPERTY details (type, size, rent, floor, area, map)
+                  //   BRAND  -> BRAND details    (category, outlets, areas, budget)
+                  // A brand seeking space must never show an empty "Property details"
+                  // card, and an owner must never show brand fields.
+                  const lkzType = String(lkz.user_type || '').toLowerCase();
+                  const isLkzBrand = lkzType === 'brand'
+                    || (lkzType !== 'owner' && lkzType !== 'property_owner'
+                        && !!(lkz.brand_category || lkz.current_outlets || lkz.required_size_sqft || lkz.budget_monthly_rent || lkz.preferred_format));
+                  if (isLkzBrand) {
+                    const areas = Array.isArray(lkz.target_zones) ? lkz.target_zones.filter(Boolean).join(', ') : lkz.target_zones;
+                    const brandRows = ([
+                      ['Brand', lkz.brand_name],
+                      ['Category', lkz.brand_category],
+                      ['Current outlets', lkz.current_outlets],
+                      ['Preferred areas', areas],
+                      ['Format', lkz.preferred_format],
+                      ['Size needed', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
+                      ['Budget', lkz.budget_monthly_rent],
+                      ['Other details', lkz.notes || lkz.other_details || lkz.description || lkz.key_interest_signal],
+                    ] as Array<[string, any]>).filter((r) => !!r[1]);
+                    if (!brandRows.length) return null;
+                    return (
+                      <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                        <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--text-muted)' }}>Brand details</div>
+                        {brandRows.map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between gap-2 text-xs">
+                            <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                            <span className="text-right truncate max-w-[60%]" style={{ color: 'var(--text-secondary)' }} title={String(value)}>{String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
                   // Free-text "any other details" the owner shared that don't fit a
                   // fixed field (e.g. "No front glass", "fully visible prime property",
                   // landmark "Atri square"). Captured into notes/key_interest_signal.
