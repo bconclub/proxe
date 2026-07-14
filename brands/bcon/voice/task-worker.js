@@ -47,6 +47,9 @@ const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
 // what goes out on a test phone before any real lead is messaged. Unset it to go
 // live. Digits only (e.g. 919731660933).
 const TEST_RECIPIENT = (process.env.TEST_RECIPIENT || '').replace(/\D/g, '') || null;
+// Autonomous task creation (morning-briefing proactive inserts + lead
+// scanners) is OPT-IN: tasks are born from human interactions, not scanners.
+const AUTO_CREATE_TASKS = String(process.env.AUTO_CREATE_TASKS || '').toLowerCase() === 'true';
 if (TEST_RECIPIENT) {
   console.log(`[TEST MODE] All WhatsApp sends redirected to TEST_RECIPIENT=${TEST_RECIPIENT}. No real lead will be messaged.`);
 }
@@ -1525,7 +1528,7 @@ async function morningBriefing() {
       const timeStr = scheduledIST.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
       // ── High-score leads with no tasks and no booking ──
-      if (score >= 70 && !hasPendingTasks && !hasBooking && !hasPendingBookPush) {
+      if (AUTO_CREATE_TASKS && score >= 70 && !hasPendingTasks && !hasBooking && !hasPendingBookPush) {
         await supabase.from('agent_tasks').insert({
           task_type: 'push_to_book',
           task_description: `Morning briefing: push high-score lead ${name} to book`,
@@ -1545,7 +1548,7 @@ async function morningBriefing() {
       }
 
       // ── Not contacted in 3+ days but warm ──
-      if (lastInteraction && lastInteraction < threeDaysAgo && (temp === 'warm' || temp === 'hot') && !hasPendingTasks) {
+      if (AUTO_CREATE_TASKS && lastInteraction && lastInteraction < threeDaysAgo && (temp === 'warm' || temp === 'hot') && !hasPendingTasks) {
         const daysSince = Math.floor((Date.now() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24));
         await supabase.from('agent_tasks').insert({
           task_type: 'follow_up_day1',
@@ -1560,7 +1563,7 @@ async function morningBriefing() {
       }
 
       // ── Re-engagement opportunity: cold lead read recent message ──
-      if (prediction.reengagementOpportunity && !hasPendingTasks) {
+      if (AUTO_CREATE_TASKS && prediction.reengagementOpportunity && !hasPendingTasks) {
         await supabase.from('agent_tasks').insert({
           task_type: 'follow_up_day1',
           task_description: `Morning briefing: ${name} (cold) read recent message — re-engage`,
@@ -1814,8 +1817,17 @@ async function main() {
     await checkUnansweredQuestions();
 
     await createBookingReminderTasks();
-    await createFollowUpTasks();
-    await createColdLeadTasks();
+    // AUTONOMOUS task creation is OFF (founder, 14 Jul): tasks must be born
+    // from a HUMAN interaction — a logged call, a note, a booking — where the
+    // brain plans the next steps per person. The lead-scanners below decided
+    // on their own to ping weeks-old leads at random times; that behavior is
+    // opt-in only now. Re-enable deliberately with AUTO_CREATE_TASKS=true.
+    if (AUTO_CREATE_TASKS) {
+      await createFollowUpTasks();
+      await createColdLeadTasks();
+    } else {
+      console.log('[TaskWorker] Autonomous task creation disabled — interaction-driven tasks only');
+    }
 
     // Log task counts before processing
     const { data: taskCounts } = await supabase
