@@ -244,6 +244,13 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
     section(`${whoTag}${clean(l.leadType) ? `   ·   _${clean(l.leadType)}_` : ''}`),
   ];
 
+  // Captured brief — the Brand/Property fields (category, areas, size, budget…),
+  // one compact multiline block. Only non-empty fields render.
+  const brief = (l.detailFields || [])
+    .filter(([, v]) => clean(v == null ? '' : String(v)))
+    .map(([k, v]) => `*${clean(k)}:*  ${clean(String(v))}`);
+  if (brief.length) blocks.push(section(brief.join('\n')));
+
   // The issue, one glanceable italic line.
   if (clean(l.detail)) blocks.push(section(`_${clean(l.detail).slice(0, 400)}_`));
 
