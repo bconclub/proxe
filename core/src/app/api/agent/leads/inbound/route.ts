@@ -964,7 +964,15 @@ export async function POST(request: NextRequest) {
       : null
     if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
       try {
-        const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
+        // The lead's "name" is often the BRAND they typed (e.g. "Bulbul Blablu"),
+        // not a person — greeting "Hi Bulbul" is wrong. Only use it as a first
+        // name when it looks like a real person AND is NOT the same as the brand
+        // name; otherwise greet "there".
+        const lkzBrand = String(brand_name || brandCtxData.brand_name || '').trim().toLowerCase()
+        const nameIsPerson = leadName !== 'Lead'
+          && isLikelyRealPersonName(leadName)
+          && leadName.trim().toLowerCase() !== lkzBrand
+        const firstName = (nameIsPerson ? leadName : 'there').split(' ')[0]
         const templateName = 'lokazen_lead_confirm'
         const params: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: firstName }]
         const renderedBody = `Hi ${firstName}, Lokazen here - we have received your enquiry and a property specialist will contact you shortly. Reply to this message anytime to share your requirement (area, size, budget).`
