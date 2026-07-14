@@ -1,3 +1,10 @@
+##  · feat(bcon): tasks are INTERACTION-DRIVEN only — autonomous scanners retired
+
+- Founder model: a task exists because a human interaction created it (call logged → brain plans next steps per person; booking → reminders). The worker's autonomous creators — createFollowUpTasks, createColdLeadTasks, and the morning-briefing "proactive intelligence" inserts (push_to_book / stale-lead day-1s / cold re-engagement) — are now gated behind AUTO_CREATE_TASKS=true (default OFF). Booking reminders + task execution + Telegram briefings stay.
+- Queue purged: 22 scanner-created tasks cancelled ("firing random people at random times"); the 11 interaction-born tasks remain (Raaja + Riitesh RNR ladders, R's booking reminders + Thursday callback).
+- Ops: bcon-tasks pm2-deleted from the VPS earlier today (was running every 5 min via cron_restart, completing tasks with dead WhatsApp creds).
+- `(pending-sha)`
+
 ##  · fix(core): "Friday" books FRIDAY — bare weekday names parse in booking dates
 
 - resolveBookingDate understood "tomorrow"/"next friday"/"25 june" but a BARE weekday ("Friday", "this Friday", "coming Monday") fell to new Date("friday") = Invalid and silently booked TOMORROW — a founder's "he gave me Friday" note booked Tue 10am. Bare/this/coming weekday now maps to the next occurrence; "day after tomorrow" added too.
