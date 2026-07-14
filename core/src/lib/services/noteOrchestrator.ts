@@ -198,6 +198,17 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
     // keep today
   } else if (lower === 'tomorrow') {
     targetIST.setUTCDate(targetIST.getUTCDate() + 1);
+  } else if (lower === 'day after tomorrow' || lower === 'day after') {
+    targetIST.setUTCDate(targetIST.getUTCDate() + 2);
+  } else if (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(lower.replace(/^(this|coming|on)\s+/, ''))) {
+    // BARE weekday — how people actually talk: "Friday", "this Friday",
+    // "coming Monday". Used to fall through to new Date('friday') = Invalid
+    // and silently book TOMORROW (a Friday meeting landed on Tuesday).
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const targetDay = dayNames.indexOf(lower.replace(/^(this|coming|on)\s+/, ''));
+    let daysAhead = targetDay - targetIST.getUTCDay();
+    if (daysAhead <= 0) daysAhead += 7; // said "Friday" on a Friday → next week
+    targetIST.setUTCDate(targetIST.getUTCDate() + daysAhead);
   } else if (lower.startsWith('next ')) {
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const targetDay = dayNames.indexOf(lower.replace('next ', '').trim());
