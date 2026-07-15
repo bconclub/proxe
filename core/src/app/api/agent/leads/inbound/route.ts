@@ -1017,6 +1017,10 @@ export async function POST(request: NextRequest) {
         let templateName = confirmName
         let renderedBody = confirmBody
         let components: Array<{ type: 'body'; parameters: Array<any> }> = confirmComponents
+        // Quick-reply buttons baked into each approved template. WhatsApp renders
+        // them from the template itself; we mirror the labels into metadata so the
+        // dashboard inbox shows the same chips (confirm has none).
+        let templateButtons: string[] = []
 
         if (isBrandLead) {
           const brandName = String(brandCtxData.brand_name || '').trim() || 'your brand'
@@ -1032,6 +1036,7 @@ export async function POST(request: NextRequest) {
             { type: 'text', parameter_name: 'locations', text: locations },
           ] }]
           renderedBody = `Hi ${firstName}, Loka here from Lokazen\n\nGot your brief for ${brandName}:\n\nBudget: ₹${rentRange}/mo\nSize: ${sizeRange} sq ft\nAreas: ${locations}\n\nWe are pulling matched spaces that fit your requirement.\n\nTeam Lokazen`
+          templateButtons = ['How it works', 'Talk to The Team']
         } else if (isOwnerLead) {
           // Owners often drop a Google Maps pin instead of typing a locality, so
           // property_zone can be empty while the map link is present — use it as
@@ -1047,6 +1052,7 @@ export async function POST(request: NextRequest) {
             { type: 'text', parameter_name: 'rent', text: rent },
           ] }]
           renderedBody = `Hi ${firstName}, Loka here from Lokazen.\n\nGot your property listing brief:\n\n📍 Location: ${location}\n\nSize: ${size} sq ft\nExpected rent: ₹${rent}/mo\n\nWe are matching it against active brands looking to expand.\n\nTeam Lokazen`
+          templateButtons = ['How it Works', 'Talk to the Team']
         }
 
         let waRes = await sendWhatsAppTemplate(normalizedPhone, templateName, components, 'en')
@@ -1058,6 +1064,7 @@ export async function POST(request: NextRequest) {
           console.warn(`[inbound] Lokazen ${templateName} failed (${waRes.error}) — falling back to ${confirmName}`)
           templateName = confirmName
           renderedBody = confirmBody
+          templateButtons = []
           waRes = await sendWhatsAppTemplate(normalizedPhone, confirmName, confirmComponents, 'en')
         }
         await supabase.from('conversations').insert({
@@ -1069,6 +1076,7 @@ export async function POST(request: NextRequest) {
           metadata: {
             template_name: templateName,
             template_language: 'en',
+            template_buttons: templateButtons.length ? templateButtons : undefined,
             auto_sent: true,
             trigger: 'inbound_new_lead',
             sent_by: 'system (inbound webhook)',
