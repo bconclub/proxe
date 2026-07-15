@@ -1033,7 +1033,10 @@ export async function POST(request: NextRequest) {
           ] }]
           renderedBody = `Hi ${firstName}, Loka here from Lokazen\n\nGot your brief for ${brandName}:\n\nBudget: ₹${rentRange}/mo\nSize: ${sizeRange} sq ft\nAreas: ${locations}\n\nWe are pulling matched spaces that fit your requirement.\n\nTeam Lokazen`
         } else if (isOwnerLead) {
-          const location = String(brandCtxData.property_zone || '').trim() || 'your area'
+          // Owners often drop a Google Maps pin instead of typing a locality, so
+          // property_zone can be empty while the map link is present — use it as
+          // the location before falling back to a generic phrase.
+          const location = String(brandCtxData.property_zone || brandCtxData.google_maps_url || '').trim() || 'your area'
           const size = String(brandCtxData.property_size_sqft || '').trim() || 'your space'
           const rent = String(brandCtxData.asking_rent_monthly || '').trim() || 'your expected rent'
           templateName = 'lokazen_property_owner_welcome_v1'
