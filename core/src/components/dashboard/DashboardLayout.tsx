@@ -10,6 +10,7 @@ import { getBuildDate } from '@/lib/buildInfo'
 import { getBrandConfig } from '@/configs'
 import ArtifactSwitcher from '@/components/dashboard/ArtifactSwitcher'
 import DashboardBrain from '@/components/dashboard/DashboardBrain'
+import ReportIssueModal from '@/components/dashboard/ReportIssueModal'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
@@ -41,6 +42,7 @@ import {
   MdCampaign,
   MdSensors,
   MdPushPin,
+  MdReportProblem,
 } from 'react-icons/md'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
@@ -156,6 +158,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
+  const [reportIssueOpen, setReportIssueOpen] = useState(false)
   const moreOptionsRef = React.useRef<HTMLDivElement>(null)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
@@ -894,6 +897,46 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )
             })}
           </div>
+
+          {/* Report Issue — pinned under the nav on every brand. Anyone on the
+              team screenshots what's broken and sends it straight to HQ
+              (brand's issue-reports bucket → issues vault). */}
+          <button
+            type="button"
+            onClick={() => {
+              setReportIssueOpen(true)
+              if (isMobile) setMobileSidebarOpen(false)
+            }}
+            title={!showExpanded ? 'Report Issue' : undefined}
+            className="dashboard-layout-nav-item dashboard-layout-report-issue flex items-center flex-shrink-0"
+            style={{
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              backgroundColor: 'transparent',
+              margin: '2px 0',
+              borderRadius: '8px',
+              padding: '7px 10px 7px 0',
+              width: !showExpanded ? '40px' : 'auto',
+              cursor: 'pointer',
+              transition: 'background-color 180ms ease, color 180ms ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+              e.currentTarget.style.color = 'var(--text-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.color = 'var(--text-secondary)'
+            }}
+          >
+            <span style={{ width: '40px', minWidth: '40px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'inherit' }}>
+              <MdReportProblem size={16} />
+            </span>
+            {showExpanded && (
+              <span className="flex-1 truncate text-left" style={{ lineHeight: '20px' }}>Report Issue</span>
+            )}
+          </button>
         </nav>
 
         {/* Footer Section: User + Menu + Version in one compact strip */}
@@ -1063,7 +1106,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             <MdMenu size={20} />
           </button>
-          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
+          <h1 className="text-xl font-black flex-1 truncate" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
+          {/* Report Issue — mobile gets it in the top bar (no sidebar visible). */}
+          <button
+            onClick={() => setReportIssueOpen(true)}
+            className="touch-44 flex items-center justify-center p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+            style={{ color: 'var(--text-secondary)' }}
+            aria-label="Report Issue"
+          >
+            <MdReportProblem size={20} />
+          </button>
         </div>
 
         {/* Page content */}
@@ -1089,6 +1141,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           changes: open it, navigate anywhere, and it stays docked bottom-right
           with your conversation intact. Gated on the brand's brain feature. */}
       {brandFeatures.brain && <DashboardBrain dock />}
+
+      {/* Report Issue modal — layout-level so it opens over any page. */}
+      <ReportIssueModal open={reportIssueOpen} onClose={() => setReportIssueOpen(false)} />
     </div>
   )
 }
