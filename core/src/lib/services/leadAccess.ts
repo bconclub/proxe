@@ -12,7 +12,7 @@
  * can't express the match.
  */
 import { BRAND_ID, getBrandConfig } from '@/configs'
-import { COURSE_OPTIONS, normalizeCourse } from '@/configs/courses'
+import { getLeadTypeOptions, normalizeLeadType, leadTypeField } from '@/configs/leadTypes'
 
 // Leads with no course_interest yet (fresh, uncaptured) stay visible to
 // restricted users so new leads never silently vanish from every pipeline.
@@ -54,7 +54,7 @@ export async function getLeadAccess(supabase: any, userId: string): Promise<Lead
     }
     const isAdmin = me?.role === 'admin'
     const types: string[] | null = Array.isArray(me?.allowed_lead_types) && me.allowed_lead_types.length > 0
-      ? me.allowed_lead_types.map((t: string) => normalizeCourse(t)).filter(Boolean)
+      ? me.allowed_lead_types.map((t: string) => normalizeLeadType(t)).filter(Boolean)
       : null
     if (isAdmin || !types) return UNRESTRICTED(userId, isAdmin)
     return { restricted: true, isAdmin, allowedTypes: types, userId }
@@ -65,10 +65,11 @@ export async function getLeadAccess(supabase: any, userId: string): Promise<Lead
   }
 }
 
-/** Canonical lead type of a lead row, '' when untyped. */
+/** Canonical lead type of a lead row, '' when untyped. Brand-aware: reads
+ * course_interest (course brands) or user_type (Lokazen). */
 export function leadTypeOf(lead: any): string {
-  const raw = lead?.unified_context?.[BRAND_ID]?.course_interest
-  return normalizeCourse(raw)
+  const raw = lead?.unified_context?.[BRAND_ID]?.[leadTypeField()]
+  return normalizeLeadType(raw)
 }
 
 export function canSeeLead(access: LeadAccess, lead: any): boolean {
@@ -91,9 +92,10 @@ export function filterLeads<T = any>(access: LeadAccess, leads: T[]): T[] {
 export function sanitizeAllowedLeadTypes(raw: any): string[] | null | undefined {
   if (raw === null || raw === undefined) return null
   if (!Array.isArray(raw)) return undefined
+  const options = getLeadTypeOptions()
   const canonical = raw
-    .map((t: any) => normalizeCourse(String(t)))
-    .filter((t: string) => (COURSE_OPTIONS as readonly string[]).includes(t))
+    .map((t: any) => normalizeLeadType(String(t)))
+    .filter((t: string) => options.includes(t))
   return canonical.length > 0 ? Array.from(new Set(canonical)) : null
 }
 
