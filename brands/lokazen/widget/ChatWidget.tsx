@@ -209,6 +209,50 @@ const cleanSummary = (summary: string | null | undefined): string => {
     .trim();
 };
 
+// First-touch attribution. UTM params live only on the ad LANDING url, so we
+// persist them in localStorage the first time this browser is seen and reuse
+// them at chat/conversion time (by then the user has navigated away from the
+// landing url and the params are gone). Sent in the chat metadata so PROXe can
+// store the real marketing source instead of tagging every web lead "Direct".
+const LKZ_FIRST_TOUCH_KEY = 'lkz_first_touch';
+function getFirstTouchAttribution(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const p = new URLSearchParams(window.location.search);
+  const cur = {
+    utm_source: p.get('utm_source') || '',
+    utm_medium: p.get('utm_medium') || '',
+    utm_campaign: p.get('utm_campaign') || '',
+    utm_content: p.get('utm_content') || '',
+    utm_term: p.get('utm_term') || '',
+  };
+  const hasUtm = !!(cur.utm_source || cur.utm_medium || cur.utm_campaign);
+  let stored: Record<string, string> | null = null;
+  try { stored = JSON.parse(localStorage.getItem(LKZ_FIRST_TOUCH_KEY) || 'null'); } catch { /* ignore */ }
+  if (!stored) {
+    // First page ever seen in this browser — this IS the first touch.
+    stored = { ...cur, landing_page: window.location.href, referrer: document.referrer || '' };
+    try { localStorage.setItem(LKZ_FIRST_TOUCH_KEY, JSON.stringify(stored)); } catch { /* ignore */ }
+  } else if (hasUtm && !stored.utm_source && !stored.utm_campaign) {
+    // First touch was UTM-less but a later page in the same browser carries UTM
+    // (e.g. they returned via an ad) — upgrade it once.
+    stored = { ...stored, ...cur };
+    try { localStorage.setItem(LKZ_FIRST_TOUCH_KEY, JSON.stringify(stored)); } catch { /* ignore */ }
+  }
+  // Current-url UTM wins if present (they're on a landing page now); else the
+  // persisted first touch.
+  const src = hasUtm ? cur : (stored || cur);
+  const out: Record<string, string> = {
+    page_url: window.location.href,
+    landing_page: (stored && stored.landing_page) || window.location.href,
+  };
+  const ref = (stored && stored.referrer) || document.referrer || '';
+  if (ref) out.referrer = ref;
+  for (const k of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'] as const) {
+    if (src[k]) out[k] = src[k];
+  }
+  return out;
+}
+
 export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = false }: ChatWidgetProps) {
   const brand = getCurrentBrandId();
   const config = getBrandConfig(brand);
@@ -900,6 +944,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', resetOnLoad = fa
   const buildRequestPayload = () => ({
     pageContext,
     lokazenAudience: isLokazenScoutPage ? 'scout' : undefined,
+    attribution: getFirstTouchAttribution(),
     session: {
       externalId: externalSessionId,
       supabaseId: sessionRecord?.id ?? null,
