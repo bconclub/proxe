@@ -308,7 +308,7 @@ User's message: ${input.message}`
         rawResponse = `You're booked for ${recovered.timeDisplay} ${recovered.dateLabel}. The team will call you then.`;
       } else {
         console.error('[Engine] FALSE BOOKING CLAIM — could not recover a slot from the conversation. Overwriting + flagging lead.');
-        await flagForHumanFollowup(supabase, input, 'Agent claimed a booking that book_consultation did not actually persist');
+        await flagForHumanFollowup(supabase, input, 'BOOKING FAILED — the customer tried to book a call but it did not save. Please call them to confirm a time.');
         rawResponse = "I could not lock that slot just now, but I have passed your details to our team. They will reach out to confirm your time shortly.";
       }
     }
