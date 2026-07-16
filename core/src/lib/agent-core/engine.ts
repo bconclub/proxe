@@ -299,9 +299,18 @@ User's message: ${input.message}`
     const claimsBooked = /(\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way|booked,?\b|your (call|visit|callback) is (set|booked|scheduled|confirmed)|(call|callback|visit) is set for|team will (confirm|call)|will confirm and call you|will call you then)\b|\bat \d{1,2}(:\d{2})?\s*(am|pm)\s+works\b)/i
       .test(rawResponse);
     if (claimsBooked) {
-      console.error('[Engine] FALSE BOOKING CLAIM — response confirms a booking but book_consultation did not succeed this turn. Overwriting + flagging lead.');
-      await flagForHumanFollowup(supabase, input, 'Agent claimed a booking that book_consultation did not actually persist');
-      rawResponse = "I could not lock that slot just now, but I have passed your details to our team. They will reach out to confirm your time shortly.";
+      // Before giving up: go back through the conversation, pull the date + time
+      // the user actually agreed, and register it. A failed/never-called booking
+      // should not lose the call — recover it instead of only apologising.
+      const recovered = await recoverLostBooking(input, rawResponse, supabase);
+      if (recovered) {
+        console.log(`[Engine] FALSE BOOKING CLAIM RECOVERED from conversation: ${recovered.dateISO} ${recovered.timeDisplay}`);
+        rawResponse = `You're booked for ${recovered.timeDisplay} ${recovered.dateLabel}. The team will call you then.`;
+      } else {
+        console.error('[Engine] FALSE BOOKING CLAIM — could not recover a slot from the conversation. Overwriting + flagging lead.');
+        await flagForHumanFollowup(supabase, input, 'Agent claimed a booking that book_consultation did not actually persist');
+        rawResponse = "I could not lock that slot just now, but I have passed your details to our team. They will reach out to confirm your time shortly.";
+      }
     }
   }
 
@@ -2030,6 +2039,128 @@ function buildBookingTools(
 }
 
 // ─── Flow Task Scheduling ──────────────────────────────────────────────────
+
+/**
+ * Booking recovery. The model confirmed a booking but book_consultation never
+ * persisted one (tool not called, or an old-format failure). Rather than lose
+ * the call, re-read the conversation, pull the date + time the user actually
+ * agreed, and register it via storeBooking + a team Slack ping. Conservative by
+ * design: only acts when BOTH an allowed online time AND a concrete date can be
+ * read with confidence (the model's own confirmation line first, then recent
+ * history); otherwise returns null and the caller escalates to a human. Online
+ * slots only (3/4/5 PM) — the offline window is never auto-recovered.
+ */
+async function recoverLostBooking(
+  input: AgentInput,
+  rawResponse: string,
+  supabase: SupabaseClient,
+): Promise<{ dateISO: string; timeDisplay: string; dateLabel: string } | null> {
+  const bookingPhone = input.userProfile?.phone || '';
+  if (!bookingPhone) return null; // need a lead to attach the booking to
+
+  // Search the model's confirmation first (it states the agreed slot), then the
+  // most recent turns (user taps like "3:00 PM" / "Tomorrow").
+  const corpus: string[] = [
+    rawResponse || '',
+    input.message || '',
+    ...(input.conversationHistory || []).slice(-10).reverse().map((m) => m.content || ''),
+  ];
+
+  // TIME — online slots are 3/4/5 PM only (15:00 / 16:00 / 17:00).
+  const readTime = (s: string): string | null => {
+    const m = s.match(/\b([3-5])\s*(?::\s*0?0)?\s*p\.?\s*m\.?/i) || s.match(/\b(15|16|17)\s*:\s*00\b/);
+    if (!m) return null;
+    const h = Number(m[1]);
+    return `${h >= 15 ? h : h + 12}:00`;
+  };
+  let time24: string | null = null;
+  for (const s of corpus) { const t = readTime(s); if (t) { time24 = t; break; } }
+  if (!time24 || !isAllowedBookingTime(time24, 'online')) return null;
+
+  // DATE — resolve today / tomorrow / weekday / explicit ISO in IST.
+  const now = new Date();
+  const istToday = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const [ty, tm, tdd] = istToday.split('-').map(Number);
+  const baseUTC = Date.UTC(ty, tm - 1, tdd, 12, 0, 0);
+  const isoAt = (o: number) => new Date(baseUTC + o * 86400000).toISOString().slice(0, 10);
+  const dowAt = (o: number) => new Date(baseUTC + o * 86400000).getUTCDay();
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  const readDate = (s: string): string | null => {
+    const iso = s.match(/\b(20\d{2})-(\d{2})-(\d{2})\b/);
+    if (iso) return iso[0];
+    const low = s.toLowerCase();
+    if (/\btomorrow\b/.test(low)) { let o = 1; while (dowAt(o) === 0) o++; return isoAt(o); }
+    if (/\btoday\b/.test(low)) return isoAt(0);
+    for (let i = 1; i < 7; i++) { // skip index 0 (sunday, closed)
+      if (new RegExp(`\\b${days[i]}\\b`).test(low)) {
+        for (let o = 1; o <= 7; o++) { if (dowAt(o) === i) return isoAt(o); }
+      }
+    }
+    return null;
+  };
+  let dateISO: string | null = null;
+  for (const s of corpus) { const d = readDate(s); if (d) { dateISO = d; break; } }
+  if (!dateISO) return null;
+
+  // Never register a Sunday (closed).
+  const [dy, dm, dd] = dateISO.split('-').map(Number);
+  const dow = new Date(Date.UTC(dy, dm - 1, dd, 12)).getUTCDay();
+  if (dow === 0) return null;
+
+  const hour = Number(time24.split(':')[0]);
+  const timeDisplay = `${((hour + 11) % 12) + 1}:00 PM`; // 15 -> "3:00 PM"
+  const dateLabel = dateISO === isoAt(0) ? 'today'
+    : dateISO === isoAt(1) ? 'tomorrow'
+    : `on ${new Date(Date.UTC(dy, dm - 1, dd, 12)).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' })}`;
+
+  // Persist. storeBooking resolves the lead by phone and throws on a failed save.
+  try {
+    await storeBooking(
+      input.sessionId,
+      {
+        date: dateISO,
+        time: timeDisplay,
+        status: 'Call Booked',
+        name: input.userProfile?.name || 'Lead',
+        phone: bookingPhone,
+        email: input.userProfile?.email || undefined,
+        sessionType: 'online',
+        conversationSummary: input.summary || undefined,
+        title: `Callback - ${input.userProfile?.name || 'Lead'}`,
+      },
+      input.channel || 'whatsapp',
+      supabase,
+    );
+  } catch (e: any) {
+    console.error('[Engine] Booking recovery persist failed:', e?.message || e);
+    return null;
+  }
+
+  // Ping the team so a human calls at the agreed time.
+  try {
+    const audienceLabel = input.lokazenAudience === 'brand' ? 'Brand'
+      : input.lokazenAudience === 'owner' ? 'Property Owner' : null;
+    let brandLabel = 'PROXe';
+    try { brandLabel = getBrandConfig()?.name || getCurrentBrandId() || 'PROXe'; } catch { /* keep default */ }
+    await notifySlackBooking({
+      brandLabel,
+      name: input.userProfile?.name || 'Lead',
+      phone: bookingPhone,
+      email: input.userProfile?.email || null,
+      leadType: audienceLabel,
+      dateTime: `${dateISO} · ${timeDisplay}`,
+      title: 'Recovered callback (auto-booked from chat)',
+      channel: input.channel || null,
+      summary: input.summary || null,
+    });
+  } catch (e: any) {
+    console.error('[Engine] Booking recovery Slack notify failed:', e?.message || e);
+  }
+
+  console.log(`[Engine] Booking RECOVERED: ${dateISO} ${timeDisplay} phone=${bookingPhone}`);
+  return { dateISO, timeDisplay, dateLabel };
+}
 
 /**
  * Parse "3:00 PM" style time + "2026-03-20" date into a Date (IST)
