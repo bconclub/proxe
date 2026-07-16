@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MdPersonAdd, MdContentCopy, MdDelete, MdCheck, MdRefresh, MdEdit } from 'react-icons/md'
 import { getCurrentBrandId, getBrandConfig } from '@/configs'
-import { COURSE_OPTIONS } from '@/configs/courses'
+import { getLeadTypeOptions } from '@/configs/leadTypes'
 
 // features.leadAccess: per-user allowed lead types (courses). Admin sets them
 // here (per row + at invite time); null/empty = all types.
@@ -467,7 +467,7 @@ export default function UserManagementPage() {
                       {LEAD_ACCESS_ON && (
                         <td className="hidden lg:table-cell px-4 py-3">
                           <div className="flex flex-wrap gap-1" style={{ opacity: savingTypesFor === u.id ? 0.5 : 1 }}>
-                            {COURSE_OPTIONS.map((course) => {
+                            {getLeadTypeOptions().map((course) => {
                               const active = Array.isArray(u.allowed_lead_types) && u.allowed_lead_types.includes(course)
                               const unrestricted = !u.allowed_lead_types || u.allowed_lead_types.length === 0
                               return (
@@ -611,7 +611,7 @@ export default function UserManagementPage() {
                         Lead access <span className="font-normal text-[var(--text-muted)]">(none selected = all types)</span>
                       </label>
                       <div className="flex flex-wrap gap-1.5">
-                        {COURSE_OPTIONS.map((course) => {
+                        {getLeadTypeOptions().map((course) => {
                           const active = inviteTypes.includes(course)
                           return (
                             <button
