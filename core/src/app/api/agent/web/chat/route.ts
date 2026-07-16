@@ -24,6 +24,7 @@ import {
   logMessage,
   upsertSummary,
   isLikelyRealPersonName,
+  buildAttribution,
 } from '@/lib/services';
 import { notifySlackLead } from '@/lib/services/slackNotifier';
 import { BRAND_ID } from '@/configs';
@@ -100,6 +101,10 @@ export async function POST(request: NextRequest) {
     // Extract session & memory from metadata (matches web-agent format)
     const session = metadata.session || {};
     const memory = metadata.memory || {};
+    // First-touch attribution the widget captured from the landing url (utm_*,
+    // page_url, landing_page, referrer). Used to stamp the real marketing source
+    // on a NEW web lead so it stops showing as generic "Web Chat / Direct".
+    const attribution = (metadata.attribution && typeof metadata.attribution === 'object') ? metadata.attribution : {};
     const pageContext = metadata.pageContext || session.pageContext || '';
     const externalSessionId = session.externalId || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const userProfile = session.user || {};
@@ -778,6 +783,48 @@ async function postProcess(
           console.error('[agent/web/chat] Failed to backfill conversations:', backfillError);
         } else {
           console.log('[agent/web/chat] Backfilled conversations with new lead_id:', leadId);
+        }
+      }
+
+      // 2c. Stamp the real marketing source on this NEW web lead from the
+      // first-touch attribution the widget captured off the landing url. Set
+      // ONCE at creation (never overwrite). Without this every web-chat lead
+      // renders as generic "Web Chat / Direct" even when it came from an ad.
+      if (leadId && (attribution.utm_source || attribution.utm_campaign || attribution.page_url || attribution.referrer)) {
+        try {
+          const referrer = String(attribution.referrer || '');
+          // Off-site referrer with no UTM => a referral; else let deriveSource decide.
+          const resolvedChannel = (!attribution.utm_source && referrer && !/lokazen\.in/i.test(referrer))
+            ? 'referral'
+            : null;
+          const attr = buildAttribution({
+            utmSource: attribution.utm_source || null,
+            channel: 'web',
+            resolvedChannel,
+            utm: {
+              source: attribution.utm_source || null,
+              medium: attribution.utm_medium || null,
+              campaign: attribution.utm_campaign || null,
+              content: attribution.utm_content || null,
+              term: attribution.utm_term || null,
+            },
+            pageUrl: attribution.landing_page || attribution.page_url || null,
+          });
+          const { data: leadRow } = await supabase
+            .from('all_leads')
+            .select('unified_context')
+            .eq('id', leadId)
+            .maybeSingle();
+          const ctx = leadRow?.unified_context || {};
+          if (!ctx.attribution) {
+            await supabase
+              .from('all_leads')
+              .update({ unified_context: { ...ctx, attribution: attr } })
+              .eq('id', leadId);
+            console.log('[agent/web/chat] Stored attribution for new lead:', { leadId, source: attr.source, source_label: attr.source_label });
+          }
+        } catch (attrErr) {
+          console.error('[agent/web/chat] Failed to store attribution:', attrErr);
         }
       }
     }
