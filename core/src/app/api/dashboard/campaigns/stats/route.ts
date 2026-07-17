@@ -17,14 +17,31 @@ export const dynamic = 'force-dynamic'
 
 const SEND_LABELS: Record<string, string> = {
   webinar_reminder: 'Reminder',
+  webinar_starting_soon: 'Starting soon',
+  webinar_live: 'Live now',
   webinar_register_nudge: 'Registration nudge',
 }
 
-// Who each send targets — surfaced as the card's subtext so it's obvious the
-// campaign is a reminder to registered leads AND a nudge to the rest.
+// Who each send targets — surfaced as the card's subtext.
 const SEND_AUDIENCE: Record<string, string> = {
   webinar_reminder: 'registered leads',
+  webinar_starting_soon: 'registered leads',
+  webinar_live: 'registered leads',
   webinar_register_nudge: 'not-yet-registered leads',
+}
+
+// Two distinct campaigns share the webinar tag but hit opposite audiences:
+// everything to REGISTERED leads (reminder + day-of) is one campaign; the
+// registration NUDGE to the rest is its own. Split so each shows separately.
+const SEND_GROUP: Record<string, 'registered' | 'nudge'> = {
+  webinar_reminder: 'registered',
+  webinar_starting_soon: 'registered',
+  webinar_live: 'registered',
+  webinar_register_nudge: 'nudge',
+}
+const GROUP_META: Record<string, { label: string; audience: string }> = {
+  registered: { label: 'Reminders', audience: 'registered leads' },
+  nudge: { label: 'Registration nudge', audience: 'not-yet-registered leads' },
 }
 
 export async function GET() {
@@ -69,15 +86,17 @@ export async function GET() {
     const m: any = r.metadata || {}
     const cid = m.campaign
     if (!cid) continue
-    if (!byCampaign[cid]) {
-      byCampaign[cid] = { id: cid, sends: {}, first: r.created_at, last: r.created_at, webinarName: m.webinar_name || null, eventName: null, leads: new Set<string>() }
+    const src = m.source || m.template_name || 'send'
+    const group = SEND_GROUP[src] || 'registered'
+    const key = `${cid}:${group}`
+    if (!byCampaign[key]) {
+      byCampaign[key] = { id: key, campaign: cid, group, sends: {}, first: r.created_at, last: r.created_at, webinarName: m.webinar_name || null, eventName: null, leads: new Set<string>() }
     }
-    const c = byCampaign[cid]
+    const c = byCampaign[key]
     if (r.created_at < c.first) c.first = r.created_at
     if (r.created_at > c.last) c.last = r.created_at
     if (r.lead_id) c.leads.add(r.lead_id)
 
-    const src = m.source || m.template_name || 'send'
     // The reminder went to REGISTERED leads, so its webinar_name is the real
     // event title (the nudge's title is a different ad campaign name).
     if (src === 'webinar_reminder' && m.webinar_name) c.eventName = m.webinar_name
@@ -100,15 +119,13 @@ export async function GET() {
         (a: any, s: any) => ({ sent: a.sent + s.sent, delivered: a.delivered + s.delivered, read: a.read + s.read, clicked: a.clicked + s.clicked }),
         { sent: 0, delivered: 0, read: 0, clicked: 0 },
       )
-      // One-line "what this is" so the card isn't just the (nudge) ad-campaign name.
-      const description = sends
-        .map((s: any) => `${s.label} → ${s.audience || `${s.sent}`}`)
-        .join('  ·  ')
+      const gm = GROUP_META[c.group] || { label: '', audience: '' }
+      const event = c.eventName || c.webinarName || c.campaign
       return {
         id: c.id,
-        name: c.eventName || c.webinarName || c.id,
-        description,
-        type: String(c.id).startsWith('webinar') ? 'Webinar' : 'Campaign',
+        name: gm.label ? `${event} — ${gm.label}` : event,
+        description: `${gm.audience || ''}${gm.audience ? ' · ' : ''}${sends.map((s: any) => s.label).join(' + ')}`,
+        type: String(c.campaign).startsWith('webinar') ? 'Webinar' : 'Campaign',
         recipients: c.leads.size,
         firstSent: c.first,
         lastSent: c.last,
