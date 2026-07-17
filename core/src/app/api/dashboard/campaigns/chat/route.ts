@@ -121,32 +121,36 @@ async function listTemplates(): Promise<string> {
 
 // ─── Tools + prompt ──────────────────────────────────────────────────────────
 
-const TOOLS: ToolDefinition[] = [
-  {
-    name: 'query_audience',
-    description:
-      'Count and sample the brand\'s leads matching filters. ALWAYS call this before stating any audience numbers. Combine filters freely.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        stage: { type: 'string', description: `Pipeline group key or label: ${PIPELINE_STAGE_GROUPS.map((g) => g.key).join(', ')}` },
-        course: { type: 'string', description: `Course interest, one of: ${COURSE_OPTIONS.join(', ')}` },
-        user_type: { type: 'string', description: 'student | parent | professional' },
-        webinar: { type: 'boolean', description: 'true = only webinar registrants, false = exclude them' },
-        source: { type: 'string', description: 'Touchpoint substring: whatsapp, web, facebook, instagram, google…' },
-        city: { type: 'string' },
-        created_within_days: { type: 'number', description: 'Only leads created in the last N days' },
-        active_within_days: { type: 'number', description: 'Only leads with activity in the last N days' },
-        inactive_for_days: { type: 'number', description: 'Only leads silent for at least N days (re-engagement)' },
-      },
+// Tools are built per brand so a brand's taxonomy never bleeds into another's
+// prompt. course/user_type/webinar are Windchasers-aviation filters — off
+// elsewhere; every brand keeps the neutral stage/source/city/recency filters.
+function buildTools(): ToolDefinition[] {
+  const props: Record<string, any> = {
+    stage: { type: 'string', description: `Pipeline group key or label: ${PIPELINE_STAGE_GROUPS.map((g) => g.key).join(', ')}` },
+    source: { type: 'string', description: 'Touchpoint substring: whatsapp, web, facebook, instagram, google…' },
+    city: { type: 'string' },
+    created_within_days: { type: 'number', description: 'Only leads created in the last N days' },
+    active_within_days: { type: 'number', description: 'Only leads with activity in the last N days' },
+    inactive_for_days: { type: 'number', description: 'Only leads silent for at least N days (re-engagement)' },
+  }
+  if (BRAND_ID === 'windchasers') {
+    props.course = { type: 'string', description: `Course interest, one of: ${COURSE_OPTIONS.join(', ')}` }
+    props.user_type = { type: 'string', description: 'student | parent | professional' }
+    props.webinar = { type: 'boolean', description: 'true = only webinar registrants, false = exclude them' }
+  }
+  return [
+    {
+      name: 'query_audience',
+      description: 'Count and sample the brand\'s leads matching filters. ALWAYS call this before stating any audience numbers. Combine filters freely.',
+      input_schema: { type: 'object', properties: props },
     },
-  },
-  {
-    name: 'list_templates',
-    description: 'List the brand\'s Meta-approved WhatsApp templates (name, body, footer, buttons). Call before proposing templates.',
-    input_schema: { type: 'object', properties: {} },
-  },
-]
+    {
+      name: 'list_templates',
+      description: 'List the brand\'s Meta-approved WhatsApp templates (name, body, footer, buttons). Call before proposing templates.',
+      input_schema: { type: 'object', properties: {} },
+    },
+  ]
+}
 
 function systemPrompt(): string {
   const brand = getBrandConfig()
@@ -172,7 +176,7 @@ OUTPUT — your FINAL reply must be STRICT JSON only (no prose around it, no cod
   "suggestedCampaignName": string | null,
   "goal": string | null
 }
-"goal" = one short line naming what this campaign is trying to achieve (e.g. "Re-engage & remind about pilot training").
+"goal" = one short line naming what this campaign is trying to achieve, in ${brand.name}'s own words (e.g. "Re-engage leads who went quiet").
 Set "audience" from your query_audience result (echo its filters). Empty arrays when nothing applies.`
 }
 
@@ -218,7 +222,7 @@ export async function POST(request: NextRequest) {
     const raw = await generateResponseWithTools(
       systemPrompt(),
       `${transcript}\n\n(Reply now with the STRICT JSON object only.)`,
-      { tools: TOOLS, toolHandlers: { query_audience: queryAudience, list_templates: listTemplates }, maxToolRounds: 6 },
+      { tools: buildTools(), toolHandlers: { query_audience: queryAudience, list_templates: listTemplates }, maxToolRounds: 6 },
       2000,
       'chat',
     )

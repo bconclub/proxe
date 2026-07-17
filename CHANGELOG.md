@@ -1,3 +1,10 @@
+## 2026-07-17 · fix(core): Campaigns no-bleed - brand-owned smart suggestions + personalization vars
+
+- The Campaigns workspace no longer bleeds Windchasers aviation content into other brands. Smart-suggestion chips and the default personalization variables now come from config.campaigns.{suggestions,variables}; shared core ships NEUTRAL defaults (generic "Qualified leads from last 30 days" etc + {{customer_name}} only). Windchasers keeps its pilot/cabin-crew prompts + {{course}}/{{city}} vars via its own config.
+- Campaign brain (chat route) tools built per brand: the aviation-only filters (course / user_type / webinar) are exposed to the LLM on Windchasers only; every brand keeps the neutral stage/source/city/recency filters. Goal example de-aviation'd (brand-name driven).
+- User-facing: bcon (and every non-windchasers brand) now shows its own generic audience prompts + variables, not pilot/cabin-crew.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): Campaigns polish - PROXe agent everywhere, core-only Features, custom schedule picker
 
 - The campaign agent is now "PROXe" on every brand (was "<Brand> AI" / "Windy") - the product's assistant, brand-neutral. Dropped the windchasers Campaign-Assistant label override.

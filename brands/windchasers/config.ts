@@ -28,6 +28,18 @@ export const windchasersConfig: BrandConfig = {
     leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
     campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
   },
+  // Campaigns workspace content in Windchasers' aviation language (shared core
+  // ships neutral defaults; this keeps the pilot/cabin-crew audience prompts on
+  // Windchasers only — no bleed to other brands).
+  campaigns: {
+    suggestions: [
+      'Qualified pilot leads from last 30 days',
+      'Webinar registrants who never replied',
+      'Re-engage leads inactive for 14+ days',
+      'Cabin crew leads from Instagram',
+    ],
+    variables: ['customer_name', 'course', 'city'],
+  },
   // Brain content: the CORE COMMUNICATIONS checklist (Eval → Communications).
   // evalJourneys is deliberately omitted ('none') — the journeys bench renders
   // BCON's content, which is wrong-brand here.
