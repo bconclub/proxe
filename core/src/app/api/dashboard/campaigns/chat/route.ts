@@ -137,6 +137,9 @@ function buildTools(): ToolDefinition[] {
     props.course = { type: 'string', description: `Course interest, one of: ${COURSE_OPTIONS.join(', ')}` }
     props.user_type = { type: 'string', description: 'student | parent | professional' }
     props.webinar = { type: 'boolean', description: 'true = only webinar registrants, false = exclude them' }
+  } else if (BRAND_ID === 'lokazen') {
+    // Lokazen has three distinct audiences; every campaign targets exactly one.
+    props.user_type = { type: 'string', description: 'REQUIRED segment, one of: brand (a business seeking commercial space), owner (a property owner listing space), scout (a gig worker who spots empty shops for payouts). These are three completely different audiences. Pick one, never mix.' }
   }
   return [
     {
@@ -184,7 +187,12 @@ RULES
   - marketing-safe copy (no spam bait, includes a clear next step)
 - PERSONALIZATION VARIABLES: the ONLY variables you may put in any draft body, footer or button are: ${allowed.map((v) => `{{${v}}}`).join(', ')}. Do NOT invent any other variable (never {{course_name}}, {{product}}, {{offer}}, etc.). If you want to reference a detail that is not in this list, write it in plain words instead of a placeholder. When unsure, use only {{customer_name}}.
 - Keep "message" short and practical (2-4 sentences). No markdown headings.
-- NEVER use em dashes or en dashes (— or –) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".
+- NEVER use em dashes or en dashes (— or –) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".${BRAND_ID === 'lokazen' ? `
+- LOKAZEN AUDIENCES (critical): there are THREE separate audiences that must NEVER be mixed in one campaign , their needs and messaging are completely different:
+    - brand: a business looking for commercial space (wants matches, plans, site visits)
+    - owner: a property owner listing space (wants qualified tenants, listing help)
+    - scout: a gig worker who spots empty shops for payouts (wants gigs, KYC, payouts)
+  Every campaign targets exactly ONE user_type. If the teammate's description maps to one segment, filter query_audience by that user_type. If it does NOT name a segment (e.g. "everyone who went quiet"), do NOT lump them , run query_audience once per segment and present the per-audience breakdown (count + with_phone for brand / owner / scout) in "message" so they pick which audience to send, then draft copy for THAT audience only. A brand-seeker and a property owner must never get the same message.` : ''}
 
 OUTPUT — your FINAL reply must be STRICT JSON only (no prose around it, no code fences):
 {
