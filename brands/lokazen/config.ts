@@ -1,5 +1,7 @@
 import type { BrandConfig } from '@/configs/types';
 
+// Redeploy trigger 2026-07-18: pick up corrected GOOGLE_CALENDAR_ID (was the SA
+// client_id by mistake). Calendar creds bake at build time.
 export const lokazenConfig: BrandConfig = {
   name: 'Lokazen',
   brand: 'lokazen',
