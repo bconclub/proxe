@@ -1178,11 +1178,14 @@ export async function POST(request: NextRequest) {
         // the 5-minute window — only true back-to-back duplicates are squashed.
         const ONE_TIME_SCOUT_EVENTS = new Set(['signup', 'kyc_received', 'kyc_approved', 'upi_saved'])
         // "submission received" was firing on EVERY property a scout sent (seen
-        // live: 5 identical "we received your submission" in 90 min = spam). One
-        // acknowledgement per scouting session is enough; the Scout Portal lists
-        // every submission. Squash repeats within 3h. payout stays repeatable on
-        // the default short window (each payout is distinct and important).
-        const SUBMISSION_DEDUP_MS = 3 * 60 * 60 * 1000
+        // live: 5 identical "we received your submission" in 90 min = spam). The
+        // 3h window (2026-07-13) still let an all-day scout collect 4-5 identical
+        // texts per day — re-reported via Report Issue ISS-20260716-qj09j5 (one
+        // active scout: 16 sends in 4 days). One acknowledgement per DAY is
+        // enough; the Scout Portal lists every submission. payout stays
+        // repeatable on the default short window (each payout is distinct and
+        // important).
+        const SUBMISSION_DEDUP_MS = 24 * 60 * 60 * 1000
         const dedupWindowMs = ONE_TIME_SCOUT_EVENTS.has(canonicalEvent) ? Infinity
           : canonicalEvent === 'submission' ? SUBMISSION_DEDUP_MS
           : undefined
