@@ -184,7 +184,21 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await authClient.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!getBrandConfig().features?.campaigns) {
+    // Feature gate honors the runtime override (Settings → Features) on top of
+    // the brand-config default, mirroring useFeatureFlags on the client.
+    let campaignsOn = !!getBrandConfig().features?.campaigns
+    try {
+      const service: any = getServiceClient()
+      if (service) {
+        const { data } = await service
+          .from('dashboard_settings')
+          .select('value')
+          .eq('key', 'feature_flags')
+          .maybeSingle()
+        if (typeof data?.value?.campaigns === 'boolean') campaignsOn = data.value.campaigns
+      }
+    } catch { /* config default stands */ }
+    if (!campaignsOn) {
       return NextResponse.json({ error: 'Campaigns is not enabled for this brand' }, { status: 403 })
     }
 

@@ -1,3 +1,11 @@
+## 2026-07-17 · feat(core): Campaigns on every brand + the full feature picture in Configure -> Features
+
+- features.campaigns switched ON for all 5 brands (bcon, lokazen, pop, proxe join windchasers) - the AI campaign workspace is everywhere.
+- Configure -> Features now shows the real feature set: Campaigns, Voice/Calls, Dashboard Brain, Brain Actions, Pipeline Funnel (no longer "Soon" - it shipped), Follow-up Sequence - all runtime-toggleable per brand (whitelist extended). Below them a "Per-brand setup" section shows Lead Access, Scouts/Gigs and War Room read-only with their current state - they need per-brand DB setup so they stay config-locked.
+- The Campaigns page and its chat API now honor the runtime toggle (Settings override on top of config default), so switching Campaigns off/on takes effect without a redeploy; the nav row already did.
+- User-facing: no more "campaign not active in this brand" - and Features finally shows what's actually live where.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(windchasers): Campaigns = the AI campaign workspace (1:1 with the reference structure)
 
 - Campaigns now opens the two-column workspace: chat on the left (assistant intro from the brand's campaign persona - "Windy" on windchasers, editable campaign name, Channel: WhatsApp header, plan summary card with Audience detected / Channel / Goal chips, smart-suggestion chips, rotating-placeholder input bar with attach/mic affordances + disclaimer line), and a right rail with Templates (Approved/Draft/Reminder/Nudge/Promo filter pills, live registry + chat drafts via new GET /api/dashboard/campaigns/templates), Audience summary (estimated reach + reach donut, real WhatsApp-reachable split), Campaign setup (channel/template/send-time rows + Review & Schedule Campaign), and Personalization variables ({{vars}} from the selected template, custom add).

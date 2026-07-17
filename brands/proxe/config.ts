@@ -23,6 +23,7 @@ export const proxeConfig: BrandConfig = {
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
     pipelineFunnel: false,
     followUpSequence: false,
+    campaigns: true, // AI campaign workspace
   },
   systemPrompt: {
     path: '@/api/prompts/proxe-prompt',

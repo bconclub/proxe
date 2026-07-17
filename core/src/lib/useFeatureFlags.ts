@@ -6,11 +6,13 @@ import { getBrandConfig } from '@/configs'
 export interface FeatureFlags {
   voice?: boolean
   brain?: boolean
+  brainActions?: boolean
   pipelineFunnel?: boolean
   followUpSequence?: boolean
-  warRoom?: boolean
-  scouts?: boolean
-  campaigns?: boolean // config-driven only (no settings toggle yet)
+  warRoom?: boolean   // config-locked (needs the brand's war-room DB views)
+  scouts?: boolean    // config-locked (lokazen's gig-worker data model)
+  leadAccess?: boolean // config-locked (needs migration 036 columns)
+  campaigns?: boolean
 }
 
 /**
