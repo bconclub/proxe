@@ -1457,6 +1457,15 @@ export default function LeadsTable({
                   subSource = 'Web Form'
                 }
 
+                // Lokazen leads come through the WEBSITE (onboarding forms + the
+                // site chat), so the generic "Web Chat" / "Web Form" first-touch
+                // reads wrong to the team — these ARE website leads. Relabel to
+                // "Website". Display-only over the stored first_touch='web', so it
+                // reconciles every existing lead at once with no backfill.
+                if (brandId === 'lokazen' && (subSource === 'Web Chat' || subSource === 'Web Form')) {
+                  subSource = 'Website'
+                }
+
                 // Score pill colors
                 // Score pill classes - using CSS variables for consistency
                 const scorePillClass = score != null
