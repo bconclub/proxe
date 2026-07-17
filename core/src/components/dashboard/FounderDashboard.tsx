@@ -61,6 +61,12 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
+  // Windchasers-only: lead-type breakdown for the Engine Overview strip. Null on
+  // other brands (aviation taxonomy). Webinar splits by Zoom-registration status.
+  leadTypeBreakdown?: {
+    pilot: number; flightSchool: number; cabinCrew: number; webinar: number
+    webinarRegistered: number; webinarNotRegistered: number; total: number
+  } | null
   // Gigs tab only - scout lifecycle stage breakdown (all zero otherwise). Same
   // stage derivation as the Gigs table's STATUS column, so they never disagree.
   gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
@@ -169,6 +175,7 @@ function fmtMs(ms: number): string {
 const brandCfg = getBrandConfig()
 const isPop = brandCfg.brand === 'pop'
 const isBcon = brandCfg.brand === 'bcon'
+const isWindchasers = brandCfg.brand === 'windchasers'
 // BCON + POP share the newer dashboard-home look (bcon is the origin fork,
 // pop is its clone): subtler tints, cohort funnel with a Today window,
 // reply-rate-driven Follow-up Health, compact Upcoming Events rows.
@@ -1084,6 +1091,42 @@ export default function FounderDashboard() {
             />
           </div>
           )}
+          {/* Lead-type breakdown (windchasers) - at-a-glance split of Total Leads
+              by program, plus the webinar registered-vs-not difference. */}
+          {isWindchasers && !isGigsView && metrics.leadTypeBreakdown && (() => {
+            const lb = metrics.leadTypeBreakdown!
+            const tot = lb.total || 1
+            const pct = (n: number) => `${Math.round((100 * n) / tot)}%`
+            const items = [
+              { label: 'Pilot', count: lb.pilot, color: '#3B82F6' },
+              { label: 'Flight School', count: lb.flightSchool, color: '#0ea5e9' },
+              { label: 'Cabin Crew', count: lb.cabinCrew, color: '#f59e0b' },
+              { label: 'Webinar', count: lb.webinar, color: '#a855f7' },
+            ]
+            return (
+              <div className="pt-3 mt-1 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-muted)' }}>By type</span>
+                  {items.map((it) => (
+                    <span key={it.label} className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full" style={{ background: it.color }} />
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{it.label}</span>
+                      <span className="text-xs font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{it.count.toLocaleString()}</span>
+                      <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{pct(it.count)}</span>
+                    </span>
+                  ))}
+                </div>
+                {lb.webinar > 0 && (
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[11px] tabular-nums">
+                    <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Webinar split</span>
+                    <span style={{ color: '#22c55e' }}>{lb.webinarRegistered} registered</span>
+                    <span style={{ color: 'var(--text-muted)' }}>·</span>
+                    <span style={{ color: '#f59e0b' }}>{lb.webinarNotRegistered} not registered</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
             {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention - check the Follow-up Due column.`}

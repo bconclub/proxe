@@ -392,6 +392,32 @@ export async function GET(request: NextRequest) {
     
     // Total leads count (all time + time-filtered)
     const totalLeadsCount = safeLeads.length
+
+    // Lead-type breakdown for the Engine Overview strip (windchasers taxonomy:
+    // Pilot / Flight School / Cabin Crew / Webinar). Aviation-specific, so null
+    // on other brands. Webinar splits by whether Zoom registration completed
+    // (a personal join link exists), the same distinction the reminder cron uses.
+    let leadTypeBreakdown: {
+      pilot: number; flightSchool: number; cabinCrew: number; webinar: number
+      webinarRegistered: number; webinarNotRegistered: number; total: number
+    } | null = null
+    if (BRAND_ID === 'windchasers') {
+      const b = { pilot: 0, flightSchool: 0, cabinCrew: 0, webinar: 0, webinarRegistered: 0, webinarNotRegistered: 0 }
+      for (const lead of safeLeads) {
+        const wc: any = (lead.unified_context || {}).windchasers || {}
+        const ci = String(wc.course_interest || '').toLowerCase()
+        const lt = String(wc.lead_type || '').toLowerCase()
+        if (lt === 'webinar') {
+          b.webinar++
+          if (wc.zoom_registered || wc.zoom_join_url) b.webinarRegistered++
+          else b.webinarNotRegistered++
+        } else if (ci.includes('cabin')) b.cabinCrew++
+        else if (ci.includes('flight school') || ci.includes('flying school')) b.flightSchool++
+        else b.pilot++
+      }
+      leadTypeBreakdown = { ...b, total: totalLeadsCount }
+    }
+
     const totalLeads7D = safeLeads.filter(lead => {
       const created = new Date(lead.created_at)
       return (now.getTime() - created.getTime()) <= 7 * 24 * 60 * 60 * 1000
@@ -2023,6 +2049,7 @@ export async function GET(request: NextRequest) {
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
       },
+      leadTypeBreakdown,
       engagedLeads: {
         count: engagedLeadsCount,
         count1D: engagedLeads1D.length,
