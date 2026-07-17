@@ -417,6 +417,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showPropertyModal, setShowPropertyModal] = useState(false)
+  const [showBrandModal, setShowBrandModal] = useState(false)
   const [pushingListing, setPushingListing] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle')
   const [showAttribution, setShowAttribution] = useState(false)
   const [showPATResult, setShowPATResult] = useState(false)
@@ -2193,26 +2194,148 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         && !!(lkz.brand_category || lkz.current_outlets || lkz.required_size_sqft || lkz.budget_monthly_rent || lkz.preferred_format));
                   if (isLkzBrand) {
                     const areas = Array.isArray(lkz.target_zones) ? lkz.target_zones.filter(Boolean).join(', ') : lkz.target_zones;
+                    const sizeNeeded = lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null;
+                    const brandOther = lkz.notes || lkz.other_details || lkz.description || lkz.key_interest_signal || null;
+                    const website = lkz.website || lkz.brand_website || lkz.url || lkz.site || null;
                     const brandRows = ([
                       ['Brand', lkz.brand_name],
                       ['Category', lkz.brand_category],
                       ['Current outlets', lkz.current_outlets],
                       ['Preferred areas', areas],
                       ['Format', lkz.preferred_format],
-                      ['Size needed', lkz.required_size_sqft ? `${lkz.required_size_sqft} sqft` : null],
+                      ['Size needed', sizeNeeded],
                       ['Budget', lkz.budget_monthly_rent],
-                      ['Other details', lkz.notes || lkz.other_details || lkz.description || lkz.key_interest_signal],
+                      ['Other details', brandOther],
                     ] as Array<[string, any]>).filter((r) => !!r[1]);
                     if (!brandRows.length) return null;
+                    // Inline card stays MINIMAL (brand + category) with a "View all"
+                    // click-out, exactly like the owner property card. The full field
+                    // set + website live behind the modal so the card never grows.
+                    const previewRows = brandRows.slice(0, 2);
+                    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(`${lkz.brand_name || ''} ${lkz.brand_category || ''} Bangalore`.trim())}`;
                     return (
                       <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                        <div className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--text-muted)' }}>Brand details</div>
-                        {brandRows.map(([label, value]) => (
+                        <button
+                          type="button"
+                          onClick={() => setShowBrandModal(true)}
+                          className="flex items-center justify-between gap-2 w-full text-left group"
+                          title="View all brand details"
+                        >
+                          <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Brand details</span>
+                          <span className="flex items-center gap-0.5 text-[10px] font-medium" style={{ color: BRAND_ACCENT }}>
+                            View all <MdChevronRight size={13} />
+                          </span>
+                        </button>
+                        {previewRows.map(([label, value]) => (
                           <div key={label} className="flex items-center justify-between gap-2 text-xs">
                             <span style={{ color: 'var(--text-muted)' }}>{label}</span>
                             <span className="text-right truncate max-w-[60%]" style={{ color: 'var(--text-secondary)' }} title={String(value)}>{String(value)}</span>
                           </div>
                         ))}
+
+                        {showBrandModal && (
+                          <div
+                            onClick={() => setShowBrandModal(false)}
+                            style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                          >
+                            {(() => {
+                              const accentSoft = `color-mix(in srgb, ${BRAND_ACCENT} 14%, transparent)`
+                              const accentBorder = `color-mix(in srgb, ${BRAND_ACCENT} 40%, transparent)`
+                              const tileBg = 'color-mix(in srgb, var(--text-primary) 4%, transparent)'
+                              const tiles = ([
+                                { icon: MdApartment, label: 'Outlets', value: lkz.current_outlets },
+                                { icon: MdSquareFoot, label: 'Size needed', value: sizeNeeded },
+                                { icon: MdCurrencyRupee, label: 'Budget', value: lkz.budget_monthly_rent },
+                                { icon: MdBusinessCenter, label: 'Format', value: lkz.preferred_format },
+                              ] as Array<{ icon: any; label: string; value: any }>).filter((t) => !!t.value)
+                              return (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ width: 'min(500px, 94vw)', maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg-secondary, #0f1116)', border: '1px solid var(--border-primary)', borderRadius: 18, padding: 20 }}
+                                >
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Brand details</h3>
+                                    <button type="button" onClick={() => setShowBrandModal(false)}
+                                      className="flex items-center justify-center rounded-lg" style={{ width: 30, height: 30, background: tileBg, color: 'var(--text-secondary)' }}>
+                                      <MdClose size={18} />
+                                    </button>
+                                  </div>
+
+                                  <div className="flex items-start gap-3 mb-4">
+                                    <span className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 46, height: 46, background: accentSoft, border: `1px solid ${accentBorder}` }}>
+                                      <MdBusinessCenter size={24} style={{ color: BRAND_ACCENT }} />
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{String(lkz.brand_name || 'Brand')}</p>
+                                      {lkz.brand_category && (
+                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: accentSoft, color: BRAND_ACCENT }}>
+                                            <MdBusinessCenter size={13} /> {String(lkz.brand_category)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {tiles.length > 0 && (
+                                    <div className="grid gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)', gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+                                      {tiles.map(({ icon: Icon, label, value }) => (
+                                        <div key={label} className="rounded-xl p-2.5" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                          <div className="flex items-center gap-1 mb-1">
+                                            <Icon size={14} style={{ color: BRAND_ACCENT }} />
+                                            <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                                          </div>
+                                          <p className="text-[12.5px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{String(value)}</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {areas && (
+                                    <div className="rounded-xl p-2.5 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                      <div className="flex items-center gap-1 mb-1">
+                                        <MdPlace size={14} style={{ color: BRAND_ACCENT }} />
+                                        <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Preferred areas</span>
+                                      </div>
+                                      <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{String(areas)}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Website: the captured link if any, plus a one-click web find for the brand. */}
+                                  <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: website ? '1fr 1fr' : '1fr' }}>
+                                    {website && (
+                                      <a href={/^https?:\/\//i.test(String(website)) ? String(website) : `https://${website}`} target="_blank" rel="noopener noreferrer"
+                                        className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
+                                        style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                        <MdOpenInNew size={14} style={{ color: BRAND_ACCENT }} />
+                                        <span className="text-[12.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>Visit website</span>
+                                      </a>
+                                    )}
+                                    <a href={searchUrl} target="_blank" rel="noopener noreferrer"
+                                      className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
+                                      style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                      <MdOpenInNew size={14} style={{ color: BRAND_ACCENT }} />
+                                      <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>Find online</span>
+                                      <MdChevronRight size={15} style={{ color: 'var(--text-muted)' }} />
+                                    </a>
+                                  </div>
+
+                                  {brandOther && (
+                                    <div className="flex items-start gap-3 rounded-xl p-3 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
+                                      <span className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 34, height: 34, background: accentSoft }}>
+                                        <MdDescription size={17} style={{ color: BRAND_ACCENT }} />
+                                      </span>
+                                      <div className="min-w-0">
+                                        <p className="text-[12px] font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Other details</p>
+                                        <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{String(brandOther)}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )}
                       </div>
                     );
                   }
