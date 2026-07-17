@@ -69,7 +69,7 @@ export function extractTopics(summary: string): string[] {
     'support', 'help', 'assistance',
     'qualification', 'qualify', 'lead',
     // Industry-specific keywords
-    'pilot', 'helicopter', 'drone', 'cabin crew',
+    'pilot', 'helicopter', 'cabin crew',
     'dgca', 'cpl', 'atpl', 'training', 'license',
     'ai', 'automation', 'chatbot', 'brand', 'marketing',
   ];

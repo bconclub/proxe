@@ -11,7 +11,7 @@
 
 import { isLikelyRealPersonName, cleanDisplayName } from '@/lib/services/utils';
 
-export type CourseInterest = 'DGCA' | 'Flight' | 'Heli' | 'Cabin' | 'Drone';
+export type CourseInterest = 'DGCA' | 'Flight' | 'Heli' | 'Cabin';
 export type UserType = 'student' | 'parent' | 'professional' | 'early_stage';
 export type Timeline = 'asap' | '1-3mo' | '6+mo' | '1yr+';
 
@@ -40,7 +40,7 @@ Extract the customer's PROFILE from what they have said.
 Return JSON ONLY (no prose, no markdown, no code fences):
 {
   "user_type": "student | parent | professional | early_stage | null",
-  "course_interest": "DGCA | Flight | Heli | Cabin | Drone | null",
+  "course_interest": "DGCA | Flight | Heli | Cabin | null",
   "timeline": "asap | 1-3mo | 6+mo | 1yr+ | null",
   "education": "string | null",
   "city": "string | null",
@@ -61,7 +61,6 @@ Rules:
     - "Flight" = explicitly mentioned flight training abroad / hours / actual flying schools
     - "Heli" = helicopter pilot
     - "Cabin" = cabin crew / flight attendant / air hostess
-    - "Drone" = drone pilot / UAV
 - timeline:
     - "asap" = wants to start this month / urgently
     - "1-3mo" = next 1-3 months
@@ -142,7 +141,7 @@ export async function extractProfileFromConversation(
     if (parsed.user_type && ['student', 'parent', 'professional', 'early_stage'].includes(parsed.user_type)) {
       out.user_type = parsed.user_type;
     }
-    if (parsed.course_interest && ['DGCA', 'Flight', 'Heli', 'Cabin', 'Drone'].includes(parsed.course_interest)) {
+    if (parsed.course_interest && ['DGCA', 'Flight', 'Heli', 'Cabin'].includes(parsed.course_interest)) {
       out.course_interest = parsed.course_interest;
     }
     if (parsed.timeline && ['asap', '1-3mo', '6+mo', '1yr+'].includes(parsed.timeline)) {

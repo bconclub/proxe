@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
     }
     if (leadBrand === 'windchasers') {
       // Normalize the interest to one canonical course label
-      // (Pilot / DGCA / Helicopter / Cabin Crew / Drone) — no abbreviated variations.
+      // (Pilot / DGCA / Helicopter / Cabin Crew / Flight School) — no abbreviated variations.
       const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
       const normalizedCourse = normalizeCourse(interestRaw)
       if (normalizedCourse && interestRaw !== 'other') {

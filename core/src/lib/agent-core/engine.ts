@@ -1382,7 +1382,7 @@ function buildBookingTools(
           },
           course_interest: {
             type: 'string',
-            enum: ['pilot', 'helicopter', 'drone', 'cabin', 'general'],
+            enum: ['pilot', 'helicopter', 'cabin', 'general'],
             description: 'Which training program they are interested in',
           },
           session_type: {

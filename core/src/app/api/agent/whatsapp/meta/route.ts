@@ -926,7 +926,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // Deterministic quick-replies (findQuickReplyFor) are ALL Windchasers aviation
-    // content (pilot/DGCA/helicopter/drone pricing). They must NEVER fire for other
+    // content (pilot/DGCA/helicopter pricing). They must NEVER fire for other
     // brands — a BCON/Lokazen customer texting "how much?" would get pilot pricing.
     if (!isCustomerButtonTap && brand === 'windchasers') {
       const quickReply = findQuickReplyFor(messageText);
@@ -1091,7 +1091,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // 10. Update lead context — merge extracted intent into brand namespace
     //
     //   user_type      = student / parent / professional
-    //   course_interest = DGCA / Flight / Heli / Cabin / Drone (mapped from intent)
+    //   course_interest = DGCA / Flight / Heli / Cabin (mapped from intent)
     //   timeline       = asap / 1-3mo / 6+mo / 1yr+
     //
     // The dashboard's TYPE / COURSE columns read from unified_context[brand],
@@ -1104,7 +1104,6 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       flying: 'Flight',
       helicopter: 'Heli',
       heli: 'Heli',
-      drone: 'Drone',
       cabin: 'Cabin',
     };
     const intentUpdate: Record<string, string> = {};

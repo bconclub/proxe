@@ -117,7 +117,7 @@ const JUNK_NAME_DENYLIST = new Set([
   'bcon', 'windchasers', 'wind chasers', 'proxe', 'nidaan', 'alpha', 'arc',
   // Common page/section labels people accidentally typed instead of name
   'interior', 'exterior', 'home', 'about', 'contact', 'pilot training',
-  'cpl', 'ppl', 'atpl', 'dgca', 'helicopter', 'drone', 'cabin crew',
+  'cpl', 'ppl', 'atpl', 'dgca', 'helicopter', 'cabin crew',
   // Form/button labels
   'name', 'full name', 'phone', 'phone number', 'email', 'message',
   'submit', 'click', 'click here', 'loading', 'open whatsapp', 'whatsapp',
