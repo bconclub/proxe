@@ -16,6 +16,7 @@ import {
   MdHistory, MdCheckCircle, MdGroups, MdDoneAll,
 } from 'react-icons/md'
 import { brandConfig } from '@/configs'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -216,11 +217,16 @@ function ReachDonut({ pct }: { pct: number }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
-  if (!brandConfig.features?.campaigns) {
+  // Runtime flags (config default + Settings → Features override) so the
+  // toggle takes effect without a redeploy.
+  const flags = useFeatureFlags()
+  if (!flags.campaigns) {
     return (
       <div className="max-w-[560px] mx-auto text-center py-20">
         <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Campaigns isn't enabled for this brand</div>
-        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Switch it on in the brand config (features.campaigns) to use the campaign builder.</div>
+        <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          Switch it on in <a href="/dashboard/settings/features" style={{ color: 'var(--accent-primary)' }}>Configure → Features</a> to use the campaign workspace.
+        </div>
       </div>
     )
   }

@@ -24,13 +24,17 @@ const FEATURES_KEY = 'feature_flags'
 export interface FeatureFlags {
   voice?: boolean
   brain?: boolean
+  brainActions?: boolean
   pipelineFunnel?: boolean
   followUpSequence?: boolean
+  campaigns?: boolean
 }
 
 // The known flag keys — anything posted outside this set is ignored so the
-// settings panel can't write arbitrary junk into the row.
-const FLAG_KEYS: (keyof FeatureFlags)[] = ['voice', 'brain', 'pipelineFunnel', 'followUpSequence']
+// settings panel can't write arbitrary junk into the row. leadAccess / scouts /
+// warRoom are deliberately NOT here: they need per-brand DB setup (migrations,
+// views), so they stay config-locked and display-only in the panel.
+const FLAG_KEYS: (keyof FeatureFlags)[] = ['voice', 'brain', 'brainActions', 'pipelineFunnel', 'followUpSequence', 'campaigns']
 
 function pickFlags(input: any): FeatureFlags {
   const out: FeatureFlags = {}

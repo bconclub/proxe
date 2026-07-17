@@ -24,6 +24,7 @@ export const popConfig: BrandConfig = {
     pipelineFunnel: true,
     followUpSequence: true,
     warRoom: true,
+    campaigns: true, // AI campaign workspace
   },
   // POP artifacts - the surfaces built on top of the engine. Clicking the
   // sidebar brand header opens the artifact switcher listing these. All of
