@@ -1,3 +1,10 @@
+## 2026-07-17 · feat(core): Support card under Configure - every reported issue with live status
+
+- Configure gains a Support card -> /dashboard/settings/support: every issue the team filed via Report Issue, newest first, with status chip (Open / In progress / Fixed / Closed), severity, reporter, page + version context, screenshot thumbnails (signed URLs, private bucket), and the fix note once HQ marks it fixed. Tabs: All / Open / Fixed.
+- GET /api/dashboard/report-issue lists the brand's own issue-reports bucket (last 6 months, 200 cap) - bucket-only like the POST, zero migrations, works on all brands day one. No bucket yet = clean empty state.
+- User-facing: the team can now see what they reported and whether it got fixed, right inside Configure.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): pipeline click-through actually filters the Leads list
 
 - Clicking any pipeline card/chevron now lands on /dashboard/leads WITH the stage applied. The Leads list expands ?stage=<value> to the stage's whole pipeline group (Qualified = Qualified + High Intent, Lost = Closed Lost/Lost/Cold/Not Qualified...) so the list matches the funnel count, and shows a removable chip named by ?stageLabel= (carries the brand's renamed key event). Previously the param was silently ignored - the pipeline deep link had never filtered anything.

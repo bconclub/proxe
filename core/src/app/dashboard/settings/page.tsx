@@ -9,6 +9,7 @@
 import {
   MdPsychology, MdGroup, MdGridView, MdOutlineForum, MdHub,
   MdNotificationsActive, MdPalette, MdChatBubbleOutline, MdToken,
+  MdSupportAgent,
 } from 'react-icons/md';
 import { getBrandConfig, brandLabel } from '@/configs';
 
@@ -66,6 +67,11 @@ export default function SettingsPage() {
       href: '/dashboard/settings/widget', title: 'Widget Appearance',
       desc: 'How the widget appears on your website — search bar or floating chat bubble.',
       icon: <MdChatBubbleOutline size={22} />, color: '#a855f7',
+    },
+    {
+      href: '/dashboard/settings/support', title: 'Support',
+      desc: 'Every issue the team has reported — status, screenshots, and fix notes in one place.',
+      icon: <MdSupportAgent size={22} />, color: '#0ea5e9',
     },
     {
       href: '/tokens', title: 'Token Usage',
