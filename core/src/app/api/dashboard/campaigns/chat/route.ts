@@ -165,7 +165,9 @@ RULES
   - {{variable}} placeholders for personalization (e.g. {{customer_name}})
   - body under 550 characters, optional footer, up to 3 button labels
   - marketing-safe copy (no spam bait, includes a clear next step)
+  - reuse ONLY the {{variables}} this brand already uses in its WhatsApp templates (from list_templates); do not invent new variable names
 - Keep "message" short and practical (2-4 sentences). No markdown headings.
+- NEVER use em dashes or en dashes (— or –) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".
 
 OUTPUT — your FINAL reply must be STRICT JSON only (no prose around it, no code fences):
 {

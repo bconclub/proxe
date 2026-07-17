@@ -620,12 +620,23 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
     return t.kind === tplFilter
   })
 
+  // The variables this brand actually uses in WhatsApp: the union of {{vars}}
+  // across every loaded template (approved registry + drafts). This is what
+  // shows when no single template is picked, so Personalization mirrors real
+  // WhatsApp usage, not a hardcoded guess.
+  const templateVars = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of templates) for (const v of varsOf(t)) set.add(v)
+    return [...set]
+  }, [templates])
+
   const variables = useMemo(() => {
-    // A picked template's own {{vars}} win; otherwise the brand's default set.
+    // A picked template's own {{vars}} win; else the brand's real template vars;
+    // else the neutral config default.
     const base = varsOf(selectedTpl)
-    const defaults = base.length > 0 ? base : DEFAULT_VARIABLES
+    const defaults = base.length > 0 ? base : (templateVars.length > 0 ? templateVars : DEFAULT_VARIABLES)
     return [...new Set([...defaults, ...customVars])]
-  }, [selectedTpl, customVars])
+  }, [selectedTpl, templateVars, customVars])
 
   const reachPct = audience && audience.count > 0
     ? Math.round(((audience.with_phone ?? audience.count) / audience.count) * 100)
@@ -760,10 +771,10 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
               className="flex-1 text-[13px] bg-transparent outline-none min-w-0"
               style={{ color: 'var(--text-primary)' }}
             />
-            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Attachments — coming soon" style={{ color: 'var(--text-muted)' }}>
+            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Attachments (coming soon)" style={{ color: 'var(--text-muted)' }}>
               <MdAttachFile size={17} />
             </button>
-            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Voice — coming soon" style={{ color: 'var(--text-muted)' }}>
+            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Voice (coming soon)" style={{ color: 'var(--text-muted)' }}>
               <MdMicNone size={17} />
             </button>
             <button
@@ -876,7 +887,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
             </div>
           ) : (
             <div className="text-[11.5px] py-2" style={{ color: 'var(--text-muted)' }}>
-              Describe your audience in the chat — the detected reach shows up here.
+              Describe your audience in the chat and the detected reach shows up here.
             </div>
           )}
         </div>
