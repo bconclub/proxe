@@ -45,8 +45,13 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Date.now()
-  const results = { checked: 0, sent24h: 0, sent2h: 0, nudged: 0, skipped: 0, errors: 0 }
+  const results = { checked: 0, sent24h: 0, sent2h: 0, nudged: 0, wouldSend: 0, skipped: 0, errors: 0 }
   const log: string[] = []
+  // Kill-switch: no reminder/nudge reaches a real lead until this is explicitly
+  // set to 'true' in the windchasers env. Default OFF = dry run: the cron still
+  // computes who is DUE and logs it (results.wouldSend), but sends nothing and
+  // sets no markers, so enabling it later delivers to everyone still eligible.
+  const sendsEnabled = process.env.WINDCHASERS_WEBINAR_SENDS_ENABLED === 'true'
   // Public Zoom registration page for the not-registered nudge. The nudge's v2
   // template carries this as a "Complete Registration" URL button; this value is
   // only used by the v1 fallback (body-embed) if v2 isn't approved. Env overrides
@@ -89,6 +94,7 @@ export async function GET(req: NextRequest) {
         if (!registerUrl) { results.skipped++; continue }                   // dormant until URL configured
 
         const webinarName = String(wc.webinar_name || '').trim()
+        if (!sendsEnabled) { results.wouldSend++; log.push(`lead=${lead.id} DRY-RUN nudge (sends disabled)`); continue }
         const result = await sendWebinarRegisterNudge(lead.phone, lead.customer_name || '', webinarName, registerUrl)
         if (!result.success) {
           results.errors++
@@ -130,6 +136,7 @@ export async function GET(req: NextRequest) {
       const when = step === '24h' ? `tomorrow at ${timeDisplay}` : `in about 2 hours (${timeDisplay})`
       const webinarName = String(wc.webinar_name || '').trim()
 
+      if (!sendsEnabled) { results.wouldSend++; log.push(`lead=${lead.id} DRY-RUN reminder ${step} (sends disabled)`); continue }
       const result = await sendWebinarReminder(lead.phone, lead.customer_name || '', webinarName, when)
       if (!result.success) {
         results.errors++
