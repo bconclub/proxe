@@ -741,16 +741,20 @@ export async function sendWebinarStartingSoon(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v1', [
+  const components = [
     {
-      type: 'body',
+      type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
         { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
         { type: 'text', parameter_name: 'join_url', text: joinUrl },
       ],
     },
-  ])
+  ]
+  // v2 = clean copy (no em dash); fall back to the approved v1 if v2 isn't approved yet.
+  const res = await sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v2', components)
+  if (!res.success) return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v1', components)
+  return res
 }
 
 export async function sendWebinarLiveNow(
@@ -758,16 +762,19 @@ export async function sendWebinarLiveNow(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v1', [
+  const components = [
     {
-      type: 'body',
+      type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
         { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
         { type: 'text', parameter_name: 'join_url', text: joinUrl },
       ],
     },
-  ])
+  ]
+  const res = await sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v2', components)
+  if (!res.success) return sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v1', components)
+  return res
 }
 
 /**
