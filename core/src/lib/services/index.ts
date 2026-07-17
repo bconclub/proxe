@@ -108,6 +108,7 @@ export {
   sendWebinarConfirm,
   sendWebinarConfirmParents,
   sendWebinarReminder,
+  sendWebinarRegisterNudge,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';

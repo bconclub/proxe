@@ -17,13 +17,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, logMessage, sendWebinarReminder } from '@/lib/services'
+import { getServiceClient, logMessage, sendWebinarReminder, sendWebinarRegisterNudge } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 const TEMPLATE = 'windchasers_webinar_reminder_v1'
+const NUDGE_TEMPLATE = 'windchasers_webinar_register_nudge_v1'
 
 /**
  * Parse the stored webinar_date into epoch ms. Pabbly/registration sends it as
@@ -68,8 +69,11 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Date.now()
-  const results = { checked: 0, sent24h: 0, sent2h: 0, skipped: 0, errors: 0 }
+  const results = { checked: 0, sent24h: 0, sent2h: 0, nudged: 0, skipped: 0, errors: 0 }
   const log: string[] = []
+  // Public Zoom registration page for the not-registered nudge. Unset → the
+  // nudge segment stays dormant (leads are skipped, never messaged linkless).
+  const registerUrl = process.env.WINDCHASERS_WEBINAR_REGISTER_URL || ''
 
   const { data: registrants, error: queryErr } = await supabase
     .from('all_leads')
@@ -94,6 +98,47 @@ export async function GET(req: NextRequest) {
       if (isNaN(startsAt)) { results.skipped++; continue }   // genuinely unparseable
       const hoursUntil = (startsAt - now) / 3_600_000
       if (hoursUntil <= 0) { results.skipped++; continue }   // already started / past
+
+      // Zoom-registered leads hold a personal join link → they get the pre-webinar
+      // reminders below. Leads who only gave name+phone (no join link) never
+      // finished registration, so a "webinar tomorrow" reminder would be wrong —
+      // they instead get a one-time "complete your registration" nudge while
+      // there's still time to sign up.
+      const registered = !!(wc.zoom_registered || wc.zoom_join_url)
+      if (!registered) {
+        if (wc.webinar_register_nudge_sent) { results.skipped++; continue } // once only
+        if (hoursUntil < 3) { results.skipped++; continue }                 // too late to register
+        if (!registerUrl) { results.skipped++; continue }                   // dormant until URL configured
+
+        const webinarName = String(wc.webinar_name || '').trim()
+        const result = await sendWebinarRegisterNudge(lead.phone, lead.customer_name || '', webinarName, registerUrl)
+        if (!result.success) {
+          results.errors++
+          log.push(`lead=${lead.id} nudge send failed: ${result.error}`)
+          continue // no marker on failure → retried next run (e.g. once Meta approves the template)
+        }
+        const nudgeName = (lead.customer_name || 'there').split(' ')[0]
+        await logMessage(
+          lead.id,
+          'whatsapp',
+          'agent',
+          `Hi ${nudgeName}, you started signing up for ${webinarName || 'our webinar'} but didn't finish. Complete your registration here: ${registerUrl} (${NUDGE_TEMPLATE} template)`,
+          'template',
+          { source: 'webinar_register_nudge', template_name: NUDGE_TEMPLATE, trigger: 'webinar_register_nudge', webinar_name: webinarName || null, webinar_date: rawDate },
+          supabase,
+        )
+        await supabase
+          .from('all_leads')
+          .update({
+            unified_context: {
+              ...ctx,
+              windchasers: { ...wc, webinar_register_nudge_sent: new Date(now).toISOString() },
+            },
+          })
+          .eq('id', lead.id)
+        results.nudged++
+        continue
+      }
 
       // Which step is due? 2h step wins if both windows somehow overlap.
       let step: '24h' | '2h' | null = null

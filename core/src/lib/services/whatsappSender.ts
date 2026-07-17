@@ -725,6 +725,38 @@ export async function sendWebinarReminder(
 }
 
 /**
+ * "Complete your registration" nudge for webinar leads who gave name + phone
+ * but never finished Zoom registration (so they hold no join link). Fired by
+ * /api/cron/webinar-reminder for the not-registered segment.
+ *
+ * Template: windchasers_webinar_register_nudge_v1 — NAMED params:
+ *   customer_name · webinar_name · register_url (the public Zoom register page)
+ *
+ * Dormant until BOTH exist: the template is approved in Meta AND the register
+ * URL is configured (WINDCHASERS_WEBINAR_REGISTER_URL). Until then the cron
+ * skips the send (no URL) or Meta 4xx's it (no template) — nothing goes out.
+ */
+export async function sendWebinarRegisterNudge(
+  to: string,
+  name: string,
+  webinarName: string,
+  registerUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_register_nudge_v1', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
+        { type: 'text', parameter_name: 'register_url', text: registerUrl },
+      ],
+    },
+  ])
+}
+
+/**
  * Pick the RNR (no-reply / missed-call) re-engagement template.
  * Two steps per segment — step 1 = first re-attempt, step 2 = "tried again".
  * Routed pilot vs generic by the lead's source. Names are Meta-approved with a
