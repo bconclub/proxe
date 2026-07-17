@@ -22,6 +22,7 @@ export const windchasersConfig: BrandConfig = {
   features: {
     voice: false,
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
+    brainActions: true, // brain can drive the dashboard (open lead / open page / suggest dial), validated server-side
     pipelineFunnel: true,
     followUpSequence: false,
     leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
