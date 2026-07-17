@@ -39,20 +39,19 @@ export async function GET() {
   if (!rows.length) return NextResponse.json({ campaigns: [] })
 
   // Which recipients later tapped a quick-reply button (e.g. "Join WhatsApp Group").
-  const leadIds = Array.from(new Set(rows.map((r: any) => r.lead_id).filter(Boolean)))
+  // Fetch inbound button taps broadly and intersect in JS — a `.in()` over the
+  // full recipient list (100+ ids) silently returned nothing.
   const clickedLeads = new Set<string>()
-  if (leadIds.length) {
-    const { data: taps } = await sb
-      .from('conversations')
-      .select('lead_id, metadata')
-      .eq('sender', 'customer')
-      .in('lead_id', leadIds)
-      .limit(5000)
-    for (const t of taps || []) {
-      const m: any = t.metadata || {}
-      if (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button' || m.quick_reply_trigger) {
-        if (t.lead_id) clickedLeads.add(t.lead_id)
-      }
+  const { data: taps } = await sb
+    .from('conversations')
+    .select('lead_id, metadata')
+    .eq('sender', 'customer')
+    .order('created_at', { ascending: false })
+    .limit(8000)
+  for (const t of taps || []) {
+    const m: any = t.metadata || {}
+    if (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button' || m.quick_reply_trigger) {
+      if (t.lead_id) clickedLeads.add(t.lead_id)
     }
   }
 
