@@ -39,6 +39,8 @@ export interface Campaign {
   status: 'draft' | 'ready' | 'sent' | 'archived'
   audience: CampaignAudience
   template: CampaignTemplate | null
+  channel?: string
+  scheduled_at?: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -122,6 +124,10 @@ export async function POST(request: NextRequest) {
             status: body.template.status === 'approved' ? 'approved' : 'draft',
             variables: Array.isArray(body.template.variables) ? body.template.variables : undefined,
           }
+        : null,
+      channel: body.channel === 'whatsapp' || !body.channel ? 'whatsapp' : String(body.channel).slice(0, 20),
+      scheduled_at: body.scheduled_at && !isNaN(new Date(body.scheduled_at).getTime())
+        ? new Date(body.scheduled_at).toISOString()
         : null,
       created_by: user.email || user.id,
       created_at: now,

@@ -169,8 +169,10 @@ OUTPUT — your FINAL reply must be STRICT JSON only (no prose around it, no cod
   "audience": { "description": string, "filters": object, "count": number, "with_phone": number, "sample": [{"name": string, "phone": string, "stage": string}] } | null,
   "templates": [{"name": string, "body": string, "footer": string|null, "buttons": [string]|null, "status": "approved"}],
   "drafts": [{"name": string, "body": string, "footer": string|null, "buttons": [string]|null, "variables": [string]}],
-  "suggestedCampaignName": string | null
+  "suggestedCampaignName": string | null,
+  "goal": string | null
 }
+"goal" = one short line naming what this campaign is trying to achieve (e.g. "Re-engage & remind about pilot training").
 Set "audience" from your query_audience result (echo its filters). Empty arrays when nothing applies.`
 }
 

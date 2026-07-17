@@ -1,17 +1,19 @@
 'use client'
 
-// Campaigns — overview first (stat cards + campaign table, the mock's
-// structure in brand theme tokens), chat builder behind "New campaign".
-// The builder: describe who you want to reach; the brain pulls the real
-// audience, lines up approved WhatsApp templates or drafts fresh ones with
-// {{variables}}, and the campaign saves as 'ready'. Sending stays separate.
+// Campaigns — the AI campaign workspace (mock-faithful structure, brand theme
+// colors): chat on the left, Templates / Audience summary / Campaign setup /
+// Personalization rail on the right. "Previous Campaigns" opens the overview
+// list. The chat pulls real audiences and templates; Review & Schedule saves
+// the campaign as 'ready' with a send time — actual sending stays separate.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  MdCampaign, MdSend, MdPersonOutline, MdCheckCircle, MdEditNote,
-  MdDeleteOutline, MdOutlineSms, MdSearch, MdAdd, MdArrowBack,
+  MdCampaign, MdSend, MdPersonOutline, MdEdit,
+  MdDeleteOutline, MdSearch, MdAutoAwesome, MdSmartToy,
   MdOutlineMarkEmailRead, MdOutlineVisibility, MdOutlineAdsClick,
-  MdMoreVert, MdExpandMore, MdExpandLess,
+  MdMoreVert, MdExpandLess, MdAttachFile, MdMicNone, MdWhatsapp,
+  MdChevronRight, MdOutlineCalendarToday, MdOutlineArticle, MdAdd,
+  MdHistory, MdCheckCircle, MdGroups, MdDoneAll,
 } from 'react-icons/md'
 import { brandConfig } from '@/configs'
 
@@ -30,6 +32,7 @@ interface Tpl {
   footer?: string | null
   buttons?: string[] | null
   status: 'approved' | 'draft'
+  kind?: string
   variables?: string[]
 }
 interface Reply {
@@ -38,10 +41,12 @@ interface Reply {
   templates: Tpl[]
   drafts: Tpl[]
   suggestedCampaignName: string | null
+  goal?: string | null
 }
 interface Msg {
   role: 'user' | 'assistant'
   content: string
+  at: number
   reply?: Reply
 }
 interface SavedCampaign {
@@ -50,6 +55,7 @@ interface SavedCampaign {
   status: string
   audience: { description: string; count: number }
   template: { name: string; status: string } | null
+  scheduled_at?: string | null
   created_by?: string
   created_at: string
   updated_at?: string
@@ -74,43 +80,42 @@ interface SentCampaign {
   lastSent: string | null
 }
 
-const GREEN = '#22c55e', AMBER = '#f59e0b', PURPLE = '#8b5cf6', BLUE = '#3b82f6'
+const GREEN = '#22c55e', AMBER = '#f59e0b', PURPLE = '#8b5cf6', BLUE = '#3b82f6', RED = '#ef4444'
+
+const ASSISTANT = brandConfig.labels?.['Campaign Assistant'] || `${brandConfig.name} AI`
 
 const SUGGESTIONS = [
-  'Webinar registrants who never replied on WhatsApp',
-  'Qualified pilot-training leads from the last 30 days',
-  'Cabin Crew leads that came from Instagram',
-  'Leads that went quiet for 14+ days, re-engagement',
+  { icon: <MdGroups size={15} />, text: 'Qualified pilot leads from last 30 days' },
+  { icon: <MdOutlineMarkEmailRead size={15} />, text: 'Webinar registrants who never replied' },
+  { icon: <MdHistory size={15} />, text: 'Re-engage leads inactive for 14+ days' },
+  { icon: <MdPersonOutline size={15} />, text: 'Cabin crew leads from Instagram' },
 ]
 
-type TabKey = 'live' | 'scheduled' | 'pending' | 'completed' | 'all'
-const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'live', label: 'Live campaigns' },
-  { key: 'scheduled', label: 'Scheduled' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'completed', label: 'Completed' },
-  { key: 'all', label: 'All' },
+const PLACEHOLDERS = [
+  'Describe who you want to reach…',
+  'Re-engage leads who went quiet…',
+  'Send reminder to webinar registrants…',
 ]
 
-function relTime(iso?: string | null): string {
-  if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  if (!isFinite(diff)) return ''
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${Math.max(1, mins)}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+const fmtTime = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+function prettyTplName(name: string): string {
+  return name
+    .replace(new RegExp(`^${brandConfig.brand}_`, 'i'), '')
+    .replace(/_v\d+$/i, '')
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
-function sinceLabel(iso?: string | null): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ''
-  return `Since ${d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
+function varsOf(t: Tpl | null): string[] {
+  if (!t) return []
+  const found = new Set<string>(t.variables || [])
+  for (const m of (t.body || '').matchAll(/\{\{([^}]+)\}\}/g)) found.add(m[1].trim())
+  return [...found]
 }
 
-// ─── Shared chat pieces (builder) ────────────────────────────────────────────
+// ─── Small pieces ────────────────────────────────────────────────────────────
 
 function TplBody({ text }: { text: string }) {
   const parts = text.split(/(\{\{[^}]+\}\})/g)
@@ -125,6 +130,41 @@ function TplBody({ text }: { text: string }) {
   )
 }
 
+// The mock's "Here's what I've put together" summary card.
+function PlanCard({ a, goal }: { a: Audience; goal?: string | null }) {
+  const rows = [
+    {
+      icon: <MdGroups size={16} />, color: BLUE,
+      title: 'Audience detected', sub: a.description,
+      chip: `${a.count.toLocaleString()} leads`, chipColor: BLUE,
+    },
+    {
+      icon: <MdWhatsapp size={16} />, color: GREEN,
+      title: 'Channel', sub: 'WhatsApp',
+      chip: `${(a.with_phone ?? a.count).toLocaleString()} reachable`, chipColor: GREEN,
+    },
+    ...(goal ? [{
+      icon: <MdAutoAwesome size={16} />, color: AMBER,
+      title: 'Goal', sub: goal,
+      chip: 'Recommended', chipColor: AMBER,
+    }] : []),
+  ]
+  return (
+    <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+      {rows.map((r) => (
+        <div key={r.title} className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0" style={{ background: `${r.color}1c`, color: r.color }}>{r.icon}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>{r.title}</div>
+            <div className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{r.sub}</div>
+          </div>
+          <span className="text-[10.5px] font-semibold px-2.5 py-1 rounded-lg shrink-0" style={{ background: `${r.chipColor}18`, color: r.chipColor }}>{r.chip}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TemplateCard({ t, selected, onSelect }: { t: Tpl; selected: boolean; onSelect: () => void }) {
   const tone = t.status === 'approved' ? GREEN : AMBER
   return (
@@ -135,7 +175,7 @@ function TemplateCard({ t, selected, onSelect }: { t: Tpl; selected: boolean; on
       style={{
         borderColor: selected ? 'var(--accent-primary)' : 'var(--border-primary)',
         boxShadow: selected ? '0 0 0 1px var(--accent-primary)' : 'none',
-        background: 'var(--bg-secondary)',
+        background: 'var(--bg-primary)',
       }}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -160,39 +200,16 @@ function TemplateCard({ t, selected, onSelect }: { t: Tpl; selected: boolean; on
   )
 }
 
-function AudienceCard({ a }: { a: Audience }) {
-  const chips = Object.entries(a.filters || {}).filter(([, v]) => v !== undefined && v !== null && v !== '')
+// Two-segment reach donut — stroke-dasharray over pathLength (never degenerates).
+function ReachDonut({ pct }: { pct: number }) {
+  const p = Math.max(0, Math.min(100, pct))
   return (
-    <div className="rounded-xl border p-3.5" style={{ borderColor: `color-mix(in srgb, ${BLUE} 35%, var(--border-primary))`, background: `color-mix(in srgb, ${BLUE} 6%, var(--bg-secondary))` }}>
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full shrink-0" style={{ background: `${BLUE}22`, color: BLUE }}><MdPersonOutline size={20} /></span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{a.with_phone ?? a.count}</span>
-            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>reachable on WhatsApp{a.count !== a.with_phone ? ` · ${a.count} matched total` : ''}</span>
-          </div>
-          <div className="text-[12px] truncate" style={{ color: 'var(--text-secondary)' }}>{a.description}</div>
-        </div>
-      </div>
-      {chips.length > 0 && (
-        <div className="flex gap-1.5 mt-2.5 flex-wrap">
-          {chips.map(([k, v]) => (
-            <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>{k}: {String(v)}</span>
-          ))}
-        </div>
+    <svg width={76} height={76} viewBox="0 0 42 42" className="-rotate-90 shrink-0" aria-hidden>
+      <circle cx="21" cy="21" r="16" fill="none" stroke="var(--bg-hover)" strokeWidth="6" />
+      {p > 0 && (
+        <circle cx="21" cy="21" r="16" fill="none" stroke="var(--accent-primary)" strokeWidth="6" pathLength={100} strokeDasharray={`${p} ${100 - p}`} strokeLinecap="round" />
       )}
-      {(a.sample?.length || 0) > 0 && (
-        <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-          {a.sample.slice(0, 8).map((s, i) => (
-            <div key={i} className="flex items-center gap-2 text-[11.5px] min-w-0">
-              <span className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>{s.name}</span>
-              <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>{s.phone}</span>
-              {s.stage && <span className="shrink-0 text-[9.5px] px-1.5 rounded-full" style={{ background: 'var(--bg-hover)', color: 'var(--text-muted)' }}>{s.stage}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    </svg>
   )
 }
 
@@ -207,15 +224,499 @@ export default function CampaignsPage() {
       </div>
     )
   }
-  return <CampaignsHome />
+  return <CampaignsRoot />
 }
 
-function CampaignsHome() {
-  const [view, setView] = useState<'list' | 'builder'>('list')
+function CampaignsRoot() {
+  const [view, setView] = useState<'workspace' | 'previous'>('workspace')
+  const [wsKey, setWsKey] = useState(0) // remount workspace on "Create Campaign"
+
+  return (
+    <div className="max-w-[1240px] mx-auto flex flex-col" style={{ height: 'calc(100vh - 84px)' }}>
+      {/* ── Page header ── */}
+      <div className="flex items-center gap-3 flex-wrap pb-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl shrink-0" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--accent-primary)' }}>
+          <MdCampaign size={22} />
+        </span>
+        <div className="min-w-0 mr-auto">
+          <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>Campaigns</h1>
+          <p className="text-[12.5px]" style={{ color: 'var(--text-secondary)' }}>AI-powered campaigns that reach the right people, at the right time.</p>
+        </div>
+        <button
+          onClick={() => { setView('workspace'); setWsKey((k) => k + 1) }}
+          className="flex items-center gap-1.5 text-[12.5px] font-bold px-3.5 py-2 rounded-xl border"
+          style={{
+            background: view === 'workspace' ? 'var(--bg-secondary)' : 'transparent',
+            borderColor: view === 'workspace' ? 'var(--accent-primary)' : 'var(--border-primary)',
+            color: 'var(--text-primary)',
+          }}
+        >
+          <MdAutoAwesome size={15} style={{ color: 'var(--accent-primary)' }} /> Create Campaign
+        </button>
+        <button
+          onClick={() => setView('previous')}
+          className="flex items-center gap-1.5 text-[12.5px] font-bold px-3.5 py-2 rounded-xl border"
+          style={{
+            background: view === 'previous' ? 'var(--bg-secondary)' : 'transparent',
+            borderColor: view === 'previous' ? 'var(--accent-primary)' : 'var(--border-primary)',
+            color: 'var(--text-primary)',
+          }}
+        >
+          <MdHistory size={15} style={{ color: 'var(--accent-primary)' }} /> Previous Campaigns <MdChevronRight size={15} />
+        </button>
+      </div>
+
+      {view === 'workspace'
+        ? <Workspace key={wsKey} onSaved={() => setView('previous')} />
+        : <PreviousCampaigns />}
+    </div>
+  )
+}
+
+// ═══ WORKSPACE — chat left, rail right ═══════════════════════════════════════
+
+function Workspace({ onSaved }: { onSaved: () => void }) {
+  // Chat
+  const [messages, setMessages] = useState<Msg[]>([])
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [phIdx, setPhIdx] = useState(0)
+  const [introAt] = useState(Date.now())
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Plan state
+  const [campaignName, setCampaignName] = useState('New Campaign')
+  const [editingName, setEditingName] = useState(false)
+  const [selectedTpl, setSelectedTpl] = useState<Tpl | null>(null)
+  const [sendTime, setSendTime] = useState('')
+  const [customVars, setCustomVars] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  // Templates rail
+  const [templates, setTemplates] = useState<Tpl[]>([])
+  const [tplFilter, setTplFilter] = useState<'approved' | 'draft' | 'reminder' | 'nudge' | 'promo'>('approved')
+
+  useEffect(() => {
+    fetch('/api/dashboard/campaigns/templates')
+      .then((r) => r.json())
+      .then((d) => setTemplates(Array.isArray(d.templates) ? d.templates : []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setPhIdx((i) => (i + 1) % PLACEHOLDERS.length), 4000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, busy])
+
+  const latestReply = [...messages].reverse().find((m) => m.role === 'assistant' && m.reply)?.reply || null
+  const audience = latestReply?.audience || null
+
+  const send = async (text: string) => {
+    const q = text.trim()
+    if (!q || busy) return
+    setError(null)
+    setSavedMsg(null)
+    setInput('')
+    const next: Msg[] = [...messages, { role: 'user' as const, content: q, at: Date.now() }]
+    setMessages(next)
+    setBusy(true)
+    try {
+      const res = await fetch('/api/dashboard/campaigns/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d?.error || 'Campaign brain failed')
+      const reply: Reply = d.reply
+      setMessages((cur) => [...cur, { role: 'assistant', content: reply.message, at: Date.now(), reply }])
+      if (reply.suggestedCampaignName) setCampaignName(reply.suggestedCampaignName)
+      const firstTpl = reply.templates?.[0] || reply.drafts?.[0]
+      if (firstTpl) setSelectedTpl((cur) => cur || { ...firstTpl, status: reply.templates?.[0] ? 'approved' : 'draft' })
+    } catch (e: any) {
+      setError(e.message)
+      setMessages((cur) => cur.slice(0, -1))
+      setInput(q)
+    }
+    setBusy(false)
+  }
+
+  const schedule = async () => {
+    if (!audience || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/dashboard/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: campaignName.trim() || 'New Campaign',
+          audience,
+          template: selectedTpl,
+          channel: 'whatsapp',
+          scheduled_at: sendTime ? new Date(sendTime).toISOString() : null,
+        }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d?.error || 'Save failed')
+      setSavedMsg(`Saved "${d.campaign.name}" as ${d.campaign.status}. Sending is not wired yet — nobody gets messaged.`)
+      setTimeout(onSaved, 1600)
+    } catch (e: any) {
+      setError(e.message)
+      setSaving(false)
+    }
+  }
+
+  const shownTemplates = templates.filter((t) => {
+    if (tplFilter === 'approved') return t.status === 'approved'
+    if (tplFilter === 'draft') return t.status === 'draft'
+    return t.kind === tplFilter
+  })
+
+  const variables = useMemo(() => {
+    const base = varsOf(selectedTpl)
+    const defaults = base.length > 0 ? base : ['customer_name', 'course', 'city']
+    return [...new Set([...defaults, ...customVars])]
+  }, [selectedTpl, customVars])
+
+  const reachPct = audience && audience.count > 0
+    ? Math.round(((audience.with_phone ?? audience.count) / audience.count) * 100)
+    : 0
+
+  return (
+    <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-3.5">
+
+      {/* ── LEFT: chat card ── */}
+      <div className="flex flex-col min-h-0 rounded-2xl border" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+        {/* Card header */}
+        <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+          {editingName ? (
+            <input
+              autoFocus
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+              onBlur={() => setEditingName(false)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingName(false) }}
+              maxLength={80}
+              className="text-[14px] font-bold rounded-md border px-2 py-1 outline-none"
+              style={{ background: 'var(--bg-primary)', borderColor: 'var(--accent-primary)', color: 'var(--text-primary)', width: 240 }}
+            />
+          ) : (
+            <>
+              <span className="text-[14px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{campaignName}</span>
+              <button onClick={() => setEditingName(true)} className="p-1 opacity-60 hover:opacity-100" title="Rename campaign" style={{ color: 'var(--text-secondary)' }}>
+                <MdEdit size={14} />
+              </button>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--text-secondary)' }}>
+            Channel:
+            <span className="flex items-center gap-1 font-semibold rounded-lg border px-2 py-1" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)' }}>
+              <MdWhatsapp size={15} style={{ color: GREEN }} /> WhatsApp
+            </span>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+          {/* Assistant intro — always first */}
+          <div className="flex gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdSmartToy size={18} /></span>
+            <div className="max-w-[80%]">
+              <div className="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+                {`Hi, I'm ${ASSISTANT} — your AI campaign assistant.\nLet's build a campaign that gets results. Tell me who you want to reach, where you want to reach them, and what you want to achieve. I'll handle the rest.`}
+              </div>
+              <div className="text-[10px] mt-1 ml-1" style={{ color: 'var(--text-muted)' }}>{fmtTime(introAt)}</div>
+            </div>
+          </div>
+
+          {messages.map((m, i) => (
+            m.role === 'user' ? (
+              <div key={i} className="flex justify-end gap-2.5">
+                <div className="max-w-[75%]">
+                  <div className="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-[13px] leading-relaxed" style={{ background: `color-mix(in srgb, var(--accent-primary) 15%, var(--bg-primary))`, color: 'var(--text-primary)' }}>
+                    {m.content}
+                  </div>
+                  <div className="text-[10px] mt-1 mr-1 flex items-center gap-1 justify-end" style={{ color: 'var(--text-muted)' }}>
+                    {fmtTime(m.at)} <MdDoneAll size={12} style={{ color: BLUE }} />
+                  </div>
+                </div>
+                <span className="flex h-9 w-9 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdPersonOutline size={18} /></span>
+              </div>
+            ) : (
+              <div key={i} className="flex gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdSmartToy size={18} /></span>
+                <div className="max-w-[85%] min-w-0 flex-1 space-y-2.5">
+                  <div className="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[13px] leading-relaxed inline-block" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+                    {m.content}
+                  </div>
+                  {m.reply?.audience && <PlanCard a={m.reply.audience} goal={m.reply.goal} />}
+                  {((m.reply?.templates?.length || 0) + (m.reply?.drafts?.length || 0)) > 0 && (
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                      {[...(m.reply!.templates || []).map((t) => ({ ...t, status: 'approved' as const })), ...(m.reply!.drafts || []).map((t) => ({ ...t, status: 'draft' as const }))].map((t) => (
+                        <TemplateCard key={t.name} t={t} selected={selectedTpl?.name === t.name} onSelect={() => setSelectedTpl(t)} />
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>{fmtTime(m.at)}</div>
+                </div>
+              </div>
+            )
+          ))}
+
+          {/* Smart suggestions — under the latest assistant turn */}
+          {!busy && (
+            <div className="pl-[46px]">
+              <div className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Smart suggestions</div>
+              <div className="flex flex-wrap gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s.text}
+                    onClick={() => send(s.text)}
+                    className="flex items-center gap-2 text-[11.5px] px-3 py-2 rounded-xl border text-left transition-colors hover:opacity-80"
+                    style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                  >
+                    <span style={{ color: 'var(--accent-primary)' }}>{s.icon}</span>
+                    {s.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {busy && (
+            <div className="flex items-center gap-2 text-xs pl-[46px]" style={{ color: 'var(--text-muted)' }}>
+              <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: 'var(--accent-primary)' }} />
+              Pulling the audience…
+            </div>
+          )}
+        </div>
+
+        {/* Input bar */}
+        <div className="px-4 pb-2 pt-1">
+          {error && <div className="text-xs mb-1.5" style={{ color: RED }}>{error}</div>}
+          {savedMsg && <div className="text-xs mb-1.5" style={{ color: GREEN }}>{savedMsg}</div>}
+          <form
+            onSubmit={(e) => { e.preventDefault(); send(input) }}
+            className="flex items-center gap-2 rounded-2xl border px-3 py-2"
+            style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0" style={{ background: `color-mix(in srgb, var(--accent-primary) 15%, transparent)`, color: 'var(--accent-primary)' }}>
+              <MdAutoAwesome size={16} />
+            </span>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={PLACEHOLDERS[phIdx]}
+              disabled={busy}
+              className="flex-1 text-[13px] bg-transparent outline-none min-w-0"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Attachments — coming soon" style={{ color: 'var(--text-muted)' }}>
+              <MdAttachFile size={17} />
+            </button>
+            <button type="button" disabled className="p-1.5 shrink-0 opacity-40 cursor-not-allowed" title="Voice — coming soon" style={{ color: 'var(--text-muted)' }}>
+              <MdMicNone size={17} />
+            </button>
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              className="flex h-9 w-9 items-center justify-center rounded-full shrink-0 transition-opacity"
+              style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)', opacity: busy || !input.trim() ? 0.4 : 1 }}
+            >
+              <MdSend size={16} />
+            </button>
+          </form>
+          {/* Placeholder cycle dots */}
+          <div className="flex justify-center gap-1.5 mt-1.5">
+            {PLACEHOLDERS.map((_, i) => (
+              <span key={i} className="inline-block h-1 w-1 rounded-full" style={{ background: i === phIdx ? 'var(--accent-primary)' : 'var(--border-primary)' }} />
+            ))}
+          </div>
+          <div className="text-center text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+            {ASSISTANT} can make mistakes. Review before sending.
+          </div>
+        </div>
+      </div>
+
+      {/* ── RIGHT: rail ── */}
+      <div className="min-h-0 overflow-y-auto space-y-3.5 pb-2">
+
+        {/* Templates */}
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="flex items-center mb-3">
+            <span className="text-[14px] font-bold" style={{ color: 'var(--text-primary)' }}>Templates</span>
+            <a href="/dashboard/settings/whatsapp-templates" className="ml-auto text-[11.5px] font-semibold" style={{ color: 'var(--accent-primary)', textDecoration: 'none' }}>View all</a>
+          </div>
+          <div className="flex gap-1 flex-wrap mb-3">
+            {([['approved', 'Approved'], ['draft', 'Draft'], ['reminder', 'Reminder'], ['nudge', 'Nudge'], ['promo', 'Promo']] as const).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setTplFilter(k)}
+                className="text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-colors"
+                style={{
+                  background: tplFilter === k ? 'var(--bg-hover)' : 'transparent',
+                  color: tplFilter === k ? 'var(--text-primary)' : 'var(--text-muted)',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
+            {shownTemplates.length === 0 ? (
+              <div className="text-[11.5px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>
+                {tplFilter === 'draft' ? 'Drafts appear when the chat writes new templates.' : 'No templates here yet.'}
+              </div>
+            ) : (
+              shownTemplates.slice(0, 12).map((t) => {
+                const tone = t.status === 'approved' ? GREEN : AMBER
+                const selected = selectedTpl?.name === t.name
+                return (
+                  <button
+                    key={t.name}
+                    onClick={() => setSelectedTpl(t)}
+                    className="w-full text-left flex items-start gap-2.5 rounded-xl border px-2.5 py-2 transition-all"
+                    style={{
+                      borderColor: selected ? 'var(--accent-primary)' : 'var(--border-primary)',
+                      background: 'var(--bg-primary)',
+                    }}
+                  >
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full shrink-0 mt-0.5" style={{ background: `${GREEN}1a`, color: GREEN }}>
+                      <MdWhatsapp size={15} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{prettyTplName(t.name)}</div>
+                      <div className="text-[10.5px] leading-snug" style={{ color: 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {t.body}
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: `${tone}1c`, color: tone }}>
+                      {t.status === 'approved' ? 'Approved' : 'Draft'}
+                    </span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Audience summary */}
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[14px] font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Audience summary</div>
+          {audience ? (
+            <div className="flex items-center gap-4">
+              <div className="min-w-0">
+                <div className="text-3xl font-black leading-tight tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                  {(audience.with_phone ?? audience.count).toLocaleString()}
+                </div>
+                <div className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>Estimated reach</div>
+              </div>
+              <div className="ml-auto flex items-center gap-3">
+                <ReachDonut pct={reachPct} />
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="h-2 w-2 rounded-full inline-block" style={{ background: 'var(--accent-primary)' }} />
+                    WhatsApp <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{reachPct}%</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="h-2 w-2 rounded-full inline-block" style={{ background: 'var(--bg-hover)' }} />
+                    No phone <span className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{100 - reachPct}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-[11.5px] py-2" style={{ color: 'var(--text-muted)' }}>
+              Describe your audience in the chat — the detected reach shows up here.
+            </div>
+          )}
+        </div>
+
+        {/* Campaign setup */}
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[14px] font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Campaign setup</div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: 'var(--bg-primary)' }}>
+              <span style={{ color: 'var(--text-muted)' }}><MdOutlineArticle size={17} /></span>
+              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Channel</span>
+              <span className="ml-auto flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                <MdWhatsapp size={15} style={{ color: GREEN }} /> WhatsApp
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: 'var(--bg-primary)' }}>
+              <span style={{ color: 'var(--text-muted)' }}><MdOutlineArticle size={17} /></span>
+              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Template</span>
+              <span className="ml-auto text-[12px] font-semibold truncate max-w-[150px]" style={{ color: selectedTpl ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                {selectedTpl ? prettyTplName(selectedTpl.name) : 'Pick a template'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: 'var(--bg-primary)' }}>
+              <span style={{ color: 'var(--text-muted)' }}><MdOutlineCalendarToday size={16} /></span>
+              <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Send time</span>
+              <input
+                type="datetime-local"
+                value={sendTime}
+                onChange={(e) => setSendTime(e.target.value)}
+                className="ml-auto text-[11.5px] rounded-md border px-1.5 py-1 outline-none"
+                style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', color: sendTime ? 'var(--text-primary)' : 'var(--text-muted)' }}
+              />
+            </div>
+          </div>
+          <button
+            onClick={schedule}
+            disabled={!audience || saving}
+            className="w-full mt-3 flex items-center justify-center gap-2 text-[13px] font-bold px-3 py-2.5 rounded-xl transition-opacity"
+            style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)', opacity: !audience || saving ? 0.4 : 1 }}
+          >
+            <MdAutoAwesome size={16} /> {saving ? 'Saving…' : 'Review & Schedule Campaign'}
+          </button>
+          {!audience && (
+            <div className="text-[10.5px] mt-1.5 text-center" style={{ color: 'var(--text-muted)' }}>Detect an audience in the chat first.</div>
+          )}
+        </div>
+
+        {/* Personalization */}
+        <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[14px] font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Personalization <span className="font-normal text-[11.5px]" style={{ color: 'var(--text-muted)' }}>(Variables)</span></div>
+          <div className="flex flex-wrap gap-1.5">
+            {variables.map((v) => (
+              <span key={v} className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-lg" style={{ background: `${PURPLE}18`, color: PURPLE }}>
+                {`{{${v}}}`}
+              </span>
+            ))}
+            <button
+              onClick={() => {
+                const v = window.prompt('Variable name (e.g. batch):')
+                const clean = (v || '').trim().replace(/[^a-zA-Z0-9_]/g, '')
+                if (clean) setCustomVars((cur) => [...new Set([...cur, clean])])
+              }}
+              className="flex items-center gap-0.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg border"
+              style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+            >
+              <MdAdd size={13} /> Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ═══ PREVIOUS CAMPAIGNS — the overview list ══════════════════════════════════
+
+function PreviousCampaigns() {
   const [saved, setSaved] = useState<SavedCampaign[]>([])
   const [sent, setSent] = useState<SentCampaign[]>([])
-  const [upcoming, setUpcoming] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const loadAll = () => {
     Promise.all([
@@ -224,59 +725,11 @@ function CampaignsHome() {
     ]).then(([a, b]) => {
       setSaved(Array.isArray(a.campaigns) ? a.campaigns : [])
       setSent(Array.isArray(b.campaigns) ? b.campaigns : [])
-      setUpcoming(Array.isArray(b.upcoming) ? b.upcoming : [])
       setLoading(false)
     })
   }
   useEffect(loadAll, [])
 
-  if (view === 'builder') {
-    return (
-      <CampaignsBuilder
-        onBack={() => { setView('list'); loadAll() }}
-      />
-    )
-  }
-  return (
-    <CampaignsList
-      saved={saved}
-      sent={sent}
-      upcoming={upcoming}
-      loading={loading}
-      onNew={() => setView('builder')}
-      onChanged={loadAll}
-    />
-  )
-}
-
-// ─── List view (the mock's overview) ─────────────────────────────────────────
-
-function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
-  saved: SavedCampaign[]
-  sent: SentCampaign[]
-  upcoming: any[]
-  loading: boolean
-  onNew: () => void
-  onChanged: () => void
-}) {
-  const [tab, setTab] = useState<TabKey>('live')
-  const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const searchRef = useRef<HTMLInputElement>(null)
-
-  // Cmd/Ctrl+K focuses search — the mock's ⌘K affordance.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        searchRef.current?.focus()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  // Aggregate stat cards across every SENT campaign — real numbers only.
   const agg = useMemo(() => {
     const t = { sent: 0, delivered: 0, read: 0, clicked: 0 }
     for (const c of sent) {
@@ -289,104 +742,9 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
   }, [sent])
   const rate = (n: number) => (agg.sent > 0 ? `${Math.round((n / agg.sent) * 100)}%` : '0%')
 
-  // Merge sent (live) + saved (planned) into tab buckets.
-  type Row = {
-    kind: 'sent' | 'saved' | 'upcoming'
-    id: string
-    name: string
-    badge: string
-    target: string
-    statusLabel: string
-    statusColor: string
-    since: string
-    updated: string
-    deliveredPct: number | null
-    read: number | null
-    clicked: number | null
-    sentC?: SentCampaign
-    savedC?: SavedCampaign
-  }
-  const rows: Row[] = useMemo(() => {
-    const sentRows: Row[] = sent.map((c) => ({
-      kind: 'sent',
-      id: c.id,
-      name: c.name,
-      badge: 'WHATSAPP',
-      target: c.description || `Target: ${c.recipients} people · ${c.type}`,
-      statusLabel: 'Live',
-      statusColor: GREEN,
-      since: sinceLabel(c.lastSent),
-      updated: relTime(c.lastSent),
-      deliveredPct: c.totals?.sent > 0 ? Math.round((c.totals.delivered / c.totals.sent) * 100) : 0,
-      read: c.totals?.read ?? 0,
-      clicked: c.totals?.clicked ?? 0,
-      sentC: c,
-    }))
-    const savedRows: Row[] = saved.map((c) => {
-      const map: Record<string, { label: string; color: string }> = {
-        ready: { label: 'Scheduled', color: AMBER },
-        draft: { label: 'Pending', color: 'var(--text-muted)' as string },
-        sent: { label: 'Completed', color: BLUE },
-        archived: { label: 'Completed', color: 'var(--text-muted)' as string },
-      }
-      const st = map[c.status] || map.draft
-      return {
-        kind: 'saved' as const,
-        id: c.id,
-        name: c.name,
-        badge: 'WHATSAPP',
-        target: `Target: ${c.audience?.description || `${c.audience?.count ?? 0} people`}${c.created_by ? ` · Created by ${c.created_by.split('@')[0]}` : ''}`,
-        statusLabel: st.label,
-        statusColor: st.color,
-        since: sinceLabel(c.created_at),
-        updated: relTime(c.updated_at || c.created_at),
-        deliveredPct: null,
-        read: null,
-        clicked: null,
-        savedC: c,
-      }
-    })
-    const upcomingRows: Row[] = (upcoming || []).map((u: any) => {
-      const at = u.scheduledAt ? new Date(u.scheduledAt) : null
-      const when = at ? at.toLocaleString('en-IN', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
-      return {
-        kind: 'upcoming' as const,
-        id: u.id,
-        name: `${u.name} · ${u.label}`,
-        badge: 'WHATSAPP',
-        target: `${u.audience}${when ? ` · fires ${when}` : ''} · ${u.template}`,
-        statusLabel: 'Scheduled',
-        statusColor: AMBER,
-        since: when ? `Fires ${when}` : 'Scheduled',
-        updated: when,
-        deliveredPct: null,
-        read: null,
-        clicked: null,
-      }
-    })
-    return [...upcomingRows, ...sentRows, ...savedRows]
-  }, [sent, saved, upcoming])
-
-  const counts: Record<TabKey, number> = useMemo(() => ({
-    live: rows.filter((r) => r.statusLabel === 'Live').length,
-    scheduled: rows.filter((r) => r.statusLabel === 'Scheduled').length,
-    pending: rows.filter((r) => r.statusLabel === 'Pending').length,
-    completed: rows.filter((r) => r.statusLabel === 'Completed').length,
-    all: rows.length,
-  }), [rows])
-
-  const shown = rows.filter((r) => {
-    if (tab === 'live' && r.statusLabel !== 'Live') return false
-    if (tab === 'scheduled' && r.statusLabel !== 'Scheduled') return false
-    if (tab === 'pending' && r.statusLabel !== 'Pending') return false
-    if (tab === 'completed' && r.statusLabel !== 'Completed') return false
-    if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
   const removeSaved = async (id: string) => {
     await fetch(`/api/dashboard/campaigns?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {})
-    onChanged()
+    loadAll()
   }
 
   const STATS = [
@@ -396,56 +754,52 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
     { label: 'Clicked', value: agg.clicked, sub: `${rate(agg.clicked)} click rate`, color: AMBER, icon: <MdOutlineAdsClick size={18} /> },
   ]
 
-  const tabLabel = TABS.find((t) => t.key === tab)!.label
+  const rows = useMemo(() => {
+    const sentRows = sent.map((c) => ({
+      kind: 'sent' as const,
+      id: c.id,
+      name: c.name,
+      target: c.description || `Target: ${c.recipients} people · ${c.type}`,
+      statusLabel: 'Live',
+      statusColor: GREEN,
+      since: c.lastSent ? `Since ${new Date(c.lastSent).toLocaleString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}` : '',
+      deliveredPct: c.totals?.sent > 0 ? Math.round((c.totals.delivered / c.totals.sent) * 100) : 0,
+      read: c.totals?.read ?? 0,
+      clicked: c.totals?.clicked ?? 0,
+      sentC: c as SentCampaign | undefined,
+      savedC: undefined as SavedCampaign | undefined,
+    }))
+    const savedRows = saved.map((c) => ({
+      kind: 'saved' as const,
+      id: c.id,
+      name: c.name,
+      target: `Target: ${c.audience?.description || `${c.audience?.count ?? 0} people`}${c.scheduled_at ? ` · ${new Date(c.scheduled_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : ''}`,
+      statusLabel: c.status === 'ready' ? 'Scheduled' : c.status === 'draft' ? 'Pending' : 'Completed',
+      statusColor: c.status === 'ready' ? AMBER : c.status === 'draft' ? ('var(--text-muted)' as string) : BLUE,
+      since: `Since ${new Date(c.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`,
+      deliveredPct: null as number | null,
+      read: null as number | null,
+      clicked: null as number | null,
+      sentC: undefined as SentCampaign | undefined,
+      savedC: c as SavedCampaign | undefined,
+    }))
+    return [...sentRows, ...savedRows].filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()))
+  }, [sent, saved, search])
 
   return (
-    <div className="max-w-[1100px] mx-auto">
-      {/* Header */}
-      <div className="flex items-start gap-3 flex-wrap">
-        <div className="min-w-0 mr-auto">
-          <h1 className="text-2xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>Campaigns</h1>
-          <p className="text-[12.5px] mt-1" style={{ color: 'var(--text-secondary)' }}>Create, manage and track all your outreach campaigns.</p>
-        </div>
-        <div className="relative">
-          <MdSearch size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            ref={searchRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search campaigns…"
-            className="text-[12.5px] rounded-lg border pl-8 pr-12 py-2 outline-none w-[220px]"
-            style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
-          />
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9.5px] font-bold px-1.5 py-0.5 rounded border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-muted)' }}>⌘K</span>
-        </div>
-        <button
-          onClick={onNew}
-          className="flex items-center gap-1.5 text-[12.5px] font-bold px-3.5 py-2 rounded-lg shrink-0"
-          style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
-        >
-          <MdAdd size={17} /> New campaign
-        </button>
+    <div className="flex-1 min-h-0 overflow-y-auto space-y-3.5 pb-4">
+      <div className="relative w-[240px]">
+        <MdSearch size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search campaigns…"
+          className="text-[12.5px] rounded-lg border pl-8 pr-3 py-2 outline-none w-full"
+          style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+        />
       </div>
 
-      {/* Status tabs */}
-      <div className="inline-flex gap-1 mt-4 p-1 rounded-xl border" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className="text-[12px] font-semibold px-3.5 py-1.5 rounded-lg transition-colors"
-            style={{
-              background: tab === t.key ? 'var(--accent-primary)' : 'transparent',
-              color: tab === t.key ? 'var(--bg-primary)' : 'var(--text-secondary)',
-            }}
-          >
-            {t.label}{counts[t.key] > 0 && tab !== t.key ? ` (${counts[t.key]})` : ''}
-          </button>
-        ))}
-      </div>
-
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {STATS.map((s) => (
           <div key={s.label} className="rounded-xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
             <div className="flex items-center gap-3">
@@ -460,35 +814,25 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
         ))}
       </div>
 
-      {/* Campaign table */}
-      <div className="rounded-xl border mt-4 overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
         <div className="px-4 py-3 text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>
-          {tabLabel} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({shown.length})</span>
+          All campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({rows.length})</span>
         </div>
-        <div className="hidden md:grid px-4 py-2 text-[10px] font-bold uppercase tracking-wider" style={{ gridTemplateColumns: '2.4fr 1.1fr 1.6fr 0.7fr 40px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-primary)', borderBottom: '1px solid var(--border-primary)' }}>
-          <span>Campaign</span>
-          <span>Status</span>
-          <span>Performance</span>
-          <span>Updated</span>
-          <span />
-        </div>
-
         {loading ? (
           <div className="px-4 py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>Loading…</div>
-        ) : shown.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No {tabLabel.toLowerCase()} yet</div>
-            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Hit "New campaign" and describe who you want to reach.</div>
+            <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>No campaigns yet</div>
+            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Hit "Create Campaign" and describe who you want to reach.</div>
           </div>
         ) : (
-          shown.map((r) => (
+          rows.map((r) => (
             <div key={`${r.kind}-${r.id}`} style={{ borderTop: '1px solid var(--border-primary)' }}>
               <div
-                className="grid grid-cols-1 md:grid-cols-[2.4fr_1.1fr_1.6fr_0.7fr_40px] gap-y-2 items-center px-4 py-3 campaign-row"
+                className="grid grid-cols-1 md:grid-cols-[2.4fr_1.1fr_1.6fr_40px] gap-y-2 items-center px-4 py-3 campaign-row"
                 style={{ cursor: r.sentC ? 'pointer' : 'default' }}
                 onClick={() => r.sentC && setExpanded(expanded === r.id ? null : r.id)}
               >
-                {/* Campaign */}
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0" style={{ background: `${r.kind === 'sent' ? PURPLE : BLUE}1c`, color: r.kind === 'sent' ? PURPLE : BLUE }}>
                     <MdCampaign size={18} />
@@ -496,12 +840,11 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{r.name}</span>
-                      <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: `${GREEN}1c`, color: GREEN }}>{r.badge}</span>
+                      <span className="text-[8.5px] font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: `${GREEN}1c`, color: GREEN }}>WHATSAPP</span>
                     </div>
                     <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{r.target}</div>
                   </div>
                 </div>
-                {/* Status */}
                 <div>
                   <div className="flex items-center gap-1.5 text-[12px] font-semibold" style={{ color: r.statusColor }}>
                     <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: r.statusColor }} />
@@ -509,7 +852,6 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
                   </div>
                   <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>{r.since}</div>
                 </div>
-                {/* Performance */}
                 {r.deliveredPct !== null ? (
                   <div className="flex items-center gap-4">
                     <div className="min-w-[92px]">
@@ -530,9 +872,6 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
                 ) : (
                   <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Not sent yet{r.savedC?.template ? ` · ${r.savedC.template.name}` : ' · no template'}</div>
                 )}
-                {/* Updated */}
-                <div className="text-[11.5px]" style={{ color: 'var(--text-muted)' }}>{r.updated}</div>
-                {/* Actions */}
                 <div className="flex justify-end">
                   {r.savedC ? (
                     <button onClick={(e) => { e.stopPropagation(); removeSaved(r.id) }} className="p-1.5 rounded-md" title="Delete" style={{ color: 'var(--text-muted)' }}>
@@ -545,7 +884,6 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
                   )}
                 </div>
               </div>
-              {/* Sent-campaign expansion: per-send breakdown */}
               {r.sentC && expanded === r.id && (
                 <div className="px-4 pb-3 space-y-1">
                   {r.sentC.sends.map((s, i) => (
@@ -564,281 +902,7 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
           ))
         )}
       </div>
-
       <style>{`.campaign-row:hover { background: var(--bg-hover); }`}</style>
-    </div>
-  )
-}
-
-// ─── Builder view (the chat) ─────────────────────────────────────────────────
-
-function CampaignsBuilder({ onBack }: { onBack: () => void }) {
-  const [messages, setMessages] = useState<Msg[]>([])
-  const [input, setInput] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedTpl, setSelectedTpl] = useState<Tpl | null>(null)
-  const [campaignName, setCampaignName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const scrollRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, busy])
-
-  const latestReply = [...messages].reverse().find((m) => m.role === 'assistant' && m.reply)?.reply || null
-  const audience = latestReply?.audience || null
-
-  const send = async (text: string) => {
-    const q = text.trim()
-    if (!q || busy) return
-    setError(null)
-    setInput('')
-    const next: Msg[] = [...messages, { role: 'user' as const, content: q }]
-    setMessages(next)
-    setBusy(true)
-    try {
-      const res = await fetch('/api/dashboard/campaigns/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) }),
-      })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d?.error || 'Campaign brain failed')
-      const reply: Reply = d.reply
-      setMessages((cur) => [...cur, { role: 'assistant', content: reply.message, reply }])
-      setSelectedTpl(null)
-      if (reply.suggestedCampaignName) setCampaignName(reply.suggestedCampaignName)
-    } catch (e: any) {
-      setError(e.message)
-      setMessages((cur) => cur.slice(0, -1))
-      setInput(q)
-    }
-    setBusy(false)
-  }
-
-  const saveCampaign = async () => {
-    if (!audience || saving) return
-    setSaving(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/dashboard/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: campaignName.trim() || `Campaign ${new Date().toLocaleDateString()}`,
-          audience,
-          template: selectedTpl,
-        }),
-      })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d?.error || 'Save failed')
-      onBack()
-    } catch (e: any) {
-      setError(e.message)
-      setSaving(false)
-    }
-  }
-
-  const railTemplates = (latestReply?.templates || []).map((t) => ({ ...t, status: 'approved' as const }))
-    .concat((latestReply?.drafts || []).map((t) => ({ ...t, status: 'draft' as const })))
-  const VARS = ['{{first_name}}', '{{course}}', '{{city}}', '{{batch}}']
-  return (
-    <div className="max-w-[1180px] mx-auto flex flex-col" style={{ height: 'calc(100vh - 88px)' }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 pb-3 shrink-0">
-        <button onClick={onBack} className="p-1.5 rounded-lg shrink-0" title="Back to campaigns" style={{ color: 'var(--text-secondary)' }}>
-          <MdArrowBack size={19} />
-        </button>
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0" style={{ background: `${PURPLE}1c`, color: PURPLE }}>
-          <MdCampaign size={22} />
-        </span>
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>New campaign</h1>
-          <p className="text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
-            Say who you want to reach, {brandConfig.name} pulls the list and lines up the message.
-          </p>
-        </div>
-      </div>
-
-      {/* Two columns: chat (left) + campaign rail (right) */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
-      {/* LEFT: chat + input */}
-      <div className="flex flex-col min-h-0">
-      {/* Chat area */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto rounded-xl border p-4 space-y-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-        {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-8">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: `${PURPLE}1c`, color: PURPLE }}><MdOutlineSms size={24} /></span>
-            <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Who do you want to reach?</div>
-            <div className="text-xs max-w-[380px]" style={{ color: 'var(--text-secondary)' }}>
-              Describe the audience in plain words. I'll pull the matching leads, show approved templates, or draft new ones with variables.
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center max-w-[560px] mt-1">
-              {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => send(s)} className="text-[11.5px] px-3 py-1.5 rounded-full border transition-colors hover:opacity-80" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'space-y-2.5'}>
-            {m.role === 'user' ? (
-              <div className="rounded-2xl rounded-br-md px-3.5 py-2 max-w-[75%] text-[13px]" style={{ background: `color-mix(in srgb, var(--accent-primary) 16%, var(--bg-primary))`, color: 'var(--text-primary)' }}>
-                {m.content}
-              </div>
-            ) : (
-              <>
-                <div className="rounded-2xl rounded-bl-md px-3.5 py-2 max-w-[85%] text-[13px] leading-relaxed" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}>
-                  {m.content}
-                </div>
-                {m.reply?.audience && <AudienceCard a={m.reply.audience} />}
-                {(m.reply?.templates?.length || 0) > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Approved templates, pick one</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {m.reply!.templates.map((t) => (
-                        <TemplateCard key={t.name} t={{ ...t, status: 'approved' }} selected={selectedTpl?.name === t.name} onSelect={() => setSelectedTpl({ ...t, status: 'approved' })} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {(m.reply?.drafts?.length || 0) > 0 && (
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <MdEditNote size={13} /> Fresh drafts, need Meta approval before sending
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {m.reply!.drafts.map((t) => (
-                        <TemplateCard key={t.name} t={{ ...t, status: 'draft' }} selected={selectedTpl?.name === t.name} onSelect={() => setSelectedTpl({ ...t, status: 'draft' })} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
-
-        {busy && (
-          <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: PURPLE }} />
-            Pulling the audience…
-          </div>
-        )}
-      </div>
-
-      {error && <div className="text-xs mt-2" style={{ color: '#ef4444' }}>{error}</div>}
-
-      {/* Input */}
-      <form
-        onSubmit={(e) => { e.preventDefault(); send(input) }}
-        className="flex items-center gap-2 mt-2.5 rounded-xl border px-3 py-2 shrink-0"
-        style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder='Try: "Qualified pilot leads from the last 30 days"'
-          disabled={busy}
-          className="flex-1 text-[13px] bg-transparent outline-none"
-          style={{ color: 'var(--text-primary)' }}
-        />
-        <button type="submit" disabled={busy || !input.trim()} className="p-1.5 rounded-lg shrink-0" style={{ color: input.trim() && !busy ? 'var(--accent-primary)' : 'var(--text-muted)' }}>
-          <MdSend size={18} />
-        </button>
-      </form>
-      </div>{/* end left column */}
-
-      {/* RIGHT RAIL — templates, audience, setup, schedule */}
-      <div className="hidden lg:flex flex-col gap-3 min-h-0 overflow-y-auto pr-0.5">
-        {/* Templates */}
-        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Templates</span>
-            <span className="text-[11px] font-semibold" style={{ color: PURPLE }}>{railTemplates.length || ''}</span>
-          </div>
-          {railTemplates.length > 0 ? (
-            <div className="space-y-2">
-              {railTemplates.slice(0, 3).map((t) => {
-                const badge = t.status === 'approved'
-                  ? { label: 'Approved', color: GREEN, bg: `${GREEN}1f` }
-                  : { label: 'Draft', color: '#e0a951', bg: 'rgba(224,169,81,0.14)' }
-                return (
-                  <button key={t.name} onClick={() => setSelectedTpl(t)} className="w-full text-left rounded-lg border p-2.5 flex gap-2.5 items-start transition-colors"
-                    style={{ borderColor: selectedTpl?.name === t.name ? PURPLE : 'var(--border-primary)', background: 'var(--bg-primary)' }}>
-                    <span className="inline-block h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ background: GREEN }} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.name}</span>
-                      <span className="block text-[10.5px] leading-snug mt-0.5" style={{ color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.body}</span>
-                    </span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="text-[11px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>Describe an audience in the chat and matching templates show up here.</div>
-          )}
-        </div>
-
-        {/* Audience summary */}
-        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Audience summary</div>
-          {audience ? (
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="text-[28px] font-bold leading-none tabular-nums" style={{ color: 'var(--text-primary)' }}>{(audience.with_phone ?? audience.count).toLocaleString()}</div>
-                <div className="text-[10.5px] mt-1" style={{ color: 'var(--text-muted)' }}>Estimated reach</div>
-              </div>
-              <div className="ml-auto h-14 w-14 rounded-full shrink-0" style={{ background: `conic-gradient(${GREEN} 0 100%)`, WebkitMask: 'radial-gradient(circle 10px at center, transparent 98%, #000 100%)', mask: 'radial-gradient(circle 10px at center, transparent 98%, #000 100%)' }} />
-            </div>
-          ) : (
-            <div className="text-[11px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>Reach shows once you describe an audience.</div>
-          )}
-          <div className="flex items-center gap-1.5 mt-2.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            <span className="inline-block h-2 w-2 rounded-full" style={{ background: GREEN }} /> WhatsApp
-          </div>
-        </div>
-
-        {/* Campaign setup */}
-        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Campaign setup</div>
-          <div className="space-y-2 text-[12px]">
-            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Channel</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>WhatsApp</span></div>
-            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Template</span><span className="font-semibold truncate max-w-[160px]" style={{ color: selectedTpl ? 'var(--text-primary)' : 'var(--text-muted)' }}>{selectedTpl?.name || 'Not picked'}</span></div>
-            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Audience</span><span className="font-semibold" style={{ color: audience ? 'var(--text-primary)' : 'var(--text-muted)' }}>{audience ? `${audience.with_phone ?? audience.count} people` : 'Not set'}</span></div>
-          </div>
-          <input
-            value={campaignName}
-            onChange={(e) => setCampaignName(e.target.value)}
-            placeholder="Campaign name"
-            className="w-full mt-2.5 text-[12px] px-2.5 py-1.5 rounded-md border outline-none"
-            style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          />
-        </div>
-
-        {/* Review & Schedule */}
-        <button onClick={saveCampaign} disabled={!audience || saving} className="w-full text-[12.5px] font-bold py-2.5 rounded-xl shrink-0 flex items-center justify-center gap-1.5"
-          style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)', opacity: (!audience || saving) ? 0.5 : 1 }}>
-          {saving ? 'Saving...' : 'Review & Schedule Campaign'}
-        </button>
-
-        {/* Personalization */}
-        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Personalization</div>
-          <div className="flex flex-wrap gap-1.5">
-            {VARS.map((v) => (
-              <span key={v} className="text-[10.5px] font-mono px-2 py-1 rounded-md border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>{v}</span>
-            ))}
-            <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md border" style={{ borderColor: PURPLE, color: PURPLE }}>+ Add</span>
-          </div>
-        </div>
-      </div>
-      </div>{/* end 2-col grid */}
     </div>
   )
 }
