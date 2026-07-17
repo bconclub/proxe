@@ -23,6 +23,13 @@ export type ProductUpdate = {
 // older than 0.1 predate the scheme and carry no version chip.
 export const PRODUCT_UPDATES: ProductUpdate[] = [
   {
+    id: '2026-07-17-report-issue',
+    title: 'See something broken? Report it in one click',
+    detail: 'New Report Issue button in the sidebar — paste a screenshot, tell us what went wrong, done. Every report reaches the team and fixes ship in updates.',
+    date: '2026-07-17',
+    version: '0.2',
+  },
+  {
     id: '2026-07-10-mobile',
     title: 'PROXe is live on mobile',
     detail: 'The whole dashboard now works on your phone — WhatsApp-style chats, tap-friendly leads, pipeline, events. Open it on mobile and go.',
