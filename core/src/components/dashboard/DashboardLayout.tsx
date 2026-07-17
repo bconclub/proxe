@@ -72,6 +72,8 @@ const navigation: NavItem[] = [
   // War Room (pop) — the constituency map. Feature-gated; first-class nav for
   // the campaign brand instead of hiding in the profile dropdown.
   { name: 'War Room', href: '/war-room', icon: MdMap },
+  // Campaigns — chat-driven campaign builder; feature-gated per brand.
+  { name: 'Campaigns', href: '/dashboard/campaigns', icon: MdCampaign },
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
@@ -95,7 +97,7 @@ const PINS_KEY = 'artifact-pins'
 // Calls/Scouts/War Room are feature-gated per brand; their array slots are
 // counted here so the dividers land in the same rendered position whether or
 // not they are shown.
-const DIVIDER_AFTER_INDICES = [6, 9]
+const DIVIDER_AFTER_INDICES = [6, 10] // Campaigns insert shifted OPERATIONS by one
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -645,6 +647,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               if (item.href === '/dashboard/scouts' && (!brandFeatures.scouts || brandId === 'lokazen')) return null
               // Feature toggle: War Room only for brands with it on (pop).
               if (item.href === '/war-room' && !brandFeatures.warRoom) return null
+              // Feature toggle: Campaigns only for brands running the builder.
+              if (item.href === '/dashboard/campaigns' && !brandFeatures.campaigns) return null
               // POP is a campaign, not a sales org — keep the nav clear and
               // direct: no sales Pipeline, no Flow builder. War Room is reachable
               // from the brand logo/artifact switcher. Overview lives IN the

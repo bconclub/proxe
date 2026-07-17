@@ -10,6 +10,7 @@ export interface FeatureFlags {
   followUpSequence?: boolean
   warRoom?: boolean
   scouts?: boolean
+  campaigns?: boolean // config-driven only (no settings toggle yet)
 }
 
 /**
