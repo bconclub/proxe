@@ -108,6 +108,8 @@ export {
   sendWebinarConfirm,
   sendWebinarConfirmParents,
   sendWebinarReminder,
+  sendWebinarStartingSoon,
+  sendWebinarLiveNow,
   sendWebinarRegisterNudge,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,

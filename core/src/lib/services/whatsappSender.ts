@@ -730,6 +730,47 @@ export async function sendWebinarReminder(
 }
 
 /**
+ * Day-of webinar sends to REGISTERED leads (they hold a personal Zoom join link).
+ * Fired by /api/cron/webinar-reminder:
+ *   - startingSoon (~30 min before) → windchasers_webinar_starting_soon_v1
+ *   - liveNow (at start)            → windchasers_webinar_live_now_v1
+ * NAMED params: customer_name · webinar_name · join_url (the lead's own link).
+ */
+export async function sendWebinarStartingSoon(
+  to: string, name: string, webinarName: string, joinUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v1', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
+        { type: 'text', parameter_name: 'join_url', text: joinUrl },
+      ],
+    },
+  ])
+}
+
+export async function sendWebinarLiveNow(
+  to: string, name: string, webinarName: string, joinUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v1', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
+        { type: 'text', parameter_name: 'join_url', text: joinUrl },
+      ],
+    },
+  ])
+}
+
+/**
  * "Complete your registration" nudge for webinar leads who gave name + phone
  * but never finished Zoom registration (so they hold no join link). Fired by
  * /api/cron/webinar-reminder for the not-registered segment.
