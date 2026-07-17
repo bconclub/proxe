@@ -25,6 +25,7 @@ export const windchasersConfig: BrandConfig = {
     pipelineFunnel: true,
     followUpSequence: false,
     leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
+    campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
   },
   // Brain content: the CORE COMMUNICATIONS checklist (Eval → Communications).
   // evalJourneys is deliberately omitted ('none') — the journeys bench renders

@@ -1,3 +1,11 @@
+## 2026-07-17 · feat(core): Campaigns - chat-driven campaign builder (windchasers first)
+
+- New /dashboard/campaigns (sidebar row, feature-gated via features.campaigns - ON for windchasers only): a chat where you describe who to reach in plain words. The brain (Claude tool loop) queries the brand's REAL leads - stage groups, course, user type, webinar flag, source, city, recency/inactivity windows - and answers with an audience card (reachable-on-WhatsApp count + sample names) plus the message: up to 3 matching Meta-APPROVED templates from the registry, or exactly two fresh drafts with {{variables}} when nothing fits. Multi-turn refinement works ("only Mumbai", "make it shorter").
+- Pick a template, name it, Save -> campaign persists per brand (dashboard_settings key campaigns_v1, zero migrations) as ready/draft; saved list with delete on the page. SENDING IS NOT WIRED - saving never messages anyone; launch stays a separate explicit step for a later round.
+- APIs: /api/dashboard/campaigns (GET/POST/PATCH/DELETE store) + /api/dashboard/campaigns/chat (auth + flag-gated brain, read-only tools). Page shows a plain notice on brands without the flag; chat API 403s.
+- User-facing (windchasers): new Campaigns item in the left panel - "qualified pilot leads from the last 30 days" pulls the real list and lines up ready templates.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): Support card under Configure - every reported issue with live status
 
 - Configure gains a Support card -> /dashboard/settings/support: every issue the team filed via Report Issue, newest first, with status chip (Open / In progress / Fixed / Closed), severity, reporter, page + version context, screenshot thumbnails (signed URLs, private bucket), and the fix note once HQ marks it fixed. Tabs: All / Open / Fixed.
