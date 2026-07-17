@@ -175,6 +175,9 @@ function CampaignsChat() {
   const [showSaved, setShowSaved] = useState(true)
   // Campaigns that actually went out — live delivery metrics from the message log.
   const [sentCampaigns, setSentCampaigns] = useState<any[]>([])
+  // Previous Campaigns (sent + planned, with metrics) is the landing view; Create
+  // Campaign is the chat builder. Land on Previous so campaign performance is first.
+  const [tab, setTab] = useState<'create' | 'previous'>('previous')
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -271,11 +274,36 @@ function CampaignsChat() {
             Say who you want to reach — {brandConfig.name} pulls the list and lines up the message.
           </p>
         </div>
+        <div className="ml-auto flex items-center gap-1 shrink-0">
+          {([['create', 'Create Campaign'], ['previous', 'Previous Campaigns']] as const).map(([k, label]) => (
+            <button
+              key={k} type="button" onClick={() => setTab(k)}
+              className="text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors border"
+              style={{
+                color: tab === k ? '#ffffff' : 'var(--text-secondary)',
+                background: tab === k ? PURPLE : 'transparent',
+                borderColor: tab === k ? PURPLE : 'var(--border-primary)',
+              }}
+            >
+              {label}{k === 'previous' && (sentCampaigns.length + saved.length) > 0 ? ` · ${sentCampaigns.length + saved.length}` : ''}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {tab === 'previous' && (
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
+      {sentCampaigns.length === 0 && saved.length === 0 && (
+        <div className="h-full flex flex-col items-center justify-center text-center gap-2 py-10">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: `${PURPLE}1c`, color: PURPLE }}><MdCampaign size={24} /></span>
+          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No campaigns yet</div>
+          <div className="text-xs max-w-[360px]" style={{ color: 'var(--text-secondary)' }}>Sent campaigns and their delivery metrics show up here. Create one from the Create Campaign tab.</div>
+        </div>
+      )}
 
       {/* Sent campaigns — live delivery metrics from the message log */}
       {sentCampaigns.length > 0 && (
-        <div className="space-y-3 mb-3">
+        <div className="space-y-3">
           {sentCampaigns.map((c) => {
             const t = c.totals || { sent: 0, delivered: 0, read: 0, clicked: 0 }
             const pct = (n: number) => (t.sent > 0 ? `${Math.round((n / t.sent) * 100)}%` : '0%')
@@ -358,7 +386,11 @@ function CampaignsChat() {
           )}
         </div>
       )}
+      </div>
+      )}
 
+      {tab === 'create' && (
+      <>
       {/* Chat area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto rounded-xl border p-4 space-y-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
         {messages.length === 0 && (
@@ -469,6 +501,8 @@ function CampaignsChat() {
           <MdSend size={18} />
         </button>
       </form>
+      </>
+      )}
     </div>
   )
 }

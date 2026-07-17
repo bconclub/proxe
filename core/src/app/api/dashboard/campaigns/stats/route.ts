@@ -24,16 +24,18 @@ export async function GET() {
   const sb = getServiceClient()
   if (!sb) return NextResponse.json({ campaigns: [] })
 
-  // Every agent template row that carries a campaign tag.
+  // Every agent template row, newest first; keep only the campaign-tagged ones.
+  // (Filtering the JSON tag in JS is more robust than a PostgREST json `not.is`
+  // filter, which silently returned nothing here.)
   const { data: sends } = await sb
     .from('conversations')
     .select('lead_id, metadata, created_at')
     .eq('sender', 'agent')
     .eq('message_type', 'template')
-    .not('metadata->>campaign', 'is', null)
-    .limit(5000)
+    .order('created_at', { ascending: false })
+    .limit(8000)
 
-  const rows = sends || []
+  const rows = (sends || []).filter((r: any) => r.metadata && r.metadata.campaign)
   if (!rows.length) return NextResponse.json({ campaigns: [] })
 
   // Which recipients later tapped a quick-reply button (e.g. "Join WhatsApp Group").
