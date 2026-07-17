@@ -1,6 +1,6 @@
 {
   "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "crons": [
-    { "path": "/api/cron/webinar-reminder", "schedule": "0 * * * *" }
+    { "path": "/api/cron/webinar-reminder", "schedule": "*/10 * * * *" }
   ]
 }

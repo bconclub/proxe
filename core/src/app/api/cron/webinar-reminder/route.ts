@@ -17,14 +17,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getServiceClient, logMessage, sendWebinarReminder, sendWebinarRegisterNudge } from '@/lib/services'
+import { getServiceClient, logMessage, sendWebinarReminder, sendWebinarRegisterNudge, sendWebinarStartingSoon, sendWebinarLiveNow } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const TEMPLATE = 'windchasers_webinar_reminder_v1'
 const NUDGE_TEMPLATE = 'windchasers_webinar_register_nudge_v1'
+const STARTING_SOON_TEMPLATE = 'windchasers_webinar_starting_soon_v1'
+const LIVE_TEMPLATE = 'windchasers_webinar_live_now_v1'
 
 /**
  * Parse the stored webinar_date into epoch ms. Pabbly/registration sends it as
@@ -69,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Date.now()
-  const results = { checked: 0, sent24h: 0, sent2h: 0, nudged: 0, wouldSend: 0, skipped: 0, errors: 0 }
+  const results = { checked: 0, sent24h: 0, sent2h: 0, sentStartingSoon: 0, sentLive: 0, nudged: 0, wouldSend: 0, skipped: 0, errors: 0 }
   const log: string[] = []
   // Kill-switch: no reminder/nudge reaches a real lead until this is explicitly
   // set to 'true' in the windchasers env. Default OFF = dry run: the cron still
@@ -104,7 +106,9 @@ export async function GET(req: NextRequest) {
       const startsAt = parseWebinarDateMs(rawDate)
       if (isNaN(startsAt)) { results.skipped++; continue }   // genuinely unparseable
       const hoursUntil = (startsAt - now) / 3_600_000
-      if (hoursUntil <= 0) { results.skipped++; continue }   // already started / past
+      // Skip only once well past the start — the "live now" step still fires for a
+      // short window AFTER the webinar begins (hoursUntil goes slightly negative).
+      if (hoursUntil <= -0.6) { results.skipped++; continue }
 
       // Zoom-registered leads hold a personal join link → they get the pre-webinar
       // reminders below. Leads who only gave name+phone (no join link) never
@@ -146,6 +150,47 @@ export async function GET(req: NextRequest) {
           .eq('id', lead.id)
         results.nudged++
         continue
+      }
+
+      // Day-of sends to REGISTERED leads (they hold a personal Zoom join link):
+      //   starting_soon ~30 min before (window 15-45 min out), live at start
+      //   (6 min before → ~35 min after). Idempotent per marker; the every-10-min
+      //   cron cadence lets these hit their tight windows. Carries the lead's own
+      //   join link so they tap straight into the room.
+      const joinUrl = String(wc.zoom_join_url || '').trim()
+      if (registered && joinUrl) {
+        let dayStep: 'starting_soon' | 'live' | null = null
+        if (hoursUntil <= 0.1 && hoursUntil > -0.6 && !wc.webinar_live_sent) dayStep = 'live'
+        else if (hoursUntil >= 0.3 && hoursUntil <= 0.6 && !wc.webinar_starting_soon_sent) dayStep = 'starting_soon'
+        if (dayStep) {
+          const webinarName = String(wc.webinar_name || '').trim()
+          if (!sendsEnabled) { results.wouldSend++; log.push(`lead=${lead.id} DRY-RUN ${dayStep} (sends disabled)`); continue }
+          const send = dayStep === 'live'
+            ? await sendWebinarLiveNow(lead.phone, lead.customer_name || '', webinarName, joinUrl)
+            : await sendWebinarStartingSoon(lead.phone, lead.customer_name || '', webinarName, joinUrl)
+          if (!send.success) {
+            results.errors++
+            log.push(`lead=${lead.id} ${dayStep} send failed: ${send.error}`)
+            continue // no marker on failure → retried next run
+          }
+          const dfn = (lead.customer_name || 'there').split(' ')[0]
+          const tpl = dayStep === 'live' ? LIVE_TEMPLATE : STARTING_SOON_TEMPLATE
+          const body = dayStep === 'live'
+            ? `Hi ${dfn}, we're live now — ${webinarName || 'our webinar'} has started. Join here: ${joinUrl} (${tpl} template)`
+            : `Hi ${dfn}, ${webinarName || 'our webinar'} starts in 30 minutes. Join here: ${joinUrl} (${tpl} template)`
+          await logMessage(
+            lead.id, 'whatsapp', 'agent', body, 'template',
+            { source: `webinar_${dayStep}`, template_name: tpl, trigger: `webinar_${dayStep}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar_18jul' },
+            supabase,
+          )
+          await supabase
+            .from('all_leads')
+            .update({ unified_context: { ...ctx, windchasers: { ...wc, [`webinar_${dayStep}_sent`]: new Date(now).toISOString() } } })
+            .eq('id', lead.id)
+          if (dayStep === 'live') results.sentLive++
+          else results.sentStartingSoon++
+          continue
+        }
       }
 
       // Which step is due? 2h step wins if both windows somehow overlap.
