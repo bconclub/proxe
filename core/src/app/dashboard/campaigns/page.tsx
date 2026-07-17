@@ -214,6 +214,7 @@ function CampaignsHome() {
   const [view, setView] = useState<'list' | 'builder'>('list')
   const [saved, setSaved] = useState<SavedCampaign[]>([])
   const [sent, setSent] = useState<SentCampaign[]>([])
+  const [upcoming, setUpcoming] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadAll = () => {
@@ -223,6 +224,7 @@ function CampaignsHome() {
     ]).then(([a, b]) => {
       setSaved(Array.isArray(a.campaigns) ? a.campaigns : [])
       setSent(Array.isArray(b.campaigns) ? b.campaigns : [])
+      setUpcoming(Array.isArray(b.upcoming) ? b.upcoming : [])
       setLoading(false)
     })
   }
@@ -239,6 +241,7 @@ function CampaignsHome() {
     <CampaignsList
       saved={saved}
       sent={sent}
+      upcoming={upcoming}
       loading={loading}
       onNew={() => setView('builder')}
       onChanged={loadAll}
@@ -248,9 +251,10 @@ function CampaignsHome() {
 
 // ─── List view (the mock's overview) ─────────────────────────────────────────
 
-function CampaignsList({ saved, sent, loading, onNew, onChanged }: {
+function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
   saved: SavedCampaign[]
   sent: SentCampaign[]
+  upcoming: any[]
   loading: boolean
   onNew: () => void
   onChanged: () => void
@@ -287,7 +291,7 @@ function CampaignsList({ saved, sent, loading, onNew, onChanged }: {
 
   // Merge sent (live) + saved (planned) into tab buckets.
   type Row = {
-    kind: 'sent' | 'saved'
+    kind: 'sent' | 'saved' | 'upcoming'
     id: string
     name: string
     badge: string
@@ -342,8 +346,26 @@ function CampaignsList({ saved, sent, loading, onNew, onChanged }: {
         savedC: c,
       }
     })
-    return [...sentRows, ...savedRows]
-  }, [sent, saved])
+    const upcomingRows: Row[] = (upcoming || []).map((u: any) => {
+      const at = u.scheduledAt ? new Date(u.scheduledAt) : null
+      const when = at ? at.toLocaleString('en-IN', { weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
+      return {
+        kind: 'upcoming' as const,
+        id: u.id,
+        name: `${u.name} — ${u.label}`,
+        badge: 'WHATSAPP',
+        target: `${u.audience}${when ? ` · fires ${when}` : ''} · ${u.template}`,
+        statusLabel: 'Scheduled',
+        statusColor: AMBER,
+        since: when ? `Fires ${when}` : 'Scheduled',
+        updated: when,
+        deliveredPct: null,
+        read: null,
+        clicked: null,
+      }
+    })
+    return [...upcomingRows, ...sentRows, ...savedRows]
+  }, [sent, saved, upcoming])
 
   const counts: Record<TabKey, number> = useMemo(() => ({
     live: rows.filter((r) => r.statusLabel === 'Live').length,
