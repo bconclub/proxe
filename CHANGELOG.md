@@ -1,3 +1,11 @@
+## 2026-07-17 · feat(core): Campaigns polish - PROXe agent everywhere, core-only Features, custom schedule picker
+
+- The campaign agent is now "PROXe" on every brand (was "<Brand> AI" / "Windy") - the product's assistant, brand-neutral. Dropped the windchasers Campaign-Assistant label override.
+- Features panel shows CORE features only (Campaigns, Voice/Calls, Dashboard Brain, Brain Actions, Pipeline Funnel, Follow-up Sequence). Removed the "Per-brand setup" section - Scouts/Gigs, War Room and Lead Access are brand-specific DB-bound features and don't belong in every brand's panel.
+- Send time now uses a proper picker: a themed month calendar (prev/next month, past days disabled, Clear/Soon shortcuts) plus sorted scrollable hour / minute / AM-PM columns and a Set button - replacing the raw native datetime-local.
+- User-facing: cleaner Features screen, PROXe everywhere, a real scheduling picker.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): Campaigns on every brand + the full feature picture in Configure -> Features
 
 - features.campaigns switched ON for all 5 brands (bcon, lokazen, pop, proxe join windchasers) - the AI campaign workspace is everywhere.
