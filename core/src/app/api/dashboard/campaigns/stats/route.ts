@@ -118,5 +118,43 @@ export async function GET() {
     })
     .sort((a: any, b: any) => (a.lastSent < b.lastSent ? 1 : -1))
 
-  return NextResponse.json({ campaigns })
+  // Upcoming (scheduled, not-yet-sent) day-of webinar sends. Registered leads get
+  // "starting soon" ~30 min before + "live now" at start — surface what's queued.
+  const upcoming: any[] = []
+  const { data: wleads } = await sb
+    .from('all_leads')
+    .select('unified_context')
+    .filter('unified_context->windchasers->>lead_type', 'eq', 'webinar')
+    .limit(2000)
+  if (wleads && wleads.length) {
+    const parseDate = (raw: string): number => {
+      const d = new Date(raw).getTime()
+      if (!isNaN(d)) return d
+      const m = String(raw).match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4}).*?(\d{1,2}):(\d{2})\s*([ap]m)/i)
+      if (!m) return NaN
+      const months: Record<string, number> = { january: 0, february: 1, march: 2, april: 3, may: 4, june: 5, july: 6, august: 7, september: 8, october: 9, november: 10, december: 11 }
+      const mo = months[m[2].toLowerCase()]
+      if (mo === undefined) return NaN
+      let hh = parseInt(m[4], 10) % 12
+      if (/pm/i.test(m[6])) hh += 12
+      return Date.UTC(parseInt(m[3], 10), mo, parseInt(m[1], 10), hh, parseInt(m[5], 10)) - 5.5 * 3_600_000
+    }
+    let webinarName = '', webinarMs = NaN, startingSoonPending = 0, livePending = 0
+    for (const l of wleads) {
+      const wc: any = (l.unified_context || {}).windchasers || {}
+      if (!(wc.zoom_registered || wc.zoom_join_url)) continue
+      if (!webinarName && wc.webinar_name) webinarName = wc.webinar_name
+      if (isNaN(webinarMs) && wc.webinar_date) webinarMs = parseDate(wc.webinar_date)
+      if (!wc.webinar_starting_soon_sent) startingSoonPending++
+      if (!wc.webinar_live_sent) livePending++
+    }
+    if (!isNaN(webinarMs) && webinarMs > Date.now() - 3_600_000) {
+      upcoming.push(
+        { id: 'webinar_starting_soon', name: webinarName || 'Webinar', label: 'Starting soon (~30 min before)', scheduledAt: new Date(webinarMs - 30 * 60_000).toISOString(), audience: `${startingSoonPending} registered`, template: 'windchasers_webinar_starting_soon_v1' },
+        { id: 'webinar_live', name: webinarName || 'Webinar', label: 'We are live', scheduledAt: new Date(webinarMs).toISOString(), audience: `${livePending} registered`, template: 'windchasers_webinar_live_now_v1' },
+      )
+    }
+  }
+
+  return NextResponse.json({ campaigns, upcoming })
 }
