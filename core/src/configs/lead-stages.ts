@@ -38,6 +38,35 @@ export const LEAD_STAGES: LeadStageDef[] = [
 
 export const LEAD_STAGE_VALUES = LEAD_STAGES.map((s) => s.value)
 
+// ─── PIPELINE GROUPS — how the pipeline page rolls stages up ────────────────
+// The pipeline funnel shows GROUPS of stages (Qualified = Qualified + High
+// Intent, Lost = every lost-ish value…). Clicking a group deep-links to
+// /dashboard/leads?stage=<first value>; LeadsTable expands that value back to
+// the whole group so the list matches the funnel count.
+export interface PipelineStageGroup {
+  key: string
+  label: string
+  values: string[]
+}
+
+export const PIPELINE_STAGE_GROUPS: PipelineStageGroup[] = [
+  { key: 'new',       label: 'New',         values: ['New', '', 'In Sequence'] },
+  { key: 'engaged',   label: 'Engaged',     values: ['Engaged'] },
+  { key: 'qualified', label: 'Qualified',   values: ['Qualified', 'High Intent'] },
+  { key: 'keyEvent',  label: 'Demo Booked', values: ['Booking Made'] },
+  { key: 'demoDone',  label: 'Demo Done',   values: ['Call Done', 'Demo Done'] },
+  { key: 'offerMade', label: 'Offer Made',  values: ['Proposal Sent', 'Offer Made'] },
+  { key: 'won',       label: 'Won',         values: ['Closed Won', 'Converted', 'Won'] },
+  { key: 'noShow',    label: 'No Show',     values: ['No Show'] },
+  { key: 'parked',    label: 'Parked',      values: ['Parked'] },
+  { key: 'lost',      label: 'Lost',        values: ['Closed Lost', 'Lost', 'Cold', 'Not Qualified'] },
+]
+
+/** The pipeline group containing this stage value (null when unmapped). */
+export function pipelineGroupForStage(value: string): PipelineStageGroup | null {
+  return PIPELINE_STAGE_GROUPS.find((g) => g.values.includes(value)) || null
+}
+
 /** Chip colors in the shape the dashboard tables already consume. */
 export function getStageColor(stage: string | null): { bg: string; text: string; style: { backgroundColor: string; color: string } } {
   const def = LEAD_STAGES.find((s) => s.value === stage) || LEAD_STAGES[0]
