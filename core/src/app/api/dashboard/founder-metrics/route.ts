@@ -393,31 +393,6 @@ export async function GET(request: NextRequest) {
     // Total leads count (all time + time-filtered)
     const totalLeadsCount = safeLeads.length
 
-    // Lead-type breakdown for the Engine Overview strip (windchasers taxonomy:
-    // Pilot / Flight School / Cabin Crew / Webinar). Aviation-specific, so null
-    // on other brands. Webinar splits by whether Zoom registration completed
-    // (a personal join link exists), the same distinction the reminder cron uses.
-    let leadTypeBreakdown: {
-      pilot: number; flightSchool: number; cabinCrew: number; webinar: number
-      webinarRegistered: number; webinarNotRegistered: number; total: number
-    } | null = null
-    if (BRAND_ID === 'windchasers') {
-      const b = { pilot: 0, flightSchool: 0, cabinCrew: 0, webinar: 0, webinarRegistered: 0, webinarNotRegistered: 0 }
-      for (const lead of safeLeads) {
-        const wc: any = (lead.unified_context || {}).windchasers || {}
-        const ci = String(wc.course_interest || '').toLowerCase()
-        const lt = String(wc.lead_type || '').toLowerCase()
-        if (lt === 'webinar') {
-          b.webinar++
-          if (wc.zoom_registered || wc.zoom_join_url) b.webinarRegistered++
-          else b.webinarNotRegistered++
-        } else if (ci.includes('cabin')) b.cabinCrew++
-        else if (ci.includes('flight school') || ci.includes('flying school')) b.flightSchool++
-        else b.pilot++
-      }
-      leadTypeBreakdown = { ...b, total: totalLeadsCount }
-    }
-
     const totalLeads7D = safeLeads.filter(lead => {
       const created = new Date(lead.created_at)
       return (now.getTime() - created.getTime()) <= 7 * 24 * 60 * 60 * 1000
@@ -1374,6 +1349,76 @@ export async function GET(request: NextRequest) {
     })
     console.log(`📊 Warm Leads: 7D=${warmLeads7D.length} 14D=${warmLeads14D.length} 30D=${warmLeads30D.length} total=${warmLeadsList.length}`)
 
+    // ── Engine Overview per-segment funnels (windchasers) ─────────────────────
+    // The overview switches the funnel by program (All / Pilot / Flight School /
+    // Cabin Crew / Webinar) and by window (Today/7D/14D/All). Each is a cohort
+    // funnel: within a window we take leads created in it, then count how far that
+    // cohort got — reusing the SAME stage predicates as the headline metrics, just
+    // filtered to the program. Webinar is special: its stages are Total → Engaged
+    // → Registered → Not registered → Messaged (a reminder/nudge was sent).
+    let segmentFunnels: Record<string, any> | null = null
+    if (BRAND_ID === 'windchasers') {
+      const segOf = (l: any): 'pilot' | 'flightSchool' | 'cabinCrew' | 'webinar' => {
+        const wc: any = (l.unified_context || {}).windchasers || {}
+        if (String(wc.lead_type || '').toLowerCase() === 'webinar') return 'webinar'
+        const ci = String(wc.course_interest || '').toLowerCase()
+        if (ci.includes('cabin')) return 'cabinCrew'
+        if (ci.includes('flight school') || ci.includes('flying school')) return 'flightSchool'
+        return 'pilot'
+      }
+      const isEngaged = (l: any) => engagedStages.includes(l.lead_stage || '') || !!getBookingData(l).bookingDate
+      const isBooked = (l: any) => l.lead_stage === 'Booking Made' || !!getBookingData(l).bookingDate
+      const isStale = (l: any) => {
+        const last = l.last_interaction_at ? new Date(l.last_interaction_at) : new Date(l.created_at)
+        return last < staleThreshold
+      }
+      const wcOf = (l: any): any => (l.unified_context || {}).windchasers || {}
+      const isReg = (l: any) => { const wc = wcOf(l); return !!(wc.zoom_registered || wc.zoom_join_url) }
+      const isSent = (l: any) => { const wc = wcOf(l); return !!(wc.webinar_reminder_24h_sent || wc.webinar_reminder_2h_sent || wc.webinar_register_nudge_sent) }
+      const createdWithin = (l: any, days: number | null) =>
+        days == null || (now.getTime() - new Date(l.created_at).getTime()) <= days * 86_400_000
+      const WINDOWS: Array<['Today' | '7D' | '14D' | 'All', number | null]> = [['Today', 1], ['7D', 7], ['14D', 14], ['All', null]]
+
+      const standardFunnel = (leads: any[]) => {
+        const out: any = {}
+        for (const [key, days] of WINDOWS) {
+          const cohort = leads.filter(l => createdWithin(l, days))
+          out[key] = {
+            total: cohort.length,
+            engaged: cohort.filter(isEngaged).length,
+            warm: cohort.filter(isWarmLead).length,
+            followUpDue: cohort.filter(isStale).length,
+            booked: cohort.filter(isBooked).length,
+          }
+        }
+        return out
+      }
+      const webinarFunnel = (leads: any[]) => {
+        const out: any = {}
+        for (const [key, days] of WINDOWS) {
+          const cohort = leads.filter(l => createdWithin(l, days))
+          out[key] = {
+            total: cohort.length,
+            engaged: cohort.filter(isEngaged).length,
+            registered: cohort.filter(isReg).length,
+            notRegistered: cohort.filter(l => !isReg(l)).length,
+            sent: cohort.filter(isSent).length,
+          }
+        }
+        return out
+      }
+
+      const buckets: Record<string, any[]> = { pilot: [], flightSchool: [], cabinCrew: [], webinar: [] }
+      for (const l of safeLeads) buckets[segOf(l)].push(l)
+      segmentFunnels = {
+        all: standardFunnel(safeLeads),
+        pilot: standardFunnel(buckets.pilot),
+        flightSchool: standardFunnel(buckets.flightSchool),
+        cabinCrew: standardFunnel(buckets.cabinCrew),
+        webinar: webinarFunnel(buckets.webinar),
+      }
+    }
+
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
     // ----------------------------------------------------------------------------
@@ -2049,7 +2094,7 @@ export async function GET(request: NextRequest) {
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
       },
-      leadTypeBreakdown,
+      segmentFunnels,
       engagedLeads: {
         count: engagedLeadsCount,
         count1D: engagedLeads1D.length,
