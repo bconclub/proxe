@@ -1,3 +1,10 @@
+## 2026-07-18 · feat(core): Configure "WhatsApp Templates" becomes a full WhatsApp overview
+
+- The Configure card is now "WhatsApp" (was "WhatsApp Templates") and the page leads with a health header before the templates: Quality rating (Meta GREEN/YELLOW/RED as High/Medium/Low with a colored dot), Messaging tier + daily cap, Sent messages over the last 30 days (and 7-day sub), and the template count. Message templates follow under their own heading.
+- New GET /api/dashboard/whatsapp/overview: pulls the number's live status from Meta (quality_rating, messaging_limit_tier, throughput, name_status, display number, verified name) and the brand's own send volume from the conversations log (last 7/30 days). Best-effort, degrades gracefully with a notice when WhatsApp is not connected.
+- User-facing: Configure -> WhatsApp shows your number's standing and volume at a glance, not just the template list.
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): Campaigns brain can only use the brand's allowed variables (kills {{course_name}} bleed)
 
 - The campaign brain was inventing variables like {{course_name}} on brands that have no such field (lokazen etc.) because those brands have no template registry to anchor to. Now the prompt carries a HARD per-brand whitelist: the only variables allowed in any draft are {{customer_name}} + the brand's config.campaigns.variables + (windchasers) its real registry vars. Anything else is forbidden; the model writes plain words instead.
