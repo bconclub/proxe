@@ -1,3 +1,12 @@
+## 2026-07-17 · feat(core): Pipeline page redesign - one-viewport funnel, editable key event, Lost + reasons
+
+- Pipeline page rebuilt to the new funnel design and sized to exactly one viewport on desktop (same full-height layout branch as home/inbox): pre-key cards (New/Engaged/Qualified with 30-day sparklines), a KEY EVENT hero with the Qualified→key-event conversion bar, post-key + exit-state card rows with progress rings, the chevron flow with step-conversion % under every stage, and an 8-card insights strip (Key Event Rate, Show-up Rate, True Win Rate, Revivable, Active Pipeline, Avg Time to Close, Biggest Drop-off, Win Rate). The lead table (search/sort/pagination/lead modal) lives below the fold; chevron clicks filter it and scroll to it. All colors are theme tokens + color-mix, so light/dark both work.
+- "Closed-Lost" is now "Lost" and the card shows WHY: the lost-stage DB values double as reasons ("Went cold", "Not qualified", unspecified) tallied live per brand.
+- The key event is renameable per brand: admins get a pencil on the hero → the label persists in the brand's dashboard_settings (key 'pipeline_config', new /api/dashboard/settings/pipeline GET/POST, admin-gated writes, empty save resets to the brand default). BrandConfig gains optional pipeline.keyEventLabel for pack-level defaults. The name flows through the hero, chevron, table badges, and insight subtitles.
+- PipelineFunnel.tsx deleted (absorbed into the page). features.leadAccess scoping (All/Open Pool/My Pipeline/member switcher) preserved and now also scopes the funnel counts, not just the table.
+- User-facing: pipeline page looks completely different on every brand - one-screen funnel first, lead list below.
+- `(pending-sha)`
+
 ## 2026-07-14 · fix(windchasers): webinar reminders actually fire (date parse + scheduled)
 
 - The webinar-reminder cron was skipping ALL registrants: webinar_date is stored as a human label ("18 July 2026 at 11:30 AM IST") which `new Date()` can't parse → NaN → skip. Added parseWebinarDateMs (parses the DD Month YYYY at HH:MM am/pm format as IST). 143 registrants for 18 Jul now compute the correct 24h/2h windows.
