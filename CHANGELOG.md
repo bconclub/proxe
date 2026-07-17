@@ -1,3 +1,10 @@
+## 2026-07-18 · fix(core): Campaigns brain can only use the brand's allowed variables (kills {{course_name}} bleed)
+
+- The campaign brain was inventing variables like {{course_name}} on brands that have no such field (lokazen etc.) because those brands have no template registry to anchor to. Now the prompt carries a HARD per-brand whitelist: the only variables allowed in any draft are {{customer_name}} + the brand's config.campaigns.variables + (windchasers) its real registry vars. Anything else is forbidden; the model writes plain words instead.
+- Belt-and-suspenders server guard: after the model replies, any placeholder outside the allowed set is stripped to "it" so a rogue {{course_name}} can never render even if the LLM ignores the rule. Applied to draft bodies/footers/buttons/variables and the message.
+- User-facing: lokazen (and every non-aviation brand) re-engagement drafts no longer show {{course_name}}.
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): Campaigns personalization from real WhatsApp templates + em-dash sweep
 
 - Personalization variables now reflect the variables the brand ACTUALLY uses in its WhatsApp templates: the union of {{vars}} across every loaded template (approved registry + drafts) shows when no single template is picked, instead of a hardcoded guess. Windchasers shows its real set ({{customer_name}}, {{date}}, {{parent_name}}, {{time}}, {{topic}}, {{tier}}...); brands with no template registry fall back to {{customer_name}}.

@@ -152,8 +152,25 @@ function buildTools(): ToolDefinition[] {
   ]
 }
 
+// The ONLY personalization variables the brain may put in drafts for this brand.
+// customer_name is always safe; the brand's config vars + (for windchasers) the
+// real registry template vars extend it. A brand with no registry/config gets
+// customer_name only — so nothing like {{course_name}} bleeds onto a non-aviation
+// brand just because the LLM had no template to anchor to.
+function allowedVariables(): string[] {
+  const set = new Set<string>(['customer_name'])
+  for (const v of (getBrandConfig().campaigns?.variables || [])) set.add(v)
+  if (BRAND_ID === 'windchasers') {
+    for (const t of Object.values(WA_TEMPLATE_BODIES)) {
+      for (const m of (t.body || '').matchAll(/\{\{([^}]+)\}\}/g)) set.add(m[1].trim())
+    }
+  }
+  return [...set].filter((v) => v && v !== 'param')
+}
+
 function systemPrompt(): string {
   const brand = getBrandConfig()
+  const allowed = allowedVariables()
   return `You are the campaign strategist inside ${brand.name}'s PROXe dashboard. A teammate describes who they want to reach on WhatsApp; you pull the real audience and line up the message.
 
 RULES
@@ -165,7 +182,7 @@ RULES
   - {{variable}} placeholders for personalization (e.g. {{customer_name}})
   - body under 550 characters, optional footer, up to 3 button labels
   - marketing-safe copy (no spam bait, includes a clear next step)
-  - reuse ONLY the {{variables}} this brand already uses in its WhatsApp templates (from list_templates); do not invent new variable names
+- PERSONALIZATION VARIABLES: the ONLY variables you may put in any draft body, footer or button are: ${allowed.map((v) => `{{${v}}}`).join(', ')}. Do NOT invent any other variable (never {{course_name}}, {{product}}, {{offer}}, etc.). If you want to reference a detail that is not in this list, write it in plain words instead of a placeholder. When unsure, use only {{customer_name}}.
 - Keep "message" short and practical (2-4 sentences). No markdown headings.
 - NEVER use em dashes or en dashes (— or –) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".
 
@@ -242,6 +259,25 @@ export async function POST(request: NextRequest) {
     }
     reply.templates = Array.isArray(reply.templates) ? reply.templates : []
     reply.drafts = Array.isArray(reply.drafts) ? reply.drafts : []
+
+    // Hard guard: strip any personalization variable the model invented outside
+    // this brand's allowed set (e.g. {{course_name}} on a non-aviation brand).
+    // Disallowed placeholders become "it" so the sentence stays readable and no
+    // rogue variable can ever render, regardless of what the LLM returned.
+    const allowedSet = new Set(allowedVariables())
+    const sanitize = (s: unknown): string =>
+      typeof s === 'string'
+        ? s.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_m, name) => (allowedSet.has(String(name).trim()) ? `{{${String(name).trim()}}}` : 'it'))
+        : (s as string)
+    for (const d of reply.drafts) {
+      if (d && typeof d === 'object') {
+        d.body = sanitize(d.body)
+        if (d.footer) d.footer = sanitize(d.footer)
+        if (Array.isArray(d.buttons)) d.buttons = d.buttons.map(sanitize)
+        if (Array.isArray(d.variables)) d.variables = d.variables.filter((v: string) => allowedSet.has(String(v).trim()))
+      }
+    }
+    reply.message = sanitize(reply.message)
 
     return NextResponse.json({ reply })
   } catch (error) {
