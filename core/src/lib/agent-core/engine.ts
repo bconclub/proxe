@@ -298,7 +298,22 @@ User's message: ${input.message}`
     // through with a false "recorded" claim and nothing saved.
     const claimsBooked = /(\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way|booked,?\b|your (call|visit|callback) is (set|booked|scheduled|confirmed)|(call|callback|visit) is set for|team will (confirm|call|connect)|will confirm and call you|will call you then|call you at|flag (this|it|these|that|your details) to (the|our) team|noted[,.]? .*call you)\b|\bat \d{1,2}(:\d{2})?\s*(am|pm)\s+works\b)/i
       .test(rawResponse);
-    if (claimsBooked) {
+    // DETERMINISTIC SAFETY NET (never silent): if the customer's message THIS turn
+    // is a bare time-slot pick ("3 PM" / "3:00 PM" / "15:00") in reply to a booking
+    // prompt, a booking was expected. If none registered, we MUST act regardless of
+    // what the model typed — even an honest "I couldn't book" would otherwise leave
+    // the team unaware. Gated on a booking context so a stray "5 pm" never fires.
+    const msgTrim = String(input.message || '').trim();
+    const isBareSlot = /^(1[0-2]|[1-9])(:[0-5]\d)?\s*(a\.?m\.?|p\.?m\.?)$/i.test(msgTrim)
+      || /^(1[01]|1[3-9]|2[0-3]):[0-5]\d$/.test(msgTrim);
+    const lastAsst = (input.conversationHistory || []).slice(-3).reverse().find((m) => m.role === 'assistant');
+    const inBookingCtx = !!lastAsst && /\b(\d\s*(am|pm)|what time|which .*work|\bslot\b|book|call ?back|schedule|\bcall you\b)\b/i.test(String(lastAsst.content || ''));
+    // If the model is still COLLECTING info (asking for email/name/number) the
+    // flow isn't done — that's not a failed booking, so don't force the net.
+    const responseAsksForInfo = /\?\s*$/.test(rawResponse.trim())
+      || /\b(e-?mail|your name|best (number|time)|reach you (on|at)|what('?s| is) your|share your)\b/i.test(rawResponse);
+    const userPickedSlot = isBareSlot && inBookingCtx && !responseAsksForInfo;
+    if (claimsBooked || userPickedSlot) {
       // Before giving up: go back through the conversation, pull the date + time
       // the user actually agreed, and register it. A failed/never-called booking
       // should not lose the call — recover it instead of only apologising.
