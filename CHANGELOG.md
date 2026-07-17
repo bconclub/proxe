@@ -1,3 +1,11 @@
+## 2026-07-17 · feat(core): pipeline page trimmed to the pure one-screen funnel (v2 mock)
+
+- Pipeline page now matches the final mock exactly, nothing but the funnel at 100vh: header (brand mark + "Pipeline Overview" + subtitle), FOUR top cards (New/Engaged/Qualified/key event, each with its own color + 30d sparkline), KEY MILESTONE hero, post-key + exit rows, chevron flow. Chevron % is now each stage's share of ALL leads (was step conversion), and the % sits inside the chevron.
+- REMOVED: the 8-card insights strip and the below-fold lead table (search/sort/pagination/lead modal) - fewer containers per the founder's direction; every card and chevron clicks through to the Leads list filtered by stage instead.
+- Lost reason wording: "Unqualified" (was "Not qualified"). Key-milestone rename (admin pencil) unchanged.
+- User-facing: pipeline is a single non-scrolling funnel screen on desktop now.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): Pipeline page redesign - one-viewport funnel, editable key event, Lost + reasons
 
 - Pipeline page rebuilt to the new funnel design and sized to exactly one viewport on desktop (same full-height layout branch as home/inbox): pre-key cards (New/Engaged/Qualified with 30-day sparklines), a KEY EVENT hero with the Qualified→key-event conversion bar, post-key + exit-state card rows with progress rings, the chevron flow with step-conversion % under every stage, and an 8-card insights strip (Key Event Rate, Show-up Rate, True Win Rate, Revivable, Active Pipeline, Avg Time to Close, Biggest Drop-off, Win Rate). The lead table (search/sort/pagination/lead modal) lives below the fold; chevron clicks filter it and scroll to it. All colors are theme tokens + color-mix, so light/dark both work.
