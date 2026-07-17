@@ -36,7 +36,7 @@ function summaryDomain(brand: string): { who: string; s1: string; s2: string; do
   if (brand === 'windchasers') {
     return {
       who: 'an aviation training academy (Windchasers)',
-      s1: 'Sentence 1: Who they are and which course/program they\'re interested in (e.g. CPL, PPL, helicopter, cabin crew, drone) — only if actually known.',
+      s1: 'Sentence 1: Who they are and which course/program they\'re interested in (e.g. CPL, PPL, helicopter, cabin crew) — only if actually known.',
       s2: 'Sentence 2: What they asked about or what was discussed.',
       dont: 'This is a pilot-training lead, not a business. Do not write that they "haven\'t shared information about their business".',
       ex1: 'Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.',

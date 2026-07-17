@@ -585,7 +585,6 @@ export default function FounderDashboard() {
     if (!t) return null
     if (t.includes('cabin')) return { label: 'Cabin Crew', color: '#a855f7', bg: 'rgba(168,85,247,0.14)' }
     if (t.includes('helicopter')) return { label: 'Helicopter', color: '#f472b6', bg: 'rgba(244,114,182,0.14)' }
-    if (t.includes('drone')) return { label: 'Drone', color: '#2dd4bf', bg: 'rgba(45,212,191,0.14)' }
     if (t.includes('flight training')) return { label: 'Flight Training', color: '#10b981', bg: 'rgba(16,185,129,0.14)' }
     if (t.includes('cpl')) return { label: 'CPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }
     if (t.includes('ppl')) return { label: 'PPL Path', color: '#fbbf24', bg: 'rgba(245,158,11,0.16)' }

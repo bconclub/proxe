@@ -52,8 +52,6 @@ export function extractIntent(
     intent.courseInterest = 'pilot';
   } else if (lowerMessage.includes('helicopter')) {
     intent.courseInterest = 'helicopter';
-  } else if (lowerMessage.includes('drone')) {
-    intent.courseInterest = 'drone';
   } else if (lowerMessage.includes('cabin crew') || lowerMessage.includes('flight attendant')) {
     intent.courseInterest = 'cabin';
   }

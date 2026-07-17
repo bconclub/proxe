@@ -66,14 +66,6 @@ const TRIGGERS: QuickReplyTrigger[] = [
       buttons: ['Eligibility', 'Duration', 'How to apply'],
     },
   },
-  {
-    match: /\b(drone|rpas|uav)\b/i,
-    config: {
-      triggerKey: 'drone',
-      body: 'Drone pilot training. What would you like to know?',
-      buttons: ['Career', 'Duration', 'Cost'],
-    },
-  },
   // ── DGCA ground-classes fee (MUST come before the generic cost trigger so a
   //     "fees structure for DGCA" question gives the COURSE fee, not ₹80 lakh.
   //     Also before the subjects trigger so "6 subjects fees" → fee, not list) ─

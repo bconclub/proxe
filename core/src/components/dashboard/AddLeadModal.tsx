@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { MdClose, MdImage, MdAutoAwesome, MdPersonAdd, MdArrowBack, MdArrowForward } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { getCurrentBrandId, brandLabel } from '@/configs'
+import { COURSE_OPTIONS } from '@/configs/courses'
 
 interface AddLeadModalProps {
   isOpen: boolean
@@ -11,7 +12,6 @@ interface AddLeadModalProps {
   onCreated?: () => void
 }
 
-const COURSE_OPTIONS = ['DGCA', 'Flight', 'Heli', 'Cabin', 'Drone']
 const USER_TYPE_OPTIONS = [
   { value: 'student', label: 'Student' },
   { value: 'parent', label: 'Parent' },

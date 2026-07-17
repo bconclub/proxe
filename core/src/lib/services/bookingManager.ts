@@ -722,7 +722,6 @@ export async function createCalendarEvent(booking: {
     const courseNameMap: Record<string, string> = {
       pilot: 'Pilot Training',
       helicopter: 'Helicopter Training',
-      drone: 'Drone Training',
       cabin: 'Cabin Crew Training',
     };
     // Aviation names only apply when courseInterest is set (Windchasers). For

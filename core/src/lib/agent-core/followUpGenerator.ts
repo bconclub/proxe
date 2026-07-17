@@ -20,7 +20,6 @@ WindChasers is an honest, transparent aviation training academy offering:
 - Commercial Pilot License (CPL) training
 - Helicopter Pilot Training
 - Cabin Crew Training
-- Drone Pilot Training
 - DGCA Ground Classes
 
 AVAILABLE BUTTON TYPES:
@@ -254,7 +253,7 @@ async function generateSubsequentButtons(
     lowerResponse.includes('₹') || lowerResponse.includes('pricing');
 
   const isInterestedInService = lowerMessage.includes('pilot') || lowerMessage.includes('helicopter') ||
-    lowerMessage.includes('cabin crew') || lowerMessage.includes('drone') ||
+    lowerMessage.includes('cabin crew') ||
     lowerMessage.includes('ai') || lowerMessage.includes('automation') ||
     lowerResponse.includes('program') || lowerResponse.includes('solution');
 

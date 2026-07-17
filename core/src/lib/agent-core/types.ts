@@ -40,7 +40,7 @@ export interface AgentOutput {
 
 export interface ExtractedIntent {
   userType?: string;       // 'student' | 'parent' | 'professional'
-  courseInterest?: string;  // 'pilot' | 'helicopter' | 'drone' | 'cabin'
+  courseInterest?: string;  // 'pilot' | 'helicopter' | 'cabin'
   timeline?: string;        // 'asap' | '1-3mo' | '6+mo' | '1yr+'
   questionsAsked?: string[]; // 'cost' | 'eligibility' | 'timeline' | 'course'
   buttonClicks?: string[];

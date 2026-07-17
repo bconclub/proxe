@@ -46,7 +46,7 @@ Rules:
 - Phone: keep country code if shown (e.g. +91...). Strip spaces and dashes. If no digits are visible, use null.
 - If a field isn't present, use null. Do not guess.`
 
-const AVIATION_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers — pilot training, DGCA, cabin crew, drone).
+const AVIATION_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers — pilot training, DGCA, cabin crew, helicopter).
 
 Return ONLY a single JSON object, no prose, no markdown fences. Schema:
 {

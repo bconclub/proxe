@@ -879,7 +879,6 @@ export default function LeadsTable({
                   <option value="Flight">Flight</option>
                   <option value="Heli">Heli</option>
                   <option value="Cabin">Cabin</option>
-                  <option value="Drone">Drone</option>
                 </select>
               )}
             </>
