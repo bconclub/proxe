@@ -242,5 +242,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, results, log, timestamp: new Date(now).toISOString() })
+  return NextResponse.json({ success: true, sendsEnabled, results, log, timestamp: new Date(now).toISOString() })
 }
