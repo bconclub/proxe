@@ -1,3 +1,10 @@
+## 2026-07-14 · fix(windchasers): webinar reminders actually fire (date parse + scheduled)
+
+- The webinar-reminder cron was skipping ALL registrants: webinar_date is stored as a human label ("18 July 2026 at 11:30 AM IST") which `new Date()` can't parse → NaN → skip. Added parseWebinarDateMs (parses the DD Month YYYY at HH:MM am/pm format as IST). 143 registrants for 18 Jul now compute the correct 24h/2h windows.
+- Scheduled the cron hourly in core/vercel.json ("0 * * * *") — it wasn't scheduled at all, so it never ran. Windchasers-gated + idempotent, so it no-ops on other brands' projects.
+- STILL BLOCKED (user): windchasers_webinar_reminder_v1 does NOT exist at Meta (only ..._confirmation_v1 is approved). Create + approve it with params {{customer_name}} {{webinar_name}} {{when}} — until then the reminder sends fail (logged, no marker, auto-retried once approved). The 24h reminder is due ~17 Jul.
+- `(pending-sha)`
+
 ## 2026-07-14 · fix(core): light-mode sweep — hardcoded white borders/bg → theme tokens
 
 - Follow-up to the light-mode token fix: swept the top-traffic dashboards (inbox, pipeline, LeadDetailsModal, humans, Skeleton, TodaySnapshotButton, MicroCharts) for hardcoded `rgba(255,255,255,x)` borders / dividers / backgrounds / skeleton fills / a progress-ring track / disabled-pager color that were invisible on the light background. Replaced with `var(--border-primary)` / `var(--bg-hover)` / `var(--text-muted)` / `var(--text-primary)`. Left the `var(--x, rgba(...))` fallbacks alone (the var is always defined; fallback never used). Text-white on colored avatars/badges/buttons left as-is (correct in both themes).

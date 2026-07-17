@@ -25,6 +25,30 @@ export const maxDuration = 60
 
 const TEMPLATE = 'windchasers_webinar_reminder_v1'
 
+/**
+ * Parse the stored webinar_date into epoch ms. Pabbly/registration sends it as
+ * a human label ("18 July 2026 at 11:30 AM IST"), which `new Date()` cannot
+ * parse — so the cron was skipping every registrant. Fall back to a manual
+ * parse (treated as IST, UTC+5:30). Returns NaN if genuinely unparseable.
+ */
+function parseWebinarDateMs(raw: string): number {
+  const direct = new Date(raw).getTime()
+  if (!isNaN(direct)) return direct // already ISO / natively parseable
+  const m = String(raw).match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4}).*?(\d{1,2}):(\d{2})\s*([ap]m)/i)
+  if (!m) return NaN
+  const months: Record<string, number> = {
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+  }
+  const mo = months[m[2].toLowerCase()]
+  if (mo === undefined) return NaN
+  let hh = parseInt(m[4], 10) % 12
+  if (/pm/i.test(m[6])) hh += 12
+  const day = parseInt(m[1], 10), yr = parseInt(m[3], 10), mm = parseInt(m[5], 10)
+  // The wall-clock time is IST → convert to the equivalent UTC instant.
+  return Date.UTC(yr, mo, day, hh, mm) - 5.5 * 3_600_000
+}
+
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
@@ -66,8 +90,8 @@ export async function GET(req: NextRequest) {
       const rawDate = wc.webinar_date
       if (!rawDate || !lead.phone) { results.skipped++; continue }
 
-      const startsAt = new Date(rawDate).getTime()
-      if (isNaN(startsAt)) { results.skipped++; continue }   // unparseable date — Pabbly should send ISO
+      const startsAt = parseWebinarDateMs(rawDate)
+      if (isNaN(startsAt)) { results.skipped++; continue }   // genuinely unparseable
       const hoursUntil = (startsAt - now) / 3_600_000
       if (hoursUntil <= 0) { results.skipped++; continue }   // already started / past
 
