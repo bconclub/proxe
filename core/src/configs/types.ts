@@ -99,6 +99,13 @@ export interface BrandConfig {
       promptsEditor?: boolean;   // show the per-language voice-prompts editor
     };
   };
+  // Pipeline page content. keyEventLabel is the brand's DEFAULT name for the
+  // key milestone stage ("Demo Booked", "Site Visit Booked"…) — admins can
+  // override it from the dashboard (stored in dashboard_settings key
+  // 'pipeline_config'), and the stored value wins over this default.
+  pipeline?: {
+    keyEventLabel?: string;
+  };
   // Dashboard vocabulary overrides. The dashboard shell was written in
   // business-CRM English (Leads, High Intent, Booked Calls, Priority Lead
   // Queue…) — a brand whose audience isn't "sales leads" (e.g. pop = voters/

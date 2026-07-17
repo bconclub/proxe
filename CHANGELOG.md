@@ -1,3 +1,128 @@
+## 2026-07-17 · feat(core): Pipeline page redesign - one-viewport funnel, editable key event, Lost + reasons
+
+- Pipeline page rebuilt to the new funnel design and sized to exactly one viewport on desktop (same full-height layout branch as home/inbox): pre-key cards (New/Engaged/Qualified with 30-day sparklines), a KEY EVENT hero with the Qualified→key-event conversion bar, post-key + exit-state card rows with progress rings, the chevron flow with step-conversion % under every stage, and an 8-card insights strip (Key Event Rate, Show-up Rate, True Win Rate, Revivable, Active Pipeline, Avg Time to Close, Biggest Drop-off, Win Rate). The lead table (search/sort/pagination/lead modal) lives below the fold; chevron clicks filter it and scroll to it. All colors are theme tokens + color-mix, so light/dark both work.
+- "Closed-Lost" is now "Lost" and the card shows WHY: the lost-stage DB values double as reasons ("Went cold", "Not qualified", unspecified) tallied live per brand.
+- The key event is renameable per brand: admins get a pencil on the hero → the label persists in the brand's dashboard_settings (key 'pipeline_config', new /api/dashboard/settings/pipeline GET/POST, admin-gated writes, empty save resets to the brand default). BrandConfig gains optional pipeline.keyEventLabel for pack-level defaults. The name flows through the hero, chevron, table badges, and insight subtitles.
+- PipelineFunnel.tsx deleted (absorbed into the page). features.leadAccess scoping (All/Open Pool/My Pipeline/member switcher) preserved and now also scopes the funnel counts, not just the table.
+- User-facing: pipeline page looks completely different on every brand - one-screen funnel first, lead list below.
+- `(pending-sha)`
+
+## 2026-07-14 · fix(windchasers): webinar reminders actually fire (date parse + scheduled)
+
+- The webinar-reminder cron was skipping ALL registrants: webinar_date is stored as a human label ("18 July 2026 at 11:30 AM IST") which `new Date()` can't parse → NaN → skip. Added parseWebinarDateMs (parses the DD Month YYYY at HH:MM am/pm format as IST). 143 registrants for 18 Jul now compute the correct 24h/2h windows.
+- Scheduled the cron hourly in core/vercel.json ("0 * * * *") — it wasn't scheduled at all, so it never ran. Windchasers-gated + idempotent, so it no-ops on other brands' projects.
+- STILL BLOCKED (user): windchasers_webinar_reminder_v1 does NOT exist at Meta (only ..._confirmation_v1 is approved). Create + approve it with params {{customer_name}} {{webinar_name}} {{when}} — until then the reminder sends fail (logged, no marker, auto-retried once approved). The 24h reminder is due ~17 Jul.
+- `(pending-sha)`
+
+## 2026-07-14 · fix(core): light-mode sweep — hardcoded white borders/bg → theme tokens
+
+- Follow-up to the light-mode token fix: swept the top-traffic dashboards (inbox, pipeline, LeadDetailsModal, humans, Skeleton, TodaySnapshotButton, MicroCharts) for hardcoded `rgba(255,255,255,x)` borders / dividers / backgrounds / skeleton fills / a progress-ring track / disabled-pager color that were invisible on the light background. Replaced with `var(--border-primary)` / `var(--bg-hover)` / `var(--text-muted)` / `var(--text-primary)`. Left the `var(--x, rgba(...))` fallbacks alone (the var is always defined; fallback never used). Text-white on colored avatars/badges/buttons left as-is (correct in both themes).
+- `(pending-sha)`
+
+## 2026-07-14 · fix(windchasers): flight-school leads + agent time/fee bugs
+
+- COURSE: flight-school leads no longer mislabelled "Pilot". `normalizeCourse` now maps flight-school/study-abroad → "Flight School" (before the generic "flight"→Pilot rule); inbound route forces COURSE="Flight School" for flight_school form/source/school fields and stores school + country. New COURSE option "Flight School".
+- WELCOME: flight-school leads get the generic welcome (has a "Flight Schools" button) instead of the pilot-training welcome. (Dedicated windchasers_flight_school_welcome_v1 can replace it once Meta-approved + param names confirmed.)
+- FEES (live bug): the bare-"fees"/"cost" quick-reply asserted Pilot ₹60–70L to everyone (no course context) — cabin-crew/flight-school leads got pilot fees. Now course-neutral: asks which program or offers a counsellor callback. Course-specific fee questions still fast-path via the CPL/DGCA triggers.
+- TIME (live bug): agent apologized for a "missed" 5PM call at 2PM. Added a TIME AWARENESS rule (future slot = upcoming, not missed) to the per-turn IST context, and gave the voice channel a current-IST + upcoming line (it had none).
+- `(pending-sha)`
+
+##  · fix(core): Key Event updates on rebooking — top-level booking columns refreshed
+
+- Rebooking via a call note updated unified_context.voice.booking_* but NOT the top-level all_leads.booking_date/booking_time columns — which the Key Event card reads FIRST, so the stale old slot shadowed the new one ("Friday 17th July 11am" logged, card stuck on Wed 15th 10:00). The BOOKING_MADE branch now refreshes the columns in the same update.
+- Data: R's columns corrected to Fri 17 Jul 11:00; duplicate 10:00-era reminders cancelled (kept: 24h Thu 11:00, 30m Fri 10:30, Thursday-evening callback).
+- `(pending-sha)`
+
+##  · fix(core): lead-modal name edit no longer explodes the header layout
+
+- Clicking the name-edit pencil grew the contact card +90px (input's intrinsic size=20 min-width at text-xl) and crushed the Quick Stats column into tall slivers. Fix: size={1} on the edit input + min-w-0 on the contact-card section. Verified: header widths byte-identical before/after entering edit mode. Core modal — applies to every brand's dashboard.
+- `(pending-sha)`
+
+##  · feat(bcon): tasks are INTERACTION-DRIVEN only — autonomous scanners retired
+
+- Founder model: a task exists because a human interaction created it (call logged → brain plans next steps per person; booking → reminders). The worker's autonomous creators — createFollowUpTasks, createColdLeadTasks, and the morning-briefing "proactive intelligence" inserts (push_to_book / stale-lead day-1s / cold re-engagement) — are now gated behind AUTO_CREATE_TASKS=true (default OFF). Booking reminders + task execution + Telegram briefings stay.
+- Queue purged: 22 scanner-created tasks cancelled ("firing random people at random times"); the 11 interaction-born tasks remain (Raaja + Riitesh RNR ladders, R's booking reminders + Thursday callback).
+- Ops: bcon-tasks pm2-deleted from the VPS earlier today (was running every 5 min via cron_restart, completing tasks with dead WhatsApp creds).
+- `(pending-sha)`
+
+##  · fix(core): "Friday" books FRIDAY — bare weekday names parse in booking dates
+
+- resolveBookingDate understood "tomorrow"/"next friday"/"25 june" but a BARE weekday ("Friday", "this Friday", "coming Monday") fell to new Date("friday") = Invalid and silently booked TOMORROW — a founder's "he gave me Friday" note booked Tue 10am. Bare/this/coming weekday now maps to the next occurrence; "day after tomorrow" added too.
+- Data repaired for lead R: booking moved to Fri 17 Jul 10:00, reminders re-aimed (24h Thu 10:00, 30m Fri 09:30), and the note's "Thursday evening call him back" now exists as a human_followup (Thu 6pm).
+- `(pending-sha)`
+
+##  · fix(core): template messages get READ RECEIPTS — wa_message_id logged on every template send
+
+- Delivery/read ticks match conversations on metadata.wa_message_id; the dashboard send_template path logged only meta_message_id and the follow-up cron logged no id at all — template bubbles could never tick past "sent". Both now log wa_message_id + whatsapp_message_id (the worker already did). Raaja's sent row backfilled so late receipts still attach.
+- `(pending-sha)`
+
+##  · feat(core): template variables extracted from what the lead SAID (leadFacts)
+
+- New resolveLeadFacts(): goal / brand / pain distilled from the lead's own words — their form answers (Company Name, current_system → human-phrased pain like "managing leads manually on WhatsApp"), the campaign they responded to (utm.campaign, e.g. "AI Lead Machine"), and chat-extracted profile fields. Fallbacks are last resort, never the default.
+- Wired into the follow-up cron sender AND the Tasks-board previews (batch lead fetch → real values instead of [[goal]]/[[brand]] chips). Verified live: "saw nilamahal looking into AI Lead Machine", "saw NS Credit Consultant Pvt Ltd looking into Marketing / Ads".
+- Fixed en route: selects referenced a nonexistent all_leads.service_interest column, silently zeroing the lead fetch.
+- `(pending-sha)`
+
+##  · feat(bcon): day 1/3/5 retries use the DAY-WISE template ladders (onetouch/lowtouch)
+
+- The RNR-sequence day tasks repeated the generic follow-up 3×. Meta already holds day-specific approved copy: onetouch_d1/d3/d7 (ghost — never replied) and lowtouch_d1/d3/d7 (engaged — has replied). Day tasks now route by engagement: engaged→lowtouch, ghost→onetouch; day 5 borrows the d7 body (existing convention). Wired in the worker, the cron sender (with per-template named params), dashboard previews, and the flows/journeys ladders.
+- Verified: each day previews DIFFERENT copy on a live lead.
+- `(pending-sha)`
+
+##  · fix(core): RNR model corrected — pair fires ONLY on call-miss touches; day 1/3/5 stay standard cadence
+
+- Founder model: first RNR call → rnr_1, a second logged RNR → rnr_2, and the scheduled day 1/3/5 retries send the STANDARD follow-up templates that were already set up (NOT RNR copy). Corrected across the worker (day retries fall through to normal rotation; missed-call picks rnr_1/rnr_2 by last-sent), the cron sender (cap 2 applies only to RNR touches; day steps flow the standard template), dashboard previews, and the flows/journeys ladders.
+- Verified live: both open leads preview missed-call = "We just tried calling you", day 1/3/5 = "you reached out recently…", re-engage = re-engagement.
+- Removed the "Latest note" card from the lead summary (notes live in the Notes tab).
+- `(pending-sha)`
+
+##  · fix(core): inbox renders templates FULLY (body + buttons) + Lokazen chip leak killed + whole Meta form shown
+
+- Template sends from the dashboard now log the RENDERED body (server-side fill from the brand template map) + template_buttons metadata — the thread shows the real message with WhatsApp-style buttons, never "[Template: name]". RNR pair buttons (Book a call / Chat here) added to journeys + worker maps. Raaja's existing row backfilled.
+- LEAK: audienceOf() painted Lokazen's OWNER/SCOUT/BRAND chips on every brand — bcon B2B leads with user_type "business_owner" substring-matched "owner". Now lokazen-only (the detail-panel copy of this taxonomy was already gated; the list chip escaped the audit).
+- Meta Form Submission card shows EVERY answered field (was a cherry-picked subset — a form matching only "urgency" rendered one lonely field).
+- `(pending-sha)`
+
+##  · feat(core): RNR cron sender is brand-aware — bcon ladder fires the real templates to real numbers
+
+- /api/cron/follow-up-sequence was windchasers-only (pilot/generic template names + single customer_name param) — on bcon every send would 4xx. Now brand-routed: bcon → bcon_service_rnr_1/2_v1 with 3 NAMED params (customer_name, service_name, brand_name from lead context), re_engage closes on the re-engagement template, cap 4 RNR sends (windchasers path unchanged, cap 2).
+- New sendNamedTemplate() in whatsappSender for multi-named-param templates.
+- Verified: authorized local ping → due:0 errors:0; no TEST_RECIPIENT gates in the core send path (real numbers only).
+- REMAINING (user): add the bcon URL to the external cron scheduler — nothing pings it on prod yet.
+- `(pending-sha)`
+
+## 2026-07-13 · refactor(core): rename won stage 'Converted' → 'Closed Won'
+
+- The won stage is now 'Closed Won' (pairs with 'Closed Lost'), replacing 'Converted' across the taxonomy: stage/override/convert APIs, note classifier (CONVERTED category still triggers it), LeadStageSelector, stage dropdowns, colors, funnel/pipeline/humans groupings, metrics, types, lead-stages config. The 'Converted' classifier category name is unchanged.
+- Migration 038 drops the lead_stage CHECK (by definition, any name), migrates existing 'Converted' rows → 'Closed Won', and re-adds the constraint with the full current stage set. RUN THIS in each brand's Supabase before/with the deploy — until then the DB rejects 'Closed Won'.
+- Funnel/grouping arrays keep 'Converted' alongside 'Closed Won' so un-migrated brands' legacy rows still count as Won.
+- `(pending-sha)`
+
+## 2026-07-13 · feat(core): "Convert lead" action + conversion-date tracking
+
+- New "Convert lead" option in the lead modal's + menu → a modal to enter conversion date (defaults today), program/batch, deal value ₹, and notes. Converting sets stage=Converted, records the date, stores the deal details in unified_context.conversion, cancels pending follow-ups, and logs a stage change + activity note. New endpoint POST /api/dashboard/leads/[id]/convert.
+- New `converted_at` column (migration 037, windchasers) — the conversion date is written there (soft-fail if the column isn't present yet) AND always into unified_context.conversion so it works before the migration runs.
+- The auto-convert path (note/call classified CONVERTED) now ALSO records converted_at (was only flipping the stage, losing the date).
+- `(pending-sha)`
+
+## 2026-07-13 · fix(windchasers): Telegram team alert on escalations + stop name-repetition spam
+
+- flagForHumanFollowup now also pings the team's Telegram group (TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID) alongside the existing Slack ping — so a booking the agent couldn't lock ("passed to our team"), an empty-response escalation, or a repeat-guard trip actually reaches a human on Telegram. Env-guarded no-op for brands without Telegram set; goes only to that brand's own group (no bleed). NOTE: needs TELEGRAM_BOT_TOKEN + TELEGRAM_ADMIN_CHAT_ID in the windchasers CORE/Vercel env (currently only in the worker).
+- Agent prompt: added NAME USAGE rule — use the first name at most once (first message), don't re-greet every reply ("Kartik… Kartik… Kartik") — fixes the repetitive/spammy feel.
+- `(pending-sha)`
+
+## 2026-07-13 · fix(windchasers): TYPE column falls back to course (cabin-crew leads no longer blank)
+
+- The pipeline TYPE column only showed `user_type` (student/parent). Cabin-crew leads carry `course=Cabin Crew` but no user_type, so TYPE was blank. Now TYPE falls back to the course when user_type is empty, so cabin-crew (and other course-only) leads show their kind. Windchasers-gated (showAviationColumns); other brands unchanged.
+- `(pending-sha)`
+
+## 2026-07-13 · fix(windchasers): WhatsApp delivery receipts + last-touch on auto-templates
+
+- Auto-template sends (webinar confirm, cabin-crew, new-lead/parent welcome, FB-lead, dashboard add-lead) never stored Meta's message id, so the status webhook (matches on `metadata.wa_message_id`) could not attach delivery/read receipts — every row stuck on a single tick. Now the send wrappers propagate `messageId` and every log site stores `wa_message_id` + `delivery_status: 'sent'`, so ticks flow. (Forward-only — historical rows have no captured wamid.)
+- After a successful auto-welcome/confirm, `last_touchpoint` is bumped to `whatsapp` (+ `last_interaction_at`), so the pipeline LAST TOUCH column reflects the WhatsApp we sent instead of staying "Form".
+- `sendCabinCrewWelcome` / `sendWelcomeTemplate` / `sendParentWelcomeTemplate` / `sendWebinarConfirm` return types widened to carry `messageId`.
+- `(pending-sha)`
+
 ## 2026-07-13 · fix(windchasers): inbox shows the REAL WhatsApp template (body + buttons + footer)
 
 - Mirror of the main-branch fix onto one-core (windchasers-only behavior; pop unaffected). New `core/src/configs/whatsapp-template-bodies.ts` (real Meta-approved windchasers template bodies + footer + buttons + `renderWaTemplate`). Inbound webinar-confirm + new-lead welcome now log the real rendered template; inbox renders the template footer. Other send sites (cabin/facebook-lead/dashboard-add) land when one-core catches up to main.
