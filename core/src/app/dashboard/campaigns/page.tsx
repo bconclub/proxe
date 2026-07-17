@@ -315,13 +315,16 @@ function CampaignsChat() {
             ]
             return (
               <div key={c.id} className="rounded-xl border p-3.5" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-1">
                   <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0" style={{ background: `${PURPLE}22`, color: PURPLE }}>{c.type}</span>
                   <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
                   <span className="ml-auto text-[10.5px] shrink-0" style={{ color: 'var(--text-muted)' }}>
                     {c.lastSent ? new Date(c.lastSent).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' }) : ''}
                   </span>
                 </div>
+                {c.description && (
+                  <div className="text-[11px] mb-3" style={{ color: 'var(--text-secondary)' }}>{c.description}</div>
+                )}
                 <div className="grid grid-cols-4 gap-2 mb-3">
                   {tiles.map((tl) => (
                     <div key={tl.label} className="rounded-lg border px-2.5 py-2" style={{ borderColor: 'var(--border-primary)' }}>
