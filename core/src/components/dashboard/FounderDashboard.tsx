@@ -61,12 +61,14 @@ interface FounderMetrics {
   }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
   leadFlow: { new: number; engaged: number; qualified: number; booked: number }
-  // Windchasers-only: lead-type breakdown for the Engine Overview strip. Null on
-  // other brands (aviation taxonomy). Webinar splits by Zoom-registration status.
-  leadTypeBreakdown?: {
-    pilot: number; flightSchool: number; cabinCrew: number; webinar: number
-    webinarRegistered: number; webinarNotRegistered: number; total: number
-  } | null
+  // Windchasers-only: per-program Engine Overview funnels, keyed by segment then
+  // by window. Standard segments carry total/engaged/warm/followUpDue/booked;
+  // webinar carries total/engaged/registered/notRegistered/sent. Null on other brands.
+  segmentFunnels?: Record<string, Record<string, {
+    total: number; engaged: number
+    warm?: number; followUpDue?: number; booked?: number
+    registered?: number; notRegistered?: number; sent?: number
+  }>> | null
   // Gigs tab only - scout lifecycle stage breakdown (all zero otherwise). Same
   // stage derivation as the Gigs table's STATUS column, so they never disagree.
   gigStageCounts?: { loggedIn: number; kycStarted: number; kycDone: number; live: number; active: number }
@@ -352,6 +354,9 @@ export default function FounderDashboard() {
   // Engine Overview funnel - All-time snapshot by default, with 7d/14d windows.
   // POP adds a Today (24h) window (cohort funnel ported from the pop fork).
   const [engineRange, setEngineRange] = useState<'Today' | '7D' | '14D' | 'All'>('All')
+  // Engine Overview program switch (windchasers): All / Pilot / Flight School /
+  // Cabin Crew / Webinar. Re-slices the funnel; the date toggle still applies.
+  const [engineSegment, setEngineSegment] = useState<'all' | 'pilot' | 'flightSchool' | 'cabinCrew' | 'webinar'>('all')
   // Top-bar user profile menu.
   const [profileOpen, setProfileOpen] = useState(false)
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
@@ -674,6 +679,21 @@ export default function FounderDashboard() {
   // POP shows campaign-scale numbers, so the Engine nodes abbreviate (10.5K).
   const engK = (n: number): number | string => (isPop ? abbrevK(n) : n)
   const engTopSub = engineRange === 'All' ? 'top of funnel' : engineRange === 'Today' ? 'new today' : engineRange === '7D' ? 'new in 7 days' : 'new in 14 days'
+  // Windchasers Engine Overview: the selected program's funnel for the current
+  // window. Present only when segmentFunnels is populated (windchasers); drives
+  // the program switcher + funnel nodes below, replacing the single-segment
+  // fallback above. Webinar swaps the middle/last nodes to registration stages.
+  const wcFunnels = isWindchasers ? metrics.segmentFunnels : null
+  const wcSeg = wcFunnels ? (wcFunnels[engineSegment]?.[engineRange] || wcFunnels[engineSegment]?.All) : null
+  const isWebinarSeg = engineSegment === 'webinar'
+  const segPct = (n: number) => { const t = wcSeg?.total || 0; return t > 0 ? `${Math.round((n / t) * 100)}% of total` : '0% of total' }
+  const SEGMENTS: Array<{ key: typeof engineSegment; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'pilot', label: 'Pilot' },
+    { key: 'flightSchool', label: 'Flight School' },
+    { key: 'cabinCrew', label: 'Cabin Crew' },
+    { key: 'webinar', label: 'Webinar' },
+  ]
   // Active Conversations card - its OWN toggle (24h / 7d / 14d), distinct leads
   // with conversation activity in the window.
   const tc = metrics.totalConversations
@@ -1049,6 +1069,25 @@ export default function FounderDashboard() {
             </div>
             )}
           </div>
+          {/* Program switcher (windchasers) — re-slices the funnel by program; the
+              date toggle above still applies to whichever program is selected. */}
+          {isWindchasers && wcFunnels && !isGigsView && (
+            <div className="flex items-center gap-1 flex-wrap mt-2 shrink-0">
+              {SEGMENTS.map((s) => (
+                <button
+                  key={s.key} type="button" onClick={() => setEngineSegment(s.key)}
+                  className="text-[11px] font-semibold rounded-full px-2.5 py-1 transition-colors border"
+                  style={{
+                    color: engineSegment === s.key ? '#ffffff' : 'var(--text-secondary)',
+                    backgroundColor: engineSegment === s.key ? 'var(--accent-primary)' : 'transparent',
+                    borderColor: engineSegment === s.key ? 'var(--accent-primary)' : 'var(--border-primary)',
+                  }}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Funnel fills the card's height so there's no dead space at the bottom */}
           {isPop && metrics.campaignHome?.ladder ? (() => {
             const lad = metrics.campaignHome.ladder!
@@ -1062,7 +1101,25 @@ export default function FounderDashboard() {
                 <EngineNode icon={<MdAssignment size={26} />} color="#10b981" count={engK(lad.grievances)} label="Grievances Logged" sub="all time" last />
               </div>
             )
-          })() : (
+          })() : (isWindchasers && wcSeg && !isGigsView) ? (
+          <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-center sm:justify-between gap-0 sm:gap-1 py-2 sm:py-6">
+            <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={wcSeg.total} label="Total Leads" sub={engTopSub} />
+            <EngineNode icon={<MdPeople size={28} />} color="#22c55e" count={wcSeg.engaged} label="Engaged" sub={segPct(wcSeg.engaged)} />
+            {isWebinarSeg ? (
+              <>
+                <EngineNode icon={<MdVerified size={28} />} color="#10b981" count={wcSeg.registered ?? 0} label="Registered" sub={segPct(wcSeg.registered ?? 0)} />
+                <EngineNode icon={<MdSchedule size={28} />} color="#f59e0b" count={wcSeg.notRegistered ?? 0} label="Not Registered" sub={segPct(wcSeg.notRegistered ?? 0)} />
+                <EngineNode icon={<MdMessage size={28} />} color="#a855f7" count={wcSeg.sent ?? 0} label="Messaged" sub="reminder / nudge sent" last />
+              </>
+            ) : (
+              <>
+                <EngineNode icon={<MdLocalFireDepartment size={28} />} color="#f59e0b" count={wcSeg.warm ?? 0} label="Warm" sub={segPct(wcSeg.warm ?? 0)} />
+                <EngineNode icon={<MdSchedule size={28} />} color="#a855f7" count={wcSeg.followUpDue ?? 0} label="Follow-up Due" sub={(wcSeg.followUpDue ?? 0) > 0 ? 'Needs attention' : 'All clear'} />
+                <EngineNode icon={<MdCalendarToday size={28} />} color="#10b981" count={wcSeg.booked ?? 0} label="Booked" sub={engineRange === 'All' ? 'all time' : engineRange === 'Today' ? 'today' : `last ${engineRange === '7D' ? 7 : 14} days`} last />
+              </>
+            )}
+          </div>
+          ) : (
           <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-center sm:justify-between gap-0 sm:gap-1 py-2 sm:py-6">
             <EngineNode icon={<MdPeople size={28} />} color="#3B82F6" count={engK(engTotal)} label={brandLabel('Total Leads')} sub={engTopSub} />
             {isGigsView ? (
@@ -1090,42 +1147,6 @@ export default function FounderDashboard() {
             />
           </div>
           )}
-          {/* Lead-type breakdown (windchasers) - at-a-glance split of Total Leads
-              by program, plus the webinar registered-vs-not difference. */}
-          {isWindchasers && !isGigsView && metrics.leadTypeBreakdown && (() => {
-            const lb = metrics.leadTypeBreakdown!
-            const tot = lb.total || 1
-            const pct = (n: number) => `${Math.round((100 * n) / tot)}%`
-            const items = [
-              { label: 'Pilot', count: lb.pilot, color: '#3B82F6' },
-              { label: 'Flight School', count: lb.flightSchool, color: '#0ea5e9' },
-              { label: 'Cabin Crew', count: lb.cabinCrew, color: '#f59e0b' },
-              { label: 'Webinar', count: lb.webinar, color: '#a855f7' },
-            ]
-            return (
-              <div className="pt-3 mt-1 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide shrink-0" style={{ color: 'var(--text-muted)' }}>By type</span>
-                  {items.map((it) => (
-                    <span key={it.label} className="flex items-center gap-1.5">
-                      <span className="inline-block w-2 h-2 rounded-full" style={{ background: it.color }} />
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{it.label}</span>
-                      <span className="text-xs font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>{it.count.toLocaleString()}</span>
-                      <span className="text-[10px] tabular-nums" style={{ color: 'var(--text-muted)' }}>{pct(it.count)}</span>
-                    </span>
-                  ))}
-                </div>
-                {lb.webinar > 0 && (
-                  <div className="flex items-center gap-1.5 mt-1.5 text-[11px] tabular-nums">
-                    <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>Webinar split</span>
-                    <span style={{ color: '#22c55e' }}>{lb.webinarRegistered} registered</span>
-                    <span style={{ color: 'var(--text-muted)' }}>·</span>
-                    <span style={{ color: '#f59e0b' }}>{lb.webinarNotRegistered} not registered</span>
-                  </div>
-                )}
-              </div>
-            )
-          })()}
           <div className="pt-4 border-t text-xs flex items-center gap-2" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}>
             <span className="inline-block w-2 h-2 rounded-full" style={{ background: hasNewHomeLook ? healthColor : '#22c55e' }} />
             {healthLevel === 'good' ? `${brandLabel('Your follow-up engine is performing well')}. Keep it going!` : `Some ${brandLabel('Lead') === 'Person' ? 'people' : 'leads'} need attention - check the Follow-up Due column.`}
