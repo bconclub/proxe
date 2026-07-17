@@ -173,6 +173,8 @@ function CampaignsChat() {
 
   const [saved, setSaved] = useState<SavedCampaign[]>([])
   const [showSaved, setShowSaved] = useState(true)
+  // Campaigns that actually went out — live delivery metrics from the message log.
+  const [sentCampaigns, setSentCampaigns] = useState<any[]>([])
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -180,6 +182,10 @@ function CampaignsChat() {
     fetch('/api/dashboard/campaigns')
       .then((r) => r.json())
       .then((d) => setSaved(Array.isArray(d.campaigns) ? d.campaigns : []))
+      .catch(() => {})
+    fetch('/api/dashboard/campaigns/stats')
+      .then((r) => r.json())
+      .then((d) => setSentCampaigns(Array.isArray(d.campaigns) ? d.campaigns : []))
       .catch(() => {})
   }
   useEffect(loadSaved, [])
@@ -266,6 +272,53 @@ function CampaignsChat() {
           </p>
         </div>
       </div>
+
+      {/* Sent campaigns — live delivery metrics from the message log */}
+      {sentCampaigns.length > 0 && (
+        <div className="space-y-3 mb-3">
+          {sentCampaigns.map((c) => {
+            const t = c.totals || { sent: 0, delivered: 0, read: 0, clicked: 0 }
+            const pct = (n: number) => (t.sent > 0 ? `${Math.round((n / t.sent) * 100)}%` : '0%')
+            const tiles = [
+              { label: 'Sent', value: t.sent, sub: `${c.recipients} people`, color: PURPLE },
+              { label: 'Delivered', value: t.delivered, sub: pct(t.delivered), color: '#3b82f6' },
+              { label: 'Read', value: t.read, sub: pct(t.read), color: GREEN },
+              { label: 'Clicked', value: t.clicked, sub: 'group joins', color: '#f59e0b' },
+            ]
+            return (
+              <div key={c.id} className="rounded-xl border p-3.5" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0" style={{ background: `${PURPLE}22`, color: PURPLE }}>{c.type}</span>
+                  <span className="text-[13px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{c.name}</span>
+                  <span className="ml-auto text-[10.5px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    {c.lastSent ? new Date(c.lastSent).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' }) : ''}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {tiles.map((tl) => (
+                    <div key={tl.label} className="rounded-lg border px-2.5 py-2" style={{ borderColor: 'var(--border-primary)' }}>
+                      <div className="text-xl font-bold tabular-nums leading-none" style={{ color: 'var(--text-primary)' }}>{tl.value}</div>
+                      <div className="text-[10px] font-semibold mt-1" style={{ color: tl.color }}>{tl.label}</div>
+                      <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{tl.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  {(c.sends || []).map((s: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px] rounded-lg px-2.5 py-1.5" style={{ background: 'var(--bg-primary)' }}>
+                      <span className="font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
+                      <span className="font-mono text-[9.5px] truncate hidden sm:inline" style={{ color: 'var(--text-muted)' }}>{s.template}</span>
+                      <span className="ml-auto tabular-nums shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                        {s.sent} sent · {s.delivered} delivered · {s.read} read · {s.clicked} clicked
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Saved campaigns */}
       {saved.length > 0 && (
