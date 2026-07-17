@@ -80,7 +80,7 @@ const SUGGESTIONS = [
   'Webinar registrants who never replied on WhatsApp',
   'Qualified pilot-training leads from the last 30 days',
   'Cabin Crew leads that came from Instagram',
-  'Leads that went quiet for 14+ days — re-engagement',
+  'Leads that went quiet for 14+ days, re-engagement',
 ]
 
 type TabKey = 'live' | 'scheduled' | 'pending' | 'completed' | 'all'
@@ -352,7 +352,7 @@ function CampaignsList({ saved, sent, upcoming, loading, onNew, onChanged }: {
       return {
         kind: 'upcoming' as const,
         id: u.id,
-        name: `${u.name} — ${u.label}`,
+        name: `${u.name} · ${u.label}`,
         badge: 'WHATSAPP',
         target: `${u.audience}${when ? ` · fires ${when}` : ''} · ${u.template}`,
         statusLabel: 'Scheduled',
@@ -640,10 +640,13 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
     }
   }
 
+  const railTemplates = (latestReply?.templates || []).map((t) => ({ ...t, status: 'approved' as const }))
+    .concat((latestReply?.drafts || []).map((t) => ({ ...t, status: 'draft' as const })))
+  const VARS = ['{{first_name}}', '{{course}}', '{{city}}', '{{batch}}']
   return (
-    <div className="max-w-[880px] mx-auto flex flex-col" style={{ height: 'calc(100vh - 96px)' }}>
+    <div className="max-w-[1180px] mx-auto flex flex-col" style={{ height: 'calc(100vh - 88px)' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 pb-3">
+      <div className="flex items-center gap-3 pb-3 shrink-0">
         <button onClick={onBack} className="p-1.5 rounded-lg shrink-0" title="Back to campaigns" style={{ color: 'var(--text-secondary)' }}>
           <MdArrowBack size={19} />
         </button>
@@ -653,11 +656,15 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
         <div className="min-w-0">
           <h1 className="text-lg font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>New campaign</h1>
           <p className="text-[11.5px]" style={{ color: 'var(--text-secondary)' }}>
-            Say who you want to reach — {brandConfig.name} pulls the list and lines up the message.
+            Say who you want to reach, {brandConfig.name} pulls the list and lines up the message.
           </p>
         </div>
       </div>
 
+      {/* Two columns: chat (left) + campaign rail (right) */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+      {/* LEFT: chat + input */}
+      <div className="flex flex-col min-h-0">
       {/* Chat area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto rounded-xl border p-4 space-y-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
         {messages.length === 0 && (
@@ -691,7 +698,7 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
                 {m.reply?.audience && <AudienceCard a={m.reply.audience} />}
                 {(m.reply?.templates?.length || 0) > 0 && (
                   <div className="space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Approved templates — pick one</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Approved templates, pick one</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {m.reply!.templates.map((t) => (
                         <TemplateCard key={t.name} t={{ ...t, status: 'approved' }} selected={selectedTpl?.name === t.name} onSelect={() => setSelectedTpl({ ...t, status: 'approved' })} />
@@ -702,7 +709,7 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
                 {(m.reply?.drafts?.length || 0) > 0 && (
                   <div className="space-y-2">
                     <div className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <MdEditNote size={13} /> Fresh drafts — need Meta approval before sending
+                      <MdEditNote size={13} /> Fresh drafts, need Meta approval before sending
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {m.reply!.drafts.map((t) => (
@@ -724,36 +731,12 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      {/* Save bar — appears once there's an audience */}
-      {audience && (
-        <div className="flex items-center gap-2 mt-2.5 rounded-xl border px-3 py-2.5 flex-wrap" style={{ borderColor: `color-mix(in srgb, ${GREEN} 35%, var(--border-primary))`, background: `color-mix(in srgb, ${GREEN} 5%, var(--bg-secondary))` }}>
-          <span className="text-[11.5px] font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>
-            {audience.with_phone ?? audience.count} people{selectedTpl ? ` · ${selectedTpl.name}` : ' · no template picked'}
-          </span>
-          <input
-            value={campaignName}
-            onChange={(e) => setCampaignName(e.target.value)}
-            placeholder="Campaign name…"
-            className="flex-1 min-w-[160px] text-[12px] px-2.5 py-1.5 rounded-md border outline-none"
-            style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
-          />
-          <button
-            onClick={saveCampaign}
-            disabled={saving}
-            className="text-[12px] font-bold px-3.5 py-1.5 rounded-md shrink-0"
-            style={{ background: GREEN, color: '#08130b', opacity: saving ? 0.6 : 1 }}
-          >
-            {saving ? 'Saving…' : selectedTpl ? 'Save campaign' : 'Save as draft'}
-          </button>
-        </div>
-      )}
-
       {error && <div className="text-xs mt-2" style={{ color: '#ef4444' }}>{error}</div>}
 
       {/* Input */}
       <form
         onSubmit={(e) => { e.preventDefault(); send(input) }}
-        className="flex items-center gap-2 mt-2.5 rounded-xl border px-3 py-2"
+        className="flex items-center gap-2 mt-2.5 rounded-xl border px-3 py-2 shrink-0"
         style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}
       >
         <input
@@ -768,6 +751,94 @@ function CampaignsBuilder({ onBack }: { onBack: () => void }) {
           <MdSend size={18} />
         </button>
       </form>
+      </div>{/* end left column */}
+
+      {/* RIGHT RAIL — templates, audience, setup, schedule */}
+      <div className="hidden lg:flex flex-col gap-3 min-h-0 overflow-y-auto pr-0.5">
+        {/* Templates */}
+        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>Templates</span>
+            <span className="text-[11px] font-semibold" style={{ color: PURPLE }}>{railTemplates.length || ''}</span>
+          </div>
+          {railTemplates.length > 0 ? (
+            <div className="space-y-2">
+              {railTemplates.slice(0, 3).map((t) => {
+                const badge = t.status === 'approved'
+                  ? { label: 'Approved', color: GREEN, bg: `${GREEN}1f` }
+                  : { label: 'Draft', color: '#e0a951', bg: 'rgba(224,169,81,0.14)' }
+                return (
+                  <button key={t.name} onClick={() => setSelectedTpl(t)} className="w-full text-left rounded-lg border p-2.5 flex gap-2.5 items-start transition-colors"
+                    style={{ borderColor: selectedTpl?.name === t.name ? PURPLE : 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                    <span className="inline-block h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ background: GREEN }} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[12px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{t.name}</span>
+                      <span className="block text-[10.5px] leading-snug mt-0.5" style={{ color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.body}</span>
+                    </span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase shrink-0" style={{ color: badge.color, background: badge.bg }}>{badge.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-[11px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>Describe an audience in the chat and matching templates show up here.</div>
+          )}
+        </div>
+
+        {/* Audience summary */}
+        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Audience summary</div>
+          {audience ? (
+            <div className="flex items-center gap-3">
+              <div>
+                <div className="text-[28px] font-bold leading-none tabular-nums" style={{ color: 'var(--text-primary)' }}>{(audience.with_phone ?? audience.count).toLocaleString()}</div>
+                <div className="text-[10.5px] mt-1" style={{ color: 'var(--text-muted)' }}>Estimated reach</div>
+              </div>
+              <div className="ml-auto h-14 w-14 rounded-full shrink-0" style={{ background: `conic-gradient(${GREEN} 0 100%)`, WebkitMask: 'radial-gradient(circle 10px at center, transparent 98%, #000 100%)', mask: 'radial-gradient(circle 10px at center, transparent 98%, #000 100%)' }} />
+            </div>
+          ) : (
+            <div className="text-[11px] py-3 text-center" style={{ color: 'var(--text-muted)' }}>Reach shows once you describe an audience.</div>
+          )}
+          <div className="flex items-center gap-1.5 mt-2.5 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: GREEN }} /> WhatsApp
+          </div>
+        </div>
+
+        {/* Campaign setup */}
+        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Campaign setup</div>
+          <div className="space-y-2 text-[12px]">
+            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Channel</span><span className="font-semibold" style={{ color: 'var(--text-primary)' }}>WhatsApp</span></div>
+            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Template</span><span className="font-semibold truncate max-w-[160px]" style={{ color: selectedTpl ? 'var(--text-primary)' : 'var(--text-muted)' }}>{selectedTpl?.name || 'Not picked'}</span></div>
+            <div className="flex items-center justify-between"><span style={{ color: 'var(--text-secondary)' }}>Audience</span><span className="font-semibold" style={{ color: audience ? 'var(--text-primary)' : 'var(--text-muted)' }}>{audience ? `${audience.with_phone ?? audience.count} people` : 'Not set'}</span></div>
+          </div>
+          <input
+            value={campaignName}
+            onChange={(e) => setCampaignName(e.target.value)}
+            placeholder="Campaign name"
+            className="w-full mt-2.5 text-[12px] px-2.5 py-1.5 rounded-md border outline-none"
+            style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        {/* Review & Schedule */}
+        <button onClick={saveCampaign} disabled={!audience || saving} className="w-full text-[12.5px] font-bold py-2.5 rounded-xl shrink-0 flex items-center justify-center gap-1.5"
+          style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)', opacity: (!audience || saving) ? 0.5 : 1 }}>
+          {saving ? 'Saving...' : 'Review & Schedule Campaign'}
+        </button>
+
+        {/* Personalization */}
+        <div className="rounded-xl border p-3.5 shrink-0" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
+          <div className="text-[12.5px] font-bold mb-2.5" style={{ color: 'var(--text-primary)' }}>Personalization</div>
+          <div className="flex flex-wrap gap-1.5">
+            {VARS.map((v) => (
+              <span key={v} className="text-[10.5px] font-mono px-2 py-1 rounded-md border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>{v}</span>
+            ))}
+            <span className="text-[10.5px] font-semibold px-2 py-1 rounded-md border" style={{ borderColor: PURPLE, color: PURPLE }}>+ Add</span>
+          </div>
+        </div>
+      </div>
+      </div>{/* end 2-col grid */}
     </div>
   )
 }
