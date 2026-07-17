@@ -38,21 +38,23 @@ export async function GET() {
   const rows = (sends || []).filter((r: any) => r.metadata && r.metadata.campaign)
   if (!rows.length) return NextResponse.json({ campaigns: [] })
 
-  // Which recipients later tapped a quick-reply button (e.g. "Join WhatsApp Group").
-  // Fetch inbound button taps broadly and intersect in JS — a `.in()` over the
-  // full recipient list (100+ ids) silently returned nothing.
+  // Which recipients tapped a quick-reply button (e.g. "Join WhatsApp Group").
+  // Two signals: (a) inbound customer button/interactive taps; (b) the bot's
+  // deterministic quick-reply replies, which carry `quick_reply_trigger` — the
+  // webinar "Join WhatsApp Group" tap is handled+answered before it's logged as
+  // an inbound row, so (b) is the ONLY record of that click. Fetch recent rows
+  // broadly and intersect in JS (a `.in()` over 100+ recipient ids returned
+  // nothing; a PostgREST json `not.is` filter did too).
   const clickedLeads = new Set<string>()
-  const { data: taps } = await sb
+  const { data: engagement } = await sb
     .from('conversations')
-    .select('lead_id, metadata')
-    .eq('sender', 'customer')
+    .select('lead_id, sender, metadata')
     .order('created_at', { ascending: false })
-    .limit(8000)
-  for (const t of taps || []) {
-    const m: any = t.metadata || {}
-    if (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button' || m.quick_reply_trigger) {
-      if (t.lead_id) clickedLeads.add(t.lead_id)
-    }
+    .limit(12000)
+  for (const e of engagement || []) {
+    const m: any = e.metadata || {}
+    const tapped = !!m.quick_reply_trigger || (e.sender === 'customer' && (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button'))
+    if (tapped && e.lead_id) clickedLeads.add(e.lead_id)
   }
 
   const byCampaign: Record<string, any> = {}
