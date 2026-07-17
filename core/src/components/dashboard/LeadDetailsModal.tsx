@@ -2277,6 +2277,24 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   </div>
 
+                                  {/* Requirement headline — the brand is a SEEKER, so lead with
+                                      what they need (size · budget · areas) at a glance. */}
+                                  {(() => {
+                                    const budgetStr = lkz.budget_monthly_rent
+                                      ? (/[₹]|rs\b/i.test(String(lkz.budget_monthly_rent)) ? String(lkz.budget_monthly_rent) : `₹${lkz.budget_monthly_rent}/mo`)
+                                      : null
+                                    const parts = [sizeNeeded, budgetStr, areas].filter(Boolean)
+                                    if (!parts.length) return null
+                                    return (
+                                      <div className="rounded-xl p-3 mb-3" style={{ background: accentSoft, border: `1px solid ${accentBorder}` }}>
+                                        <span className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: BRAND_ACCENT }}>Requirement</span>
+                                        <p className="text-[13px] font-semibold leading-snug mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                          {parts.join('   ·   ')}
+                                        </p>
+                                      </div>
+                                    )
+                                  })()}
+
                                   {tiles.length > 0 && (
                                     <div className="grid gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)', gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
                                       {tiles.map(({ icon: Icon, label, value }) => (
