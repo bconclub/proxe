@@ -1,3 +1,11 @@
+## 2026-07-17 · feat(windchasers): Campaigns page restructured - overview first, builder behind New campaign
+
+- Campaigns now lands on the overview: header with search (Cmd+K) + accent "New campaign" button, status pills (Live / Scheduled / Pending / Completed / All), four aggregate stat cards (Sent, Delivered + delivery rate, Read + read rate, Clicked + click rate - real numbers from the message log, no fabricated trends), and a campaign table (channel badge, target line, status dot + since-date, delivered % bar, read / clicked counts, updated, per-send breakdown on click, delete for planned rows).
+- The chat builder is unchanged but moved behind "New campaign" with a back arrow; saving returns to the overview. All colors are brand theme tokens - the reference mock's palette was NOT copied.
+- The old Create/Previous tab pair and the bottom "create a campaign in steps" strip are gone.
+- User-facing: Campaigns reads like a campaign console; chat only appears when creating.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): Campaigns - chat-driven campaign builder (windchasers first)
 
 - New /dashboard/campaigns (sidebar row, feature-gated via features.campaigns - ON for windchasers only): a chat where you describe who to reach in plain words. The brain (Claude tool loop) queries the brand's REAL leads - stage groups, course, user type, webinar flag, source, city, recency/inactivity windows - and answers with an audience card (reachable-on-WhatsApp count + sample names) plus the message: up to 3 matching Meta-APPROVED templates from the registry, or exactly two fresh drafts with {{variables}} when nothing fits. Multi-turn refinement works ("only Mumbai", "make it shorter").
