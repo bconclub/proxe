@@ -1,3 +1,10 @@
+## 2026-07-17 · feat(core): pipeline click-through actually filters the Leads list
+
+- Clicking any pipeline card/chevron now lands on /dashboard/leads WITH the stage applied. The Leads list expands ?stage=<value> to the stage's whole pipeline group (Qualified = Qualified + High Intent, Lost = Closed Lost/Lost/Cold/Not Qualified...) so the list matches the funnel count, and shows a removable chip named by ?stageLabel= (carries the brand's renamed key event). Previously the param was silently ignored - the pipeline deep link had never filtered anything.
+- Canonical group map moved to configs/lead-stages.ts (PIPELINE_STAGE_GROUPS) - pipeline page and LeadsTable read the same source.
+- User-facing: pipeline is now the navigation layer - tap New/Qualified/Lost/etc, get exactly those people.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(core): pipeline page trimmed to the pure one-screen funnel (v2 mock)
 
 - Pipeline page now matches the final mock exactly, nothing but the funnel at 100vh: header (brand mark + "Pipeline Overview" + subtitle), FOUR top cards (New/Engaged/Qualified/key event, each with its own color + 30d sparkline), KEY MILESTONE hero, post-key + exit rows, chevron flow. Chevron % is now each stage's share of ALL leads (was step conversion), and the % sits inside the chevron.

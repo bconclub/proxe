@@ -29,7 +29,7 @@ import {
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
-import { LEAD_STAGES, getStageColor as getStageColorShared } from '@/configs/lead-stages'
+import { LEAD_STAGES, getStageColor as getStageColorShared, pipelineGroupForStage } from '@/configs/lead-stages'
 
 // The legacy `status` taxonomy (New Lead / Follow Up / Wrong Enquiry…) is DEAD
 // — the column is null on every lead. The filter below now filters the STAGE
@@ -288,6 +288,14 @@ export default function LeadsTable({
   // Preset filter from URL: ?filter=engaged | warm
   const presetFilter = searchParams.get('filter') || 'all'
 
+  // Pipeline deep link: ?stage=<db value> filters to that stage's WHOLE
+  // pipeline group (Qualified + High Intent, all lost values…) so the list
+  // matches the funnel count. ?stageLabel= names the removable chip (the
+  // pipeline passes its display name, incl. a renamed key event).
+  const stageParam = searchParams.get('stage')
+  const stageLabelParam = searchParams.get('stageLabel')
+  const [urlStageActive, setUrlStageActive] = useState(true)
+
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -368,6 +376,10 @@ export default function LeadsTable({
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter((lead) => (lead.lead_stage || 'New') === statusFilter)
+    } else if (stageParam && urlStageActive) {
+      const group = pipelineGroupForStage(stageParam)
+      const vals = group ? group.values : [stageParam]
+      filtered = filtered.filter((lead) => vals.includes(lead.lead_stage || ''))
     }
 
     if (userTypeFilter !== 'all') {
@@ -448,7 +460,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, calculatedScores, webinarView, gigsView, showGigsTab])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, gigsView, showGigsTab])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -833,6 +845,18 @@ export default function LeadsTable({
                 ) : null
               })()}
 
+              {/* Pipeline deep-link chip — active ?stage= group filter, one tap to clear. */}
+              {stageParam && urlStageActive && statusFilter === 'all' && (
+                <button
+                  onClick={() => setUrlStageActive(false)}
+                  className="px-2.5 py-1 rounded-md text-[11px] font-semibold flex items-center gap-1"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)', color: 'var(--accent-primary)', border: 'none', cursor: 'pointer' }}
+                  title="Clear the pipeline stage filter"
+                >
+                  {stageLabelParam || pipelineGroupForStage(stageParam)?.label || stageParam}
+                  <span style={{ opacity: 0.6 }}>✕</span>
+                </button>
+              )}
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={filterClass} style={filterStyle}>
                 <option value="all">All stages</option>
                 {LEAD_STAGES.map((st) => (

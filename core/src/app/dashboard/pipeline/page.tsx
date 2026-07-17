@@ -10,23 +10,20 @@ import {
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { BRAND_ID, brandConfig } from '@/configs'
+import { PIPELINE_STAGE_GROUPS } from '@/configs/lead-stages'
 
-// Stage groups → the DB lead_stage values they roll up. 'High Intent' is a
-// LEGACY auto stage folded into Qualified; 'In Sequence' → New.
-const GROUPS = {
-  new: ['New', '', 'In Sequence'],
-  engaged: ['Engaged'],
-  qualified: ['Qualified', 'High Intent'],
-  keyEvent: ['Booking Made'],
-  demoDone: ['Call Done', 'Demo Done'],
-  offerMade: ['Proposal Sent', 'Offer Made'],
-  won: ['Closed Won', 'Converted', 'Won'],
-  noShow: ['No Show'],
-  parked: ['Parked'],
-  lost: ['Closed Lost', 'Lost', 'Cold', 'Not Qualified'],
-} as const
+// Stage groups → the DB lead_stage values they roll up ('High Intent' folds
+// into Qualified, 'In Sequence' → New…). Canonical map lives in
+// configs/lead-stages.ts so the Leads list expands deep links the same way.
+type GroupKey = 'new' | 'engaged' | 'qualified' | 'keyEvent' | 'demoDone' | 'offerMade' | 'won' | 'noShow' | 'parked' | 'lost'
 
-type GroupKey = keyof typeof GROUPS
+const GROUPS = Object.fromEntries(
+  PIPELINE_STAGE_GROUPS.map((g) => [g.key, g.values]),
+) as Record<GroupKey, string[]>
+
+const GROUP_LABELS = Object.fromEntries(
+  PIPELINE_STAGE_GROUPS.map((g) => [g.key, g.label]),
+) as Record<GroupKey, string>
 type Counts = Record<GroupKey, number> & { total: number }
 
 const BLUE = '#3B82F6', PURPLE = '#8b5cf6', INDIGO = '#6366f1', GREEN = '#22c55e', AMBER = '#f59e0b', GRAY = '#8a8a8a', RED = '#ef4444'
@@ -323,7 +320,12 @@ export default function PipelinePage() {
   )
 
   const qualToKey = pctNum(c.keyEvent, c.qualified)
-  const goStage = (key: GroupKey) => router.push(`/dashboard/leads?stage=${encodeURIComponent(GROUPS[key][0])}`)
+  // Deep link into the Leads list. stageLabel rides along so the list's chip
+  // shows the funnel's name for the group (incl. the brand's key event name).
+  const goStage = (key: GroupKey) => {
+    const label = key === 'keyEvent' ? keyEventLabel : GROUP_LABELS[key]
+    router.push(`/dashboard/leads?stage=${encodeURIComponent(GROUPS[key][0])}&stageLabel=${encodeURIComponent(label)}`)
+  }
 
   const brandMark = brandConfig.markPath || brandConfig.iconPath || '/logo.png'
 
