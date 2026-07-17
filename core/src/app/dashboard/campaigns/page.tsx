@@ -86,12 +86,25 @@ const GREEN = '#22c55e', AMBER = '#f59e0b', PURPLE = '#8b5cf6', BLUE = '#3b82f6'
 // The agent is PROXe everywhere — the product's assistant, brand-neutral.
 const ASSISTANT = 'PROXe'
 
-const SUGGESTIONS = [
-  { icon: <MdGroups size={15} />, text: 'Qualified pilot leads from last 30 days' },
-  { icon: <MdOutlineMarkEmailRead size={15} />, text: 'Webinar registrants who never replied' },
-  { icon: <MdHistory size={15} />, text: 'Re-engage leads inactive for 14+ days' },
-  { icon: <MdPersonOutline size={15} />, text: 'Cabin crew leads from Instagram' },
+// Smart-suggestion chips. Neutral defaults ship to every brand; a brand can
+// override with its own audience language via config.campaigns.suggestions —
+// shared core never hardcodes one brand's taxonomy (no-bleed rule).
+const DEFAULT_SUGGESTIONS = [
+  'Qualified leads from the last 30 days',
+  'Leads who never replied',
+  'Re-engage leads inactive for 14+ days',
+  'New leads from Instagram',
 ]
+const SUGGESTION_ICONS = [<MdGroups size={15} key="g" />, <MdOutlineMarkEmailRead size={15} key="m" />, <MdHistory size={15} key="h" />, <MdPersonOutline size={15} key="p" />]
+const SUGGESTIONS = (brandConfig.campaigns?.suggestions?.length ? brandConfig.campaigns.suggestions : DEFAULT_SUGGESTIONS)
+  .slice(0, 6)
+  .map((text, i) => ({ icon: SUGGESTION_ICONS[i % SUGGESTION_ICONS.length], text }))
+
+// Default personalization variables when no template is selected. Brand-config
+// driven; neutral fallback (name only) so no aviation "course" bleeds elsewhere.
+const DEFAULT_VARIABLES = brandConfig.campaigns?.variables?.length
+  ? brandConfig.campaigns.variables
+  : ['customer_name']
 
 const PLACEHOLDERS = [
   'Describe who you want to reach…',
@@ -590,8 +603,9 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
   })
 
   const variables = useMemo(() => {
+    // A picked template's own {{vars}} win; otherwise the brand's default set.
     const base = varsOf(selectedTpl)
-    const defaults = base.length > 0 ? base : ['customer_name', 'course', 'city']
+    const defaults = base.length > 0 ? base : DEFAULT_VARIABLES
     return [...new Set([...defaults, ...customVars])]
   }, [selectedTpl, customVars])
 

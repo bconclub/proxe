@@ -107,6 +107,14 @@ export interface BrandConfig {
   pipeline?: {
     keyEventLabel?: string;
   };
+  // Campaigns workspace CONTENT. Shared core must never hardcode a brand's
+  // audience taxonomy (pilot/cabin-crew…), so the smart-suggestion chips and
+  // the personalization variables come from here. Both fall back to neutral,
+  // brand-agnostic defaults — a brand only sets these to speak its own language.
+  campaigns?: {
+    suggestions?: string[];  // smart-suggestion chips (audience prompts in the brand's words)
+    variables?: string[];    // default personalization vars when no template is picked ({{name}} etc.)
+  };
   // Dashboard vocabulary overrides. The dashboard shell was written in
   // business-CRM English (Leads, High Intent, Booked Calls, Priority Lead
   // Queue…) — a brand whose audience isn't "sales leads" (e.g. pop = voters/
