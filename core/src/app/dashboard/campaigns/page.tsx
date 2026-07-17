@@ -83,7 +83,8 @@ interface SentCampaign {
 
 const GREEN = '#22c55e', AMBER = '#f59e0b', PURPLE = '#8b5cf6', BLUE = '#3b82f6', RED = '#ef4444'
 
-const ASSISTANT = brandConfig.labels?.['Campaign Assistant'] || `${brandConfig.name} AI`
+// The agent is PROXe everywhere — the product's assistant, brand-neutral.
+const ASSISTANT = 'PROXe'
 
 const SUGGESTIONS = [
   { icon: <MdGroups size={15} />, text: 'Qualified pilot leads from last 30 days' },
@@ -200,6 +201,209 @@ function TemplateCard({ t, selected, onSelect }: { t: Tpl; selected: boolean; on
     </button>
   )
 }
+
+// ─── Schedule picker — a calendar + sorted hour/minute/AM-PM columns ─────────
+// Value is a naive "YYYY-MM-DDTHH:mm" string (same shape as datetime-local) so
+// the rest of the page is unchanged.
+
+const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+function parseValue(v: string): { d: Date | null } {
+  if (!v) return { d: null }
+  const d = new Date(v)
+  return { d: isNaN(d.getTime()) ? null : d }
+}
+
+function fmtValue(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
+
+function fmtDisplay(v: string): string {
+  const { d } = parseValue(v)
+  if (!d) return ''
+  return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+// A vertical, sorted, scrollable column — the "sorted picker" columns.
+function WheelColumn({ items, value, onPick, width }: {
+  items: Array<{ label: string; value: number }>; value: number; onPick: (v: number) => void; width: number
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current?.querySelector('[data-active="true"]') as HTMLElement | null
+    el?.scrollIntoView({ block: 'center' })
+  }, [])
+  return (
+    <div ref={ref} className="overflow-y-auto py-1" style={{ width, maxHeight: 176, scrollbarWidth: 'thin' }}>
+      {items.map((it) => {
+        const active = it.value === value
+        return (
+          <button
+            key={it.value}
+            type="button"
+            data-active={active}
+            onClick={() => onPick(it.value)}
+            className="w-full text-center text-[13px] font-semibold rounded-md py-1.5 my-0.5 transition-colors"
+            style={{
+              background: active ? 'var(--accent-primary)' : 'transparent',
+              color: active ? 'var(--bg-primary)' : 'var(--text-secondary)',
+            }}
+          >
+            {it.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SchedulePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  const selected = parseValue(value).d
+  // Working state — defaults to the next round hour from now (stamped when opened).
+  const [draft, setDraft] = useState<Date | null>(selected)
+  const [viewYM, setViewYM] = useState<{ y: number; m: number }>(() => {
+    const base = selected || new Date()
+    return { y: base.getFullYear(), m: base.getMonth() }
+  })
+
+  useEffect(() => {
+    if (!open) return
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const openPicker = () => {
+    const base = selected || (() => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d })()
+    setDraft(base)
+    setViewYM({ y: base.getFullYear(), m: base.getMonth() })
+    setOpen(true)
+  }
+
+  const d = draft || new Date()
+  const hour12 = ((d.getHours() + 11) % 12) + 1
+  const isPM = d.getHours() >= 12
+
+  const setPart = (fn: (nd: Date) => void) => {
+    const nd = new Date(draft || new Date())
+    fn(nd)
+    setDraft(nd)
+  }
+
+  // Calendar grid for viewYM
+  const first = new Date(viewYM.y, viewYM.m, 1)
+  const startDow = first.getDay()
+  const daysInMonth = new Date(viewYM.y, viewYM.m + 1, 0).getDate()
+  const cells: Array<number | null> = [
+    ...Array(startDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ]
+  const today = new Date()
+  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
+  const hours = Array.from({ length: 12 }, (_, i) => ({ label: pad2(i + 1), value: i + 1 }))
+  const minutes = Array.from({ length: 12 }, (_, i) => ({ label: pad2(i * 5), value: i * 5 }))
+
+  return (
+    <div ref={wrapRef} className="ml-auto relative">
+      <button
+        type="button"
+        onClick={() => (open ? setOpen(false) : openPicker())}
+        className="flex items-center gap-1.5 text-[11.5px] font-semibold rounded-md border px-2 py-1"
+        style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', color: value ? 'var(--text-primary)' : 'var(--text-muted)' }}
+      >
+        <MdOutlineCalendarToday size={13} />
+        {value ? fmtDisplay(value) : 'Pick a time'}
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 z-50 mt-1.5 rounded-xl border shadow-xl p-3 flex gap-3"
+          style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', width: 360 }}
+        >
+          {/* Calendar */}
+          <div style={{ width: 210 }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[12.5px] font-bold" style={{ color: 'var(--text-primary)' }}>{MONTHS[viewYM.m]} {viewYM.y}</span>
+              <div className="flex gap-1">
+                <button type="button" onClick={() => setViewYM(({ y, m }) => m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 })} className="p-0.5 rounded" style={{ color: 'var(--text-secondary)' }}><MdChevronLeftIcon /></button>
+                <button type="button" onClick={() => setViewYM(({ y, m }) => m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 })} className="p-0.5 rounded" style={{ color: 'var(--text-secondary)' }}><MdChevronRightIcon /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-0.5 mb-1">
+              {DAY_LABELS.map((dl) => (
+                <div key={dl} className="text-center text-[10px] font-semibold" style={{ color: 'var(--text-muted)' }}>{dl}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5">
+              {cells.map((day, i) => {
+                if (day === null) return <div key={i} />
+                const cellDate = new Date(viewYM.y, viewYM.m, day)
+                const isToday = sameDay(cellDate, today)
+                const isSel = draft && sameDay(cellDate, draft)
+                const past = cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={past}
+                    onClick={() => setPart((nd) => { nd.setFullYear(viewYM.y, viewYM.m, day) })}
+                    className="text-center text-[11.5px] rounded-md py-1 transition-colors disabled:opacity-30"
+                    style={{
+                      background: isSel ? 'var(--accent-primary)' : 'transparent',
+                      color: isSel ? 'var(--bg-primary)' : isToday ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      fontWeight: isSel || isToday ? 700 : 500,
+                      cursor: past ? 'default' : 'pointer',
+                    }}
+                  >
+                    {day}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-2 text-[11px] font-semibold">
+              <button type="button" onClick={() => { setDraft(null); onChange(''); setOpen(false) }} style={{ color: 'var(--text-muted)' }}>Clear</button>
+              <button type="button" onClick={() => { const n = new Date(); n.setMinutes(0, 0, 0); n.setHours(n.getHours() + 1); setDraft(n); setViewYM({ y: n.getFullYear(), m: n.getMonth() }) }} style={{ color: 'var(--accent-primary)' }}>Soon</button>
+            </div>
+          </div>
+
+          {/* Sorted time columns */}
+          <div className="flex gap-1 border-l pl-2" style={{ borderColor: 'var(--border-primary)' }}>
+            <WheelColumn items={hours} value={hour12} width={40} onPick={(h) => setPart((nd) => nd.setHours((isPM ? 12 : 0) + (h % 12)))} />
+            <WheelColumn items={minutes} value={d.getMinutes() - (d.getMinutes() % 5)} width={40} onPick={(mn) => setPart((nd) => nd.setMinutes(mn))} />
+            <WheelColumn
+              items={[{ label: 'AM', value: 0 }, { label: 'PM', value: 1 }]}
+              value={isPM ? 1 : 0}
+              width={38}
+              onPick={(mer) => setPart((nd) => { const h = nd.getHours() % 12; nd.setHours(mer === 1 ? h + 12 : h) })}
+            />
+          </div>
+
+          {/* Confirm */}
+          <button
+            type="button"
+            onClick={() => { if (draft) onChange(fmtValue(draft)); setOpen(false) }}
+            className="absolute bottom-2 right-3 text-[11.5px] font-bold px-2.5 py-1 rounded-md"
+            style={{ background: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
+          >
+            Set
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Local chevron glyphs so the picker doesn't pull extra icon imports.
+function MdChevronLeftIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z" /></svg> }
+function MdChevronRightIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8.6 7.4 10 6l6 6-6 6-1.4-1.4L13.2 12z" /></svg> }
 
 // Two-segment reach donut — stroke-dasharray over pathLength (never degenerates).
 function ReachDonut({ pct }: { pct: number }) {
@@ -666,13 +870,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
             <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2.5" style={{ background: 'var(--bg-primary)' }}>
               <span style={{ color: 'var(--text-muted)' }}><MdOutlineCalendarToday size={16} /></span>
               <span className="text-[12px]" style={{ color: 'var(--text-secondary)' }}>Send time</span>
-              <input
-                type="datetime-local"
-                value={sendTime}
-                onChange={(e) => setSendTime(e.target.value)}
-                className="ml-auto text-[11.5px] rounded-md border px-1.5 py-1 outline-none"
-                style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)', color: sendTime ? 'var(--text-primary)' : 'var(--text-muted)' }}
-              />
+              <SchedulePicker value={sendTime} onChange={setSendTime} />
             </div>
           </div>
           <button

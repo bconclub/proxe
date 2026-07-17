@@ -28,10 +28,6 @@ export const windchasersConfig: BrandConfig = {
     leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
     campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
   },
-  // Dashboard vocabulary overrides (see BrandConfig.labels).
-  labels: {
-    'Campaign Assistant': 'Windy', // the Campaigns chat persona name
-  },
   // Brain content: the CORE COMMUNICATIONS checklist (Eval → Communications).
   // evalJourneys is deliberately omitted ('none') — the journeys bench renders
   // BCON's content, which is wrong-brand here.
