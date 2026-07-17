@@ -144,3 +144,5 @@ export const windchasersConfig: BrandConfig = {
 
 // one-core standard export — every brand pack exposes `brandConfig`.
 export const brandConfig = windchasersConfig;
+
+// redeploy trigger 2026-07-18: pick up WINDCHASERS_WEBINAR_SENDS_ENABLED env
