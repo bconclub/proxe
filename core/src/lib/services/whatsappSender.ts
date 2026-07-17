@@ -700,9 +700,15 @@ export async function sendWebinarConfirmParents(
 }
 
 /**
- * Pre-webinar reminder (fired by /api/cron/webinar-reminder).
- * Template: windchasers_webinar_reminder_v1 — NAMED params:
+ * Pre-webinar reminder (fired by /api/cron/webinar-reminder). NAMED params:
  *   customer_name · webinar_name · when (e.g. "tomorrow at 5:00 PM" / "in 2 hours")
+ *
+ * Prefers windchasers_webinar_reminder_v2, which adds a "Join WhatsApp Group"
+ * quick-reply — tapping it hits the Meta webhook, which replies the webinar
+ * group link (see api/agent/whatsapp/meta), so anyone who missed the group can
+ * still get in. Falls back to the button-less (already approved) v1 if v2 isn't
+ * approved yet. Both share the same body params; a static quick-reply needs no
+ * button component when sending. A 4xx on v2 sends nothing, so no double message.
  */
 export async function sendWebinarReminder(
   to: string,
@@ -712,16 +718,19 @@ export async function sendWebinarReminder(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_webinar_reminder_v1', [
+  const components = [
     {
-      type: 'body',
+      type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
         { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
         { type: 'text', parameter_name: 'when', text: when },
       ],
     },
-  ])
+  ]
+  const res = await sendWhatsAppTemplate(to, 'windchasers_webinar_reminder_v2', components)
+  if (!res.success) return sendWhatsAppTemplate(to, 'windchasers_webinar_reminder_v1', components)
+  return res
 }
 
 /**
