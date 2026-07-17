@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MdCampaign, MdSend, MdPersonOutline, MdEdit,
-  MdDeleteOutline, MdSearch, MdAutoAwesome, MdSmartToy,
+  MdDeleteOutline, MdSearch, MdAutoAwesome, MdReplay,
   MdOutlineMarkEmailRead, MdOutlineVisibility, MdOutlineAdsClick,
   MdMoreVert, MdExpandLess, MdAttachFile, MdMicNone, MdWhatsapp,
   MdChevronRight, MdOutlineCalendarToday, MdOutlineArticle, MdAdd,
@@ -90,12 +90,13 @@ const ASSISTANT = 'PROXe'
 // override with its own audience language via config.campaigns.suggestions —
 // shared core never hardcodes one brand's taxonomy (no-bleed rule).
 const DEFAULT_SUGGESTIONS = [
-  'Qualified leads from the last 30 days',
-  'Leads who never replied',
-  'Re-engage leads inactive for 14+ days',
-  'New leads from Instagram',
+  'Reach people who replied once but never connected',
+  'Re-engage leads who went quiet for 14+ days',
+  'High-intent leads who never converted',
+  'Follow up with everyone from the last 7 days',
+  'Win back leads marked lost this month',
 ]
-const SUGGESTION_ICONS = [<MdGroups size={15} key="g" />, <MdOutlineMarkEmailRead size={15} key="m" />, <MdHistory size={15} key="h" />, <MdPersonOutline size={15} key="p" />]
+const SUGGESTION_ICONS = [<MdReplay size={15} key="r" />, <MdHistory size={15} key="h" />, <MdGroups size={15} key="g" />, <MdOutlineMarkEmailRead size={15} key="m" />, <MdPersonOutline size={15} key="p" />]
 const SUGGESTIONS = (brandConfig.campaigns?.suggestions?.length ? brandConfig.campaigns.suggestions : DEFAULT_SUGGESTIONS)
   .slice(0, 6)
   .map((text, i) => ({ icon: SUGGESTION_ICONS[i % SUGGESTION_ICONS.length], text }))
@@ -418,6 +419,23 @@ function SchedulePicker({ value, onChange }: { value: string; onChange: (v: stri
 function MdChevronLeftIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z" /></svg> }
 function MdChevronRightIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8.6 7.4 10 6l6 6-6 6-1.4-1.4L13.2 12z" /></svg> }
 
+// PROXe agent mark — the "cycle": an orbit ring with an accent node, in the
+// brand accent. Used as the assistant avatar (the agent is PROXe, not a robot).
+function ProxeMark({ size = 30 }: { size?: number }) {
+  return (
+    <span
+      className="flex items-center justify-center rounded-full shrink-0"
+      style={{ width: size, height: size, background: `color-mix(in srgb, var(--accent-primary) 16%, transparent)` }}
+    >
+      <svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8.5" stroke="var(--accent-primary)" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="34 12" />
+        <circle cx="12" cy="3.5" r="2.4" fill="var(--accent-primary)" />
+        <circle cx="12" cy="12" r="2.6" fill="var(--accent-primary)" />
+      </svg>
+    </span>
+  )
+}
+
 // Two-segment reach donut — stroke-dasharray over pathLength (never degenerates).
 function ReachDonut({ pct }: { pct: number }) {
   const p = Math.max(0, Math.min(100, pct))
@@ -588,7 +606,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d?.error || 'Save failed')
-      setSavedMsg(`Saved "${d.campaign.name}" as ${d.campaign.status}. Sending is not wired yet — nobody gets messaged.`)
+      setSavedMsg(`Saved "${d.campaign.name}" as ${d.campaign.status}. Sending is not wired yet, nobody gets messaged.`)
       setTimeout(onSaved, 1600)
     } catch (e: any) {
       setError(e.message)
@@ -651,10 +669,10 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
           {/* Assistant intro — always first */}
           <div className="flex gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdSmartToy size={18} /></span>
+            <ProxeMark size={36} />
             <div className="max-w-[80%]">
               <div className="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-line" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
-                {`Hi, I'm ${ASSISTANT} — your AI campaign assistant.\nLet's build a campaign that gets results. Tell me who you want to reach, where you want to reach them, and what you want to achieve. I'll handle the rest.`}
+                {`Hi, I'm ${ASSISTANT}, your AI campaign assistant.\nLet's build a campaign that gets results. Tell me who you want to reach, where you want to reach them, and what you want to achieve. I'll handle the rest.`}
               </div>
               <div className="text-[10px] mt-1 ml-1" style={{ color: 'var(--text-muted)' }}>{fmtTime(introAt)}</div>
             </div>
@@ -675,7 +693,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
               </div>
             ) : (
               <div key={i} className="flex gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full shrink-0" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdSmartToy size={18} /></span>
+                <ProxeMark size={36} />
                 <div className="max-w-[85%] min-w-0 flex-1 space-y-2.5">
                   <div className="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-[13px] leading-relaxed inline-block" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
                     {m.content}
