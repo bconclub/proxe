@@ -1,5 +1,6 @@
 /**
- * POST /api/dashboard/report-issue
+ * POST /api/dashboard/report-issue — store a teammate's issue report
+ * GET  /api/dashboard/report-issue — list this brand's reports (Support page)
  *
  * Stores a teammate's issue report (screenshots + description + auto-context)
  * in the brand's OWN Supabase storage — private bucket `issue-reports`, one
@@ -11,7 +12,8 @@
  * Deliberately bucket-only (no table): the bucket is created on demand via the
  * storage API with the service key, so every brand gets this with ZERO SQL
  * migrations. HQ aggregates all brands' buckets into the issues vault with
- * scripts/issues-sync/pull-issues.mjs.
+ * scripts/issues-sync/pull-issues.mjs; the sync writes status/fix back into
+ * report.json, so the GET below shows the live lifecycle too.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -30,6 +32,77 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
   'image/gif': 'gif',
+}
+
+// Newest N months scanned + hard cap on reports returned — the Support page is
+// a recent-history surface, not an archive browser.
+const MAX_MONTHS = 6
+const MAX_REPORTS = 200
+const SIGNED_URL_TTL = 60 * 60 // 1h — page refetch re-signs
+
+export async function GET() {
+  try {
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServiceClient()
+    if (!supabase) {
+      return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 })
+    }
+
+    const store = supabase.storage.from(BUCKET)
+
+    // Month folders, newest first. A brand with no reports yet has no bucket —
+    // that's an empty list, not an error.
+    const { data: months, error: monthsErr } = await store.list('', { limit: 100 })
+    if (monthsErr) {
+      if (/bucket.*not.*found/i.test(monthsErr.message)) {
+        return NextResponse.json({ issues: [] })
+      }
+      throw new Error(monthsErr.message)
+    }
+    const monthNames = (months || [])
+      .map((m) => m.name)
+      .filter((n) => /^\d{4}-\d{2}$/.test(n))
+      .sort()
+      .reverse()
+      .slice(0, MAX_MONTHS)
+
+    const issues: any[] = []
+    for (const month of monthNames) {
+      if (issues.length >= MAX_REPORTS) break
+      const { data: folders } = await store.list(month, { limit: 500 })
+      const ids = (folders || []).map((f) => f.name).filter((n) => n.startsWith('ISS-'))
+      const monthIssues = await Promise.all(ids.map(async (id) => {
+        try {
+          const path = `${month}/${id}`
+          const { data: blob, error } = await store.download(`${path}/report.json`)
+          if (error || !blob) return null
+          const report = JSON.parse(await blob.text())
+          // Signed URLs so the (private) screenshots render in the page.
+          const shots: Array<{ name: string; url: string }> = []
+          for (const name of report.screenshots || []) {
+            const { data: signed } = await store.createSignedUrl(`${path}/${name}`, SIGNED_URL_TTL)
+            if (signed?.signedUrl) shots.push({ name, url: signed.signedUrl })
+          }
+          return { ...report, screenshot_urls: shots }
+        } catch { return null }
+      }))
+      issues.push(...monthIssues.filter(Boolean))
+    }
+
+    issues.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
+    return NextResponse.json({ issues: issues.slice(0, MAX_REPORTS) })
+  } catch (error) {
+    console.error('[report-issue] list failed:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 },
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
