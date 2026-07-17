@@ -1,3 +1,12 @@
+## 2026-07-17 · feat(windchasers): Campaigns = the AI campaign workspace (1:1 with the reference structure)
+
+- Campaigns now opens the two-column workspace: chat on the left (assistant intro from the brand's campaign persona - "Windy" on windchasers, editable campaign name, Channel: WhatsApp header, plan summary card with Audience detected / Channel / Goal chips, smart-suggestion chips, rotating-placeholder input bar with attach/mic affordances + disclaimer line), and a right rail with Templates (Approved/Draft/Reminder/Nudge/Promo filter pills, live registry + chat drafts via new GET /api/dashboard/campaigns/templates), Audience summary (estimated reach + reach donut, real WhatsApp-reachable split), Campaign setup (channel/template/send-time rows + Review & Schedule Campaign), and Personalization variables ({{vars}} from the selected template, custom add).
+- Review & Schedule saves the campaign as ready with scheduled_at + channel (store extended); sending remains un-wired and says so.
+- Chat brain also returns a "goal" line for the plan card. windchasers config: labels['Campaign Assistant'] = Windy.
+- Header buttons: Create Campaign (fresh workspace) / Previous Campaigns (the overview list with stat cards + campaign table from earlier today).
+- Brand theme tokens throughout; the reference mock's colors were not copied.
+- `(pending-sha)`
+
 ## 2026-07-17 · feat(windchasers): Campaigns page restructured - overview first, builder behind New campaign
 
 - Campaigns now lands on the overview: header with search (Cmd+K) + accent "New campaign" button, status pills (Live / Scheduled / Pending / Completed / All), four aggregate stat cards (Sent, Delivered + delivery rate, Read + read rate, Clicked + click rate - real numbers from the message log, no fabricated trends), and a campaign table (channel badge, target line, status dot + since-date, delivered % bar, read / clicked counts, updated, per-send breakdown on click, delete for planned rows).
