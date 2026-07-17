@@ -47,9 +47,11 @@ export async function GET(req: NextRequest) {
   const now = Date.now()
   const results = { checked: 0, sent24h: 0, sent2h: 0, nudged: 0, skipped: 0, errors: 0 }
   const log: string[] = []
-  // Public Zoom registration page for the not-registered nudge. Unset → the
-  // nudge segment stays dormant (leads are skipped, never messaged linkless).
-  const registerUrl = process.env.WINDCHASERS_WEBINAR_REGISTER_URL || ''
+  // Public Zoom registration page for the not-registered nudge. The nudge's v2
+  // template carries this as a "Complete Registration" URL button; this value is
+  // only used by the v1 fallback (body-embed) if v2 isn't approved. Env overrides
+  // the baked-in default so the link can change without a redeploy.
+  const registerUrl = process.env.WINDCHASERS_WEBINAR_REGISTER_URL || 'https://us06web.zoom.us/meeting/register/JGMzDhBqTJC635lNAhxx5w'
 
   const { data: registrants, error: queryErr } = await supabase
     .from('all_leads')

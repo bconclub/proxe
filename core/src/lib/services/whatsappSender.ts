@@ -734,12 +734,13 @@ export async function sendWebinarReminder(
  * but never finished Zoom registration (so they hold no join link). Fired by
  * /api/cron/webinar-reminder for the not-registered segment.
  *
- * Template: windchasers_webinar_register_nudge_v1 — NAMED params:
- *   customer_name · webinar_name · register_url (the public Zoom register page)
- *
- * Dormant until BOTH exist: the template is approved in Meta AND the register
- * URL is configured (WINDCHASERS_WEBINAR_REGISTER_URL). Until then the cron
- * skips the send (no URL) or Meta 4xx's it (no template) — nothing goes out.
+ * Prefers windchasers_webinar_register_nudge_v2: body + a "Complete Registration"
+ * URL button (direct to the Zoom register page) and a "Join WhatsApp Group"
+ * quick-reply (tap → Meta webhook replies the group link). Static buttons need
+ * no send-time component. Falls back to the body-embed v1 (which carries the
+ * register_url in its text) if v2 isn't approved yet. NAMED params:
+ *   v2: customer_name · webinar_name    v1: + register_url
+ * A 4xx on v2 sends nothing, so there's no double message.
  */
 export async function sendWebinarRegisterNudge(
   to: string,
@@ -749,12 +750,23 @@ export async function sendWebinarRegisterNudge(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
+  const wname = webinarName || 'our webinar'
+  const v2 = await sendWhatsAppTemplate(to, 'windchasers_webinar_register_nudge_v2', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'webinar_name', text: wname },
+      ],
+    },
+  ])
+  if (v2.success) return v2
   return sendWhatsAppTemplate(to, 'windchasers_webinar_register_nudge_v1', [
     {
       type: 'body',
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
-        { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
+        { type: 'text', parameter_name: 'webinar_name', text: wname },
         { type: 'text', parameter_name: 'register_url', text: registerUrl },
       ],
     },
