@@ -745,20 +745,21 @@ export async function sendWebinarStartingSoon(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  const components = [
+  // v3 = clean copy (no em dash) with a "Join webinar" URL button pointing at the
+  // working registration link. The per-person zoom_join_url tokens are broken
+  // (they land on Zoom's generic Join page), so joinUrl is intentionally NOT used.
+  // No fallback to v1/v2 — those embed the broken join token in the body, so a
+  // miss here sends nothing rather than a dead link.
+  void joinUrl
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v3', [
     {
       type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
         { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
-        { type: 'text', parameter_name: 'join_url', text: joinUrl },
       ],
     },
-  ]
-  // v2 = clean copy (no em dash); fall back to the approved v1 if v2 isn't approved yet.
-  const res = await sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v2', components)
-  if (!res.success) return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v1', components)
-  return res
+  ])
 }
 
 export async function sendWebinarLiveNow(
@@ -766,19 +767,18 @@ export async function sendWebinarLiveNow(
 ): Promise<{ success: boolean; error?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  const components = [
+  // v3: clean copy + "Join webinar" URL button (working registration link). The
+  // per-person join tokens are broken, so joinUrl is not used; no v1/v2 fallback.
+  void joinUrl
+  return sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v3', [
     {
       type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
         { type: 'text', parameter_name: 'webinar_name', text: webinarName || 'our webinar' },
-        { type: 'text', parameter_name: 'join_url', text: joinUrl },
       ],
     },
-  ]
-  const res = await sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v2', components)
-  if (!res.success) return sendWhatsAppTemplate(to, 'windchasers_webinar_live_now_v1', components)
-  return res
+  ])
 }
 
 /**
