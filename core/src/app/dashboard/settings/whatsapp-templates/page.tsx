@@ -44,6 +44,64 @@ function statusTint(s: string): { bg: string; color: string; icon: any; label: s
   return { bg: 'rgba(245,158,11,.13)', color: '#f59e0b', icon: MdSchedule, label: u ? u.charAt(0) + u.slice(1).toLowerCase() : 'Pending' }
 }
 
+// Meta quality rating → color + words.
+function qualityTint(q: string | null): { color: string; label: string } {
+  const u = (q || '').toUpperCase()
+  if (u === 'GREEN') return { color: '#22c55e', label: 'High' }
+  if (u === 'YELLOW') return { color: '#f59e0b', label: 'Medium' }
+  if (u === 'RED') return { color: '#ef4444', label: 'Low' }
+  return { color: 'var(--text-muted)', label: q ? q : 'Unknown' }
+}
+
+// The WhatsApp health header: quality rating, messaging tier, and send volume.
+function WhatsAppOverview({ overview, templateCount }: { overview: any; templateCount: number }) {
+  if (overview && overview.connected === false) {
+    return (
+      <div className="mb-6 rounded-xl border p-4 text-sm" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)', color: 'var(--text-secondary)' }}>
+        {overview.metaError || 'WhatsApp status is unavailable.'} Templates below still load from Meta.
+      </div>
+    )
+  }
+  const q = qualityTint(overview?.quality ?? null)
+  const cards = [
+    {
+      key: 'quality', label: 'Quality rating',
+      value: overview ? q.label : '…', valueColor: overview ? q.color : 'var(--text-muted)',
+      sub: overview?.quality ? `Meta rates this number ${String(overview.quality).toLowerCase()}` : 'From Meta',
+      dot: overview?.quality ? q.color : null,
+    },
+    {
+      key: 'tier', label: 'Messaging tier',
+      value: overview?.tier?.label || '—', valueColor: 'var(--text-primary)',
+      sub: overview?.tier?.cap ? `Up to ${overview.tier.cap}` : 'Business-initiated limit',
+    },
+    {
+      key: 'sent30', label: 'Sent · 30 days',
+      value: overview?.sent30 != null ? overview.sent30.toLocaleString() : '—', valueColor: 'var(--text-primary)',
+      sub: overview?.sent7 != null ? `${overview.sent7.toLocaleString()} in the last 7 days` : 'Template + session messages',
+    },
+    {
+      key: 'templates', label: 'Templates',
+      value: String(templateCount), valueColor: 'var(--text-primary)',
+      sub: 'Created on this number',
+    },
+  ]
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      {cards.map((c) => (
+        <div key={c.key} className="rounded-xl border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+          <div className="text-[11px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>{c.label}</div>
+          <div className="text-2xl font-bold leading-tight flex items-center gap-2" style={{ color: c.valueColor }}>
+            {c.dot && <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: c.dot }} />}
+            {c.value}
+          </div>
+          <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{c.sub}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function WhatsAppTemplatesPage() {
   const [list, setList] = useState<MetaTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,6 +125,8 @@ export default function WhatsAppTemplatesPage() {
   const [submitOk, setSubmitOk] = useState<string | null>(null)
   const [sentPayload, setSentPayload] = useState<any>(null) // exact payload Meta received (verification)
 
+  const [overview, setOverview] = useState<any>(null)
+
   const load = useCallback(async () => {
     setLoading(true); setLoadError(null)
     try {
@@ -81,7 +141,14 @@ export default function WhatsAppTemplatesPage() {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { load() }, [load])
+  const loadOverview = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/whatsapp/overview')
+      const data = await res.json()
+      if (res.ok) setOverview(data)
+    } catch { /* header degrades gracefully */ }
+  }, [])
+  useEffect(() => { load(); loadOverview() }, [load, loadOverview])
 
   // AUTO-DETECT the variable style from what's actually typed, so the sample
   // fields always match. (Bug: a Number-mode default + a named {{customer_name}}
@@ -247,10 +314,10 @@ export default function WhatsAppTemplatesPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
         <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-          <MdWhatsapp style={{ color: '#25D366' }} /> WhatsApp Message Templates
+          <MdWhatsapp style={{ color: '#25D366' }} /> WhatsApp
         </h1>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>
+          <button onClick={() => { load(); loadOverview() }} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>
             <MdRefresh size={15} /> Refresh
           </button>
           <button onClick={() => { resetForm(); setComposerOpen((v) => !v) }} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold" style={ctaStyle}>
@@ -259,8 +326,12 @@ export default function WhatsAppTemplatesPage() {
         </div>
       </div>
       <p className="text-sm mb-5" style={{ color: 'var(--text-secondary)' }}>
-        Create and submit message templates straight to Meta for approval{phone?.verifiedName ? ` · ${phone.verifiedName}${phone.displayNumber ? ` (${phone.displayNumber})` : ''}` : ''}.
+        Your number's health and messaging limits, plus every message template{phone?.verifiedName ? ` · ${phone.verifiedName}${phone.displayNumber ? ` (${phone.displayNumber})` : ''}` : ''}.
       </p>
+
+      <WhatsAppOverview overview={overview} templateCount={list.length} />
+
+      <h2 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>Message templates</h2>
 
       {submitOk && <div className="mb-3 rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ background: 'rgba(34,197,94,.12)', color: '#22c55e' }}><MdCheckCircle size={18} /> {submitOk}</div>}
 

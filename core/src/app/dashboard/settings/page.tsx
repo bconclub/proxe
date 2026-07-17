@@ -44,8 +44,8 @@ export default function SettingsPage() {
       icon: <MdGridView size={22} />, color: '#22c55e',
     },
     {
-      href: '/dashboard/settings/whatsapp-templates', title: 'WhatsApp Templates',
-      desc: 'Create and submit message templates to Meta for approval, and track status.',
+      href: '/dashboard/settings/whatsapp-templates', title: 'WhatsApp',
+      desc: 'Number health, quality rating, messaging tier and send volume, plus message templates.',
       icon: <MdOutlineForum size={22} />, color: '#25d366',
     },
     {
