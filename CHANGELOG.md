@@ -1,3 +1,11 @@
+## 2026-07-18 · fix(core): Campaigns personalization from real WhatsApp templates + em-dash sweep
+
+- Personalization variables now reflect the variables the brand ACTUALLY uses in its WhatsApp templates: the union of {{vars}} across every loaded template (approved registry + drafts) shows when no single template is picked, instead of a hardcoded guess. Windchasers shows its real set ({{customer_name}}, {{date}}, {{parent_name}}, {{time}}, {{topic}}, {{tier}}...); brands with no template registry fall back to {{customer_name}}.
+- Campaign brain instructed to reuse ONLY the brand's existing template variables (never invent new ones like {{course_name}}) and to NEVER emit em dashes or en dashes in messages, drafts, footers or goals.
+- Swept the remaining em dashes from the workspace UI (attach/voice tooltips, audience-summary empty state); the intro + save toast were already comma'd in v0.2.48.
+- Agent avatar stays the PROXe cycle mark (no dedicated PROXe logo asset exists in the repo; the proxe brand config itself notes this).
+- `(pending-sha)`
+
 ## 2026-07-18 · feat(core): sidebar reorder + Campaigns agent polish
 
 - Sidebar reordered to the founder's set: Overview, Leads, Chats, Calls (voice-gated), Pipeline, Key Events, Flow, Campaigns, Humans, Agents, Knowledge, Configure. "Events" renamed "Key Events" (route unchanged). Tasks dropped from the nav (page still reachable by URL). Scouts/War Room stay feature-gated. Dividers realigned.
