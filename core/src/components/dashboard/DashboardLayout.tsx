@@ -59,25 +59,27 @@ interface NavItem {
   children?: NavItem[]
 }
 
-// Navigation items in order
+// Navigation items in order (founder-set 2026-07-18):
+// Overview · Leads · Chats · [Calls] · Pipeline · Key Events · Flow · Campaigns
+// · Humans · Agents · Knowledge · Configure. Tasks dropped from the sidebar.
+// Calls/Scouts/War Room stay feature-gated (only render where their flag is on).
 const navigation: NavItem[] = [
   // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
+  // Calls — voice-gated; kept wherever Voice is on.
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
-  // Scouts (lokazen = "Gigs") sits directly under Pipeline; feature-gated per brand.
+  // Scouts (lokazen = "Gigs") — feature-gated per brand.
   { name: 'Scouts', href: '/dashboard/scouts', icon: MdHandshake },
-  // War Room (pop) — the constituency map. Feature-gated; first-class nav for
-  // the campaign brand instead of hiding in the profile dropdown.
+  // War Room (pop) — the constituency map. Feature-gated.
   { name: 'War Room', href: '/war-room', icon: MdMap },
+  // OPERATIONS — Events renamed "Key Events" (route unchanged).
+  { name: 'Key Events', href: '/dashboard/bookings', icon: MdCalendarToday },
+  { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
   // Campaigns — chat-driven campaign builder; feature-gated per brand.
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: MdCampaign },
-  // OPERATIONS
-  { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
-  { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
-  { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
   // SYSTEM — Humans (the team) sits before Agents; POP folds Agent Tasks into
   // the Agents page, so it's not a separate row there.
   { name: 'Humans', href: '/dashboard/humans', icon: MdPeople },
@@ -93,11 +95,11 @@ const ARTIFACT_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
 }
 const PINS_KEY = 'artifact-pins'
 
-// Divider positions: after War Room (index 6), after Flow (index 9).
-// Calls/Scouts/War Room are feature-gated per brand; their array slots are
-// counted here so the dividers land in the same rendered position whether or
-// not they are shown.
-const DIVIDER_AFTER_INDICES = [6, 10] // Campaigns insert shifted OPERATIONS by one
+// Divider positions: after War Room (index 6) splits PRIMARY from OPERATIONS,
+// after Campaigns (index 9) splits OPERATIONS from SYSTEM. Calls/Scouts/War Room
+// are feature-gated per brand; their array slots are counted here so the
+// dividers land in the same rendered position whether or not they are shown.
+const DIVIDER_AFTER_INDICES = [6, 9]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()

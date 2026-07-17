@@ -1,3 +1,12 @@
+## 2026-07-18 · feat(core): sidebar reorder + Campaigns agent polish
+
+- Sidebar reordered to the founder's set: Overview, Leads, Chats, Calls (voice-gated), Pipeline, Key Events, Flow, Campaigns, Humans, Agents, Knowledge, Configure. "Events" renamed "Key Events" (route unchanged). Tasks dropped from the nav (page still reachable by URL). Scouts/War Room stay feature-gated. Dividers realigned.
+- Campaigns chat agent = a PROXe "cycle" mark (accent orbit ring + node) instead of the generic robot face; the agent is PROXe everywhere.
+- Killed the em-dash in the campaign intro + save toast (comma) per the no-dash rule.
+- Smart suggestions are now campaign-strategy prompts (neutral, brand-agnostic): "Reach people who replied once but never connected", "Win back leads marked lost this month", etc. Brands still override via config.campaigns.suggestions.
+- User-facing: cleaner sidebar, PROXe agent identity in Campaigns, sharper suggestion prompts.
+- `(pending-sha)`
+
 ## 2026-07-17 · fix(core): Campaigns no-bleed - brand-owned smart suggestions + personalization vars
 
 - The Campaigns workspace no longer bleeds Windchasers aviation content into other brands. Smart-suggestion chips and the default personalization variables now come from config.campaigns.{suggestions,variables}; shared core ships NEUTRAL defaults (generic "Qualified leads from last 30 days" etc + {{customer_name}} only). Windchasers keeps its pilot/cabin-crew prompts + {{course}}/{{city}} vars via its own config.
