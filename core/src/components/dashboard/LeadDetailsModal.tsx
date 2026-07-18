@@ -2437,6 +2437,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               otherDetails || null,
                             ].filter(Boolean).join('\n')
                             const listingUrl = lkz.listing_url || lkz.property_url || (lkz.property_id ? `https://lokazen.in/property/${lkz.property_id}` : null)
+                            // Website-origin owners already HAVE a listing -> action is
+                            // "View listing". Only WhatsApp/chat-direct owners (typed
+                            // details in, no listing yet) get "Push to Lokazen".
+                            const cameFromWebsite = /\b(web|form|website)\b/i.test(String(currentLead.first_touchpoint || (currentLead.unified_context as any)?.attribution?.first_touch || ''))
+                            const isListed = !!listingUrl || cameFromWebsite
+                            const listingHref = listingUrl || 'https://lokazen.in/properties'
                             const imgs = Array.isArray(lkz.property_images) ? lkz.property_images : []
                             return (
                           <div
@@ -2526,12 +2532,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No photos uploaded yet.</p>
                                     )}
                                   </div>
-                                  {listingUrl && (
-                                    <a href={listingUrl} target="_blank" rel="noopener noreferrer"
-                                      className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg flex-shrink-0 transition-all hover:opacity-90" style={{ border: `1px solid ${accentBorder}`, color: 'var(--text-primary)' }}>
-                                      View listing <MdOpenInNew size={12} style={{ color: BRAND_ACCENT }} />
-                                    </a>
-                                  )}
                                 </div>
                                 {imgs.length > 0 ? (
                                   <div className="flex flex-wrap gap-2">
@@ -2555,27 +2555,40 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                             </div>
 
-                            {/* Push to Lokazen */}
-                            <button
-                              type="button"
-                              disabled={pushingListing === 'pushing'}
-                              onClick={async () => {
-                                setPushingListing('pushing');
-                                try {
-                                  const r = await fetch(`/api/dashboard/leads/${currentLead.id}/push-to-lokazen`, { method: 'POST' });
-                                  const j = await r.json();
-                                  setPushingListing(r.ok && j?.success ? 'done' : 'error');
-                                } catch { setPushingListing('error'); }
-                              }}
-                              className="w-full mt-4 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                              style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : BRAND_ACCENT, color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
-                            >
-                              {pushingListing !== 'done' && pushingListing !== 'pushing' && <MdFileUpload size={18} />}
-                              {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
-                                : pushingListing === 'done' ? '✓ Listed on Lokazen'
-                                : pushingListing === 'error' ? 'Failed, tap to retry'
-                                : 'Push to Lokazen'}
-                            </button>
+                            {/* Listed (came from the website) -> View listing.
+                                Not listed (WhatsApp/chat-direct) -> Push to Lokazen. */}
+                            {isListed ? (
+                              <a
+                                href={listingHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full mt-4 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 hover:opacity-90"
+                                style={{ background: BRAND_ACCENT, color: '#fff' }}
+                              >
+                                <MdOpenInNew size={18} /> View listing
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={pushingListing === 'pushing'}
+                                onClick={async () => {
+                                  setPushingListing('pushing');
+                                  try {
+                                    const r = await fetch(`/api/dashboard/leads/${currentLead.id}/push-to-lokazen`, { method: 'POST' });
+                                    const j = await r.json();
+                                    setPushingListing(r.ok && j?.success ? 'done' : 'error');
+                                  } catch { setPushingListing('error'); }
+                                }}
+                                className="w-full mt-4 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                style={{ background: pushingListing === 'done' ? 'rgba(16,185,129,0.15)' : BRAND_ACCENT, color: pushingListing === 'done' ? '#10b981' : '#fff', border: pushingListing === 'done' ? '1px solid #10b981' : 'none' }}
+                              >
+                                {pushingListing !== 'done' && pushingListing !== 'pushing' && <MdFileUpload size={18} />}
+                                {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
+                                  : pushingListing === 'done' ? '✓ Listed on Lokazen'
+                                  : pushingListing === 'error' ? 'Failed, tap to retry'
+                                  : 'Push to Lokazen'}
+                              </button>
+                            )}
                           </div>
                             )
                           })()}
