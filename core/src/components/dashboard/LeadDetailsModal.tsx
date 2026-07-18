@@ -2697,6 +2697,42 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       >
                         Webinar{wc.webinar_name ? ` · ${wc.webinar_name}` : ''}{wc.webinar_date ? ` · ${wc.webinar_date}` : ''}
                       </span>
+                      {/* Attendance (matched from the Zoom report after the event):
+                          green "Attended · N min" if they showed up, else blue
+                          "Registered", else a muted "Registration incomplete". */}
+                      {(() => {
+                        if (wc.zoom_attended) {
+                          const mins = Number(wc.zoom_attended_minutes)
+                          const when = wc.zoom_attended_at
+                            ? new Date(wc.zoom_attended_at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+                            : ''
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: 'rgba(22,163,74,0.18)', color: '#22c55e', border: '1px solid rgba(22,163,74,0.4)' }}
+                              title={when ? `Joined at ${when} IST` : 'Attended the webinar'}
+                            >
+                              <span aria-hidden="true">✓</span> Attended{mins > 0 ? ` · ${mins} min` : ''}{when ? ` · joined ${when}` : ''}
+                            </span>
+                          )
+                        }
+                        if (wc.zoom_registered) {
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
+                              title="Completed Zoom registration"
+                            >
+                              <span aria-hidden="true">✓</span> Registered
+                            </span>
+                          )
+                        }
+                        return (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ color: 'var(--text-muted)', border: '1px solid var(--border-primary)' }}>
+                            Registration incomplete
+                          </span>
+                        )
+                      })()}
                       <button
                         onClick={async () => {
                           if (movingToLeads) return
