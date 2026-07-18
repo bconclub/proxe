@@ -2243,12 +2243,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               const accentSoft = `color-mix(in srgb, ${BRAND_ACCENT} 14%, transparent)`
                               const accentBorder = `color-mix(in srgb, ${BRAND_ACCENT} 40%, transparent)`
                               const tileBg = 'color-mix(in srgb, var(--text-primary) 4%, transparent)'
+                              // Two headline tiles (Size needed, Budget), parallel to the
+                              // owner modal. Outlets / Format fold into Other details.
                               const tiles = ([
-                                { icon: MdApartment, label: 'Outlets', value: lkz.current_outlets },
                                 { icon: MdSquareFoot, label: 'Size needed', value: sizeNeeded },
                                 { icon: MdCurrencyRupee, label: 'Budget', value: lkz.budget_monthly_rent },
-                                { icon: MdBusinessCenter, label: 'Format', value: lkz.preferred_format },
                               ] as Array<{ icon: any; label: string; value: any }>).filter((t) => !!t.value)
+                              const brandOtherFull = [
+                                lkz.current_outlets ? `Current outlets: ${lkz.current_outlets}` : null,
+                                lkz.preferred_format ? `Format: ${lkz.preferred_format}` : null,
+                                brandOther || null,
+                              ].filter(Boolean).join('\n')
                               return (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
@@ -2310,16 +2315,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   )}
 
-                                  {areas && (
-                                    <div className="rounded-xl p-2.5 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
-                                      <div className="flex items-center gap-1 mb-1">
-                                        <MdPlace size={14} style={{ color: BRAND_ACCENT }} />
-                                        <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Preferred areas</span>
-                                      </div>
-                                      <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{String(areas)}</p>
-                                    </div>
-                                  )}
-
                                   {/* Website: the captured link if any, plus a one-click web find for the brand. */}
                                   <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: website ? '1fr 1fr' : '1fr' }}>
                                     {website && (
@@ -2339,14 +2334,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </a>
                                   </div>
 
-                                  {brandOther && (
+                                  {brandOtherFull && (
                                     <div className="flex items-start gap-3 rounded-xl p-3 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
                                       <span className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 34, height: 34, background: accentSoft }}>
                                         <MdDescription size={17} style={{ color: BRAND_ACCENT }} />
                                       </span>
                                       <div className="min-w-0">
                                         <p className="text-[12px] font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Other details</p>
-                                        <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{String(brandOther)}</p>
+                                        <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{String(brandOtherFull)}</p>
                                       </div>
                                     </div>
                                   )}
