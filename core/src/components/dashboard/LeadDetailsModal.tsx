@@ -418,6 +418,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showActivityModal, setShowActivityModal] = useState(false)
   const [showPropertyModal, setShowPropertyModal] = useState(false)
   const [showBrandModal, setShowBrandModal] = useState(false)
+  const [showKnowModal, setShowKnowModal] = useState(false)
   const [pushingListing, setPushingListing] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle')
   const [showAttribution, setShowAttribution] = useState(false)
   const [showPATResult, setShowPATResult] = useState(false)
@@ -3797,6 +3798,73 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </div>
                       )}
                     </article>
+
+                    {/* Brands only: "Know online results" — quick launcher to look
+                        the brand up online (no per-lead search backend needed). */}
+                    {(() => {
+                      const lkz: any = currentLead.unified_context?.lokazen || {}
+                      if (String(lkz.user_type || '').toLowerCase() !== 'brand') return null
+                      const brand = String(lkz.brand_name || '').trim()
+                      if (!brand) return null
+                      const cat = String(lkz.brand_category || '').trim()
+                      const q = encodeURIComponent(`${brand} ${cat}`.trim())
+                      const qCity = encodeURIComponent(`${brand} ${cat} Bangalore`.trim())
+                      const isFood = /cafe|coffee|restaurant|food|qsr|bakery|dessert|ice ?cream|kitchen|resto|dining|\bbar\b/i.test(cat)
+                      const links = [
+                        { label: 'Google', href: `https://www.google.com/search?q=${qCity}` },
+                        { label: 'Maps', href: `https://www.google.com/maps/search/${qCity}` },
+                        { label: 'Instagram', href: `https://www.google.com/search?q=${q}+instagram` },
+                        { label: 'LinkedIn', href: `https://www.google.com/search?q=${q}+linkedin+company` },
+                        ...(isFood ? [{ label: 'Zomato', href: `https://www.google.com/search?q=${q}+zomato+bangalore` }] : []),
+                      ]
+                      const accentSoft = `color-mix(in srgb, ${BRAND_ACCENT} 12%, transparent)`
+                      const accentBorder = `color-mix(in srgb, ${BRAND_ACCENT} 38%, transparent)`
+                      const tileBg = 'color-mix(in srgb, var(--text-primary) 4%, transparent)'
+                      return (
+                        <div className="mt-3">
+                          <button type="button" onClick={() => setShowKnowModal(true)}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-90"
+                            style={{ background: accentSoft, color: BRAND_ACCENT, border: `1px solid ${accentBorder}` }}>
+                            <MdOpenInNew size={13} /> Know online results
+                          </button>
+                          {showKnowModal && (
+                            <div onClick={() => setShowKnowModal(false)}
+                              style={{ position: 'fixed', inset: 0, zIndex: 2147483646, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+                              <div onClick={(e) => e.stopPropagation()}
+                                style={{ width: 'min(440px, 94vw)', background: 'var(--bg-secondary, #0f1116)', border: '1px solid var(--border-primary)', borderRadius: 18, padding: 20 }}>
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>Online results</h3>
+                                  <button type="button" onClick={() => setShowKnowModal(false)}
+                                    className="flex items-center justify-center rounded-lg" style={{ width: 28, height: 28, background: tileBg, color: 'var(--text-secondary)' }}>
+                                    <MdClose size={16} />
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 40, height: 40, background: accentSoft, border: `1px solid ${accentBorder}` }}>
+                                    <MdOpenInNew size={18} style={{ color: BRAND_ACCENT }} />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{brand}</p>
+                                    {cat && <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{cat}</p>}
+                                  </div>
+                                </div>
+                                <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>Look this brand up online:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {links.map((l) => (
+                                    <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                                      className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
+                                      style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                      <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{l.label}</span>
+                                      <MdOpenInNew size={13} style={{ color: BRAND_ACCENT }} />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {/* Latest note card removed (13 Jul) — notes live in the Notes tab; the founder didn't want it on the summary. */}
 
