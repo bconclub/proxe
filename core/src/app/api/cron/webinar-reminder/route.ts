@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
           'agent',
           `Hi ${nudgeName}, you started signing up for ${webinarName || 'our webinar'} but didn't finish. Complete your registration here: ${registerUrl} (${NUDGE_TEMPLATE} template)`,
           'template',
-          { source: 'webinar_register_nudge', template_name: NUDGE_TEMPLATE, trigger: 'webinar_register_nudge', webinar_name: webinarName || null, webinar_date: rawDate },
+          { source: 'webinar_register_nudge', template_name: NUDGE_TEMPLATE, trigger: 'webinar_register_nudge', webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar', wa_message_id: result.messageId || null, delivery_status: result.messageId ? 'sent' : undefined },
           supabase,
         )
         await supabase
@@ -180,7 +180,9 @@ export async function GET(req: NextRequest) {
             : `Hi ${dfn}, ${webinarName || 'our webinar'} starts in 30 minutes. Join here: ${joinUrl} (${tpl} template)`
           await logMessage(
             lead.id, 'whatsapp', 'agent', body, 'template',
-            { source: `webinar_${dayStep}`, template_name: tpl, trigger: `webinar_${dayStep}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar_18jul' },
+            // Store Meta's wamid so the delivery webhook can match this send and
+            // stamp delivered/read (without it the campaign shows 0 delivered/read).
+            { source: `webinar_${dayStep}`, template_name: tpl, trigger: `webinar_${dayStep}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar_18jul', wa_message_id: send.messageId || null, delivery_status: send.messageId ? 'sent' : undefined },
             supabase,
           )
           await supabase
