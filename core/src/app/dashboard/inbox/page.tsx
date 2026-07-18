@@ -245,6 +245,34 @@ function audienceOf(uc: Record<string, any> | null | undefined): { label: string
   return null
 }
 
+// Lead-category chips for the conversation list — the lead's segment at a glance:
+// their program (Webinar / course interest) + who they are (Student / Parent /
+// Professional). Reads generic fields with no hardcoded taxonomy, so it degrades
+// gracefully on any brand (shows whatever user_type/course_interest is stored).
+function leadCategoryChips(uc: Record<string, any> | null | undefined, formData?: Record<string, any> | null): Array<{ label: string; color: string }> {
+  // Windchasers taxonomy (Student/Parent + Webinar/course); other brands keep the
+  // list clean until they opt in. Lokazen already has its own audienceOf badge.
+  if (getCurrentBrandId() !== 'windchasers') return []
+  if (!uc) return []
+  const bc = { ...(uc.windchasers || {}), ...(uc[getCurrentBrandId()] || {}) }
+  const web: any = uc.web || {}, wa: any = uc.whatsapp || {}
+  const fd: any = formData || {}
+  const title = (s: string) => s.split(/[\s_]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  const chips: Array<{ label: string; color: string }> = []
+  // Program: webinar lead-type wins, else the course interest.
+  const lt = String(bc.lead_type || web.lead_type || wa.lead_type || '').toLowerCase()
+  const course = String(bc.course_interest || web.course_interest || wa.course_interest || fd.course || fd.course_interest || '').trim()
+  if (lt === 'webinar') chips.push({ label: 'Webinar', color: '#a855f7' })
+  else if (course) chips.push({ label: title(course), color: '#3b82f6' })
+  // Who they are.
+  const ut = String(bc.user_type || web.user_type || wa.user_type || fd.user_type || '').toLowerCase()
+  if (ut.includes('parent')) chips.push({ label: 'Parent', color: '#f59e0b' })
+  else if (ut.includes('student')) chips.push({ label: 'Student', color: '#22c55e' })
+  else if (ut.includes('professional')) chips.push({ label: 'Professional', color: '#0ea5e9' })
+  else if (ut) chips.push({ label: title(ut), color: '#0ea5e9' })
+  return chips.slice(0, 2)
+}
+
 function cleanMessageContent(text: string): string {
   if (!text) return '';
 
@@ -1788,6 +1816,7 @@ export default function InboxPage() {
               // agree on what "Warm" looks like.
               const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
               const aud = audienceOf(conv.unified_context);
+              const catChips = leadCategoryChips(conv.unified_context, conv.form_data);
 
               if (isSelected) {
                 // ── SELECTED CARD (minimal) ──
@@ -1837,6 +1866,14 @@ export default function InboxPage() {
                         </button>
                       </div>
 
+                      {/* Lead category chips (program + who they are) */}
+                      {catChips.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap" style={{ paddingLeft: '38px' }}>
+                          {catChips.map((c) => (
+                            <span key={c.label} className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ background: `${c.color}22`, color: c.color, border: `1px solid ${c.color}44` }}>{c.label}</span>
+                          ))}
+                        </div>
+                      )}
                       {/* Line 2: Brand · Location */}
                       {(conv.brand_name || conv.city) && (
                         <div className="text-xs truncate mt-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
@@ -1906,6 +1943,14 @@ export default function InboxPage() {
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
+                    {/* Line 1.5: lead category chips (program + who they are) */}
+                    {catChips.length > 0 && (
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        {catChips.map((c) => (
+                          <span key={c.label} className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full" style={{ background: `${c.color}22`, color: c.color, border: `1px solid ${c.color}44` }}>{c.label}</span>
+                        ))}
+                      </div>
+                    )}
                     {/* Line 2: Last message preview + EVENT badge */}
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <p className="text-[12px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
