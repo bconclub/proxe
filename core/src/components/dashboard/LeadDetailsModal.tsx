@@ -419,6 +419,21 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showPropertyModal, setShowPropertyModal] = useState(false)
   const [showBrandModal, setShowBrandModal] = useState(false)
   const [showKnowModal, setShowKnowModal] = useState(false)
+  const [onlineLoading, setOnlineLoading] = useState(false)
+  const [onlineResults, setOnlineResults] = useState<{ ok?: boolean; summary?: string; sources?: { title: string; url: string }[] } | null>(null)
+  const openOnlineResults = async () => {
+    setShowKnowModal(true)
+    setOnlineResults(null)
+    setOnlineLoading(true)
+    try {
+      const r = await fetch(`/api/dashboard/leads/${currentLead.id}/online-results`)
+      setOnlineResults(await r.json())
+    } catch {
+      setOnlineResults({ ok: false })
+    } finally {
+      setOnlineLoading(false)
+    }
+  }
   const [pushingListing, setPushingListing] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle')
   const [showAttribution, setShowAttribution] = useState(false)
   const [showPATResult, setShowPATResult] = useState(false)
@@ -3840,7 +3855,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       const tileBg = 'color-mix(in srgb, var(--text-primary) 4%, transparent)'
                       return (
                         <div className="mt-3">
-                          <button type="button" onClick={() => setShowKnowModal(true)}
+                          <button type="button" onClick={openOnlineResults}
                             className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all hover:opacity-90"
                             style={{ background: accentSoft, color: BRAND_ACCENT, border: `1px solid ${accentBorder}` }}>
                             <MdOpenInNew size={13} /> Know online results
@@ -3866,17 +3881,49 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     {cat && <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{cat}</p>}
                                   </div>
                                 </div>
-                                <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>Look this brand up online:</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {links.map((l) => (
-                                    <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                                      className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
-                                      style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
-                                      <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{l.label}</span>
-                                      <MdOpenInNew size={13} style={{ color: BRAND_ACCENT }} />
-                                    </a>
-                                  ))}
-                                </div>
+                                {onlineLoading ? (
+                                  <div className="flex items-center gap-2 py-6 justify-center">
+                                    <span className="inline-block rounded-full animate-spin" style={{ width: 16, height: 16, border: `2px solid ${accentBorder}`, borderTopColor: BRAND_ACCENT }} />
+                                    <span className="text-[12px]" style={{ color: 'var(--text-muted)' }}>Searching the web for {brand}…</span>
+                                  </div>
+                                ) : (onlineResults?.ok && (onlineResults.summary || (onlineResults.sources && onlineResults.sources.length))) ? (
+                                  <div>
+                                    {onlineResults.summary && (
+                                      <p className="text-[12.5px] leading-snug mb-3" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{onlineResults.summary}</p>
+                                    )}
+                                    {onlineResults.sources && onlineResults.sources.length > 0 && (
+                                      <>
+                                        <p className="text-[10px] uppercase tracking-wide font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>Sources</p>
+                                        <div className="flex flex-col gap-1.5">
+                                          {onlineResults.sources.map((s, i) => (
+                                            <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                                              className="flex items-center gap-2 rounded-lg p-2 transition-all hover:opacity-90"
+                                              style={{ background: tileBg, border: `1px solid var(--border-primary)` }}>
+                                              <MdOpenInNew size={13} style={{ color: BRAND_ACCENT, flexShrink: 0 }} />
+                                              <span className="text-[12px] font-medium truncate" style={{ color: 'var(--text-primary)' }} title={s.url}>{s.title}</span>
+                                            </a>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className="text-[11px] mb-2" style={{ color: 'var(--text-muted)' }}>
+                                      {onlineResults && onlineResults.ok === false ? 'Could not fetch results automatically. Look this brand up:' : 'Look this brand up online:'}
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {links.map((l) => (
+                                        <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                                          className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
+                                          style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                          <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{l.label}</span>
+                                          <MdOpenInNew size={13} style={{ color: BRAND_ACCENT }} />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
                           )}
