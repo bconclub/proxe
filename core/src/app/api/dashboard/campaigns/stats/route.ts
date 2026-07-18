@@ -20,6 +20,7 @@ const SEND_LABELS: Record<string, string> = {
   webinar_starting_soon: 'Starting soon',
   webinar_live: 'Live now',
   webinar_register_nudge: 'Registration nudge',
+  webinar_thankyou: 'Thank you',
 }
 
 // Who each send targets — surfaced as the card's subtext.
@@ -28,20 +29,7 @@ const SEND_AUDIENCE: Record<string, string> = {
   webinar_starting_soon: 'registered leads',
   webinar_live: 'registered leads',
   webinar_register_nudge: 'not-yet-registered leads',
-}
-
-// Two distinct campaigns share the webinar tag but hit opposite audiences:
-// everything to REGISTERED leads (reminder + day-of) is one campaign; the
-// registration NUDGE to the rest is its own. Split so each shows separately.
-const SEND_GROUP: Record<string, 'registered' | 'nudge'> = {
-  webinar_reminder: 'registered',
-  webinar_starting_soon: 'registered',
-  webinar_live: 'registered',
-  webinar_register_nudge: 'nudge',
-}
-const GROUP_META: Record<string, { label: string; audience: string }> = {
-  registered: { label: 'Reminders', audience: 'registered leads' },
-  nudge: { label: 'Registration nudge', audience: 'not-yet-registered leads' },
+  webinar_thankyou: 'webinar attendees',
 }
 
 export async function GET() {
@@ -62,75 +50,93 @@ export async function GET() {
   const rows = (sends || []).filter((r: any) => r.metadata && r.metadata.campaign)
   if (!rows.length) return NextResponse.json({ campaigns: [] })
 
-  // Which recipients tapped a quick-reply button (e.g. "Join WhatsApp Group").
-  // Two signals: (a) inbound customer button/interactive taps; (b) the bot's
-  // deterministic quick-reply replies, which carry `quick_reply_trigger` — the
-  // webinar "Join WhatsApp Group" tap is handled+answered before it's logged as
-  // an inbound row, so (b) is the ONLY record of that click. Fetch recent rows
-  // broadly and intersect in JS (a `.in()` over 100+ recipient ids returned
-  // nothing; a PostgREST json `not.is` filter did too).
-  const clickedLeads = new Set<string>()
+  // Per-lead template send timeline (for click attribution). Each entry is a
+  // template a lead received and when. Built from the campaign sends only.
+  const sendTimeline: Record<string, Array<{ tpl: string; t: number }>> = {}
+  for (const r of rows) {
+    if (!r.lead_id) continue
+    const m: any = r.metadata || {}
+    const tpl = String(m.template_name || m.source || 'send')
+    ;(sendTimeline[r.lead_id] = sendTimeline[r.lead_id] || []).push({ tpl, t: new Date(r.created_at).getTime() })
+  }
+  for (const id in sendTimeline) sendTimeline[id].sort((a, b) => a.t - b.t)
+
+  // Clicks: a quick-reply tap (or inbound button) is attributed to the template
+  // the lead LAST received before the tap. So a "Join WhatsApp Group" tap counts
+  // for the reminder that carried the button, not for every template the lead
+  // ever got. Two signals: (a) inbound customer button/interactive taps; (b) the
+  // bot's deterministic quick-reply replies (`quick_reply_trigger`) — the group
+  // tap is answered before it lands as an inbound row, so (b) is its only record.
+  const clickedByTpl: Record<string, Set<string>> = {}
   const { data: engagement } = await sb
     .from('conversations')
-    .select('lead_id, sender, metadata')
+    .select('lead_id, sender, metadata, created_at')
     .order('created_at', { ascending: false })
     .limit(12000)
   for (const e of engagement || []) {
     const m: any = e.metadata || {}
     const tapped = !!m.quick_reply_trigger || (e.sender === 'customer' && (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button'))
-    if (tapped && e.lead_id) clickedLeads.add(e.lead_id)
+    if (!tapped || !e.lead_id) continue
+    const tl = sendTimeline[e.lead_id]
+    if (!tl) continue
+    const tapT = new Date(e.created_at).getTime()
+    let tpl: string | null = null
+    for (const s of tl) {
+      if (s.t <= tapT) tpl = s.tpl
+      else break
+    }
+    if (tpl) (clickedByTpl[tpl] = clickedByTpl[tpl] || new Set<string>()).add(e.lead_id)
   }
 
-  const byCampaign: Record<string, any> = {}
+  // Group by TEMPLATE — each template we send is its own campaign (one template,
+  // one audience). Never merged. The user reasons per-template, so the card is
+  // per-template.
+  const byTpl: Record<string, any> = {}
   for (const r of rows) {
     const m: any = r.metadata || {}
-    const cid = m.campaign
-    if (!cid) continue
-    const src = m.source || m.template_name || 'send'
-    const group = SEND_GROUP[src] || 'registered'
-    const key = `${cid}:${group}`
-    if (!byCampaign[key]) {
-      byCampaign[key] = { id: key, campaign: cid, group, sends: {}, first: r.created_at, last: r.created_at, webinarName: m.webinar_name || null, eventName: null, leads: new Set<string>() }
+    const tpl = String(m.template_name || m.source || 'send')
+    if (!byTpl[tpl]) {
+      byTpl[tpl] = { template: tpl, source: m.source || null, campaign: m.campaign || null, sent: 0, delivered: 0, read: 0, first: r.created_at, last: r.created_at, webinarName: m.webinar_name || null, leads: new Set<string>() }
     }
-    const c = byCampaign[key]
+    const c = byTpl[tpl]
     if (r.created_at < c.first) c.first = r.created_at
     if (r.created_at > c.last) c.last = r.created_at
     if (r.lead_id) c.leads.add(r.lead_id)
-
-    // The reminder went to REGISTERED leads, so its webinar_name is the real
-    // event title (the nudge's title is a different ad campaign name).
-    if (src === 'webinar_reminder' && m.webinar_name) c.eventName = m.webinar_name
-    if (!c.sends[src]) c.sends[src] = { source: src, template: m.template_name || null, sent: 0, delivered: 0, read: 0, leads: new Set<string>() }
-    const s = c.sends[src]
-    s.sent++
-    if (r.lead_id) s.leads.add(r.lead_id)
+    if (!c.source && m.source) c.source = m.source
+    if (!c.campaign && m.campaign) c.campaign = m.campaign
+    if (!c.webinarName && m.webinar_name) c.webinarName = m.webinar_name
+    c.sent++
     const ds = m.delivery_status
-    if (ds === 'read') { s.read++; s.delivered++ }
-    else if (ds === 'delivered') s.delivered++
+    if (ds === 'read') { c.read++; c.delivered++ }
+    else if (ds === 'delivered') c.delivered++
   }
 
-  const campaigns = Object.values(byCampaign)
+  // Prettify a raw template name when we have no friendly label for its source.
+  const prettyTpl = (name: string) =>
+    name
+      .replace(/^windchasers_/, '')
+      .replace(/_v\d+$/i, '')
+      .split('_')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+
+  const campaigns = Object.values(byTpl)
     .map((c: any) => {
-      const sends = Object.values(c.sends).map((s: any) => {
-        const clicked = Array.from(s.leads as Set<string>).filter((id) => clickedLeads.has(id)).length
-        return { label: SEND_LABELS[s.source] || s.source, audience: SEND_AUDIENCE[s.source] || null, template: s.template, sent: s.sent, delivered: s.delivered, read: s.read, clicked }
-      })
-      const totals = sends.reduce(
-        (a: any, s: any) => ({ sent: a.sent + s.sent, delivered: a.delivered + s.delivered, read: a.read + s.read, clicked: a.clicked + s.clicked }),
-        { sent: 0, delivered: 0, read: 0, clicked: 0 },
-      )
-      const gm = GROUP_META[c.group] || { label: '', audience: '' }
-      const event = c.eventName || c.webinarName || c.campaign
+      const clicked = (clickedByTpl[c.template] || new Set<string>()).size
+      const label = SEND_LABELS[c.source] || prettyTpl(c.template)
+      const audience = SEND_AUDIENCE[c.source] || ''
+      const send = { label, audience: audience || null, template: c.template, sent: c.sent, delivered: c.delivered, read: c.read, clicked }
       return {
-        id: c.id,
-        name: gm.label ? `${event} — ${gm.label}` : event,
-        description: `${gm.audience || ''}${gm.audience ? ' · ' : ''}${sends.map((s: any) => s.label).join(' + ')}`,
-        type: String(c.campaign).startsWith('webinar') ? 'Webinar' : 'Campaign',
+        id: c.template,
+        name: label,
+        description: `${audience ? audience + ' · ' : ''}${c.template}`,
+        type: String(c.campaign || '').startsWith('webinar') ? 'Webinar' : 'Campaign',
         recipients: c.leads.size,
         firstSent: c.first,
         lastSent: c.last,
-        sends,
-        totals,
+        sends: [send],
+        totals: { sent: c.sent, delivered: c.delivered, read: c.read, clicked },
       }
     })
     .sort((a: any, b: any) => (a.lastSent < b.lastSent ? 1 : -1))

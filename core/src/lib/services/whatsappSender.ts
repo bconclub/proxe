@@ -738,7 +738,7 @@ export async function sendWebinarReminder(
  */
 export async function sendWebinarStartingSoon(
   to: string, name: string, webinarName: string, joinUrl: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   // v3 = clean copy (no em dash) with a "Join webinar" URL button pointing at the
@@ -760,7 +760,7 @@ export async function sendWebinarStartingSoon(
 
 export async function sendWebinarLiveNow(
   to: string, name: string, webinarName: string, joinUrl: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   // v3: clean copy + "Join webinar" URL button (working registration link). The
@@ -795,7 +795,7 @@ export async function sendWebinarRegisterNudge(
   name: string,
   webinarName: string,
   registerUrl: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const wname = webinarName || 'our webinar'
