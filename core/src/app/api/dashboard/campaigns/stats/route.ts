@@ -121,17 +121,36 @@ export async function GET() {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ')
 
+  // Templates for one webinar don't all carry its title in metadata — the
+  // reminder / day-of sends do, but the register nudge and thank-you don't.
+  // Collapse each campaign tag to a stable event key (drop the webinar/thankyou
+  // qualifiers, keep the date) and resolve a single title per event, so every
+  // template of the same webinar groups under one header on the page.
+  const eventKey = (campaign: string) => {
+    const parts = String(campaign || '').split('_').filter((p) => p && p !== 'webinar' && p !== 'thankyou')
+    return parts.join('_') || 'webinar'
+  }
+  const titleByEvent: Record<string, string> = {}
+  for (const c of Object.values(byTpl) as any[]) {
+    if (c.webinarName) titleByEvent[eventKey(c.campaign)] = titleByEvent[eventKey(c.campaign)] || c.webinarName
+  }
+
   const campaigns = Object.values(byTpl)
     .map((c: any) => {
       const clicked = (clickedByTpl[c.template] || new Set<string>()).size
       const label = SEND_LABELS[c.source] || prettyTpl(c.template)
       const audience = SEND_AUDIENCE[c.source] || ''
       const send = { label, audience: audience || null, template: c.template, sent: c.sent, delivered: c.delivered, read: c.read, clicked }
+      const isWebinar = String(c.campaign || '').startsWith('webinar')
       return {
         id: c.template,
         name: label,
+        // The webinar title this send belongs to (used to group cards on the
+        // page). Falls back to the event's shared title so nudge / thank-you
+        // (which carry no title of their own) still group with their webinar.
+        webinar: isWebinar ? (c.webinarName || titleByEvent[eventKey(c.campaign)] || 'Webinar') : null,
         description: `${audience ? audience + ' · ' : ''}${c.template}`,
-        type: String(c.campaign || '').startsWith('webinar') ? 'Webinar' : 'Campaign',
+        type: isWebinar ? 'Webinar' : 'Campaign',
         recipients: c.leads.size,
         firstSent: c.first,
         lastSent: c.last,
