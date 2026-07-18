@@ -14,6 +14,7 @@ import {
   MdMoreVert, MdExpandLess, MdAttachFile, MdMicNone, MdWhatsapp,
   MdChevronRight, MdOutlineCalendarToday, MdOutlineArticle, MdAdd,
   MdHistory, MdCheckCircle, MdGroups, MdDoneAll,
+  MdExpandMore, MdEventNote,
 } from 'react-icons/md'
 import { brandConfig } from '@/configs'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
@@ -74,6 +75,7 @@ interface SentCampaign {
   id: string
   name: string
   type: string
+  webinar?: string | null
   description?: string | null
   recipients: number
   totals: { sent: number; delivered: number; read: number; clicked: number }
@@ -964,6 +966,14 @@ function PreviousCampaigns() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const toggleGroup = (w: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(w)) next.delete(w)
+      else next.add(w)
+      return next
+    })
 
   const loadAll = () => {
     Promise.all([
@@ -1001,11 +1011,13 @@ function PreviousCampaigns() {
     { label: 'Clicked', value: agg.clicked, sub: `${rate(agg.clicked)} click rate`, color: AMBER, icon: <MdOutlineAdsClick size={18} /> },
   ]
 
-  const rows = useMemo(() => {
+  const { rows, campaignCount } = useMemo(() => {
+    const q = search.toLowerCase()
     const sentRows = sent.map((c) => ({
       kind: 'sent' as const,
       id: c.id,
       name: c.name,
+      webinar: c.webinar || null,
       target: c.description || `Target: ${c.recipients} people · ${c.type}`,
       statusLabel: 'Live',
       statusColor: GREEN,
@@ -1020,6 +1032,7 @@ function PreviousCampaigns() {
       kind: 'saved' as const,
       id: c.id,
       name: c.name,
+      webinar: null as string | null,
       target: `Target: ${c.audience?.description || `${c.audience?.count ?? 0} people`}${c.scheduled_at ? ` · ${new Date(c.scheduled_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : ''}`,
       statusLabel: c.status === 'ready' ? 'Scheduled' : c.status === 'draft' ? 'Pending' : 'Completed',
       statusColor: c.status === 'ready' ? AMBER : c.status === 'draft' ? ('var(--text-muted)' as string) : BLUE,
@@ -1030,7 +1043,43 @@ function PreviousCampaigns() {
       sentC: undefined as SentCampaign | undefined,
       savedC: c as SavedCampaign | undefined,
     }))
-    return [...sentRows, ...savedRows].filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()))
+
+    // Group the sent template cards by webinar so each webinar reads as one
+    // block with its templates nested under a title header. A group is kept if
+    // the webinar title OR any of its template names matches the search.
+    const byWebinar = new Map<string, typeof sentRows>()
+    const ungrouped: typeof sentRows = []
+    for (const r of sentRows) {
+      if (r.webinar) {
+        const g = byWebinar.get(r.webinar) || []
+        g.push(r)
+        byWebinar.set(r.webinar, g)
+      } else ungrouped.push(r)
+    }
+
+    type HeaderRow = { kind: 'header'; id: string; webinar: string; count: number; totals: { sent: number; delivered: number; read: number; clicked: number } }
+    const out: Array<HeaderRow | (typeof sentRows)[number] | (typeof savedRows)[number]> = []
+    let count = 0
+    for (const [webinar, group] of byWebinar) {
+      const webinarHit = !q || webinar.toLowerCase().includes(q)
+      const visible = webinarHit ? group : group.filter((r) => r.name.toLowerCase().includes(q))
+      if (!visible.length) continue
+      const totals = visible.reduce(
+        (a, r) => ({
+          sent: a.sent + (r.sentC?.totals?.sent || 0),
+          delivered: a.delivered + (r.sentC?.totals?.delivered || 0),
+          read: a.read + (r.sentC?.totals?.read || 0),
+          clicked: a.clicked + (r.sentC?.totals?.clicked || 0),
+        }),
+        { sent: 0, delivered: 0, read: 0, clicked: 0 },
+      )
+      out.push({ kind: 'header', id: `wh-${webinar}`, webinar, count: visible.length, totals })
+      for (const r of visible) out.push(r)
+      count += visible.length
+    }
+    for (const r of ungrouped) if (!q || r.name.toLowerCase().includes(q)) { out.push(r); count++ }
+    for (const r of savedRows) if (!q || r.name.toLowerCase().includes(q)) { out.push(r); count++ }
+    return { rows: out, campaignCount: count }
   }, [sent, saved, search])
 
   return (
@@ -1063,7 +1112,7 @@ function PreviousCampaigns() {
 
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}>
         <div className="px-4 py-3 text-[13px] font-bold" style={{ color: 'var(--text-primary)' }}>
-          All campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({rows.length})</span>
+          All campaigns <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({campaignCount})</span>
         </div>
         {loading ? (
           <div className="px-4 py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>Loading…</div>
@@ -1073,11 +1122,41 @@ function PreviousCampaigns() {
             <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>Hit "Create Campaign" and describe who you want to reach.</div>
           </div>
         ) : (
-          rows.map((r) => (
+          rows.map((r) => {
+            // Webinar group header — a collapsible title bar summarising all its
+            // template cards. Clicking folds/unfolds the group.
+            if (r.kind === 'header') {
+              const pct = r.totals.sent > 0 ? Math.round((r.totals.delivered / r.totals.sent) * 100) : 0
+              const isOpen = !collapsed.has(r.webinar)
+              return (
+                <div
+                  key={`header-${r.id}`}
+                  className="flex items-center gap-3 px-4 py-2.5 campaign-row cursor-pointer"
+                  style={{ borderTop: '1px solid var(--border-primary)', background: 'var(--bg-primary)' }}
+                  onClick={() => toggleGroup(r.webinar)}
+                >
+                  <span style={{ color: 'var(--text-muted)' }}>{isOpen ? <MdExpandLess size={18} /> : <MdExpandMore size={18} />}</span>
+                  <MdEventNote size={16} style={{ color: PURPLE }} />
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{r.webinar}</div>
+                    <div className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Webinar · {r.count} template{r.count !== 1 ? 's' : ''}</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-4 text-[11px] shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="tabular-nums">{r.totals.sent} sent</span>
+                    <span className="tabular-nums">{pct}% delivered</span>
+                    <span className="tabular-nums" style={{ color: GREEN }}>{r.totals.read} read</span>
+                    <span className="tabular-nums" style={{ color: AMBER }}>{r.totals.clicked} clicked</span>
+                  </div>
+                </div>
+              )
+            }
+            // Hide a grouped template card when its webinar group is collapsed.
+            if (r.webinar && collapsed.has(r.webinar)) return null
+            return (
             <div key={`${r.kind}-${r.id}`} style={{ borderTop: '1px solid var(--border-primary)' }}>
               <div
                 className="grid grid-cols-1 md:grid-cols-[2.4fr_1.1fr_1.6fr_40px] gap-y-2 items-center px-4 py-3 campaign-row"
-                style={{ cursor: r.sentC ? 'pointer' : 'default' }}
+                style={{ cursor: r.sentC ? 'pointer' : 'default', paddingLeft: r.webinar ? 28 : undefined }}
                 onClick={() => r.sentC && setExpanded(expanded === r.id ? null : r.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -1146,7 +1225,8 @@ function PreviousCampaigns() {
                 </div>
               )}
             </div>
-          ))
+            )
+          })
         )}
       </div>
       <style>{`.campaign-row:hover { background: var(--bg-hover); }`}</style>
