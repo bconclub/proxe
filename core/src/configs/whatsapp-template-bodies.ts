@@ -16,8 +16,12 @@ export type WaTemplateBody = {
   footer?: string
   /** Button labels, in order. Rendered as WhatsApp-style buttons in the inbox. */
   buttons?: string[]
-  /** 'url' for link buttons (shown with a link affordance), else quick-reply. */
+  /** 'url' for link buttons (shown with a link affordance), else quick-reply.
+   *  Applies to every button when buttonTypes isn't given. */
   buttonType?: 'url' | 'quick_reply'
+  /** Per-button type, when a template mixes URL and quick-reply buttons. Index
+   *  aligns with `buttons`. Falls back to `buttonType` where absent. */
+  buttonTypes?: ('url' | 'quick_reply')[]
 }
 
 export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
@@ -72,6 +76,53 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
     body: `Hi {{customer_name}}, your Pilot Aptitude Test result is ready.\n\nScore: *{{score}}/100*\nTier: *{{tier}}*\n\n{{tier_message}}\n\n_*Team Windchasers*_`,
     buttons: ['Book a Demo Class'],
   },
+
+  // Webinar day-of + follow-up templates (v3 = clean copy with a real button;
+  // the join link lives in the button, never inline). The _v1 day-of names are
+  // kept as aliases because our earliest sends logged that name even though the
+  // v3 template is what actually went out — so the inbox renders them identically.
+  windchasers_webinar_live_now_v3: {
+    body: `Hi {{customer_name}}, we are live now. *{{webinar_name}}* has started.\n\nTap *Join webinar* below to come straight in.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join webinar'],
+    buttonType: 'url',
+  },
+  windchasers_webinar_live_now_v1: {
+    body: `Hi {{customer_name}}, we are live now. *{{webinar_name}}* has started.\n\nTap *Join webinar* below to come straight in.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join webinar'],
+    buttonType: 'url',
+  },
+  windchasers_webinar_starting_soon_v3: {
+    body: `Hi {{customer_name}}, your *{{webinar_name}}* webinar starts in 30 minutes.\n\nTap *Join webinar* below to come in. See you inside!`,
+    footer: 'Team WindChasers',
+    buttons: ['Join webinar'],
+    buttonType: 'url',
+  },
+  windchasers_webinar_starting_soon_v1: {
+    body: `Hi {{customer_name}}, your *{{webinar_name}}* webinar starts in 30 minutes.\n\nTap *Join webinar* below to come in. See you inside!`,
+    footer: 'Team WindChasers',
+    buttons: ['Join webinar'],
+    buttonType: 'url',
+  },
+  windchasers_webinar_thankyou_v1: {
+    body: `Hi {{customer_name}}, thank you for joining our Pilot Training webinar today. It was great having you there.\n\nReady for the next step? Book a free demo session with our team, online or on campus, and get all your questions answered one on one.\n\nTap below to pick your slot.`,
+    footer: 'Team WindChasers',
+    buttons: ['Book a demo'],
+    buttonType: 'url',
+  },
+  windchasers_webinar_register_nudge_v2: {
+    body: `Hi {{customer_name}}, you showed interest in our *{{webinar_name}}* webinar but haven't completed your registration yet.\n\nTap *Complete Registration* to secure your spot, or join our WhatsApp group for updates and the session link.`,
+    footer: 'Team WindChasers',
+    buttons: ['Complete Registration', 'Join WhatsApp Group'],
+    buttonTypes: ['url', 'quick_reply'],
+  },
+  windchasers_webinar_reminder_v2: {
+    body: `Hi {{customer_name}}, a quick reminder about the *{{webinar_name}}* webinar.\n\nIt starts *{{when}}*. Tap below to join our WhatsApp group for the join link and session updates, and see you there!`,
+    footer: 'Team WindChasers',
+    buttons: ['Join WhatsApp Group'],
+    buttonType: 'quick_reply',
+  },
 }
 
 export type RenderedTemplate = {
@@ -80,6 +131,7 @@ export type RenderedTemplate = {
   footer?: string
   buttons?: string[]
   buttonType?: 'url' | 'quick_reply'
+  buttonTypes?: ('url' | 'quick_reply')[]
 }
 
 /**
@@ -104,5 +156,5 @@ export function renderWaTemplate(
     })
     .replace(/[ \t]+\n/g, '\n')
     .trim()
-  return { content, footer: tpl.footer, buttons: tpl.buttons, buttonType: tpl.buttonType }
+  return { content, footer: tpl.footer, buttons: tpl.buttons, buttonType: tpl.buttonType, buttonTypes: tpl.buttonTypes }
 }
