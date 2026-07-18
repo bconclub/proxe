@@ -2426,14 +2426,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             const pt = String(lkz.property_type || 'Property')
                             const category = /commercial|office|retail|warehouse|restaurant|shop|showroom|kiosk/i.test(pt) ? 'Commercial' : (pt.length <= 16 ? pt : null)
                             const avail = lkz.availability_date || null
-                            // The 4 headline tiles across the top (one row, so the
-                            // modal stays short). Deposit/extras live in Other details.
+                            // Two headline tiles (Size, Rent). Floor / Area fold into
+                            // Other details below, matching the design.
+                            const rentVal = lkz.asking_rent_monthly
+                              ? `${lkz.asking_rent_monthly}${/month|\/mo|\bpm\b/i.test(String(lkz.asking_rent_monthly)) ? '' : ' / month'}`
+                              : null
                             const tiles = ([
                               { icon: MdSquareFoot, label: 'Size', value: lkz.property_size_sqft ? `${lkz.property_size_sqft} sqft` : null },
-                              { icon: MdStairs, label: 'Floor', value: lkz.floor },
-                              { icon: MdCurrencyRupee, label: 'Rent', value: lkz.asking_rent_monthly },
-                              { icon: MdPlace, label: 'Area', value: lkz.property_zone || lkz.city },
+                              { icon: MdCurrencyRupee, label: 'Rent', value: rentVal },
                             ] as Array<{ icon: any; label: string; value: any }>).filter((t) => !!t.value)
+                            const area = lkz.property_zone || lkz.city || null
+                            const otherDetailsFull = [
+                              lkz.floor ? `Floor: ${lkz.floor}` : null,
+                              area ? `Area: ${area}` : null,
+                              otherDetails || null,
+                            ].filter(Boolean).join('\n')
+                            const listingUrl = lkz.listing_url || lkz.property_url || (lkz.property_id ? `https://lokazen.in/property/${lkz.property_id}` : null)
                             const imgs = Array.isArray(lkz.property_images) ? lkz.property_images : []
                             return (
                           <div
@@ -2486,39 +2494,26 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                             )}
 
-                            {/* Availability (wider) + map button beside it */}
-                            {(avail || maps) && (
-                              <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: avail && maps ? '3fr 2fr' : '1fr' }}>
-                                {avail && (
-                                  <div className="rounded-xl p-2.5" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
-                                    <div className="flex items-center gap-1 mb-1">
-                                      <MdEventAvailable size={14} style={{ color: BRAND_ACCENT }} />
-                                      <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>Availability</span>
-                                    </div>
-                                    <p className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>{avail}</p>
-                                  </div>
-                                )}
-                                {maps && (
-                                  <a href={String(maps)} target="_blank" rel="noopener noreferrer"
-                                    className="flex items-center justify-center gap-1.5 rounded-xl p-2.5 transition-all hover:opacity-90"
-                                    style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
-                                    <MdOpenInNew size={14} style={{ color: BRAND_ACCENT }} />
-                                    <span className="text-[12.5px] font-semibold" style={{ color: 'var(--text-primary)' }}>View on Google Maps</span>
-                                    <MdChevronRight size={15} style={{ color: 'var(--text-muted)' }} />
-                                  </a>
-                                )}
-                              </div>
+                            {/* View on Google Maps — full width */}
+                            {maps && (
+                              <a href={String(maps)} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center justify-center gap-1.5 rounded-xl p-3 mt-2 transition-all hover:opacity-90"
+                                style={{ background: tileBg, border: `1px solid ${accentBorder}` }}>
+                                <MdPlace size={15} style={{ color: BRAND_ACCENT }} />
+                                <span className="text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>View on Google Maps</span>
+                                <MdOpenInNew size={13} style={{ color: 'var(--text-muted)' }} />
+                              </a>
                             )}
 
-                            {/* Other details */}
-                            {otherDetails && (
+                            {/* Other details (Floor + Area + free text) */}
+                            {otherDetailsFull && (
                               <div className="flex items-start gap-3 rounded-xl p-3 mt-2" style={{ background: tileBg, border: '1px solid var(--border-primary)' }}>
                                 <span className="flex items-center justify-center rounded-lg flex-shrink-0" style={{ width: 34, height: 34, background: accentSoft }}>
                                   <MdDescription size={17} style={{ color: BRAND_ACCENT }} />
                                 </span>
                                 <div className="min-w-0">
                                   <p className="text-[12px] font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>Other details</p>
-                                  <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{otherDetails}</p>
+                                  <p className="text-[12px] leading-snug" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{otherDetailsFull}</p>
                                 </div>
                               </div>
                             )}
@@ -2529,9 +2524,20 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 <MdImage size={17} style={{ color: BRAND_ACCENT }} />
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[12px] font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-                                  Photos{imgs.length ? ` (${imgs.length})` : ''}
-                                </p>
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <div className="min-w-0">
+                                    <p className="text-[12px] font-semibold" style={{ color: 'var(--text-primary)' }}>Property photos{imgs.length ? ` (${imgs.length})` : ''}</p>
+                                    {imgs.length === 0 && (
+                                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No photos uploaded yet.</p>
+                                    )}
+                                  </div>
+                                  {listingUrl && (
+                                    <a href={listingUrl} target="_blank" rel="noopener noreferrer"
+                                      className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg flex-shrink-0 transition-all hover:opacity-90" style={{ border: `1px solid ${accentBorder}`, color: 'var(--text-primary)' }}>
+                                      View listing <MdOpenInNew size={12} style={{ color: BRAND_ACCENT }} />
+                                    </a>
+                                  )}
+                                </div>
                                 {imgs.length > 0 ? (
                                   <div className="flex flex-wrap gap-2">
                                     {imgs.map((img: any, i: number) => (
@@ -2545,7 +2551,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 ) : lkz.property_id ? (
                                   <LokazenPropertyGallery propertyId={String(lkz.property_id)} />
                                 ) : (
-                                  <p className="text-[12px]" style={{ color: 'var(--text-muted)' }}>No photos shared yet</p>
+                                  <div className="flex flex-col items-center justify-center gap-1 rounded-xl py-6 px-3 text-center" style={{ border: '1px dashed var(--border-primary)' }}>
+                                    <MdImage size={22} style={{ color: 'var(--text-muted)' }} />
+                                    <p className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>No photos yet</p>
+                                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Add photos to give buyers a better view</p>
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -2568,8 +2578,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               {pushingListing !== 'done' && pushingListing !== 'pushing' && <MdFileUpload size={18} />}
                               {pushingListing === 'pushing' ? 'Pushing to Lokazen…'
                                 : pushingListing === 'done' ? '✓ Listed on Lokazen'
-                                : pushingListing === 'error' ? 'Failed — tap to retry'
-                                : 'Push to Lokazen (list property)'}
+                                : pushingListing === 'error' ? 'Failed, tap to retry'
+                                : 'Push to Lokazen'}
                             </button>
                           </div>
                             )
