@@ -454,6 +454,16 @@ export default function LeadsTable({
       })
     }
 
+    // Webinar view: float the leads who actually attended to the top so the
+    // post-event "who showed up" list reads at a glance (stable otherwise).
+    if (webinarView) {
+      filtered = [...filtered].sort((a, b) => {
+        const aa = a.unified_context?.[brandId]?.zoom_attended ? 1 : 0
+        const bb = b.unified_context?.[brandId]?.zoom_attended ? 1 : 0
+        return bb - aa
+      })
+    }
+
     if (limit) {
       filtered = filtered.slice(0, limit)
     }
@@ -1942,6 +1952,33 @@ export default function LeadsTable({
                           >
                             {n > 0 ? `${n} submitted` : '0'}
                           </span>
+                        )
+                      })() : webinarView ? (() => {
+                        // Webinar view: attendance wins if we have it (matched from
+                        // the Zoom report after the event), else did they COMPLETE
+                        // Zoom registration vs just click Register?
+                        const wc = uc?.[brandId] || {}
+                        if (wc.zoom_attended) {
+                          const mins = Number(wc.zoom_attended_minutes)
+                          return (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                              style={{ background: 'rgba(22,163,74,0.18)', color: '#22c55e', border: '1px solid rgba(22,163,74,0.4)' }}
+                              title={wc.zoom_attended_at ? `Joined ${new Date(wc.zoom_attended_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : 'Attended the webinar'}
+                            >
+                              <span aria-hidden="true">✓</span> Attended{mins > 0 ? ` ${mins}m` : ''}
+                            </span>
+                          )
+                        }
+                        return wc.zoom_registered ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
+                          >
+                            <span aria-hidden="true">✓</span> Registered
+                          </span>
+                        ) : (
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
                         )
                       })() : bookingDate ? (() => {
                         // Resolve session type: explicit field wins, else infer from meet link presence.

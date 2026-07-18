@@ -32,6 +32,7 @@ import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 import WhatsAppTemplatePicker from '@/components/dashboard/WhatsAppTemplatePicker'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId } from '@/configs'
+import { WA_TEMPLATE_BODIES, renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 // One brand per build — resolves statically. bcon's inbox carries extra
 // fork-specific UI (full Meta-form card, planned follow-ups timeline) and a
@@ -2327,6 +2328,38 @@ export default function InboxPage() {
                   // show a "Manual" badge so it's distinct from the bot's auto-replies.
                   const isManual = !isCustomer && msg.metadata?.human === true
 
+                  // Resolve the ACTUAL approved template so the card shows the real
+                  // copy + buttons even for older sends that logged a hand-written
+                  // stub (no buttons, inline URL, debug suffix). The registry is the
+                  // source of truth; metadata wins only where it already carries the
+                  // richer fields.
+                  const tplName: string | undefined = isTemplate ? msg.metadata?.template_name : undefined
+                  const tplReg = tplName ? WA_TEMPLATE_BODIES[tplName] : undefined
+                  // Body: for a webinar template, re-render from the registry with
+                  // the lead's name + webinar so the join link lives in the button,
+                  // not the text. Other templates keep their logged content.
+                  let templateBody: string = msg.content
+                  if (tplReg && tplName?.startsWith('windchasers_webinar_')) {
+                    const first = (selectedConversation?.lead_name || '').split(' ')[0]
+                    const re = renderWaTemplate(tplName, {
+                      customer_name: first || 'there',
+                      webinar_name: msg.metadata?.webinar_name || 'our webinar',
+                      when: msg.metadata?.when || msg.metadata?.webinar_date || '',
+                    })
+                    if (re?.content) templateBody = re.content
+                  }
+                  const effButtons: string[] | undefined =
+                    Array.isArray(msg.metadata?.template_buttons) && msg.metadata.template_buttons.length
+                      ? msg.metadata.template_buttons
+                      : tplReg?.buttons
+                  const effFooter: string | undefined = msg.metadata?.template_footer || tplReg?.footer
+                  const effButtonType = (idx: number): 'url' | 'quick_reply' =>
+                    (Array.isArray(msg.metadata?.template_button_types) && msg.metadata.template_button_types[idx])
+                      || tplReg?.buttonTypes?.[idx]
+                      || msg.metadata?.template_button_type
+                      || tplReg?.buttonType
+                      || 'quick_reply'
+
                   return (
                     <React.Fragment key={msg.id}>
                     {dateSeparator}
@@ -2418,7 +2451,7 @@ export default function InboxPage() {
                              asterisks ("All set, Punith. Your demo is locked in for
                              *Tuesday, May 26*."). */}
                           {(isTemplate || msg.channel === 'whatsapp')
-                            ? renderWhatsAppMarkdown(msg.content)
+                            ? renderWhatsAppMarkdown(isTemplate ? templateBody : msg.content)
                             : renderMarkdown(msg.content)}
                         </div>
                         {/* WhatsApp-style time, bottom-right of the bubble (ticks
@@ -2541,12 +2574,12 @@ export default function InboxPage() {
                         {/* Meta-approved template FOOTER (e.g. "Team Windchasers") —
                             small grey line under the body, above the buttons, mirroring
                             how WhatsApp shows the real template. */}
-                        {isTemplate && msg.metadata?.template_footer && (
+                        {isTemplate && effFooter && (
                           <div className="px-2.5 pb-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                            {msg.metadata.template_footer}
+                            {effFooter}
                           </div>
                         )}
-                        {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
+                        {effButtons && effButtons.length > 0 && (
                           isTemplate ? (
                             // WhatsApp-style buttons — stacked, divided by hairlines.
                             // Theme-aware: uses var(--accent-primary) for label + var(--border-primary)
@@ -2557,8 +2590,8 @@ export default function InboxPage() {
                             // Meta's side, not something we send, so it's shown as a
                             // label only (no href) rather than guessing a link.
                             <div className="flex flex-col" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => {
-                                const isUrlButton = msg.metadata?.template_button_type === 'url'
+                              {effButtons.map((btn: string, btnIdx: number) => {
+                                const isUrlButton = effButtonType(btnIdx) === 'url'
                                 return (
                                   <div
                                     key={btnIdx}
@@ -2589,7 +2622,7 @@ export default function InboxPage() {
                             </div>
                           ) : (
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                              {effButtons.map((btn: string, btnIdx: number) => (
                                 <span
                                   key={btnIdx}
                                   className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"

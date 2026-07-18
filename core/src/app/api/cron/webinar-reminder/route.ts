@@ -19,14 +19,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, logMessage, sendWebinarReminder, sendWebinarRegisterNudge, sendWebinarStartingSoon, sendWebinarLiveNow } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const TEMPLATE = 'windchasers_webinar_reminder_v1'
-const NUDGE_TEMPLATE = 'windchasers_webinar_register_nudge_v1'
-const STARTING_SOON_TEMPLATE = 'windchasers_webinar_starting_soon_v1'
-const LIVE_TEMPLATE = 'windchasers_webinar_live_now_v1'
+// Names logged on each send = the template that ACTUALLY goes out (v2/v3), so the
+// inbox renders the exact approved copy + buttons. The senders send these too.
+const TEMPLATE = 'windchasers_webinar_reminder_v2'
+const NUDGE_TEMPLATE = 'windchasers_webinar_register_nudge_v2'
+const STARTING_SOON_TEMPLATE = 'windchasers_webinar_starting_soon_v3'
+const LIVE_TEMPLATE = 'windchasers_webinar_live_now_v3'
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -106,13 +109,14 @@ export async function GET(req: NextRequest) {
           continue // no marker on failure → retried next run (e.g. once Meta approves the template)
         }
         const nudgeName = (lead.customer_name || 'there').split(' ')[0]
+        const nudgeRendered = renderWaTemplate(NUDGE_TEMPLATE, { customer_name: nudgeName, webinar_name: webinarName || 'our webinar' })
         await logMessage(
           lead.id,
           'whatsapp',
           'agent',
-          `Hi ${nudgeName}, you started signing up for ${webinarName || 'our webinar'} but didn't finish. Complete your registration here: ${registerUrl} (${NUDGE_TEMPLATE} template)`,
+          nudgeRendered?.content || `Hi ${nudgeName}, you showed interest in our ${webinarName || 'our webinar'} webinar but haven't completed your registration yet. Tap Complete Registration to secure your spot.`,
           'template',
-          { source: 'webinar_register_nudge', template_name: NUDGE_TEMPLATE, trigger: 'webinar_register_nudge', webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar', wa_message_id: result.messageId || null, delivery_status: result.messageId ? 'sent' : undefined },
+          { source: 'webinar_register_nudge', template_name: NUDGE_TEMPLATE, trigger: 'webinar_register_nudge', webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar', wa_message_id: result.messageId || null, delivery_status: result.messageId ? 'sent' : undefined, template_footer: nudgeRendered?.footer, template_buttons: nudgeRendered?.buttons, template_button_type: nudgeRendered?.buttonType, template_button_types: nudgeRendered?.buttonTypes },
           supabase,
         )
         await supabase
@@ -151,14 +155,19 @@ export async function GET(req: NextRequest) {
           }
           const dfn = (lead.customer_name || 'there').split(' ')[0]
           const tpl = dayStep === 'live' ? LIVE_TEMPLATE : STARTING_SOON_TEMPLATE
-          const body = dayStep === 'live'
-            ? `Hi ${dfn}, we're live now — ${webinarName || 'our webinar'} has started. Join here: ${joinUrl} (${tpl} template)`
-            : `Hi ${dfn}, ${webinarName || 'our webinar'} starts in 30 minutes. Join here: ${joinUrl} (${tpl} template)`
+          // Log the EXACT approved template (clean body + button), not a stub — so
+          // the inbox shows what the lead actually received (join link is in the
+          // button, never inline). joinUrl stays out of the body by design.
+          const rendered = renderWaTemplate(tpl, { customer_name: dfn, webinar_name: webinarName || 'our webinar' })
+          const body = rendered?.content
+            || (dayStep === 'live'
+              ? `Hi ${dfn}, we are live now. ${webinarName || 'our webinar'} has started. Tap Join webinar below.`
+              : `Hi ${dfn}, your ${webinarName || 'our webinar'} webinar starts in 30 minutes. Tap Join webinar below.`)
           await logMessage(
             lead.id, 'whatsapp', 'agent', body, 'template',
             // Store Meta's wamid so the delivery webhook can match this send and
             // stamp delivered/read (without it the campaign shows 0 delivered/read).
-            { source: `webinar_${dayStep}`, template_name: tpl, trigger: `webinar_${dayStep}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar_18jul', wa_message_id: send.messageId || null, delivery_status: send.messageId ? 'sent' : undefined },
+            { source: `webinar_${dayStep}`, template_name: tpl, trigger: `webinar_${dayStep}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar_18jul', wa_message_id: send.messageId || null, delivery_status: send.messageId ? 'sent' : undefined, template_footer: rendered?.footer, template_buttons: rendered?.buttons, template_button_type: rendered?.buttonType, template_button_types: rendered?.buttonTypes },
             supabase,
           )
           await supabase
@@ -193,13 +202,14 @@ export async function GET(req: NextRequest) {
       }
 
       const firstName = (lead.customer_name || 'there').split(' ')[0]
+      const remRendered = renderWaTemplate(TEMPLATE, { customer_name: firstName, webinar_name: webinarName || 'our webinar', when })
       await logMessage(
         lead.id,
         'whatsapp',
         'agent',
-        `Hi ${firstName}, reminder: ${webinarName || 'our webinar'} starts ${when}. (${TEMPLATE} template)`,
+        remRendered?.content || `Hi ${firstName}, a quick reminder about the ${webinarName || 'our webinar'} webinar. It starts ${when}.`,
         'template',
-        { source: 'webinar_reminder', template_name: TEMPLATE, trigger: `webinar_reminder_${step}`, webinar_name: webinarName || null, webinar_date: rawDate },
+        { source: 'webinar_reminder', template_name: TEMPLATE, trigger: `webinar_reminder_${step}`, webinar_name: webinarName || null, webinar_date: rawDate, campaign: 'webinar', wa_message_id: result.messageId || null, delivery_status: result.messageId ? 'sent' : undefined, template_footer: remRendered?.footer, template_buttons: remRendered?.buttons, template_button_type: remRendered?.buttonType, template_button_types: remRendered?.buttonTypes },
         supabase,
       )
       // Mark the step sent (re-merge onto the snapshot ctx we already hold).

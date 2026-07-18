@@ -711,7 +711,7 @@ export async function sendWebinarReminder(
   name: string,
   webinarName: string,
   when: string,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const components = [
