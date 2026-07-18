@@ -270,7 +270,13 @@ function leadCategoryChips(uc: Record<string, any> | null | undefined, formData?
   else if (ut.includes('student')) chips.push({ label: 'Student', color: '#22c55e' })
   else if (ut.includes('professional')) chips.push({ label: 'Professional', color: '#0ea5e9' })
   else if (ut) chips.push({ label: title(ut), color: '#0ea5e9' })
-  return chips.slice(0, 2)
+  const out = chips.slice(0, 2)
+  // Attended chip (webinar): prepend a green "attended Nm" so it stands out.
+  if (bc.zoom_attended) {
+    const mins = Number(bc.zoom_attended_minutes)
+    out.unshift({ label: mins > 0 ? `Attended ${mins}m` : 'Attended', color: '#16a34a' })
+  }
+  return out.slice(0, 3)
 }
 
 function cleanMessageContent(text: string): string {
@@ -2893,6 +2899,11 @@ export default function InboxPage() {
             const profileRows: { label: string; value: string }[] = []
             if (userType) profileRows.push({ label: 'Type', value: String(userType) })
             if (courseInterest) profileRows.push({ label: 'Course', value: String(courseInterest) })
+            if (wc.zoom_attended) {
+              const m = Number(wc.zoom_attended_minutes)
+              const when = wc.zoom_attended_at ? new Date(wc.zoom_attended_at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : ''
+              profileRows.push({ label: 'Attended', value: `Yes${m > 0 ? ` · ${m} min` : ''}${when ? ` · joined ${when}` : ''}` })
+            }
             if (age) profileRows.push({ label: 'Age', value: String(age) })
             if (city) profileRows.push({ label: 'City', value: String(city) })
             if (source) profileRows.push({ label: 'Source', value: String(source).replace(/_/g, ' ') })
