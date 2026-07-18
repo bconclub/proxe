@@ -88,10 +88,24 @@ export async function GET() {
     if (tpl) (clickedByTpl[tpl] = clickedByTpl[tpl] || new Set<string>()).add(e.lead_id)
   }
 
+  // One webinar = one EVENT, even though its templates were tagged with slightly
+  // different campaign strings (e.g. `webinar_18jul` vs `webinar_thankyou_18jul`)
+  // and carry different titles in metadata (the day-of sends use the real Zoom
+  // name; the register nudge carries the Meta AD name of the audience it came
+  // from). Collapse each campaign tag to a stable event key so every template of
+  // the same webinar groups together.
+  const eventKey = (campaign: string) => {
+    const parts = String(campaign || '').split('_').filter((p) => p && p !== 'webinar' && p !== 'thankyou')
+    return parts.join('_') || 'webinar'
+  }
+
   // Group by TEMPLATE — each template we send is its own campaign (one template,
-  // one audience). Never merged. The user reasons per-template, so the card is
-  // per-template.
+  // one audience). Never merged. Alongside, tally per-event votes for the webinar
+  // title and date at the ROW level so the group header uses the name/date that
+  // most sends actually carried (the Zoom name wins over a stray ad name).
   const byTpl: Record<string, any> = {}
+  const nameVotes: Record<string, Record<string, number>> = {}
+  const dateVotes: Record<string, Record<string, number>> = {}
   for (const r of rows) {
     const m: any = r.metadata || {}
     const tpl = String(m.template_name || m.source || 'send')
@@ -109,6 +123,11 @@ export async function GET() {
     const ds = m.delivery_status
     if (ds === 'read') { c.read++; c.delivered++ }
     else if (ds === 'delivered') c.delivered++
+    if (String(c.campaign || m.campaign || '').startsWith('webinar')) {
+      const ek = eventKey(m.campaign)
+      if (m.webinar_name) { (nameVotes[ek] = nameVotes[ek] || {})[m.webinar_name] = (nameVotes[ek][m.webinar_name] || 0) + 1 }
+      if (m.webinar_date) { (dateVotes[ek] = dateVotes[ek] || {})[m.webinar_date] = (dateVotes[ek][m.webinar_date] || 0) + 1 }
+    }
   }
 
   // Prettify a raw template name when we have no friendly label for its source.
@@ -121,18 +140,19 @@ export async function GET() {
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ')
 
-  // Templates for one webinar don't all carry its title in metadata — the
-  // reminder / day-of sends do, but the register nudge and thank-you don't.
-  // Collapse each campaign tag to a stable event key (drop the webinar/thankyou
-  // qualifiers, keep the date) and resolve a single title per event, so every
-  // template of the same webinar groups under one header on the page.
-  const eventKey = (campaign: string) => {
-    const parts = String(campaign || '').split('_').filter((p) => p && p !== 'webinar' && p !== 'thankyou')
-    return parts.join('_') || 'webinar'
-  }
+  // Pick the most-voted value in a tally.
+  const topVote = (votes?: Record<string, number>): string =>
+    votes ? (Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] || '') : ''
+  // "18 July 2026 at 11:30 AM IST" -> "18 July 2026" (drop the time-of-day tail).
+  const dayOf = (raw: string): string => String(raw || '').split(/\s+at\s+/i)[0].trim()
+
+  // Canonical title per event = the dominant Zoom name + the webinar day, so the
+  // group header reads e.g. "Pilot Training Complete Roadmap 2026 · 18 July 2026".
   const titleByEvent: Record<string, string> = {}
-  for (const c of Object.values(byTpl) as any[]) {
-    if (c.webinarName) titleByEvent[eventKey(c.campaign)] = titleByEvent[eventKey(c.campaign)] || c.webinarName
+  for (const ek of new Set([...Object.keys(nameVotes), ...Object.keys(dateVotes)])) {
+    const name = topVote(nameVotes[ek])
+    const day = dayOf(topVote(dateVotes[ek]))
+    titleByEvent[ek] = [name, day].filter(Boolean).join(' · ')
   }
 
   const campaigns = Object.values(byTpl)
@@ -145,10 +165,11 @@ export async function GET() {
       return {
         id: c.template,
         name: label,
-        // The webinar title this send belongs to (used to group cards on the
-        // page). Falls back to the event's shared title so nudge / thank-you
-        // (which carry no title of their own) still group with their webinar.
-        webinar: isWebinar ? (c.webinarName || titleByEvent[eventKey(c.campaign)] || 'Webinar') : null,
+        // The webinar this send belongs to (used to group cards on the page).
+        // ALWAYS the event's canonical "Zoom name · date" so every template of one
+        // webinar groups together — the per-send webinar_name is deliberately
+        // ignored because the nudge audience carries a different (ad) name.
+        webinar: isWebinar ? (titleByEvent[eventKey(c.campaign)] || c.webinarName || 'Webinar') : null,
         description: `${audience ? audience + ' · ' : ''}${c.template}`,
         type: isWebinar ? 'Webinar' : 'Campaign',
         recipients: c.leads.size,
