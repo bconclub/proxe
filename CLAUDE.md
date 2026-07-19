@@ -32,6 +32,8 @@ Per-brand deploys are scoped by `core/scripts/vercel-ignore.sh` reading the **co
 - touching `brands/<id>/` → that brand rebuilds
 So: scope the commit by blast radius. Brand-scoped commits that also change shared behavior will leave other brands stale — use a generic scope for shared changes.
 
+A `commit-msg` hook (`scripts/git-hooks/commit-msg`, installed to `.git/hooks/`) prints a **warning** (never blocks) when a `core/`-touching commit uses a generic/non-brand scope, since that rebuilds ALL 5 brands. A flag-gated feature (e.g. `logCallChat` = bcon only) should ship `feat(bcon):` and build 1 brand, not 5. Reinstall on a fresh clone: `cp scripts/git-hooks/commit-msg .git/hooks/ && chmod +x .git/hooks/commit-msg`. Silence per-commit with `PROXE_NO_SCOPE_HINT=1`.
+
 ## WORK DISCIPLINE — worktree per thread (MANDATORY)
 
 Multiple Claude threads run concurrently on this machine. The main checkout at `C:\GO PROXe` is a shared, permanently-dirty tree. **Never commit from it; never `git add -A` anywhere.**

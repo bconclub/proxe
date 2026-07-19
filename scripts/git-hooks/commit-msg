@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# commit-msg — BUILD-COST ADVISORY (warning only, never blocks).
+#
+# Mirrors core/scripts/vercel-ignore.sh: a commit that touches core/ with a
+# GENERIC / non-brand scope rebuilds ALL 5 brand projects. A brand-scoped
+# commit (feat(bcon):, fix(windchasers): ...) rebuilds only that brand.
+#
+# This hook does NOT change your commit. It just prints, at commit time, how
+# many brand builds the scope you chose will trigger, so a bcon-gated change
+# (flag off elsewhere) gets scoped feat(bcon): instead of feat(core): and
+# builds 1 brand, not 5. See CLAUDE.md "scope the commit by blast radius".
+#
+# Never exits non-zero -> can never block a commit or disrupt a concurrent
+# thread. Silence entirely with PROXE_NO_SCOPE_HINT=1.
+
+[ "${PROXE_NO_SCOPE_HINT:-}" = "1" ] && exit 0
+
+msg_file="$1"
+subj="$(sed -n '1p' "$msg_file" 2>/dev/null)"
+# Ignore merge / revert / fixup auto-messages.
+case "$subj" in
+  Merge*|Revert*|fixup!*|squash!*) exit 0 ;;
+esac
+
+# Files in THIS commit (staged tree).
+files="$(git diff --cached --name-only 2>/dev/null || true)"
+echo "$files" | grep -q "^core/" || exit 0   # no core/ change -> scoping is moot
+
+scope="$(printf '%s' "$subj" | sed -n 's/^[a-zA-Z][a-zA-Z]*(\([^)]*\)):.*/\1/p')"
+
+case "$scope" in
+  lokazen|bcon|proxe|windchasers|windchaser|pop|pop-voice)
+    exit 0 ;;  # brand scope -> only that brand rebuilds, nothing to warn
+esac
+
+# core/ touched with a generic / non-brand scope -> ALL 5 brands rebuild.
+brands_touched="$(echo "$files" | sed -n 's;^brands/\([^/]*\)/.*;\1;p' | sort -u | tr '\n' ' ')"
+printf '\n\033[33m[build-cost]\033[0m core/ change with scope "%s" -> rebuilds ALL 5 brands.\n' "${scope:-<none>}"
+echo   "            Only correct if this change is LIVE for every brand right now."
+echo   "            If it is gated to one brand (feature flag off elsewhere), scope it"
+echo   "            feat(<brand>): (e.g. feat(bcon):) so ONLY that brand builds."
+[ -n "$brands_touched" ] && echo "            (brand folders in this commit: $brands_touched)"
+echo   "            Intentional shared change? Ignore this. Silence: PROXE_NO_SCOPE_HINT=1."
+echo
+exit 0
