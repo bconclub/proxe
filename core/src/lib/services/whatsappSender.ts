@@ -32,9 +32,12 @@ async function getCredentials() {
   return creds;
 }
 
-/** Normalize phone: strip everything except digits */
-function normalizePhone(phone: string): string {
-  return phone.replace(/[^0-9]/g, '');
+/** Normalize phone: strip everything except digits.
+ *  Coerce first — Pabbly (and other inbound integrations) sometimes send the
+ *  phone as a JSON number, which would throw "e.replace is not a function" and
+ *  500 the whole facebook-lead / inbound send. String() keeps every caller safe. */
+function normalizePhone(phone: string | number | null | undefined): string {
+  return String(phone ?? '').replace(/[^0-9]/g, '');
 }
 
 /** Extract the dynamic suffix from a template URL parameter.
