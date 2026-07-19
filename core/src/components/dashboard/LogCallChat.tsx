@@ -73,12 +73,34 @@ const STEP_ICON: Record<string, React.ReactNode> = {
   move: <MdSwapHoriz size={14} />,
   message: <MdOutlineWavingHand size={14} />,
 }
+// Human date + time for the chips: relative day (Today/Tomorrow) or "Mon, 20
+// Jul", and 12-hour time with AM/PM. Never a raw ISO string.
+function fmtWhen(dateStr?: string, timeStr?: string): string {
+  let dayLabel = ''
+  if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, mo, da] = dateStr.split('-').map(Number)
+    const dt = new Date(y, mo - 1, da)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const diff = Math.round((dt.getTime() - today.getTime()) / 86400000)
+    dayLabel = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : diff === -1 ? 'Yesterday'
+      : dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+  } else if (dateStr) {
+    dayLabel = dateStr
+  }
+  let timeLabel = ''
+  if (timeStr && /^\d{1,2}:\d{2}/.test(timeStr)) {
+    const [h, m] = timeStr.split(':').map(Number)
+    const ap = h >= 12 ? 'PM' : 'AM'
+    timeLabel = `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ap}`
+  }
+  return [dayLabel, timeLabel].filter(Boolean).join(', ')
+}
 function stepChipLabel(step: DecisionStep): string {
   const d = step.detail || {}
-  const when = [d.date, d.time].filter(Boolean).join(' ')
+  const when = fmtWhen(d.date, d.time)
   switch (step.action) {
-    case 'book': return `Book ${when || 'the slot'} + reminders`
-    case 'task': return `Remind you ${when}`.trim()
+    case 'book': return `Book ${when || 'the slot'}, with reminders`
+    case 'task': return `Remind you ${when || 'later'}`
     case 'close': return `Close: ${d.stage}`
     case 'sequence': return `AI ${d.sequence} sequence`
     case 'move': return `Move to ${d.stage}`
