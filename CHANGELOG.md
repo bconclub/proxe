@@ -1,3 +1,10 @@
+## 2026-07-18 · fix(core): simpler log-call chat + a real "send a thank-you" action
+
+- The post-call chat was too busy: it hedged ("a call happened or a callback is planned") and dumped the worker's internal steps ("Mark last touchpoint as voice", "Stage to X, score 80") plus a redundant confirm card on open. Now PROXe opens with ONE clean line ("Call logged. ...") and chips, no jargon, no premature card.
+- New "message" action: PROXe drafts a short thank-you and, on Confirm, sends it on WhatsApp right after the call. Free-form text works inside the 24h window; outside it (common after a phone call) the drafted message is saved as a note so nothing is lost, and the result says which happened. A thank-you send does not claim the lead or stop the AI cadence.
+- POST_CALL suggestion copy reworded to "The call is done. I'd send a quick thank-you now and keep it moving." Applies to both the chat and the legacy hub.
+- `(pending-sha)`
+
 ## 2026-07-18 · feat(core): log a call opens a chat with PROXe (decide next steps in conversation)
 
 - After logging a call, instead of a static "what next" grid, a chat with PROXe opens (behind features.logCallChat, ON for bcon): PROXe opens by saying what is going on with the lead and what it would do, the human types free text or taps option chips, and PROXe proposes a confirmation card. One Confirm executes the whole plan. The chat transcript is the learning signal, no separate "why" box.

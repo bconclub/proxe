@@ -310,8 +310,8 @@ export function proposePlan(c: NoteClassification): PlanProposal {
     case 'POST_CALL':
       return {
         category: c.category, action: 'post_call',
-        reason: 'A call happened or a callback is planned. I\'d keep it warm with one light touch.',
-        next_steps: ['Mark last touchpoint as voice', 'Post-call follow-up in 1 hour'],
+        reason: 'The call is done. I\'d send a quick thank-you now and keep it moving.',
+        next_steps: ['Send a thank-you message', 'Keep the lead warm'],
       };
     case 'DEMO_TAKEN':
       return {
