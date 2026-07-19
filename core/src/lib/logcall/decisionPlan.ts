@@ -128,6 +128,11 @@ export function validateSteps(rawSteps: any): DecisionStep[] {
     }
     steps.push(step)
   }
+  // close and sequence are contradictory: closing a lead must not also run an
+  // AI cadence on it. If both slipped through, closing wins.
+  if (steps.some((s) => s.action === 'close')) {
+    return steps.filter((s) => s.action !== 'sequence')
+  }
   return steps
 }
 

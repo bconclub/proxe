@@ -50,17 +50,41 @@ function describeStep(step: DecisionStep): string {
   }
 }
 
-// The FIXED next-step menu. `message` opens the template picker (client-side);
-// the rest are conversational (go to PROXe). `rec` maps an AI-proposed action
-// to the highlighted step.
+// The FIXED next-step menu (trimmed to the four that matter: message opens the
+// template picker; book/task/close are conversational). Every menu key that a
+// proposed plan touches gets highlighted, so "send thank-you + book + remind"
+// all light up together. `rec` maps an AI-proposed action to a highlight.
 const NEXT_STEPS: Array<{ key: string; label: string; icon: React.ReactNode; prompt?: string; rec: string[] }> = [
   { key: 'message', label: 'Send a thank-you', icon: <MdOutlineWavingHand size={15} />, rec: ['post_call', 'message', 'none'] },
   { key: 'book', label: 'Book / reschedule', icon: <MdEventAvailable size={15} />, prompt: 'Help me book or reschedule a demo for this lead.', rec: ['book'] },
   { key: 'task', label: 'Remind me', icon: <MdNotificationsActive size={15} />, prompt: 'Set me a follow-up reminder for this lead.', rec: [] },
-  { key: 'move', label: 'Move stage', icon: <MdSwapHoriz size={15} />, prompt: 'Move this lead to a different stage.', rec: ['nurture'] },
-  { key: 'sequence', label: 'Hand to AI', icon: <MdRepeat size={15} />, prompt: 'Put this lead into an automated follow-up sequence.', rec: ['sequence'] },
   { key: 'close', label: 'Close lead', icon: <MdBlock size={15} />, prompt: 'Close this lead.', rec: ['close'] },
 ]
+// Plan step action → the menu key it lights up.
+const STEP_TO_KEY: Record<string, string> = { book: 'book', task: 'task', close: 'close', message: 'message' }
+
+// Short chip labels + icons for the confirm card (compact, not a sentence).
+const STEP_ICON: Record<string, React.ReactNode> = {
+  book: <MdEventAvailable size={14} />,
+  task: <MdNotificationsActive size={14} />,
+  close: <MdBlock size={14} />,
+  sequence: <MdRepeat size={14} />,
+  move: <MdSwapHoriz size={14} />,
+  message: <MdOutlineWavingHand size={14} />,
+}
+function stepChipLabel(step: DecisionStep): string {
+  const d = step.detail || {}
+  const when = [d.date, d.time].filter(Boolean).join(' ')
+  switch (step.action) {
+    case 'book': return `Book ${when || 'the slot'} + reminders`
+    case 'task': return `Remind you ${when}`.trim()
+    case 'close': return `Close: ${d.stage}`
+    case 'sequence': return `AI ${d.sequence} sequence`
+    case 'move': return `Move to ${d.stage}`
+    case 'message': return `Template: ${d.template}`
+    default: return step.action
+  }
+}
 
 // Which approved templates fit the call outcome. Connected → a post-call
 // thank-you; a missed call → an R&R / missed-call template.
@@ -158,6 +182,19 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
       if (messages[i].role === 'assistant') return messages[i].plan || null
     }
     return null
+  })()
+
+  // Every menu key the current proposal touches lights up together. From the
+  // active plan's steps, plus the recommended step, plus a thank-you whenever a
+  // plan exists on a connected call (the message send is always sensible then).
+  const highlightKeys = (() => {
+    const keys = new Set<string>()
+    if (recKey) keys.add(recKey)
+    if (activePlan) {
+      for (const s of activePlan.steps) { const k = STEP_TO_KEY[s.action]; if (k) keys.add(k) }
+      if (outcome === 'Connected') keys.add('message')
+    }
+    return keys
   })()
 
   const send = async (text: string) => {
@@ -266,6 +303,12 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         </div>
 
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+          {/* What the human logged (their input), shown up top. */}
+          <div className="flex items-start gap-2 text-[12px] rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+            <span className="font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>You logged</span>
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>{outcome}</span>
+            {notes.trim() && <span className="min-w-0">{notes.trim()}</span>}
+          </div>
           {loading ? (
             <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}><MdAutorenew className="animate-spin" size={14} /> Reading the context…</div>
           ) : messages.map((m, i) => {
@@ -293,15 +336,22 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                     </div>
                   )}
 
-                  {/* Confirm card: newest assistant plan */}
+                  {/* Confirm card: newest assistant plan, shown as step chips */}
                   {m.role === 'assistant' && isLastAssistant && m.plan && (
                     <div className="mt-2 rounded-xl border p-3" style={{ borderColor: ACCENT, background: `color-mix(in srgb, ${ACCENT} 8%, var(--bg-primary))` }}>
-                      <div className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>{m.plan.summary}</div>
-                      <ul className="space-y-0.5 mb-2.5">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Here is what I will set up</div>
+                      <div className="flex flex-wrap gap-1.5 mb-2.5">
+                        {outcome === 'Connected' && (
+                          <button onClick={openThankYou} className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-90" style={{ borderColor: ACCENT, background: `color-mix(in srgb, ${ACCENT} 12%, transparent)`, color: 'var(--text-primary)' }} title="Pick the template to send">
+                            <MdOutlineWavingHand size={14} style={{ color: ACCENT }} /> Send a thank-you
+                          </button>
+                        )}
                         {m.plan.steps.map((s, j) => (
-                          <li key={j} className="text-[12px] flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}><span style={{ color: ACCENT }}>•</span> {describeStep(s)}</li>
+                          <span key={j} className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1.5 rounded-lg" style={{ background: 'var(--bg-hover)', color: 'var(--text-primary)' }}>
+                            <span style={{ color: ACCENT }}>{STEP_ICON[s.action] || <MdCheck size={14} />}</span> {stepChipLabel(s)}
+                          </span>
                         ))}
-                      </ul>
+                      </div>
                       <button onClick={confirm} disabled={saving} className="w-full text-[12.5px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-40 flex items-center justify-center gap-1.5" style={{ background: ACCENT }}><MdCheck size={15} /> {saving ? 'Saving…' : 'Confirm'}</button>
                     </div>
                   )}
@@ -323,15 +373,15 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         {/* Fixed, predictable next-steps menu */}
         <div className="px-3 pt-2" style={{ borderTop: '1px solid var(--border-primary)' }}>
           <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Next steps</div>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             {NEXT_STEPS.map((s) => {
-              const recommended = recKey === s.key
+              const lit = highlightKeys.has(s.key)
               return (
                 <button key={s.key} onClick={() => (s.key === 'message' ? openThankYou() : send(s.prompt!))} disabled={busy || loading}
-                  className="flex items-center gap-1.5 text-[11.5px] font-medium px-2 py-1.5 rounded-lg border text-left transition-colors hover:opacity-80 disabled:opacity-40"
-                  style={{ borderColor: recommended ? ACCENT : 'var(--border-primary)', background: recommended ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)', color: 'var(--text-primary)' }}
-                  title={recommended ? 'PROXe suggests this' : undefined}>
-                  <span style={{ color: recommended ? ACCENT : 'var(--text-secondary)' }}>{s.icon}</span>
+                  className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1.5 rounded-lg border text-left transition-colors hover:opacity-80 disabled:opacity-40"
+                  style={{ borderColor: lit ? ACCENT : 'var(--border-primary)', background: lit ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                  title={lit ? 'PROXe suggests this' : undefined}>
+                  <span style={{ color: lit ? ACCENT : 'var(--text-secondary)' }}>{s.icon}</span>
                   <span className="truncate">{s.label}</span>
                 </button>
               )
