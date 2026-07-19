@@ -10,7 +10,7 @@
 import { LEAD_STAGE_VALUES } from '@/configs/lead-stages'
 import { resolveBookingDate } from '@/lib/services'
 
-export type DecisionAction = 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close'
+export type DecisionAction = 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'message'
 export type SequenceKey = 'ghost' | 'engaged' | 'reengage'
 
 export interface DecisionDetail {
@@ -19,6 +19,7 @@ export interface DecisionDetail {
   date?: string
   time?: string
   note?: string
+  text?: string // the WhatsApp message body (action: message)
 }
 export interface DecisionStep {
   action: DecisionAction
@@ -43,7 +44,7 @@ export const SEQUENCES: Array<{ key: SequenceKey; label: string }> = [
   { key: 'reengage', label: 'Re-engage, light touch in 2 days' },
 ]
 
-const ACTIONS: DecisionAction[] = ['none', 'book', 'sequence', 'task', 'move', 'close']
+const ACTIONS: DecisionAction[] = ['none', 'book', 'sequence', 'task', 'move', 'close', 'message']
 const SEQ_KEYS: SequenceKey[] = ['ghost', 'engaged', 'reengage']
 const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/
 
@@ -97,6 +98,10 @@ function validateStep(raw: any): DecisionStep | null {
     if (date) detail.date = date
     if (time) detail.time = time
     if (action === 'task' && typeof rd.note === 'string') detail.note = scrubDashes(rd.note).slice(0, 200)
+  } else if (action === 'message') {
+    const text = typeof rd.text === 'string' ? scrubDashes(rd.text).trim().slice(0, 600) : ''
+    if (!text) return null
+    detail.text = text
   }
   // action 'none' needs no detail.
   return { action, detail }
@@ -144,6 +149,7 @@ export function describeStep(step: DecisionStep): string {
     case 'sequence': return `Hand back to the AI on the ${d.sequence} sequence`
     case 'move': return `Move the lead to ${d.stage}`
     case 'close': return `Close the lead as ${d.stage}`
+    case 'message': return `Send now: "${d.text}"`
     case 'none': return 'Go with the AI plan'
     default: return step.action
   }

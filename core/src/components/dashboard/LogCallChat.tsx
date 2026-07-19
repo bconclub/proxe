@@ -26,7 +26,7 @@ interface Props {
 
 // Local mirrors of lib/logcall/decisionPlan types + describeStep, so this client
 // bundle never imports the server module (which pulls the note orchestrator).
-type DecisionStep = { action: 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close'; detail: Record<string, any> }
+type DecisionStep = { action: 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'message'; detail: Record<string, any> }
 type DecisionPlan = { summary: string; steps: DecisionStep[]; reason?: string }
 type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null }
 
@@ -39,6 +39,7 @@ function describeStep(step: DecisionStep): string {
     case 'sequence': return `Hand back to the AI on the ${d.sequence} sequence`
     case 'move': return `Move the lead to ${d.stage}`
     case 'close': return `Close the lead as ${d.stage}`
+    case 'message': return `Send now: "${d.text}"`
     case 'none': return 'Go with the AI plan'
     default: return step.action
   }
@@ -70,19 +71,18 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         if (!alive) return
         setSnapshot(d.context_snapshot || null)
         setAiPlan(d.ai_proposed_plan || null)
-        const plan = d.ai_proposed_plan
-        const opening = plan?.reason
-          ? `${plan.reason}${Array.isArray(plan.next_steps) && plan.next_steps.length ? `\n\nNext: ${plan.next_steps.join('. ')}.` : ''}`
+        // Clean one-liner only. No internal step dump, no premature confirm card.
+        // The chips (and free text) drive the actual decision.
+        const opening = d.ai_proposed_plan?.reason
+          ? `Call logged. ${d.ai_proposed_plan.reason}`
           : `Call logged for ${leadName}. What do you want to do next?`
         setMessages([{
           role: 'assistant',
           content: opening,
-          chips: ['Sounds good', 'I already booked it', 'Remind me to follow up', 'Move the stage'],
-          // The opening is confirmable as-is: accept the AI plan.
-          plan: { summary: 'Go with the AI plan', steps: [{ action: 'none', detail: {} }] },
+          chips: ['Send a thank-you now', 'I already booked it', 'Remind me to follow up', 'Move the stage'],
         }])
       } catch (e: any) {
-        if (alive) setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?`, chips: ['Book a demo', 'Remind me to follow up', 'Move the stage'] }])
+        if (alive) setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?`, chips: ['Send a thank-you now', 'Remind me to follow up', 'Move the stage'] }])
       } finally { if (alive) setLoading(false) }
     })()
     return () => { alive = false }

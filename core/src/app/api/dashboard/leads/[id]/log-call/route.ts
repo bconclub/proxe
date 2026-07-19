@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { classifyAndAct, getServiceClient, resolveBookingDate, type CallOutcome } from '@/lib/services'
+import { classifyAndAct, getServiceClient, resolveBookingDate, sendWhatsAppText, type CallOutcome } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { validateSteps, type DecisionStep } from '@/lib/logcall/decisionPlan'
@@ -242,13 +242,17 @@ export async function POST(
       return NextResponse.json({ success: true, outcome, mode: 'accept', ...result })
     }
 
-    // Only a bundle of pure sequence steps hands the lead back to the AI; any
-    // book/task/move keeps it human-owned.
+    // The human OWNS the lead when they take it over (book/task/move/close).
+    // A plan of only sequence and/or message steps hands it back to the AI (a
+    // thank-you send does not claim the lead).
     const concrete = steps.filter((s) => s.action !== 'none')
-    const handBackToAi = concrete.length > 0 && concrete.every((s) => s.action === 'sequence')
+    const handBackToAi = concrete.length > 0 && concrete.every((s) => s.action === 'sequence' || s.action === 'message')
 
-    // Cancel the generic auto-cadence once, unless we're re-enrolling a sequence.
-    if (!concrete.some((s) => s.action === 'sequence')) {
+    // Cancel the generic auto-cadence once the human takes the lead over
+    // (book/task/move/close). A lone thank-you message or a sequence re-enroll
+    // does NOT stop the cadence.
+    const takesOver = concrete.some((s) => ['book', 'task', 'move', 'close'].includes(s.action))
+    if (takesOver) {
       const { data: cancelled } = await supabase
         .from('agent_tasks')
         .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: human decided at log-call` })
@@ -301,6 +305,29 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actionsTaken.push(`Reminder set for ${detail.date || 'tomorrow'} ${detail.time || ''}`.trim())
+      } else if (step.action === 'message' && detail.text) {
+        // Send the thank-you now. Free-form text works only inside WhatsApp's
+        // 24h window (after a phone call the lead often is not), so on failure
+        // we record the drafted message as a note instead of losing it.
+        let sent = false
+        if (leadPhone) {
+          try { sent = (await sendWhatsAppText(leadPhone, detail.text)).success } catch { sent = false }
+        }
+        // Always log the message to the timeline + notes so there is a record.
+        const { data: mr } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
+        const mc = mr?.unified_context || {}
+        const mn: any[] = Array.isArray(mc.admin_notes) ? mc.admin_notes : []
+        await supabase.from('all_leads').update({
+          unified_context: {
+            ...mc,
+            admin_notes: [...mn, {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+              text: sent ? `Sent on WhatsApp: ${detail.text}` : `Drafted (not sent, likely outside the 24h window): ${detail.text}`,
+              created_by: createdBy, created_at: now.toISOString(), source: 'log_call', outcome,
+            }],
+          },
+        }).eq('id', leadId)
+        actionsTaken.push(sent ? 'Thank-you message sent' : 'Thank-you message drafted (could not send, saved as a note)')
       }
     }
 
