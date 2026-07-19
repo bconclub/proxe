@@ -18,7 +18,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient, type CallOutcome } from '@/lib/services'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { getBrandConfig } from '@/configs'
-import { generateResponse } from '@/lib/agent-core'
+import { generateResponseDetailed } from '@/lib/agent-core'
+import { estimateCost } from '@/lib/token-usage'
 import { buildCallContextSnapshot, fetchRecentConversation } from '@/lib/services/logCallContext'
 import { parsePlanTrailer, validatePlan, scrubDashes, MOVE_STAGES, CLOSE_STAGES } from '@/lib/logcall/decisionPlan'
 
@@ -124,7 +125,7 @@ export async function POST(
       ? history.map((h) => `${h.role === 'assistant' ? 'PROXe' : 'Human'}: ${String(h.content).slice(0, 2000)}`).join('\n')
       : 'Human: I just logged this call. Read my notes and lay out the plan (message to send, the follow-up, and my reminder). Do not ask me for what I already noted.'
 
-    const raw = await generateResponse(system, transcript, 800, CHAT_MODEL, 'brain')
+    const { text: raw, usage } = await generateResponseDetailed(system, transcript, 800, CHAT_MODEL, 'brain')
 
     // Strip PLAN first (greedy FOLLOWUPS regex would eat it), then FOLLOWUPS.
     const { text: afterPlan, plan: rawPlan } = parsePlanTrailer(raw)
@@ -138,7 +139,15 @@ export async function POST(
     answer = scrubDashes(answer) || 'What would you like to do with this lead?'
     const plan = validatePlan(rawPlan)
 
-    return NextResponse.json({ answer, chips, plan, context_snapshot: snapshot })
+    // Per-turn token usage + rough rupee cost, for the message watermark.
+    const USD_TO_INR = 84
+    const totalTokens = (usage.input || 0) + (usage.output || 0)
+    const costInr = estimateCost(usage.model, usage.input, usage.output, usage.cacheRead, usage.cacheWrite) * USD_TO_INR
+
+    return NextResponse.json({
+      answer, chips, plan, context_snapshot: snapshot,
+      usage: { tokens: totalTokens, input: usage.input, output: usage.output, cost_inr: Number(costInr.toFixed(4)) },
+    })
   } catch (error) {
     console.error('[log-call/chat] failed:', error)
     return NextResponse.json(
