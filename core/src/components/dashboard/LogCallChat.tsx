@@ -4,16 +4,20 @@
  * LogCallChat — the post-call decision, as a chat with PROXe (replaces the
  * static LogCallDecisionHub when features.logCallChat is on).
  *
- * Turn 0 is free: it reads the AI's suggestion from `propose` (no LLM chat call)
- * and renders PROXe's opening message + an "Accept the plan" card + tap chips.
- * The human types or taps; each turn hits log-call/chat and returns prose + new
- * chips + (once agreed) a validated PLAN rendered as a Confirm card. Nothing
- * fires until Confirm, which commits the whole bundle to log-call. Same props as
- * LogCallDecisionHub so the modal swap is one line.
+ * Predictable by design: PROXe opens with one clean line and a RECOMMENDED next
+ * step, and a FIXED menu of the same six next steps is always present (send a
+ * thank-you, book/reschedule, remind me, move stage, hand to AI, close). PROXe
+ * fills the smart detail; the human taps or types. Nothing fires until Confirm.
+ * Same props as LogCallDecisionHub so the modal swap is one line.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { MdClose, MdSmartToy, MdPerson, MdSend, MdCheck, MdAutorenew } from 'react-icons/md'
+import {
+  MdClose, MdSend, MdCheck, MdAutorenew,
+  MdOutlineWavingHand, MdEventAvailable, MdNotificationsActive,
+  MdSwapHoriz, MdRepeat, MdBlock,
+} from 'react-icons/md'
+import { brandConfig } from '@/configs'
 
 interface Props {
   leadId: string
@@ -26,7 +30,8 @@ interface Props {
 
 // Local mirrors of lib/logcall/decisionPlan types + describeStep, so this client
 // bundle never imports the server module (which pulls the note orchestrator).
-type DecisionStep = { action: 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'message'; detail: Record<string, any> }
+type StepAction = 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'message'
+type DecisionStep = { action: StepAction; detail: Record<string, any> }
 type DecisionPlan = { summary: string; steps: DecisionStep[]; reason?: string }
 type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null }
 
@@ -45,7 +50,34 @@ function describeStep(step: DecisionStep): string {
   }
 }
 
-const ACCENT = '#22c55e' // bcon accent is near-white, use an explicit color like the old hub
+// The FIXED, predictable next-step menu. Always the same six, in the same order.
+// Tapping one sends its instruction to PROXe, which fills the detail and returns
+// a confirm card. `rec` keys map an AI-proposed action to the highlighted step.
+const NEXT_STEPS: Array<{ key: string; label: string; icon: React.ReactNode; prompt: string; rec: string[] }> = [
+  { key: 'message', label: 'Send a thank-you', icon: <MdOutlineWavingHand size={15} />, prompt: 'Draft a short thank-you message to send this lead now.', rec: ['post_call', 'message', 'none'] },
+  { key: 'book', label: 'Book / reschedule', icon: <MdEventAvailable size={15} />, prompt: 'Help me book or reschedule a demo for this lead.', rec: ['book'] },
+  { key: 'task', label: 'Remind me', icon: <MdNotificationsActive size={15} />, prompt: 'Set me a follow-up reminder for this lead.', rec: [] },
+  { key: 'move', label: 'Move stage', icon: <MdSwapHoriz size={15} />, prompt: 'Move this lead to a different stage.', rec: ['nurture'] },
+  { key: 'sequence', label: 'Hand to AI', icon: <MdRepeat size={15} />, prompt: 'Put this lead into an automated follow-up sequence.', rec: ['sequence'] },
+  { key: 'close', label: 'Close lead', icon: <MdBlock size={15} />, prompt: 'Close this lead.', rec: ['close'] },
+]
+
+// PROXe's avatar = the product's icon (the brand mark shown in the sidebar and
+// login), never a generic glyph. Monogram fallback if a brand ships no image.
+const AVATAR_SRC = brandConfig.chatStructure?.avatar?.source || brandConfig.markPath || brandConfig.iconPath || ''
+function ProxeAvatar({ size = 28 }: { size?: number }) {
+  if (AVATAR_SRC) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={AVATAR_SRC} alt="PROXe" className="rounded-full shrink-0 object-cover" style={{ width: size, height: size, background: 'var(--bg-hover)' }} />
+  }
+  return (
+    <span className="flex items-center justify-center rounded-full shrink-0 font-bold" style={{ width: size, height: size, background: 'var(--accent-primary)', color: 'var(--bg-primary)', fontSize: size * 0.46 }}>
+      {(brandConfig.name || 'P').charAt(0).toUpperCase()}
+    </span>
+  )
+}
+
+const ACCENT = '#22c55e' // bcon accent is near-white, use an explicit color for confirm affordances
 
 export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel, onDone }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
@@ -55,10 +87,12 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
   const [error, setError] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<Record<string, any> | null>(null)
   const [aiPlan, setAiPlan] = useState<any>(null)
+  const [recKey, setRecKey] = useState<string | null>(null) // highlighted next step
   const [saving, setSaving] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Turn 0: read the suggestion, no LLM chat call.
+  // Turn 0: read the suggestion, no LLM chat call. One clean line + the
+  // recommended next step highlighted.
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -71,18 +105,15 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         if (!alive) return
         setSnapshot(d.context_snapshot || null)
         setAiPlan(d.ai_proposed_plan || null)
-        // Clean one-liner only. No internal step dump, no premature confirm card.
-        // The chips (and free text) drive the actual decision.
+        const action = d.ai_proposed_plan?.action || 'post_call'
+        const rec = NEXT_STEPS.find((s) => s.rec.includes(action))?.key || 'message'
+        setRecKey(rec)
         const opening = d.ai_proposed_plan?.reason
           ? `Call logged. ${d.ai_proposed_plan.reason}`
           : `Call logged for ${leadName}. What do you want to do next?`
-        setMessages([{
-          role: 'assistant',
-          content: opening,
-          chips: ['Send a thank-you now', 'I already booked it', 'Remind me to follow up', 'Move the stage'],
-        }])
-      } catch (e: any) {
-        if (alive) setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?`, chips: ['Send a thank-you now', 'Remind me to follow up', 'Move the stage'] }])
+        setMessages([{ role: 'assistant', content: opening }])
+      } catch {
+        if (alive) { setRecKey('message'); setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }]) }
       } finally { if (alive) setLoading(false) }
     })()
     return () => { alive = false }
@@ -92,7 +123,6 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, busy])
 
-  // The newest assistant plan is the only confirmable one.
   const activePlan = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'assistant') return messages[i].plan || null
@@ -151,12 +181,15 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
     <span key={label} className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>{label}: <span style={{ color: 'var(--text-primary)' }}>{String(val)}</span></span>
   ))
 
+  const lastAssistant = messages.length ? messages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1) : -1
+
   return (
     <div onClick={onCancel} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} className="flex flex-col" style={{ width: '100%', maxWidth: 540, height: 'min(680px, 88vh)', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, overflow: 'hidden' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
-          <div className="min-w-0">
+        <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+          <ProxeAvatar size={30} />
+          <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>Call logged for {leadName}</div>
             {snapshot && (
               <div className="flex flex-wrap gap-1 mt-1">
@@ -177,10 +210,10 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
               <MdAutorenew className="animate-spin" size={14} /> Reading the context…
             </div>
           ) : messages.map((m, i) => {
-            const isLastAssistant = m.role === 'assistant' && i === messages.length - 1
+            const isLastAssistant = i === lastAssistant
             return (
               <div key={i} className={m.role === 'user' ? 'flex justify-end gap-2' : 'flex gap-2'}>
-                {m.role === 'assistant' && <span className="flex h-7 w-7 items-center justify-center rounded-full shrink-0 mt-0.5" style={{ background: 'var(--bg-hover)', color: ACCENT }}><MdSmartToy size={15} /></span>}
+                {m.role === 'assistant' && <ProxeAvatar size={26} />}
                 <div className={m.role === 'user' ? 'max-w-[80%]' : 'max-w-[85%] min-w-0 flex-1'}>
                   <div className="rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-line" style={{ background: m.role === 'user' ? `color-mix(in srgb, ${ACCENT} 15%, var(--bg-primary))` : 'var(--bg-primary)', border: m.role === 'assistant' ? '1px solid var(--border-primary)' : 'none', color: 'var(--text-primary)' }}>
                     {m.content}
@@ -201,8 +234,8 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                       </button>
                     </div>
                   )}
-                  {/* Chips: only under the newest assistant turn */}
-                  {m.role === 'assistant' && isLastAssistant && (m.chips?.length || 0) > 0 && (
+                  {/* Contextual quick-answers to what PROXe just asked (LLM chips) */}
+                  {m.role === 'assistant' && isLastAssistant && !m.plan && (m.chips?.length || 0) > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {m.chips!.map((c) => (
                         <button key={c} onClick={() => send(c)} disabled={busy} className="text-[11.5px] px-2.5 py-1 rounded-full border transition-colors hover:opacity-80 disabled:opacity-40" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>{c}</button>
@@ -210,22 +243,49 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                     </div>
                   )}
                 </div>
-                {m.role === 'user' && <span className="flex h-7 w-7 items-center justify-center rounded-full shrink-0 mt-0.5" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}><MdPerson size={15} /></span>}
+                {m.role === 'user' && <ProxeAvatar size={26} />}
               </div>
             )
           })}
           {busy && (
-            <div className="flex items-center gap-2 text-xs pl-9" style={{ color: 'var(--text-muted)' }}>
+            <div className="flex items-center gap-2 text-xs pl-8" style={{ color: 'var(--text-muted)' }}>
               <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: ACCENT }} /> PROXe is thinking…
             </div>
           )}
         </div>
 
+        {/* Fixed, predictable next-steps menu — always the same six */}
+        <div className="px-3 pt-2" style={{ borderTop: '1px solid var(--border-primary)' }}>
+          <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Next steps</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {NEXT_STEPS.map((s) => {
+              const recommended = recKey === s.key
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => send(s.prompt)}
+                  disabled={busy || loading}
+                  className="flex items-center gap-1.5 text-[11.5px] font-medium px-2 py-1.5 rounded-lg border text-left transition-colors hover:opacity-80 disabled:opacity-40"
+                  style={{
+                    borderColor: recommended ? ACCENT : 'var(--border-primary)',
+                    background: recommended ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title={recommended ? 'PROXe suggests this' : undefined}
+                >
+                  <span style={{ color: recommended ? ACCENT : 'var(--text-secondary)' }}>{s.icon}</span>
+                  <span className="truncate">{s.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* Input */}
-        <div className="px-3 py-2.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
+        <div className="px-3 py-2.5">
           {error && <div className="text-xs mb-1.5" style={{ color: '#ef4444' }}>{error}</div>}
           <form onSubmit={(e) => { e.preventDefault(); send(input) }} className="flex items-center gap-2 rounded-xl border px-3 py-1.5" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Tell PROXe what happened, or tap an option…" disabled={busy || loading} className="flex-1 text-[13px] bg-transparent outline-none min-w-0" style={{ color: 'var(--text-primary)' }} />
+            <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Tell PROXe what happened, or tap a step…" disabled={busy || loading} className="flex-1 text-[13px] bg-transparent outline-none min-w-0" style={{ color: 'var(--text-primary)' }} />
             <button type="submit" disabled={busy || loading || !input.trim()} className="p-1.5 rounded-lg shrink-0" style={{ color: input.trim() && !busy ? ACCENT : 'var(--text-muted)' }}><MdSend size={17} /></button>
           </form>
         </div>
