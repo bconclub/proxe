@@ -5,17 +5,18 @@
  * static LogCallDecisionHub when features.logCallChat is on).
  *
  * Predictable by design: PROXe opens with one clean line and a RECOMMENDED next
- * step, and a FIXED menu of the same six next steps is always present (send a
- * thank-you, book/reschedule, remind me, move stage, hand to AI, close). PROXe
- * fills the smart detail; the human taps or types. Nothing fires until Confirm.
- * Same props as LogCallDecisionHub so the modal swap is one line.
+ * step, and a FIXED menu of the same steps is always present. PROXe drives
+ * book/remind/move/close/sequence conversationally. "Send a thank-you" is a
+ * TEMPLATE picker (open WhatsApp text can't be sent outside the 24h window):
+ * it lists the brand's approved templates that match the call outcome, or says
+ * none is available. Nothing fires until Confirm. Same props as the old hub.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import {
   MdClose, MdSend, MdCheck, MdAutorenew,
   MdOutlineWavingHand, MdEventAvailable, MdNotificationsActive,
-  MdSwapHoriz, MdRepeat, MdBlock,
+  MdSwapHoriz, MdRepeat, MdBlock, MdWhatsapp,
 } from 'react-icons/md'
 import { brandConfig } from '@/configs'
 
@@ -28,12 +29,11 @@ interface Props {
   onDone: () => void
 }
 
-// Local mirrors of lib/logcall/decisionPlan types + describeStep, so this client
-// bundle never imports the server module (which pulls the note orchestrator).
 type StepAction = 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'message'
 type DecisionStep = { action: StepAction; detail: Record<string, any> }
 type DecisionPlan = { summary: string; steps: DecisionStep[]; reason?: string }
-type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null }
+type TemplateOpt = { name: string; preview: string; param_names: string[] }
+type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null; templateOptions?: TemplateOpt[] }
 
 function describeStep(step: DecisionStep): string {
   const d = step.detail || {}
@@ -44,23 +44,40 @@ function describeStep(step: DecisionStep): string {
     case 'sequence': return `Hand back to the AI on the ${d.sequence} sequence`
     case 'move': return `Move the lead to ${d.stage}`
     case 'close': return `Close the lead as ${d.stage}`
-    case 'message': return `Send now: "${d.text}"`
+    case 'message': return `Send the "${d.template}" template now`
     case 'none': return 'Go with the AI plan'
     default: return step.action
   }
 }
 
-// The FIXED, predictable next-step menu. Always the same six, in the same order.
-// Tapping one sends its instruction to PROXe, which fills the detail and returns
-// a confirm card. `rec` keys map an AI-proposed action to the highlighted step.
-const NEXT_STEPS: Array<{ key: string; label: string; icon: React.ReactNode; prompt: string; rec: string[] }> = [
-  { key: 'message', label: 'Send a thank-you', icon: <MdOutlineWavingHand size={15} />, prompt: 'Draft a short thank-you message to send this lead now.', rec: ['post_call', 'message', 'none'] },
+// The FIXED next-step menu. `message` opens the template picker (client-side);
+// the rest are conversational (go to PROXe). `rec` maps an AI-proposed action
+// to the highlighted step.
+const NEXT_STEPS: Array<{ key: string; label: string; icon: React.ReactNode; prompt?: string; rec: string[] }> = [
+  { key: 'message', label: 'Send a thank-you', icon: <MdOutlineWavingHand size={15} />, rec: ['post_call', 'message', 'none'] },
   { key: 'book', label: 'Book / reschedule', icon: <MdEventAvailable size={15} />, prompt: 'Help me book or reschedule a demo for this lead.', rec: ['book'] },
   { key: 'task', label: 'Remind me', icon: <MdNotificationsActive size={15} />, prompt: 'Set me a follow-up reminder for this lead.', rec: [] },
   { key: 'move', label: 'Move stage', icon: <MdSwapHoriz size={15} />, prompt: 'Move this lead to a different stage.', rec: ['nurture'] },
   { key: 'sequence', label: 'Hand to AI', icon: <MdRepeat size={15} />, prompt: 'Put this lead into an automated follow-up sequence.', rec: ['sequence'] },
   { key: 'close', label: 'Close lead', icon: <MdBlock size={15} />, prompt: 'Close this lead.', rec: ['close'] },
 ]
+
+// Which approved templates fit the call outcome. Connected → a post-call
+// thank-you; a missed call → an R&R / missed-call template.
+function matchTemplates(templates: any[], outcome: string): TemplateOpt[] {
+  const connected = outcome === 'Connected'
+  const kw = connected
+    ? ['thank', 'post_call', 'postcall', 'post-call']
+    : ['rnr', 'r_r', 'missed', 'callback', 'no_answer', 'noanswer']
+  return (templates || [])
+    .filter((t) => String(t.status).toUpperCase() === 'APPROVED')
+    .filter((t) => kw.some((k) => String(t.name).toLowerCase().includes(k)))
+    .map((t) => {
+      const body = (t.components || []).find((c: any) => c.type === 'BODY')?.text || ''
+      const param_names = (body.match(/\{\{([^}]+)\}\}/g) || []).map((x: string) => x.replace(/[{}]/g, '').trim())
+      return { name: t.name, preview: body.replace(/\s+/g, ' ').slice(0, 90), param_names }
+    })
+}
 
 // PROXe's avatar = the product's icon (the brand mark shown in the sidebar and
 // login), never a generic glyph. Monogram fallback if a brand ships no image.
@@ -77,22 +94,21 @@ function ProxeAvatar({ size = 28 }: { size?: number }) {
   )
 }
 
-const ACCENT = '#22c55e' // bcon accent is near-white, use an explicit color for confirm affordances
+const ACCENT = '#22c55e'
 
 export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel, onDone }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(true)   // turn 0 (propose)
-  const [busy, setBusy] = useState(false)        // a chat turn in flight
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [snapshot, setSnapshot] = useState<Record<string, any> | null>(null)
   const [aiPlan, setAiPlan] = useState<any>(null)
-  const [recKey, setRecKey] = useState<string | null>(null) // highlighted next step
+  const [recKey, setRecKey] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [templates, setTemplates] = useState<any[] | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Turn 0: read the suggestion, no LLM chat call. One clean line + the
-  // recommended next step highlighted.
   useEffect(() => {
     let alive = true
     ;(async () => {
@@ -106,11 +122,8 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         setSnapshot(d.context_snapshot || null)
         setAiPlan(d.ai_proposed_plan || null)
         const action = d.ai_proposed_plan?.action || 'post_call'
-        const rec = NEXT_STEPS.find((s) => s.rec.includes(action))?.key || 'message'
-        setRecKey(rec)
-        const opening = d.ai_proposed_plan?.reason
-          ? `Call logged. ${d.ai_proposed_plan.reason}`
-          : `Call logged for ${leadName}. What do you want to do next?`
+        setRecKey(NEXT_STEPS.find((s) => s.rec.includes(action))?.key || 'message')
+        const opening = d.ai_proposed_plan?.reason ? `Call logged. ${d.ai_proposed_plan.reason}` : `Call logged for ${leadName}. What do you want to do next?`
         setMessages([{ role: 'assistant', content: opening }])
       } catch {
         if (alive) { setRecKey('message'); setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }]) }
@@ -133,11 +146,9 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
   const send = async (text: string) => {
     const q = text.trim()
     if (!q || busy) return
-    setError(null)
-    setInput('')
+    setError(null); setInput('')
     const next: ChatMsg[] = [...messages, { role: 'user', content: q }]
-    setMessages(next)
-    setBusy(true)
+    setMessages(next); setBusy(true)
     try {
       const history = next.map((m) => ({ role: m.role, content: m.content }))
       const r = await fetch(`/api/dashboard/leads/${leadId}/log-call/chat`, {
@@ -149,29 +160,67 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
       if (d.context_snapshot) setSnapshot(d.context_snapshot)
       setMessages((cur) => [...cur, { role: 'assistant', content: d.answer, chips: d.chips || [], plan: d.plan || null }])
     } catch (e: any) {
-      setError(e?.message || 'Chat failed')
-      setMessages((cur) => cur.slice(0, -1))
-      setInput(q)
+      setError(e?.message || 'Chat failed'); setMessages((cur) => cur.slice(0, -1)); setInput(q)
     }
     setBusy(false)
+  }
+
+  // "Send a thank-you": load approved templates, match by outcome, and either
+  // offer them to pick or say none is available. No LLM, no free text.
+  const openThankYou = async () => {
+    if (busy) return
+    setBusy(true); setError(null)
+    try {
+      let tpls = templates
+      if (!tpls) {
+        const r = await fetch('/api/whatsapp/templates')
+        const d = await r.json().catch(() => ({}))
+        tpls = Array.isArray(d.templates) ? d.templates : []
+        setTemplates(tpls)
+      }
+      const matches = matchTemplates(tpls || [], outcome)
+      if (matches.length === 0) {
+        const kind = outcome === 'Connected' ? 'post-call thank-you' : 'missed-call'
+        setMessages((cur) => [...cur, { role: 'assistant', content: `There's no approved ${kind} template yet, so I can't send one (WhatsApp blocks open messages outside the 24 hour window). Add one from Configure, WhatsApp, then it will show up here.` }])
+      } else {
+        setMessages((cur) => [...cur, { role: 'assistant', content: 'Pick the template to send:', templateOptions: matches }])
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Could not load templates')
+    }
+    setBusy(false)
+  }
+
+  const pickTemplate = (t: TemplateOpt) => {
+    setMessages((cur) => [...cur, {
+      role: 'assistant',
+      content: `Ready to send "${t.name}".`,
+      plan: { summary: `Send the ${t.name} template to ${leadName}`, steps: [{ action: 'message', detail: { template: t.name, param_names: t.param_names } }] },
+    }])
   }
 
   const confirm = async () => {
     if (!activePlan || saving) return
     setSaving(true); setError(null)
+    const messageOnly = activePlan.steps.every((s) => s.action === 'message')
     try {
       const chat_transcript = messages.map((m) => ({ role: m.role, content: m.content }))
       const decision_reason = [...messages].reverse().find((m) => m.role === 'user')?.content || null
       const r = await fetch(`/api/dashboard/leads/${leadId}/log-call`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          outcome, notes: notes.trim() || undefined,
-          decisions: activePlan.steps, decision_reason,
-          ai_proposed_plan: aiPlan, context_snapshot: snapshot, chat_transcript,
-        }),
+        body: JSON.stringify({ outcome, notes: notes.trim() || undefined, decisions: activePlan.steps, decision_reason, ai_proposed_plan: aiPlan, context_snapshot: snapshot, chat_transcript }),
       })
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Failed (${r.status})`)
-      onDone()
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d?.error || `Failed (${r.status})`)
+      if (messageOnly) {
+        // A template send is a light touch: keep the modal open so they can
+        // continue (book, remind). Show what happened.
+        const note = (d.actions_taken || []).find((a: string) => /template/i.test(a)) || 'Template sent.'
+        setSaving(false)
+        setMessages((cur) => [...cur.map((m) => ({ ...m, plan: null })), { role: 'assistant', content: `${note}. Anything else for this lead?` }])
+      } else {
+        onDone()
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to save'); setSaving(false)
     }
@@ -181,34 +230,27 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
     <span key={label} className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>{label}: <span style={{ color: 'var(--text-primary)' }}>{String(val)}</span></span>
   ))
 
-  const lastAssistant = messages.length ? messages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1) : -1
+  const lastAssistant = messages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1)
 
   return (
     <div onClick={onCancel} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} className="flex flex-col" style={{ width: '100%', maxWidth: 540, height: 'min(680px, 88vh)', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, overflow: 'hidden' }}>
-        {/* Header */}
         <div className="flex items-center gap-2.5 px-4 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
           <ProxeAvatar size={30} />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>Call logged for {leadName}</div>
             {snapshot && (
               <div className="flex flex-wrap gap-1 mt-1">
-                {chip('stage', snapshot.stage)}
-                {chip('temp', snapshot.temperature)}
-                {chip('score', snapshot.score)}
-                {chip('days', snapshot.days_since_first_touch)}
+                {chip('stage', snapshot.stage)}{chip('temp', snapshot.temperature)}{chip('score', snapshot.score)}{chip('days', snapshot.days_since_first_touch)}
               </div>
             )}
           </div>
           <button onClick={onCancel} className="p-1 rounded shrink-0" style={{ color: 'var(--text-secondary)' }} aria-label="Cancel"><MdClose size={18} /></button>
         </div>
 
-        {/* Messages */}
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
           {loading ? (
-            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              <MdAutorenew className="animate-spin" size={14} /> Reading the context…
-            </div>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}><MdAutorenew className="animate-spin" size={14} /> Reading the context…</div>
           ) : messages.map((m, i) => {
             const isLastAssistant = i === lastAssistant
             return (
@@ -218,28 +260,39 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                   <div className="rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-line" style={{ background: m.role === 'user' ? `color-mix(in srgb, ${ACCENT} 15%, var(--bg-primary))` : 'var(--bg-primary)', border: m.role === 'assistant' ? '1px solid var(--border-primary)' : 'none', color: 'var(--text-primary)' }}>
                     {m.content}
                   </div>
-                  {/* Confirm card: only the newest assistant plan */}
+
+                  {/* Template picker options */}
+                  {m.role === 'assistant' && (m.templateOptions?.length || 0) > 0 && (
+                    <div className="space-y-1.5 mt-2">
+                      {m.templateOptions!.map((t) => (
+                        <button key={t.name} onClick={() => pickTemplate(t)} className="w-full text-left rounded-xl border p-2.5 transition-colors hover:opacity-90" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <MdWhatsapp size={13} style={{ color: '#25D366' }} />
+                            <span className="text-[12px] font-semibold font-mono truncate" style={{ color: 'var(--text-primary)' }}>{t.name}</span>
+                          </div>
+                          <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{t.preview}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Confirm card: newest assistant plan */}
                   {m.role === 'assistant' && isLastAssistant && m.plan && (
                     <div className="mt-2 rounded-xl border p-3" style={{ borderColor: ACCENT, background: `color-mix(in srgb, ${ACCENT} 8%, var(--bg-primary))` }}>
                       <div className="text-[12px] font-semibold mb-1.5" style={{ color: 'var(--text-primary)' }}>{m.plan.summary}</div>
                       <ul className="space-y-0.5 mb-2.5">
                         {m.plan.steps.map((s, j) => (
-                          <li key={j} className="text-[12px] flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                            <span style={{ color: ACCENT }}>•</span> {describeStep(s)}
-                          </li>
+                          <li key={j} className="text-[12px] flex items-start gap-1.5" style={{ color: 'var(--text-secondary)' }}><span style={{ color: ACCENT }}>•</span> {describeStep(s)}</li>
                         ))}
                       </ul>
-                      <button onClick={confirm} disabled={saving} className="w-full text-[12.5px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-40 flex items-center justify-center gap-1.5" style={{ background: ACCENT }}>
-                        <MdCheck size={15} /> {saving ? 'Saving…' : 'Confirm'}
-                      </button>
+                      <button onClick={confirm} disabled={saving} className="w-full text-[12.5px] font-bold px-3 py-2 rounded-lg text-white disabled:opacity-40 flex items-center justify-center gap-1.5" style={{ background: ACCENT }}><MdCheck size={15} /> {saving ? 'Saving…' : 'Confirm'}</button>
                     </div>
                   )}
-                  {/* Contextual quick-answers to what PROXe just asked (LLM chips) */}
+
+                  {/* Contextual quick-answers */}
                   {m.role === 'assistant' && isLastAssistant && !m.plan && (m.chips?.length || 0) > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {m.chips!.map((c) => (
-                        <button key={c} onClick={() => send(c)} disabled={busy} className="text-[11.5px] px-2.5 py-1 rounded-full border transition-colors hover:opacity-80 disabled:opacity-40" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>{c}</button>
-                      ))}
+                      {m.chips!.map((c) => (<button key={c} onClick={() => send(c)} disabled={busy} className="text-[11.5px] px-2.5 py-1 rounded-full border transition-colors hover:opacity-80 disabled:opacity-40" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-primary)' }}>{c}</button>))}
                     </div>
                   )}
                 </div>
@@ -247,32 +300,20 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
               </div>
             )
           })}
-          {busy && (
-            <div className="flex items-center gap-2 text-xs pl-8" style={{ color: 'var(--text-muted)' }}>
-              <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: ACCENT }} /> PROXe is thinking…
-            </div>
-          )}
+          {busy && (<div className="flex items-center gap-2 text-xs pl-8" style={{ color: 'var(--text-muted)' }}><span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: ACCENT }} /> Working…</div>)}
         </div>
 
-        {/* Fixed, predictable next-steps menu — always the same six */}
+        {/* Fixed, predictable next-steps menu */}
         <div className="px-3 pt-2" style={{ borderTop: '1px solid var(--border-primary)' }}>
           <div className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>Next steps</div>
           <div className="grid grid-cols-3 gap-1.5">
             {NEXT_STEPS.map((s) => {
               const recommended = recKey === s.key
               return (
-                <button
-                  key={s.key}
-                  onClick={() => send(s.prompt)}
-                  disabled={busy || loading}
+                <button key={s.key} onClick={() => (s.key === 'message' ? openThankYou() : send(s.prompt!))} disabled={busy || loading}
                   className="flex items-center gap-1.5 text-[11.5px] font-medium px-2 py-1.5 rounded-lg border text-left transition-colors hover:opacity-80 disabled:opacity-40"
-                  style={{
-                    borderColor: recommended ? ACCENT : 'var(--border-primary)',
-                    background: recommended ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                  }}
-                  title={recommended ? 'PROXe suggests this' : undefined}
-                >
+                  style={{ borderColor: recommended ? ACCENT : 'var(--border-primary)', background: recommended ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                  title={recommended ? 'PROXe suggests this' : undefined}>
                   <span style={{ color: recommended ? ACCENT : 'var(--text-secondary)' }}>{s.icon}</span>
                   <span className="truncate">{s.label}</span>
                 </button>
@@ -281,7 +322,6 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
           </div>
         </div>
 
-        {/* Input */}
         <div className="px-3 py-2.5">
           {error && <div className="text-xs mb-1.5" style={{ color: '#ef4444' }}>{error}</div>}
           <form onSubmit={(e) => { e.preventDefault(); send(input) }} className="flex items-center gap-2 rounded-xl border px-3 py-1.5" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>

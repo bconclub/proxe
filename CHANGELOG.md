@@ -1,3 +1,10 @@
+## 2026-07-18 · feat(core): log-call "Send a thank-you" is a template picker (WhatsApp-compliant)
+
+- Open WhatsApp text can't be sent outside the 24h window, so the thank-you is now an APPROVED TEMPLATE the user picks. Tapping "Send a thank-you" lists the brand's approved templates that MATCH the call: a connected call looks for a post-call/thank-you template, a missed call looks for R&R templates. If none matches, it honestly says "no template available, add one from Configure, WhatsApp" instead of sending the wrong thing.
+- Sends the chosen template via sendWhatsAppTemplate with named body vars resolved from the lead (customer_name, service_interest/service_name, business_name, brand_name, pain_point). A template send keeps the modal open so the user can continue (thank-you, then book, then remind).
+- PROXe no longer drafts or sends messages itself (removed the free-text message action); it defers to the picker and drives book/remind/move/close/sequence conversationally. Verified over more simulated chats: booked->book+task, move/RNR conversational, thank-you redirected to the picker, zero em-dashes.
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): simpler log-call chat + a real "send a thank-you" action
 
 - The post-call chat was too busy: it hedged ("a call happened or a callback is planned") and dumped the worker's internal steps ("Mark last touchpoint as voice", "Stage to X, score 80") plus a redundant confirm card on open. Now PROXe opens with ONE clean line ("Call logged. ...") and chips, no jargon, no premature card.
