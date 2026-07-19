@@ -33,7 +33,8 @@ type StepAction = 'none' | 'book' | 'sequence' | 'task' | 'move' | 'close' | 'me
 type DecisionStep = { action: StepAction; detail: Record<string, any> }
 type DecisionPlan = { summary: string; steps: DecisionStep[]; reason?: string }
 type TemplateOpt = { name: string; preview: string; param_names: string[] }
-type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null; templateOptions?: TemplateOpt[] }
+type Usage = { tokens: number; input?: number; output?: number; cost_inr: number }
+type ChatMsg = { role: 'user' | 'assistant'; content: string; chips?: string[]; plan?: DecisionPlan | null; templateOptions?: TemplateOpt[]; usage?: Usage }
 
 function describeStep(step: DecisionStep): string {
   const d = step.detail || {}
@@ -162,7 +163,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         if (!alive) return
         if (cr.ok && cd.answer) {
           if (cd.context_snapshot) setSnapshot(cd.context_snapshot)
-          setMessages([{ role: 'assistant', content: cd.answer, chips: cd.chips || [], plan: cd.plan || null }])
+          setMessages([{ role: 'assistant', content: cd.answer, chips: cd.chips || [], plan: cd.plan || null, usage: cd.usage }])
         } else {
           setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }])
         }
@@ -212,7 +213,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
       const d = await r.json()
       if (!r.ok) throw new Error(d?.error || `Chat failed (${r.status})`)
       if (d.context_snapshot) setSnapshot(d.context_snapshot)
-      setMessages((cur) => [...cur, { role: 'assistant', content: d.answer, chips: d.chips || [], plan: d.plan || null }])
+      setMessages((cur) => [...cur, { role: 'assistant', content: d.answer, chips: d.chips || [], plan: d.plan || null, usage: d.usage }])
     } catch (e: any) {
       setError(e?.message || 'Chat failed'); setMessages((cur) => cur.slice(0, -1)); setInput(q)
     }
@@ -320,6 +321,13 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                   <div className="rounded-2xl px-3 py-2 text-[13px] leading-relaxed whitespace-pre-line" style={{ background: m.role === 'user' ? `color-mix(in srgb, ${ACCENT} 15%, var(--bg-primary))` : 'var(--bg-primary)', border: m.role === 'assistant' ? '1px solid var(--border-primary)' : 'none', color: 'var(--text-primary)' }}>
                     {m.content}
                   </div>
+
+                  {/* Per-turn token + cost watermark, right corner of the box. */}
+                  {m.role === 'assistant' && m.usage && (
+                    <div className="text-right text-[9.5px] mt-0.5 pr-1 tabular-nums" style={{ color: 'var(--text-muted)' }} title={`${m.usage.input ?? 0} in / ${m.usage.output ?? 0} out tokens this turn`}>
+                      {m.usage.tokens.toLocaleString()} tok · ₹{m.usage.cost_inr < 1 ? m.usage.cost_inr.toFixed(3) : m.usage.cost_inr.toFixed(2)}
+                    </div>
+                  )}
 
                   {/* Template picker options */}
                   {m.role === 'assistant' && (m.templateOptions?.length || 0) > 0 && (

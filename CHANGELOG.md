@@ -1,3 +1,9 @@
+## 2026-07-18 · feat(core): per-message token + rupee-cost watermark on the log-call chat
+
+- Each PROXe reply in the log-call chat now shows a small watermark under the box: the tokens that turn used and its cost in rupees (e.g. "1,521 tok, Rs 0.62"), so the operator can see spend per turn. The first turn is pricier (it caches the system prompt); later turns read from cache and cost a fraction.
+- Added generateResponseDetailed() in the agent-core client (returns text + token usage) with generateResponse kept as a thin wrapper. The log-call chat route uses it and returns { usage: { tokens, input, output, cost_inr } }, cost via estimateCost (cache-aware) at 84 INR/USD.
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): log-call chat is tighter and more visual
 
 - The opening message is now ONE short line (no recap of times/booking in prose); all the detail lives in the plan, shown as step CHIPS in the confirm card ("Book 25 Jul 16:00 + reminders", "Remind you 25 Jul 15:00", a tappable "Send a thank-you"). The card also shows what you logged (outcome + note) at the top.
