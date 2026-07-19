@@ -19,6 +19,7 @@ export const bconConfig: BrandConfig = {
     pipelineFunnel: true,
     followUpSequence: false, // gated until the re-engagement template is approved
     campaigns: true, // AI campaign workspace
+    logCallChat: true, // chat with PROXe after logging a call (test brand)
   },
   // The Brain's sales CONTENT for BCON — the persona/prompts the Brain uses on
   // this brand (functionality is shared across brands; content lives here).

@@ -1,3 +1,11 @@
+## 2026-07-18 · feat(core): log a call opens a chat with PROXe (decide next steps in conversation)
+
+- After logging a call, instead of a static "what next" grid, a chat with PROXe opens (behind features.logCallChat, ON for bcon): PROXe opens by saying what is going on with the lead and what it would do, the human types free text or taps option chips, and PROXe proposes a confirmation card. One Confirm executes the whole plan. The chat transcript is the learning signal, no separate "why" box.
+- Two-way bundled actions: e.g. "I already booked it, demo tomorrow 4pm, remind me an hour before" resolves the date/time and proposes a card that BOTH updates the booking (system side) AND sets the human a follow-up reminder (human side). Verified live on bcon.
+- New GET/POST plumbing: log-call/chat route (one Sonnet turn, prose + FOLLOWUPS chips + validated PLAN trailer, brain-route pattern); lib/logcall/decisionPlan.ts (the trust boundary: action/stage/sequence whitelists cross-checked against lead-stages, date validation, dash scrub, max 3 steps, one stage-setter); lib/services/logCallContext.ts (shared snapshot so propose and chat never drift). The commit route now accepts a decisions[] bundle additively (old single decision still works), executes each step over the existing live executors, and writes ONE combined decision_log record with chat_transcript + decided_via, keeping the brain learning readers unchanged.
+- Flag wired into useFeatureFlags, the Features settings panel, the settings API whitelist, config types, and bcon config. Non-flagged brands keep today's direct auto path.
+- `(pending-sha)`
+
 ## 2026-07-18 · feat(core): Configure "WhatsApp Templates" becomes a full WhatsApp overview
 
 - The Configure card is now "WhatsApp" (was "WhatsApp Templates") and the page leads with a health header before the templates: Quality rating (Meta GREEN/YELLOW/RED as High/Medium/Low with a colored dot), Messaging tier + daily cap, Sent messages over the last 30 days (and 7-day sub), and the template count. Message templates follow under their own heading.

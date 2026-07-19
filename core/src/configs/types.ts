@@ -69,6 +69,7 @@ export interface BrandConfig {
     scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
     leadAccess?: boolean;       // Per-user lead ownership + type access: sticky first-touch claim, allowed_lead_types filtering, per-user pipeline, Humans overview (needs migration 036 columns — windchasers)
     campaigns?: boolean;        // /dashboard/campaigns — chat-driven campaign builder (audience pull + template match/draft)
+    logCallChat?: boolean;      // after logging a call, chat with PROXe (vs the static decision hub)
   };
   // The Brain (voice orb + insights) — per-brand CONTENT for a shared
   // functionality. Every field is optional; core/src/lib/brain/brainConfig.ts

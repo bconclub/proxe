@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { MdCall, MdPsychology, MdViewKanban, MdAutorenew, MdArrowBack, MdCampaign, MdTouchApp } from 'react-icons/md'
+import { MdCall, MdPsychology, MdViewKanban, MdAutorenew, MdArrowBack, MdCampaign, MdTouchApp, MdForum } from 'react-icons/md'
 import Link from 'next/link'
 
-type FlagKey = 'voice' | 'brain' | 'brainActions' | 'pipelineFunnel' | 'followUpSequence' | 'campaigns'
+type FlagKey = 'voice' | 'brain' | 'brainActions' | 'pipelineFunnel' | 'followUpSequence' | 'campaigns' | 'logCallChat'
 type Flags = Partial<Record<FlagKey, boolean>>
 
 // Only CORE features that ship to every brand belong here. Brand-specific
@@ -15,6 +15,7 @@ const FEATURES: Array<{ key: FlagKey; name: string; desc: string; icon: React.Co
   { key: 'voice', name: 'Voice / Calls', desc: 'Vapi inbound + outbound calls and the Calls dashboard tab.', icon: MdCall, live: true },
   { key: 'brain', name: 'Dashboard Brain', desc: 'The "Ask PROXe" panel — Q&A over your live dashboard data.', icon: MdPsychology, live: true },
   { key: 'brainActions', name: 'Brain Actions', desc: 'The Brain can drive the dashboard — open a lead, open a page, suggest a dial.', icon: MdTouchApp, live: true },
+  { key: 'logCallChat', name: 'Log-call Chat', desc: 'After logging a call, chat with PROXe to decide next steps instead of a fixed button grid.', icon: MdForum, live: true },
   { key: 'pipelineFunnel', name: 'Pipeline Funnel', desc: 'The funnel-stage breakdown on the Pipeline page.', icon: MdViewKanban, live: true },
   { key: 'followUpSequence', name: 'Follow-up Sequence', desc: 'Automated re-engagement cron (needs an approved template).', icon: MdAutorenew, live: false },
 ]

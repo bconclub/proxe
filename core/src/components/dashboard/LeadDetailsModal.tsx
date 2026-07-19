@@ -22,6 +22,8 @@ const BRAND_ACCENT: string = (() => {
   catch { return 'var(--accent-primary)' }
 })()
 import LogCallDecisionHub from './LogCallDecisionHub'
+import LogCallChat from './LogCallChat'
+import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import { getCurrentBrandId, brandLabel } from '@/configs'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
@@ -397,6 +399,7 @@ function CopyIconButton({ value, label }: { value: string; label: string }) {
 export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate }: LeadDetailsModalProps) {
   const router = useRouter()
   const brandId = getCurrentBrandId()
+  const featureFlags = useFeatureFlags()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
   // Lead-modal tab visibility — configured per brand at Configure → Lead Modal.
   // Defaults every tab ON; only an explicit `false` hides one.
@@ -1484,7 +1487,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   const handleLogCall = async () => {
     if (!lead) return
-    if (brandId === 'bcon') {
+    // The hub state hosts either the chat (features.logCallChat) or the static
+    // decision hub (bcon's original path). Any brand with the flag gets the
+    // decision surface; others fall through to the direct classify-and-log POST.
+    if (featureFlags.logCallChat || brandId === 'bcon') {
       if (savingLogCall) return
       setShowLogCallHub(true)
       return
@@ -3046,14 +3052,25 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* Decision hub (bcon) — opens after the draft is saved */}
                 {showLogCallForm && showLogCallHub && lead && (
-                  <LogCallDecisionHub
-                    leadId={lead.id}
-                    leadName={lead.name || 'this lead'}
-                    outcome={logCallOutcome}
-                    notes={logCallNotes}
-                    onCancel={() => setShowLogCallHub(false)}
-                    onDone={finishLogCall}
-                  />
+                  featureFlags.logCallChat ? (
+                    <LogCallChat
+                      leadId={lead.id}
+                      leadName={lead.name || 'this lead'}
+                      outcome={logCallOutcome}
+                      notes={logCallNotes}
+                      onCancel={() => setShowLogCallHub(false)}
+                      onDone={finishLogCall}
+                    />
+                  ) : (
+                    <LogCallDecisionHub
+                      leadId={lead.id}
+                      leadName={lead.name || 'this lead'}
+                      outcome={logCallOutcome}
+                      notes={logCallNotes}
+                      onCancel={() => setShowLogCallHub(false)}
+                      onDone={finishLogCall}
+                    />
+                  )
                 )}
 
                 {/* Send Message form */}

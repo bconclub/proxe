@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { classifyNote, proposePlan, getServiceClient, type CallOutcome } from '@/lib/services'
+import { buildCallContextSnapshot } from '@/lib/services/logCallContext'
 
 // Re-deploy nudge: prior build hung on a stale restored cache (local build clean).
 export const dynamic = 'force-dynamic'
@@ -35,44 +36,10 @@ export async function POST(
       return NextResponse.json({ error: `Invalid outcome` }, { status: 400 })
     }
 
-    // Fetch context, but NEVER let a fetch hiccup kill the suggestion — degrade
-    // to an empty snapshot so the hub always gets a plan back.
-    // NOTE: all_leads has NO response_count column — selecting it 400s the whole
-    // query and empties the snapshot. Reply count comes from unified_context.
-    const { data: lead } = await supabase
-      .from('all_leads')
-      .select('customer_name, lead_stage, lead_score, last_touchpoint, last_interaction_at, created_at, unified_context')
-      .eq('id', leadId)
-      .maybeSingle()
-
-    const ctx = lead?.unified_context || {}
-    const profile = ctx.web?.profile || ctx.profile || {}
-    const daysSinceFirstTouch = lead?.created_at
-      ? Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000)
-      : null
-
-    // Reply count isn't a stored column or context field — compute it live
-    // from conversations (same approach as the worker's getResponseCount).
-    const { count: responseCount } = await supabase
-      .from('conversations')
-      .select('id', { count: 'exact', head: true })
-      .eq('lead_id', leadId)
-      .eq('sender', 'customer')
-
-    // Snapshot of WHO this lead is right now — the half of the learning record
-    // that explains "this kind of person came in".
-    const context_snapshot = {
-      stage: lead?.lead_stage || null,
-      score: lead?.lead_score ?? null,
-      temperature: ctx.lead_temperature || null,
-      response_count: responseCount ?? 0,
-      last_touchpoint: lead?.last_touchpoint || null,
-      days_since_first_touch: daysSinceFirstTouch,
-      service_interest: profile.service_interest || ctx.service_interest || null,
-      business: profile.company || profile.business || ctx.business || null,
-      pain_point: profile.pain_point || ctx.pain_point || null,
-      summary: ctx.unified_summary || null,
-    }
+    // Snapshot of WHO this lead is right now, built by the shared helper so the
+    // chat route sees the exact same picture. Never lets a fetch hiccup kill the
+    // suggestion.
+    const context_snapshot = await buildCallContextSnapshot(supabase, leadId)
 
     const classification = await classifyNote(notes, outcome)
     const ai_proposed_plan = proposePlan(classification)
