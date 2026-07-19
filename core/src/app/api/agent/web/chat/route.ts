@@ -839,6 +839,54 @@ async function postProcess(
       supabase,
     );
 
+    // 3.4 ADOPT orphaned anonymous rows: once the visitor identifies and a
+    // lead exists, earlier turns logged with lead_id NULL (same session) must
+    // link to the lead — the inbox queries by lead_id and was showing
+    // conversations that started mid-thread.
+    if (leadId) {
+      try {
+        await supabase
+          .from('conversations')
+          .update({ lead_id: leadId })
+          .is('lead_id', null)
+          .filter('metadata->>session_id', 'eq', externalSessionId);
+      } catch (adoptErr) {
+        console.error('[agent/web/chat] Orphan adoption failed:', adoptErr);
+      }
+    }
+
+    // 3.5 ADOPT client-held history the server never saw. The widget keeps its
+    // transcript in localStorage and replays it as conversationHistory; after
+    // a backend migration (or lost persistence) the server would otherwise
+    // hold only the tail of the conversation.
+    try {
+      const priorTurns = agentInput.conversationHistory || [];
+      if (priorTurns.length > 0) {
+        const { count: existing } = await supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .filter('metadata->>session_id', 'eq', externalSessionId);
+        if ((existing || 0) === 0) {
+          for (const turn of priorTurns.slice(-30)) {
+            const text = String(turn?.content || '').trim();
+            if (!text) continue;
+            await logMessage(
+              leadId,
+              'web',
+              turn.role === 'user' ? 'customer' : 'agent',
+              text,
+              'text',
+              { session_id: externalSessionId, backfilled: true, ...(leadId ? {} : { anonymous: true }) },
+              supabase,
+            );
+          }
+          console.log('[agent/web/chat] Backfilled ' + priorTurns.length + ' client-held turns for session ' + externalSessionId);
+        }
+      }
+    } catch (bfErr) {
+      console.error('[agent/web/chat] History backfill failed:', bfErr);
+    }
+
     // 4. Log messages to conversations table (always log with session_id in metadata)
     // Log customer message
     await logMessage(

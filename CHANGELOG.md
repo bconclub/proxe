@@ -22,6 +22,11 @@
 - The post-call chat was too busy: it hedged ("a call happened or a callback is planned") and dumped the worker's internal steps ("Mark last touchpoint as voice", "Stage to X, score 80") plus a redundant confirm card on open. Now PROXe opens with ONE clean line ("Call logged. ...") and chips, no jargon, no premature card.
 - New "message" action: PROXe drafts a short thank-you and, on Confirm, sends it on WhatsApp right after the call. Free-form text works inside the 24h window; outside it (common after a phone call) the drafted message is saved as a note so nothing is lost, and the result says which happened. A thank-you send does not claim the lead or stop the AI cadence.
 - POST_CALL suggestion copy reworded to "The call is done. I'd send a quick thank-you now and keep it moving." Applies to both the chat and the legacy hub.
+##  · fix(core): web conversations show from the BEGINNING — history adoption + orphan linking
+
+- Investigated: leads like Bhumi showed only the tail of their chat. The widget holds its transcript in localStorage and replays it to the agent as conversationHistory; the server (after a backend migration / lost persistence) held only the last exchange — the inbox starts mid-thread.
+- Fix 1 (backfill): when the server has NO rows for a session but the client sends history, the turns are adopted into `conversations` (metadata.backfilled) before logging the current turn — the transcript converges to complete on the next message.
+- Fix 2 (orphan adoption): once a visitor identifies and a lead exists, earlier anonymous rows (lead_id NULL, same session) are linked to the lead — the inbox queries by lead_id and was blind to them.
 - `(pending-sha)`
 
 ## 2026-07-18 · feat(core): log a call opens a chat with PROXe (decide next steps in conversation)
