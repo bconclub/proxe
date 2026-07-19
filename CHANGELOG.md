@@ -134,6 +134,9 @@
 - WELCOME: flight-school leads get the generic welcome (has a "Flight Schools" button) instead of the pilot-training welcome. (Dedicated windchasers_flight_school_welcome_v1 can replace it once Meta-approved + param names confirmed.)
 - FEES (live bug): the bare-"fees"/"cost" quick-reply asserted Pilot ₹60–70L to everyone (no course context) — cabin-crew/flight-school leads got pilot fees. Now course-neutral: asks which program or offers a counsellor callback. Course-specific fee questions still fast-path via the CPL/DGCA triggers.
 - TIME (live bug): agent apologized for a "missed" 5PM call at 2PM. Added a TIME AWARENESS rule (future slot = upcoming, not missed) to the per-turn IST context, and gave the voice channel a current-IST + upcoming line (it had none).
+##  · fix(core): inbox renders widget quick-replies as chips — no more raw [BTN:] markup
+
+- Web-agent replies store [BTN: x] markers (the widget shows real buttons to the customer); the inbox displayed them raw. Markers now stripped from all rendered text (bubbles + list previews) and shown as small chips under the bubble, so the operator sees exactly which choices the customer got.
 - `(pending-sha)`
 
 ##  · fix(core): Key Event updates on rebooking — top-level booking columns refreshed

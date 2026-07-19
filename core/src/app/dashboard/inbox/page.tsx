@@ -289,6 +289,9 @@ function cleanMessageContent(text: string): string {
   return text
     .replace(/\[User's name is [^\]]+\]\s*/g, '')
     .replace(/\[Button intent:[^\]]*\]\s*/gi, '')
+    // Widget quick-reply markup — the widget renders these as buttons for the
+    // customer; the inbox must never show the raw markers.
+    .replace(/\[BTN:\s*[^\]]*\]\s*/gi, '')
     .trim();
 }
 
@@ -2454,6 +2457,19 @@ export default function InboxPage() {
                             ? renderWhatsAppMarkdown(isTemplate ? templateBody : msg.content)
                             : renderMarkdown(msg.content)}
                         </div>
+                        {/* Widget quick replies ([BTN: x] markup) — shown as chips
+                            so the operator sees the choices the customer got. */}
+                        {(() => {
+                          const btns = [...String(msg.content || '').matchAll(/\[BTN:\s*([^\]]+)\]/gi)].map((m) => m[1].trim()).filter(Boolean)
+                          if (!btns.length) return null
+                          return (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {btns.map((b, i) => (
+                                <span key={i} className="text-[10px] px-2 py-0.5 rounded-full border" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'var(--bg-secondary)' }}>{b}</span>
+                              ))}
+                            </div>
+                          )
+                        })()}
                         {/* WhatsApp-style time, bottom-right of the bubble (ticks
                             for outbound WhatsApp render just below via their own
                             delivery block). Templates carry their own footer. */}
