@@ -22,6 +22,7 @@ import {
   sendCabinCrewWelcome,
   pickWelcomeTemplate,
   sendWelcomeTemplate,
+  sendNamedTemplate,
   isParentSource,
   sendParentWelcomeTemplate,
   isLikelyRealPersonName,
@@ -856,6 +857,11 @@ export async function POST(request: NextRequest) {
     const isWindchasersWelcomeLead =
       leadBrand === 'windchasers' && !!phone && isNewLead &&
       !isWebinarReg && !isCabinCrewLead && !isPatEarly && !isDemoEarly
+    // bcon: every brand-new inbound lead with a phone gets an IMMEDIATE welcome
+    // (website form -> web welcome, Meta/AI-Lead-Machine -> campaign welcome).
+    // The old path parked a first_outreach task for the task-worker — which is
+    // retired — so website leads reached PROXe and then sat silent.
+    const isBconWelcomeLead = leadBrand === 'bcon' && !!phone && isNewLead
 
     const { data: existingOutreach } = await supabase
       .from('agent_tasks')
@@ -884,6 +890,9 @@ export async function POST(request: NextRequest) {
       // Pilot/generic/parent welcome fires below as the first touch — no dead
       // first_outreach task (its worker never ran, so those leads were silent).
       console.log(`[inbound] Windchasers lead ${leadName} — pilot/generic/parent welcome, no first_outreach task`)
+    } else if (isBconWelcomeLead) {
+      // bcon welcome fires below as the first touch — no dead first_outreach task.
+      console.log(`[inbound] bcon lead ${leadName} — inline welcome, no first_outreach task`)
     } else if (existingOutreach && existingOutreach.length > 0) {
       console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
@@ -1473,6 +1482,70 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+    // ── bcon welcome (website forms + AI Lead Machine / Meta feeds) ──────────
+    // Fires INLINE at intake, mirroring windchasers — the first_outreach task
+    // path died with the task-worker. Dedup-guarded against re-submits.
+    if (isBconWelcomeLead) {
+      const firstName = (leadName !== 'Lead' && leadName ? leadName : 'there').split(' ')[0]
+      const bconWelcomeAlready =
+        (await wasTemplateRecentlySent(supabase, leadId, 'bcon_lead_machine_meta_welcome_v1_')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'bcon_welcome_web_v1'))
+      if (bconWelcomeAlready) {
+        console.log(`[inbound] bcon welcome SKIPPED as duplicate lead=${leadId} phone=${phone}`)
+      } else {
+        const bconBrandName = (brand_name || '').trim() || String(cf2.company || cf2.brand_name || '').trim() || 'your business'
+        const isMetaLead =
+          ['meta_forms', 'facebook', 'facebook_lead', 'meta', 'instagram'].includes(normalizedSource) ||
+          /lead\s*machine/i.test(String(campaign || cf2.utm_campaign || cf2.form_name || ''))
+        let bconTpl: string
+        let bconBody: string
+        let bconButtons: string[]
+        let bconRes: { success: boolean; error?: string; messageId?: string }
+        if (isMetaLead) {
+          bconTpl = 'bcon_lead_machine_meta_welcome_v1_'
+          bconButtons = ['Yes, Book a Demo', 'Tell me more in chat']
+          bconBody = `Hi ${firstName},\n\nThanks for your interest in *AI Lead Machine* for ${bconBrandName}.\n\nWe help businesses like yours capture, qualify and convert more leads on autopilot, fully done for you.\n\nWant to see it in action?`
+          bconRes = await sendNamedTemplate(phone, bconTpl, [
+            { name: 'customer_name', value: firstName },
+            { name: 'brand_name', value: bconBrandName },
+          ])
+        } else {
+          bconTpl = 'bcon_welcome_web_v1'
+          bconButtons = ['Book a Call', 'Tell Me More']
+          const bconInterest = String(cf2.service_interest || cf2.interest || cf2.goal || notes || '').trim() || 'growing your business'
+          const bconProbe = String(cf2.message || cf2.probe_question || '').trim().slice(0, 120) || 'Tell me a bit about what you have in mind'
+          bconBody = `Hey ${firstName}, got your enquiry about ${bconInterest} for ${bconBrandName}.\n\n${bconProbe}, Lets get on call to discuss this.`
+          bconRes = await sendNamedTemplate(phone, bconTpl, [
+            { name: 'customer_name', value: firstName },
+            { name: 'service_interest', value: bconInterest },
+            { name: 'brand_name', value: bconBrandName },
+            { name: 'probe_question', value: bconProbe },
+          ])
+        }
+        try {
+          await supabase.from('conversations').insert({
+            lead_id: leadId,
+            channel: 'whatsapp',
+            sender: 'agent',
+            content: bconRes.success ? bconBody : `[Template send FAILED: ${bconTpl}] ${bconRes.error || ''}`,
+            message_type: 'template',
+            metadata: {
+              source: 'inbound_welcome',
+              template_name: bconTpl,
+              template_buttons: bconButtons,
+              ai_generated: true,
+              send_succeeded: bconRes.success,
+              ...(bconRes.success ? {} : { send_error: bconRes.error || 'unknown' }),
+              ...(bconRes.messageId ? { wa_message_id: bconRes.messageId, whatsapp_message_id: bconRes.messageId } : {}),
+            },
+          })
+        } catch (logErr: any) {
+          console.error('[inbound] bcon welcome log failed:', logErr?.message)
+        }
+        console.log(`[inbound] bcon welcome ${bconRes.success ? 'SENT' : 'FAILED'} tpl=${bconTpl} lead=${leadId}${bconRes.error ? ` err=${bconRes.error}` : ''}`)
+      }
+    }
+
     // ── Pilot / generic / parent welcome (windchasers website + Res1/Pabbly) ──
     // Re-enabled: the v3 welcome templates are Meta-approved. Fires immediately
     // for a brand-NEW lead that isn't a webinar/cabin/PAT/demo submission — so
