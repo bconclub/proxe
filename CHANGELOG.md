@@ -1,3 +1,9 @@
+## 2026-07-18 · fix(core): log-call opens PREDICTIVELY from the call notes (consultative, not passive)
+
+- Turn 0 was a static "Call logged" line that ignored the notes. Now PROXe reads the call notes on open and lays out the whole plan proactively, structured around three parts: (1) the message to send the lead (recommend it, point to the Send-a-thank-you picker), (2) the system follow-up (book the demo/call at the noted time with reminders, or a sequence), (3) the human's next step (a reminder task). One-click Confirm; it only asks a question when a critical detail is genuinely missing from the notes.
+- The chat route now accepts an empty history as the opening turn and seeds a proactive instruction. A booked/scheduled/agreed time in the notes MUST become a book step (never a stage move). Verified: "booked demo 4pm, remind me an hour before" -> book 16:00 + remind human 15:00; "friday 6pm" -> book 18:00 + remind 17:30; thin notes -> one specific question. Zero em-dashes in generated copy.
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): log-call avatar = PROXe mark; trim the + menu, move Copy/Merge to the footer
 
 - The log-call chat avatar now uses the canonical PROXe mark (the same infinity logo the Ask PROXe dock uses), not the brand icon and not a robot glyph. The human's own messages show a person glyph.
