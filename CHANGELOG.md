@@ -1,3 +1,9 @@
+## 2026-07-18 · fix(core): log-call avatar = PROXe mark; trim the + menu, move Copy/Merge to the footer
+
+- The log-call chat avatar now uses the canonical PROXe mark (the same infinity logo the Ask PROXe dock uses), not the brand icon and not a robot glyph. The human's own messages show a person glyph.
+- The lead "+" menu is slimmed to Log a Call, Add a Note, Convert lead. Copy Lead Details and Merge with another lead moved to the lead footer (next to Owner) as icon buttons with hover tooltips ("Copy lead details", "Merge with another lead"). The copy handler was extracted so both shared one implementation.
+- `(pending-sha)`
+
 ## 2026-07-18 · feat(core): log-call "Send a thank-you" is a template picker (WhatsApp-compliant)
 
 - Open WhatsApp text can't be sent outside the 24h window, so the thank-you is now an APPROVED TEMPLATE the user picks. Tapping "Send a thank-you" lists the brand's approved templates that MATCH the call: a connected call looks for a post-call/thank-you template, a missed call looks for R&R templates. If none matches, it honestly says "no template available, add one from Configure, WhatsApp" instead of sending the wrong thing.
