@@ -14,11 +14,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  MdClose, MdSend, MdCheck, MdAutorenew,
+  MdClose, MdSend, MdCheck, MdAutorenew, MdPerson,
   MdOutlineWavingHand, MdEventAvailable, MdNotificationsActive,
   MdSwapHoriz, MdRepeat, MdBlock, MdWhatsapp,
 } from 'react-icons/md'
-import { brandConfig } from '@/configs'
+import ProxeMark from '@/components/ProxeMark'
 
 interface Props {
   leadId: string
@@ -79,17 +79,19 @@ function matchTemplates(templates: any[], outcome: string): TemplateOpt[] {
     })
 }
 
-// PROXe's avatar = the product's icon (the brand mark shown in the sidebar and
-// login), never a generic glyph. Monogram fallback if a brand ships no image.
-const AVATAR_SRC = brandConfig.chatStructure?.avatar?.source || brandConfig.markPath || brandConfig.iconPath || ''
+// PROXe's avatar = the canonical PROXe mark (the same infinity logo the Ask
+// PROXe dock uses), NOT the brand icon and never a generic robot glyph.
 function ProxeAvatar({ size = 28 }: { size?: number }) {
-  if (AVATAR_SRC) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={AVATAR_SRC} alt="PROXe" className="rounded-full shrink-0 object-cover" style={{ width: size, height: size, background: 'var(--bg-hover)' }} />
-  }
   return (
-    <span className="flex items-center justify-center rounded-full shrink-0 font-bold" style={{ width: size, height: size, background: 'var(--accent-primary)', color: 'var(--bg-primary)', fontSize: size * 0.46 }}>
-      {(brandConfig.name || 'P').charAt(0).toUpperCase()}
+    <span className="flex items-center justify-center rounded-full shrink-0" style={{ width: size, height: size, background: 'var(--bg-hover)' }}>
+      <ProxeMark size={Math.round(size * 0.58)} color="var(--accent-primary)" />
+    </span>
+  )
+}
+function UserAvatar({ size = 26 }: { size?: number }) {
+  return (
+    <span className="flex items-center justify-center rounded-full shrink-0" style={{ width: size, height: size, background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
+      <MdPerson size={Math.round(size * 0.6)} />
     </span>
   )
 }
@@ -296,7 +298,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                     </div>
                   )}
                 </div>
-                {m.role === 'user' && <ProxeAvatar size={26} />}
+                {m.role === 'user' && <UserAvatar size={26} />}
               </div>
             )
           })}
