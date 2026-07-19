@@ -114,7 +114,9 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
   useEffect(() => {
     let alive = true
     ;(async () => {
+      let aip: any = null
       try {
+        // Snapshot + the recommended step highlight (fast, no LLM).
         const r = await fetch(`/api/dashboard/leads/${leadId}/log-call/propose`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ outcome, notes: notes.trim() || undefined }),
@@ -122,13 +124,26 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         const d = await r.json().catch(() => ({}))
         if (!alive) return
         setSnapshot(d.context_snapshot || null)
-        setAiPlan(d.ai_proposed_plan || null)
-        const action = d.ai_proposed_plan?.action || 'post_call'
-        setRecKey(NEXT_STEPS.find((s) => s.rec.includes(action))?.key || 'message')
-        const opening = d.ai_proposed_plan?.reason ? `Call logged. ${d.ai_proposed_plan.reason}` : `Call logged for ${leadName}. What do you want to do next?`
-        setMessages([{ role: 'assistant', content: opening }])
+        aip = d.ai_proposed_plan || null
+        setAiPlan(aip)
+        setRecKey(NEXT_STEPS.find((s) => s.rec.includes(aip?.action || 'post_call'))?.key || 'message')
+      } catch { /* fall through to the predictive open */ }
+      try {
+        // Predictive opening: PROXe reads the call notes and lays out the plan.
+        const cr = await fetch(`/api/dashboard/leads/${leadId}/log-call/chat`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outcome, notes: notes.trim() || undefined, history: [], ai_proposed_plan: aip }),
+        })
+        const cd = await cr.json().catch(() => ({}))
+        if (!alive) return
+        if (cr.ok && cd.answer) {
+          if (cd.context_snapshot) setSnapshot(cd.context_snapshot)
+          setMessages([{ role: 'assistant', content: cd.answer, chips: cd.chips || [], plan: cd.plan || null }])
+        } else {
+          setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }])
+        }
       } catch {
-        if (alive) { setRecKey('message'); setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }]) }
+        if (alive) setMessages([{ role: 'assistant', content: `Call logged for ${leadName}. What do you want to do next?` }])
       } finally { if (alive) setLoading(false) }
     })()
     return () => { alive = false }
