@@ -13,6 +13,7 @@ export interface FeatureFlags {
   scouts?: boolean    // config-locked (lokazen's gig-worker data model)
   leadAccess?: boolean // config-locked (needs migration 036 columns)
   campaigns?: boolean
+  logCallChat?: boolean // chat-with-PROXe after logging a call (vs the static hub)
 }
 
 /**

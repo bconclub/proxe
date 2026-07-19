@@ -20,6 +20,7 @@ import { createClient } from '@/lib/supabase/server'
 import { classifyAndAct, getServiceClient, resolveBookingDate, type CallOutcome } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
+import { validateSteps, type DecisionStep } from '@/lib/logcall/decisionPlan'
 import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
@@ -104,9 +105,26 @@ export async function POST(
 
     const body = await request.json()
     const { outcome: rawOutcome, notes } = body as { outcome: CallOutcome; notes?: string }
-    const decision = body?.decision as HumanDecision | undefined
     const aiProposedPlan = body?.ai_proposed_plan || null
     const contextSnapshot = body?.context_snapshot || null
+
+    // Two client shapes:
+    //  - chat (new): { decisions: DecisionStep[], decision_reason, chat_transcript }
+    //  - hub (old):  { decision: { action, reason, detail } }  → wrap as one step
+    // Either yields a validated `steps` array; absence of both = legacy auto mode.
+    const legacyDecision = body?.decision as HumanDecision | undefined
+    const hasDecision = Array.isArray(body?.decisions) || !!legacyDecision
+    const rawSteps = Array.isArray(body?.decisions)
+      ? body.decisions
+      : legacyDecision
+        ? [{ action: legacyDecision.action, detail: legacyDecision.detail || {} }]
+        : []
+    const steps: DecisionStep[] = hasDecision ? validateSteps(rawSteps) : []
+    const chatTranscript: Array<{ role: string; content: string }> = Array.isArray(body?.chat_transcript)
+      ? body.chat_transcript.slice(-40).map((m: any) => ({ role: String(m?.role || ''), content: String(m?.content || '').slice(0, 2000) }))
+      : []
+    const lastUserMsg = [...chatTranscript].reverse().find((m) => m.role === 'user')?.content || null
+    const decisionReason = (body?.decision_reason || legacyDecision?.reason || lastUserMsg || '').toString().trim() || null
 
     if (!rawOutcome || !VALID_OUTCOMES.includes(rawOutcome)) {
       return NextResponse.json(
@@ -176,7 +194,7 @@ export async function POST(
     await assignOwnerOnTouch(supabase, leadId, user)
 
     // ── LEGACY auto mode: no human decision → classify + act as before ───────
-    if (!decision) {
+    if (!hasDecision) {
       const result = await classifyAndAct({
         leadId,
         text: trimmedNotes,
@@ -187,7 +205,9 @@ export async function POST(
       return NextResponse.json({ success: true, outcome, mode: 'auto', ...result })
     }
 
-    // ── HUMAN-DECISION mode (bcon LogCallDecisionHub commit) ─────────────────
+    // ── HUMAN-DECISION mode (hub commit OR chat bundle) ──────────────────────
+    // `steps` is a validated bundle (usually 1, up to 3 for the two-way case).
+    // A lone "none" step = accept the AI's plan and execute it.
     const leadName = leadRow.customer_name || 'Lead'
     const leadPhone = leadRow.customer_phone_normalized || leadRow.phone?.replace(/\D/g, '').slice(-10) || null
     const now = new Date()
@@ -195,25 +215,24 @@ export async function POST(
     let newStage: string | null = null
     let bookingVoice: Record<string, any> | null = null
 
-    const detail = decision.detail || {}
+    // The primary step drives the learning record + agreement (first concrete
+    // step, else the lone step). decided_via distinguishes chat from the hub.
+    const primary = steps.find((s) => s.action !== 'none') || steps[0] || { action: 'none' as const, detail: {} }
+    const decidedVia = Array.isArray(body?.decisions) || chatTranscript.length > 0 ? 'chat' : 'hub'
 
-    // ── "Accept the plan" → actually EXECUTE what the brain proposed ──────────
-    // The classifier reads the note (e.g. "demo on 2nd July 4pm") and runs the
-    // full orchestration: parse + store the booking, create reminders, set the
-    // stage. Accepting must DO the plan, not just log it.
-    if (decision.action === 'none') {
+    // ── Lone "Accept the plan" → EXECUTE what the brain proposed ─────────────
+    if (steps.length === 1 && steps[0].action === 'none') {
       const result = await classifyAndAct({ leadId, text: trimmedNotes, outcome, createdBy, supabase: supabase as any })
       const acceptRecord = {
         id: `dec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
         at: now.toISOString(), decided_by: createdBy, outcome,
         call_note: trimmedNotes || null, context_snapshot: contextSnapshot,
         ai_proposed_plan: aiProposedPlan,
-        // Accepting = the human endorsed the AI's action, so record THAT action
-        // (not "none") with accepted=true, so the Learning readout is meaningful.
-        human_decision: { action: aiProposedPlan?.action || 'none', accepted: true, detail: {}, reason: decision.reason || null },
+        human_decision: { action: aiProposedPlan?.action || 'none', accepted: true, detail: {}, reason: decisionReason, steps },
         agreement: { matched: true, delta: `accepted ai:${aiProposedPlan?.action || 'none'}` },
+        chat_transcript: chatTranscript.length ? chatTranscript : undefined,
+        decided_via: decidedVia,
       }
-      // Re-fetch AFTER classifyAndAct (it rewrites unified_context) then append.
       const { data: cr } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
       const c = cr?.unified_context || {}
       const dl = Array.isArray(c.decision_log) ? c.decision_log : []
@@ -223,15 +242,16 @@ export async function POST(
       return NextResponse.json({ success: true, outcome, mode: 'accept', ...result })
     }
 
-    // "task" and "book" keep the lead human-owned (you handle it).
-    // "sequence" hands it back to the AI. Others just set state.
-    const handBackToAi = decision.action === 'sequence'
+    // Only a bundle of pure sequence steps hands the lead back to the AI; any
+    // book/task/move keeps it human-owned.
+    const concrete = steps.filter((s) => s.action !== 'none')
+    const handBackToAi = concrete.length > 0 && concrete.every((s) => s.action === 'sequence')
 
-    // Cancel the generic auto-cadence unless we're explicitly re-enrolling.
-    if (decision.action !== 'sequence') {
+    // Cancel the generic auto-cadence once, unless we're re-enrolling a sequence.
+    if (!concrete.some((s) => s.action === 'sequence')) {
       const { data: cancelled } = await supabase
         .from('agent_tasks')
-        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: human chose '${decision.action}' at log-call hub` })
+        .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: human decided at log-call` })
         .eq('lead_id', leadId)
         .in('task_type', AUTO_FOLLOWUP_TYPES)
         .in('status', PENDING)
@@ -239,54 +259,55 @@ export async function POST(
       if (cancelled?.length) actionsTaken.push(`Cancelled ${cancelled.length} pending auto follow-ups`)
     }
 
-    if (decision.action === 'book' && (detail.date || detail.time)) {
-      const bookingAt = resolveBookingDate(detail.date || 'tomorrow', detail.time || null)
-      const timeDisp = detail.time || 'scheduled time'
-      const r24 = new Date(bookingAt.getTime() - 24 * 3600e3)
-      const r30 = new Date(bookingAt.getTime() - 30 * 60e3)
-      if (r24 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_24h', task_description: `24h reminder: ${leadName} at ${timeDisp}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r24.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
-      if (r30 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_30m', task_description: `30min reminder: ${leadName}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r30.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
-      newStage = 'Booking Made'
-      // Store the booking so the Key Event / Upcoming widgets update (mirrors
-      // the orchestrator's BOOKING_MADE behaviour).
-      bookingVoice = {
-        booking_date: bookingAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
-        booking_time: bookingAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }),
-        booking_status: 'Call Booked',
-        booking_created_at: now.toISOString(),
+    // Execute each concrete step (last stage-setter wins).
+    for (const step of concrete) {
+      const detail = step.detail || {}
+      if (step.action === 'book' && (detail.date || detail.time)) {
+        const bookingAt = resolveBookingDate(detail.date || 'tomorrow', detail.time || null)
+        const timeDisp = detail.time || 'scheduled time'
+        const r24 = new Date(bookingAt.getTime() - 24 * 3600e3)
+        const r30 = new Date(bookingAt.getTime() - 30 * 60e3)
+        if (r24 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_24h', task_description: `24h reminder: ${leadName} at ${timeDisp}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r24.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
+        if (r30 > now) await supabase.from('agent_tasks').insert({ task_type: 'booking_reminder_30m', task_description: `30min reminder: ${leadName}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: r30.toISOString(), metadata: { source: 'log_call_hub', booking_time: timeDisp, sequence: 'booking' }, created_at: now.toISOString() })
+        newStage = 'Booking Made'
+        bookingVoice = {
+          booking_date: bookingAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }),
+          booking_time: bookingAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' }),
+          booking_status: 'Call Booked',
+          booking_created_at: now.toISOString(),
+        }
+        actionsTaken.push(`Booking reminders set for ${detail.date || 'tomorrow'} ${timeDisp}`)
+      } else if (step.action === 'move' && detail.stage) {
+        newStage = detail.stage
+        actionsTaken.push(`Moved to ${detail.stage}`)
+      } else if (step.action === 'close' && detail.stage) {
+        newStage = detail.stage
+        actionsTaken.push(`Closed as ${detail.stage}`)
+      } else if (step.action === 'sequence' && detail.sequence) {
+        const seq = SEQUENCES[detail.sequence] || []
+        for (const s of seq) {
+          await supabase.from('agent_tasks').insert({ task_type: s.type, task_description: `${detail.sequence} sequence: ${s.type} for ${leadName}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(), metadata: { source: 'log_call_hub', sequence: detail.sequence }, created_at: now.toISOString() })
+        }
+        if (!newStage) newStage = 'In Sequence'
+        actionsTaken.push(`Enrolled in ${detail.sequence} sequence (${seq.length} steps)`)
+      } else if (step.action === 'task' && (detail.date || detail.time)) {
+        const dueAt = resolveBookingDate(detail.date || 'tomorrow', detail.time || null)
+        await supabase.from('agent_tasks').insert({
+          task_type: 'human_followup',
+          task_description: detail.note || `Follow up with ${leadName}`,
+          lead_id: leadId, lead_phone: leadPhone, lead_name: leadName,
+          status: 'pending', scheduled_at: dueAt.toISOString(),
+          metadata: { source: 'log_call_hub', remind_via: 'telegram', owner_email: createdBy, note: detail.note || null, human_task: true },
+          created_at: now.toISOString(),
+        })
+        actionsTaken.push(`Reminder set for ${detail.date || 'tomorrow'} ${detail.time || ''}`.trim())
       }
-      actionsTaken.push(`Booking reminders set for ${detail.date || 'tomorrow'} ${timeDisp}`)
-    } else if (decision.action === 'move' && detail.stage) {
-      newStage = detail.stage
-      actionsTaken.push(`Moved to ${detail.stage}`)
-    } else if (decision.action === 'close' && detail.stage) {
-      newStage = detail.stage
-      actionsTaken.push(`Closed as ${detail.stage}`)
-    } else if (decision.action === 'sequence' && detail.sequence) {
-      const seq = SEQUENCES[detail.sequence] || []
-      for (const s of seq) {
-        await supabase.from('agent_tasks').insert({ task_type: s.type, task_description: `${detail.sequence} sequence: ${s.type} for ${leadName}`, lead_id: leadId, lead_phone: leadPhone, lead_name: leadName, status: 'pending', scheduled_at: new Date(now.getTime() + s.offsetMs).toISOString(), metadata: { source: 'log_call_hub', sequence: detail.sequence } , created_at: now.toISOString() })
-      }
-      newStage = 'In Sequence'
-      actionsTaken.push(`Enrolled in ${detail.sequence} sequence (${seq.length} steps)`)
-    } else if (decision.action === 'task' && (detail.date || detail.time)) {
-      const dueAt = resolveBookingDate(detail.date || 'tomorrow', detail.time || null)
-      await supabase.from('agent_tasks').insert({
-        task_type: 'human_followup',
-        task_description: detail.note || `Follow up with ${leadName}`,
-        lead_id: leadId, lead_phone: leadPhone, lead_name: leadName,
-        status: 'pending', scheduled_at: dueAt.toISOString(),
-        metadata: { source: 'log_call_hub', remind_via: 'telegram', owner_email: createdBy, note: detail.note || null, human_task: true },
-        created_at: now.toISOString(),
-      })
-      actionsTaken.push(`Reminder set for ${detail.date || 'tomorrow'} ${detail.time || ''}`.trim())
     }
 
-    // 2. The learning record — context + ai plan + human choice + agreement.
-    //    activities has no metadata column in BCON, so the structured record
-    //    lives in unified_context.decision_log[] (same JSONB home as admin_notes).
-    //    The Learning view rolls these up across leads.
-    const agreement = computeAgreement(aiProposedPlan?.action, decision.action)
+    // 2. ONE combined learning record. human_decision.{action,detail} stays the
+    //    primary step (the Learning readers key off it), with the full bundle in
+    //    .steps and the chat in chat_transcript.
+    const agreement = computeAgreement(aiProposedPlan?.action, primary.action)
     const decisionRecord = {
       id: `dec_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       at: now.toISOString(),
@@ -295,8 +316,10 @@ export async function POST(
       call_note: trimmedNotes || null,
       context_snapshot: contextSnapshot,
       ai_proposed_plan: aiProposedPlan,
-      human_decision: { action: decision.action, detail, reason: decision.reason || null },
+      human_decision: { action: primary.action, detail: primary.detail, reason: decisionReason, steps },
       agreement,
+      chat_transcript: chatTranscript.length ? chatTranscript : undefined,
+      decided_via: decidedVia,
     }
 
     // 3. Apply stage + ownership flag + append the learning record.
@@ -315,10 +338,11 @@ export async function POST(
     }).eq('id', leadId)
 
     // 4. Plain (metadata-free) activity row so the decision shows in the timeline.
+    const stepSummary = actionsTaken.length ? `. ${actionsTaken.join(', ')}` : ''
     await supabase.from('activities').insert({
       lead_id: leadId,
       activity_type: 'automation',
-      note: `Decision: human chose '${decision.action}'${decision.reason ? ` (${decision.reason})` : ''} — AI proposed '${aiProposedPlan?.action || 'none'}', ${agreement.matched ? 'matched' : 'overridden'}${actionsTaken.length ? `. ${actionsTaken.join(', ')}` : ''}`,
+      note: `Decision: human chose '${primary.action}'${decisionReason ? ` (${decisionReason})` : ''}, AI proposed '${aiProposedPlan?.action || 'none'}', ${agreement.matched ? 'matched' : 'overridden'}${stepSummary}`,
       created_by: 'PROXe AI',
     })
 
