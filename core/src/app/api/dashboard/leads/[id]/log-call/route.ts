@@ -17,11 +17,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { classifyAndAct, getServiceClient, resolveBookingDate, sendWhatsAppText, type CallOutcome } from '@/lib/services'
+import { classifyAndAct, getServiceClient, resolveBookingDate, sendWhatsAppTemplate, type CallOutcome } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { validateSteps, type DecisionStep } from '@/lib/logcall/decisionPlan'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, getBrandConfig } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -305,15 +305,33 @@ export async function POST(
           created_at: now.toISOString(),
         })
         actionsTaken.push(`Reminder set for ${detail.date || 'tomorrow'} ${detail.time || ''}`.trim())
-      } else if (step.action === 'message' && detail.text) {
-        // Send the thank-you now. Free-form text works only inside WhatsApp's
-        // 24h window (after a phone call the lead often is not), so on failure
-        // we record the drafted message as a note instead of losing it.
-        let sent = false
-        if (leadPhone) {
-          try { sent = (await sendWhatsAppText(leadPhone, detail.text)).success } catch { sent = false }
+      } else if (step.action === 'message' && detail.template) {
+        // Send an APPROVED template (open text can't be sent outside the 24h
+        // window; a template can). Resolve the template's named body vars from
+        // the lead, then send.
+        const firstName = (leadRow.customer_name || '').split(' ')[0] || 'there'
+        const p = existingCtx.web?.profile || existingCtx.profile || {}
+        const brandName = getBrandConfig().name || 'our team'
+        const resolveVar = (name: string): string => {
+          switch (name) {
+            case 'customer_name': return firstName
+            case 'service_interest':
+            case 'service_name': return p.service_interest || existingCtx.service_interest || 'your enquiry'
+            case 'business_name': return p.company || p.business || existingCtx.business || 'your business'
+            case 'brand_name': return brandName
+            case 'pain_point': return p.pain_point || existingCtx.pain_point || 'your goals'
+            default: return existingCtx[name] || 'there'
+          }
         }
-        // Always log the message to the timeline + notes so there is a record.
+        const paramNames: string[] = Array.isArray(detail.param_names) ? detail.param_names : []
+        const components = paramNames.length
+          ? [{ type: 'body' as const, parameters: paramNames.map((n: string) => ({ type: 'text', parameter_name: n, text: resolveVar(n) })) }]
+          : []
+        let sent = false, sendErr = ''
+        if (leadPhone) {
+          try { const res = await sendWhatsAppTemplate(leadPhone, detail.template, components as any); sent = res.success; sendErr = res.error || '' }
+          catch (e: any) { sendErr = e?.message || 'send failed' }
+        } else { sendErr = 'no phone on lead' }
         const { data: mr } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
         const mc = mr?.unified_context || {}
         const mn: any[] = Array.isArray(mc.admin_notes) ? mc.admin_notes : []
@@ -322,12 +340,12 @@ export async function POST(
             ...mc,
             admin_notes: [...mn, {
               id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-              text: sent ? `Sent on WhatsApp: ${detail.text}` : `Drafted (not sent, likely outside the 24h window): ${detail.text}`,
+              text: sent ? `Sent template ${detail.template}` : `Template ${detail.template} could not be sent (${sendErr})`,
               created_by: createdBy, created_at: now.toISOString(), source: 'log_call', outcome,
             }],
           },
         }).eq('id', leadId)
-        actionsTaken.push(sent ? 'Thank-you message sent' : 'Thank-you message drafted (could not send, saved as a note)')
+        actionsTaken.push(sent ? `Sent the ${detail.template} template` : `Could not send ${detail.template} (${sendErr})`)
       }
     }
 

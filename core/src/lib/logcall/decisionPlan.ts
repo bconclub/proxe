@@ -19,7 +19,11 @@ export interface DecisionDetail {
   date?: string
   time?: string
   note?: string
-  text?: string // the WhatsApp message body (action: message)
+  // action: message — an APPROVED WhatsApp template (open text can't be sent
+  // outside the 24h window). param_names are the template's named body vars,
+  // resolved from the lead server-side at send time.
+  template?: string
+  param_names?: string[]
 }
 export interface DecisionStep {
   action: DecisionAction
@@ -99,9 +103,10 @@ function validateStep(raw: any): DecisionStep | null {
     if (time) detail.time = time
     if (action === 'task' && typeof rd.note === 'string') detail.note = scrubDashes(rd.note).slice(0, 200)
   } else if (action === 'message') {
-    const text = typeof rd.text === 'string' ? scrubDashes(rd.text).trim().slice(0, 600) : ''
-    if (!text) return null
-    detail.text = text
+    const template = typeof rd.template === 'string' ? rd.template.trim().slice(0, 120) : ''
+    if (!template) return null
+    detail.template = template
+    if (Array.isArray(rd.param_names)) detail.param_names = rd.param_names.filter((x: any) => typeof x === 'string').slice(0, 10)
   }
   // action 'none' needs no detail.
   return { action, detail }
@@ -149,7 +154,7 @@ export function describeStep(step: DecisionStep): string {
     case 'sequence': return `Hand back to the AI on the ${d.sequence} sequence`
     case 'move': return `Move the lead to ${d.stage}`
     case 'close': return `Close the lead as ${d.stage}`
-    case 'message': return `Send now: "${d.text}"`
+    case 'message': return `Send the "${d.template}" template now`
     case 'none': return 'Go with the AI plan'
     default: return step.action
   }
