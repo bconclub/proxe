@@ -1,3 +1,8 @@
+## 2026-07-18 · fix(core): log-call step chips show human date + time (Tomorrow, 3:00 PM)
+
+- The plan step chips no longer show a raw ISO date/time. They now read "Book Tomorrow, 3:00 PM, with reminders" and "Remind you Tomorrow, 2:30 PM": relative day (Today/Tomorrow/Yesterday, else "Sat, 25 Jul") plus 12-hour time with AM/PM.
+- `(pending-sha)`
+
 ## 2026-07-18 · feat(core): per-message token + rupee-cost watermark on the log-call chat
 
 - Each PROXe reply in the log-call chat now shows a small watermark under the box: the tokens that turn used and its cost in rupees (e.g. "1,521 tok, Rs 0.62"), so the operator can see spend per turn. The first turn is pricier (it caches the system prompt); later turns read from cache and cost a fraction.
