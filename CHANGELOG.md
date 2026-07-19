@@ -1,3 +1,10 @@
+## 2026-07-18 · fix(core): log-call chat is tighter and more visual
+
+- The opening message is now ONE short line (no recap of times/booking in prose); all the detail lives in the plan, shown as step CHIPS in the confirm card ("Book 25 Jul 16:00 + reminders", "Remind you 25 Jul 15:00", a tappable "Send a thank-you"). The card also shows what you logged (outcome + note) at the top.
+- The fixed next-steps menu is trimmed to four (Send a thank-you, Book/reschedule, Remind me, Close lead) and now HIGHLIGHTS every step the proposal touches together, not just one, so a book+remind+thank-you plan lights up all three.
+- Fixed the close+sequence contradiction from the simulation: closing a lead no longer also enrols it in an AI cadence (prompt rule + a server guard that drops any sequence step when a close step is present).
+- `(pending-sha)`
+
 ## 2026-07-18 · fix(core): log-call opens PREDICTIVELY from the call notes (consultative, not passive)
 
 - Turn 0 was a static "Call logged" line that ignored the notes. Now PROXe reads the call notes on open and lays out the whole plan proactively, structured around three parts: (1) the message to send the lead (recommend it, point to the Send-a-thank-you picker), (2) the system follow-up (book the demo/call at the noted time with reminders, or a sequence), (3) the human's next step (a reminder task). One-click Confirm; it only asks a question when a critical detail is genuinely missing from the notes.
