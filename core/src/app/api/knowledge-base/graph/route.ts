@@ -208,10 +208,27 @@ export async function GET() {
     console.error('[kb-graph] brain prompts failed', e)
   }
 
-  // ── 5. WhatsApp template bodies (Meta-approved) ──────────────────────────
+  // ── 5. WhatsApp template bodies (brand-scoped by name prefix) ────────────
+  // Two curated registries live in core, each brand-specific by naming
+  // convention (template-bodies = bcon_*, whatsapp-template-bodies =
+  // windchasers_*). Show ONLY the active brand's own templates, matched by the
+  // `${brandId}_` prefix, so nothing bleeds across brands. Brands whose
+  // templates live only in Meta simply show none here.
   try {
-    const mod = await import('@/configs/template-bodies')
-    const bodies = mod.TEMPLATE_BODIES || {}
+    const prefix = `${brandId}_`
+    const bodies: Record<string, string> = {}
+    try {
+      const { TEMPLATE_BODIES } = await import('@/configs/template-bodies')
+      for (const [name, body] of Object.entries(TEMPLATE_BODIES || {})) {
+        if (typeof body === 'string' && name.startsWith(prefix)) bodies[name] = body
+      }
+    } catch { /* registry absent */ }
+    try {
+      const { WA_TEMPLATE_BODIES } = await import('@/configs/whatsapp-template-bodies')
+      for (const [name, v] of Object.entries(WA_TEMPLATE_BODIES || {})) {
+        if (v?.body && name.startsWith(prefix)) bodies[name] = v.body
+      }
+    } catch { /* registry absent */ }
     for (const [name, body] of Object.entries(bodies)) {
       if (!body) continue
       templateCount++
