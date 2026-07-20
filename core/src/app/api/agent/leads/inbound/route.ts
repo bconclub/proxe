@@ -39,23 +39,23 @@ const LOKAZEN_SCOUT_ONBOARDING_URL =
   process.env.NEXT_PUBLIC_LOKAZEN_SCOUT_ONBOARDING_URL || 'https://www.lokazen.in/scout#scout-form'
 
 // Upstream forms/apps sometimes send a category/placeholder label instead of an
-// actual name — a single word (e.g. "Property") or a compound default a signup
+// actual name - a single word (e.g. "Property") or a compound default a signup
 // flow stamps on a brand-new account before the person enters their real name
 // (e.g. the Lokazen owner app's account default "Property Owner"). Either way
 // it then gets greeted back at the person ("Hi Property, ...") or displayed as
 // their name on the dashboard. A name counts as a placeholder when EVERY word
-// in it is a known placeholder token — so "Property Owner" is blocked but a
+// in it is a known placeholder token - so "Property Owner" is blocked but a
 // real name like "Owner Smith" is not (only one word matches).
 const NAME_PLACEHOLDER_BLOCKLIST = new Set([
   'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
   'test', 'n/a', 'na', 'none', 'unknown', 'undefined', 'null',
 ])
 function cleanName(raw?: string | number | null): string {
-  // Coerce first — inbound payloads sometimes send name/number fields non-string.
+  // Coerce first - inbound payloads sometimes send name/number fields non-string.
   const trimmed = (raw == null ? '' : String(raw)).trim()
   if (!trimmed) return ''
   // Synthetic account ids / placeholder emails the owner & scout apps stamp on a
-  // brand-new account BEFORE a real name exists — never a person's name. e.g.
+  // brand-new account BEFORE a real name exists - never a person's name. e.g.
   // "owner_9341333999_1783481293327@noemail.lokazen.in", any @noemail./noreply
   // address, or an "<type>_<digits>…" internal id. Without this the id leaks into
   // the dashboard as the lead's name and into "Hi <id>" greetings.
@@ -66,15 +66,15 @@ function cleanName(raw?: string | number | null): string {
   return isPlaceholder ? '' : trimmed
 }
 
-// Outbound-message dedup gate — this webhook can be called more than once for
+// Outbound-message dedup gate - this webhook can be called more than once for
 // the exact same event (page reload, retry, double form-submit; confirmed
 // live for lokazen scout events, firing the same template 4x in 6 minutes).
 // Every WhatsApp template send in this file should check this FIRST: skip
-// (log only — the lead's data still updates normally) if the same template
+// (log only - the lead's data still updates normally) if the same template
 // already went out to this lead within the window. Time-based rather than
 // "only ever once" so genuinely repeatable actions (a scout's 2nd/3rd/4th
 // submission, a later payout, a re-booked demo at a different time) still
-// send — only true back-to-back duplicates get squashed.
+// send - only true back-to-back duplicates get squashed.
 const TEMPLATE_DEDUP_WINDOW_MS = 5 * 60 * 1000
 async function wasTemplateRecentlySent(
   supabase: any,
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
     // Diagnostic: log exactly what each lead arrives with (name vs brand + which
     // form fields came through) so we can confirm the website is forwarding the
-    // full submission. Names/fields only — no secrets.
+    // full submission. Names/fields only - no secrets.
     console.log('[inbound] received:', JSON.stringify({
       name: name || null,
       brand_name: brand_name || null,
@@ -222,14 +222,14 @@ export async function POST(request: NextRequest) {
     const leadBrand = brand || BRAND_ID
     // Fall back to 'form' for any value not in the channel_type enum (e.g. 'pat', 'guide_download').
     // The original raw source is preserved in agent_tasks.metadata.source below.
-    // 'webinar' exists only in windchasers' channel_type enum (migration 035) —
+    // 'webinar' exists only in windchasers' channel_type enum (migration 035) -
     // other brands' inserts would 22P02, so they coerce to 'form'.
     let leadSource = VALID_TOUCHPOINTS.has(mappedSource) ? mappedSource : 'form'
     if (leadSource === 'webinar' && leadBrand !== 'windchasers') leadSource = 'form'
 
     // The lokazen all_leads.first_touchpoint CHECK constraint only permits the
     // base channels (web/whatsapp/voice/social). A form/ads/meta_forms/manual
-    // source would fail the INSERT and the lead would be LOST — the exact reason
+    // source would fail the INSERT and the lead would be LOST - the exact reason
     // onboarding/ad leads weren't arriving. Coerce the value we WRITE to an
     // allowed channel; the true source is still preserved in unified_context.
     // attribution + agent_tasks.metadata.original_source. (Scoped to lokazen so
@@ -286,17 +286,17 @@ export async function POST(request: NextRequest) {
 
     // ── Brand-namespaced context (powers dashboard TYPE / COURSE columns) ───
     // The dashboard reads unified_context[leadBrand].user_type and
-    // .course_interest — without this the columns stay blank even though we
+    // .course_interest - without this the columns stay blank even though we
     // have the data in custom_fields.
     const brandCtxData: Record<string, any> = {}
     const cf2 = (custom_fields || {}) as Record<string, any>
-    // Webinar registration flag (windchasers) — set in the brand block below,
+    // Webinar registration flag (windchasers) - set in the brand block below,
     // read later for task-skip + confirmation send.
     let isWebinarReg = false
-    // Cabin-crew lead flag (windchasers) — set in the brand block below, read
+    // Cabin-crew lead flag (windchasers) - set in the brand block below, read
     // later for the dedicated cabin-crew welcome + first_outreach skip.
     let isCabinCrewLead = false
-    // Flight-school lead flag (windchasers) — set below, read at the welcome
+    // Flight-school lead flag (windchasers) - set below, read at the welcome
     // block so these get the generic welcome (which has a "Flight Schools"
     // button) rather than the pilot-training welcome.
     let isFlightSchoolLead = false
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
     }
     if (leadBrand === 'windchasers') {
       // Normalize the interest to one canonical course label
-      // (Pilot / DGCA / Helicopter / Cabin Crew / Flight School) — no abbreviated variations.
+      // (Pilot / DGCA / Helicopter / Cabin Crew / Flight School) - no abbreviated variations.
       const interestRaw = String(cf2.interest || cf2.course_interest || '').toLowerCase().trim()
       const normalizedCourse = normalizeCourse(interestRaw)
       if (normalizedCourse && interestRaw !== 'other') {
@@ -336,7 +336,7 @@ export async function POST(request: NextRequest) {
       if (isCabinCrewLead && !brandCtxData.course_interest) {
         brandCtxData.course_interest = 'Cabin Crew'
       }
-      // Flight-school lead (study/train abroad) — from the flight-school form/
+      // Flight-school lead (study/train abroad) - from the flight-school form/
       // source or a school-name field. Force COURSE = 'Flight School' so it is
       // NOT remapped to 'Pilot' (normalizeCourse treats "flight" as Pilot).
       isFlightSchoolLead =
@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
       // ── Webinar registration (Zoom → Pabbly) ──────────────────────────────
       // Registrants are pre-leads: tagged lead_type='webinar' so the Leads
       // page's Webinar tab can segment them out of the main list. user_type
-      // (student/parent) is NOT touched — that's who they are, this is why
+      // (student/parent) is NOT touched - that's who they are, this is why
       // they came.
       // A COMPLETED Zoom registration (the Zoom → Pabbly webhook fires only after
       // they finish registering on Zoom) carries a per-registrant join_url, or a
@@ -389,7 +389,7 @@ export async function POST(request: NextRequest) {
       }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
-      // total_score is 0–150. Tier is RE-DERIVED on the server from total_score
+      // total_score is 0-150. Tier is RE-DERIVED on the server from total_score
       // (never trust the client) using the official cutoffs:
       //   140+ premium · 120+ strong · 90+ moderate · 0+ not-ready
       // See docs/pat-scoring.md for the full spec.
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
         if (!isNaN(total)) {
           brandCtxData.pat_score = total
           brandCtxData.pat_score_100 = Math.round((total * 100) / 150)
-          // Server-derived tier — authoritative
+          // Server-derived tier - authoritative
           const derivedTier =
             total >= 140 ? 'premium' :
             total >= 120 ? 'strong' :
@@ -528,7 +528,7 @@ export async function POST(request: NextRequest) {
         if (deposit) brandCtxData.deposit = deposit
         const gmaps = asStr(pick('google_maps_link', 'google_maps_url', 'gmaps_link', 'map_link', 'maps_url'))
         if (gmaps) brandCtxData.google_maps_url = gmaps
-        // Free-text the owner typed (floor / "other details" / description) — the
+        // Free-text the owner typed (floor / "other details" / description) - the
         // website bundles floor into this, so it carries the extra detail PROXe
         // otherwise dropped. Surfaces in the property modal's "Other details".
         const notes = asStr(pick('notes', 'description', 'other_details', 'details', 'message'))
@@ -609,7 +609,7 @@ export async function POST(request: NextRequest) {
 
     // ── Build attribution payload (Source / First Touch) ────────────────────
     // Source priority: resolvedChannel (custom_fields.channel) > utm_source > fallback.
-    //   custom_fields.channel is the website's own resolved channel — it has
+    //   custom_fields.channel is the website's own resolved channel - it has
     //   already mapped fbclid → facebook_ads, gclid → google_ads, etc., which
     //   catches Meta-ad leads that arrive without UTM tagging (Meta auto-tags
     //   with fbclid INSTEAD of UTM, so utm-first bucket every Meta lead as
@@ -629,7 +629,7 @@ export async function POST(request: NextRequest) {
       pageUrl: cf2.page_url || null,
     })
 
-    // Check for existing lead — scope to brand because the same phone can
+    // Check for existing lead - scope to brand because the same phone can
     // exist across brands (e.g. someone is a lead for both bcon and
     // windchasers). Without the brand filter, .maybeSingle() returns null
     // when multiple brands have this phone, sending us into the insert path
@@ -678,7 +678,7 @@ export async function POST(request: NextRequest) {
             (existingCtx[leadBrand] as any)?.lead_type !== 'webinar') {
           delete mergedBrandCtx.lead_type
         }
-        // Attribution is IMMUTABLE — never overwrite existing source/first_touch.
+        // Attribution is IMMUTABLE - never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
         const mergedAttribution = existingCtx.attribution ?? attribution
         updates.unified_context = {
@@ -692,7 +692,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('all_leads').update(updates).eq('id', existing.id)
       leadId = existing.id
     } else {
-      // Create new lead — attribution is set ONCE at creation
+      // Create new lead - attribution is set ONCE at creation
       const { data: created, error: createErr } = await supabase
         .from('all_leads')
         .insert({
@@ -776,7 +776,7 @@ export async function POST(request: NextRequest) {
       for (const candidate of [cf2.page_url, cf2.referrer]) {
         if (!candidate || typeof candidate !== 'string') continue
         try {
-          // Coerce relative paths to a parseable URL — the host is throwaway.
+          // Coerce relative paths to a parseable URL - the host is throwaway.
           const u = new URL(candidate.startsWith('http') ? candidate : `https://example.com${candidate}`)
           const cid = u.searchParams.get('conversation_id')
           if (cid) {
@@ -784,7 +784,7 @@ export async function POST(request: NextRequest) {
             break
           }
         } catch {
-          // Malformed URL — try the next source.
+          // Malformed URL - try the next source.
         }
       }
     }
@@ -792,7 +792,7 @@ export async function POST(request: NextRequest) {
     if (chatSessionId) {
       try {
         // Repoint the web_session if it's still unlinked. We deliberately
-        // don't overwrite a different lead_id — if the session was already
+        // don't overwrite a different lead_id - if the session was already
         // attached to someone else, we don't want to steal it.
         const { data: sessionUpdated, error: sessionErr } = await supabase
           .from('web_sessions')
@@ -821,19 +821,19 @@ export async function POST(request: NextRequest) {
           )
         }
       } catch (e: any) {
-        // Non-fatal — the lead has been created, the chat history just
+        // Non-fatal - the lead has been created, the chat history just
         // stays orphaned. Better to ship the lead than block on this.
         console.error('[inbound/chat-link] unexpected:', e?.message || e)
       }
     }
 
-    // Create first_outreach task — but skip if one is already pending for this
+    // Create first_outreach task - but skip if one is already pending for this
     // lead. The inbound endpoint can fire multiple times for the same lead
     // (e.g. the same Meta form is re-submitted, or the user fills the PAT
     // form after the lead form). Without this guard, every submission appends
     // a duplicate "First Outreach to X" task to the dashboard.
     // 'Lead' is a placeholder, fine for DB storage/dashboard display, but reads
-    // badly as a WhatsApp greeting ("Hi Lead" — the same class of bug as "Hi
+    // badly as a WhatsApp greeting ("Hi Lead" - the same class of bug as "Hi
     // Property"). Every firstName-for-greeting derivation below checks for this
     // exact sentinel and uses 'there' instead, without changing the DB fallback.
     const leadName = cleanName(name) || cleanName(existing?.customer_name) || 'Lead'
@@ -843,7 +843,7 @@ export async function POST(request: NextRequest) {
     let taskCreated = false
 
     // Windchasers: a brand-new, non-webinar/cabin/PAT/demo lead gets an
-    // immediate pilot/generic/parent welcome (re-enabled below — the v3 welcome
+    // immediate pilot/generic/parent welcome (re-enabled below - the v3 welcome
     // templates are Meta-approved). Mirrors the cabin-crew path: welcome now,
     // skip the (dead) first_outreach task so the lead isn't double-handled.
     const isNewLead = !existing
@@ -859,8 +859,8 @@ export async function POST(request: NextRequest) {
       !isWebinarReg && !isCabinCrewLead && !isPatEarly && !isDemoEarly
     // bcon: every brand-new inbound lead with a phone gets an IMMEDIATE welcome
     // (website form -> web welcome, Meta/AI-Lead-Machine -> campaign welcome).
-    // The old path parked a first_outreach task for the task-worker — which is
-    // retired — so website leads reached PROXe and then sat silent.
+    // The old path parked a first_outreach task for the task-worker - which is
+    // retired - so website leads reached PROXe and then sat silent.
     const isBconWelcomeLead = leadBrand === 'bcon' && !!phone && isNewLead
 
     const { data: existingOutreach } = await supabase
@@ -871,30 +871,30 @@ export async function POST(request: NextRequest) {
       .in('status', ['pending', 'queued', 'awaiting_approval'])
       .limit(1)
 
-    // Scouts do NOT run the brand/owner follow-up sequence — they have their own
+    // Scouts do NOT run the brand/owner follow-up sequence - they have their own
     // lifecycle drip (signup/KYC/submission/payout via scout_event templates), so
     // never queue a first_outreach / sequence task for a scout lead.
     const isScoutLead = leadBrand === 'lokazen' && brandCtxData.user_type === 'scout'
     if (isScoutLead) {
-      console.log(`[inbound] Scout lead ${leadName} — no follow-up sequence (scout lifecycle only)`)
+      console.log(`[inbound] Scout lead ${leadName} - no follow-up sequence (scout lifecycle only)`)
     } else if (isWebinarReg) {
-      // Webinar registrants are pre-leads at volume — the confirm + reminder
+      // Webinar registrants are pre-leads at volume - the confirm + reminder
       // templates ARE the outreach; no counsellor first_outreach task.
-      console.log(`[inbound] Webinar registration ${leadName} — no first_outreach task`)
+      console.log(`[inbound] Webinar registration ${leadName} - no first_outreach task`)
     } else if (isCabinCrewLead) {
       // Cabin-crew leads get the dedicated cabin-crew welcome below as the first
-      // touch (mirrors the FB path) — no separate first_outreach task, so the
+      // touch (mirrors the FB path) - no separate first_outreach task, so the
       // lead isn't messaged twice. The worker still follows up by scanning.
-      console.log(`[inbound] Cabin-crew lead ${leadName} — cabin-crew welcome, no first_outreach task`)
+      console.log(`[inbound] Cabin-crew lead ${leadName} - cabin-crew welcome, no first_outreach task`)
     } else if (isWindchasersWelcomeLead) {
-      // Pilot/generic/parent welcome fires below as the first touch — no dead
+      // Pilot/generic/parent welcome fires below as the first touch - no dead
       // first_outreach task (its worker never ran, so those leads were silent).
-      console.log(`[inbound] Windchasers lead ${leadName} — pilot/generic/parent welcome, no first_outreach task`)
+      console.log(`[inbound] Windchasers lead ${leadName} - pilot/generic/parent welcome, no first_outreach task`)
     } else if (isBconWelcomeLead) {
-      // bcon welcome fires below as the first touch — no dead first_outreach task.
-      console.log(`[inbound] bcon lead ${leadName} — inline welcome, no first_outreach task`)
+      // bcon welcome fires below as the first touch - no dead first_outreach task.
+      console.log(`[inbound] bcon lead ${leadName} - inline welcome, no first_outreach task`)
     } else if (existingOutreach && existingOutreach.length > 0) {
-      console.log(`[inbound] Skipping first_outreach for ${leadName} — already pending (task ${existingOutreach[0].id})`)
+      console.log(`[inbound] Skipping first_outreach for ${leadName} - already pending (task ${existingOutreach[0].id})`)
       taskCreated = true // a task already exists for this lead
     } else {
       const { error: taskErr } = await supabase.from('agent_tasks').insert({
@@ -931,12 +931,12 @@ export async function POST(request: NextRequest) {
     // Fires for genuinely new inbound leads (Brand / Property onboarding forms,
     // ads, etc.). Awaited so Vercel doesn't drop it; soft-fails so Slack never
     // blocks the lead. Detail line surfaces the captured Brand/Property fields.
-    // (Core note: gated to lokazen — other brands keep their existing behavior.)
+    // (Core note: gated to lokazen - other brands keep their existing behavior.)
     if (isNew && leadBrand === 'lokazen') {
       try {
         const lkz = brandCtxData
         const typeLabel = lkz.user_type === 'owner' ? 'Property Owner' : lkz.user_type === 'brand' ? 'Brand' : null
-        // Structured detail — rendered as Slack 2-column fields, not a joined line.
+        // Structured detail - rendered as Slack 2-column fields, not a joined line.
         const detailFields: Array<[string, string | number | null | undefined]> =
           lkz.user_type === 'owner'
             ? [
@@ -984,7 +984,7 @@ export async function POST(request: NextRequest) {
     // (signup / kyc_received / kyc_approved / upi_saved / submission / payout)
     // and never sends its own scout WhatsApp (confirmed: its own
     // notifyPayoutSent/etc. are Slack+email admin alerts only, not scout-facing).
-    // All 6 Meta-approved templates are active by default — no Vercel env-var
+    // All 6 Meta-approved templates are active by default - no Vercel env-var
     // step needed. LOKAZEN_ACTIVE_SCOUT_TEMPLATES remains as an optional
     // override (e.g. to disable one template without a code change) but is
     // never required. Scouts are handled entirely by the dedicated sender
@@ -1004,7 +1004,7 @@ export async function POST(request: NextRequest) {
     if (leadBrand === 'lokazen' && isNew && normalizedPhone && brandCtxData.user_type !== 'scout') {
       try {
         // The lead's "name" is often the BRAND they typed (e.g. "Bulbul Blablu"),
-        // not a person — greeting "Hi Bulbul" is wrong. Only use it as a first
+        // not a person - greeting "Hi Bulbul" is wrong. Only use it as a first
         // name when it looks like a real person AND is NOT the same as the brand
         // name; otherwise greet "there".
         const lkzBrand = String(brand_name || brandCtxData.brand_name || '').trim().toLowerCase()
@@ -1015,7 +1015,7 @@ export async function POST(request: NextRequest) {
         const isBrandLead = brandCtxData.user_type === 'brand'
         const isOwnerLead = brandCtxData.user_type === 'owner'
 
-        // Approved (POSITIONAL {{1}}=name) confirm template — the default AND the
+        // Approved (POSITIONAL {{1}}=name) confirm template - the default AND the
         // fallback if the richer audience welcome is not yet live on Meta.
         const confirmName = 'lokazen_lead_confirm'
         const confirmComponents = [{ type: 'body' as const, parameters: [{ type: 'text', text: firstName }] }]
@@ -1048,7 +1048,7 @@ export async function POST(request: NextRequest) {
           templateButtons = ['How it works', 'Talk to The Team']
         } else if (isOwnerLead) {
           // Owners often drop a Google Maps pin instead of typing a locality, so
-          // property_zone can be empty while the map link is present — use it as
+          // property_zone can be empty while the map link is present - use it as
           // the location before falling back to a generic phrase.
           const location = String(brandCtxData.property_zone || brandCtxData.google_maps_url || '').trim() || 'your area'
           const size = String(brandCtxData.property_size_sqft || '').trim() || 'your space'
@@ -1067,10 +1067,10 @@ export async function POST(request: NextRequest) {
         let waRes = await sendWhatsAppTemplate(normalizedPhone, templateName, components, 'en')
 
         // The richer audience welcomes (brand / owner) are still In review on
-        // Meta. Until approved the send fails — fall back to the approved confirm
+        // Meta. Until approved the send fails - fall back to the approved confirm
         // so the lead still gets a welcome. Drop once both are live.
         if (!waRes.success && (isBrandLead || isOwnerLead)) {
-          console.warn(`[inbound] Lokazen ${templateName} failed (${waRes.error}) — falling back to ${confirmName}`)
+          console.warn(`[inbound] Lokazen ${templateName} failed (${waRes.error}) - falling back to ${confirmName}`)
           templateName = confirmName
           renderedBody = confirmBody
           templateButtons = []
@@ -1099,9 +1099,9 @@ export async function POST(request: NextRequest) {
           console.error(`[inbound] Lokazen WA template FAILED lead=${leadId} template=${templateName} status=${(waRes as any).statusCode} error=${waRes.error}`)
           await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
         } else {
-          // We just reached the lead on WhatsApp — that's the latest touch now, so
+          // We just reached the lead on WhatsApp - that's the latest touch now, so
           // the lead card/list stops showing "web" after an outbound template.
-          // (first_touchpoint stays 'web' — that's the origin.)
+          // (first_touchpoint stays 'web' - that's the origin.)
           await supabase.from('all_leads')
             .update({ last_touchpoint: 'whatsapp', last_interaction_at: new Date().toISOString() })
             .eq('id', leadId)
@@ -1112,23 +1112,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── Lokazen SCOUT messaging — PROXe owns the whole drip ──────────────────
+    // ── Lokazen SCOUT messaging - PROXe owns the whole drip ──────────────────
     // The website forwards every scout_event and never texts scouts itself.
     // All 6 templates (scout_signup / scout_kyc_received / scout_kyc_approved /
     // scout_upi_saved / scout_submission_received / scout_payout_sent) are the
     // exact names approved on Lokazen's WABA and are active by default (see
-    // DEFAULT_ACTIVE_SCOUT_TEMPLATES above) — no env var required.
+    // DEFAULT_ACTIVE_SCOUT_TEMPLATES above) - no env var required.
     if (leadBrand === 'lokazen' && scoutEventToSend && normalizedPhone) {
       try {
         // Canonical scout event → the EXACT Meta-approved template on Lokazen's
         // WABA (verified live in WhatsApp Manager, 2026-07-06: every one of these
-        // 6 templates is FULLY STATIC — zero {{n}} body placeholders, just a
-        // static "Open Scout Portal" URL button — so params is always []. (Body
+        // 6 templates is FULLY STATIC - zero {{n}} body placeholders, just a
+        // static "Open Scout Portal" URL button - so params is always []. (Body
         // text below is copied verbatim from the approved previews, purely for
         // the conversations-table timeline; it is never sent to Meta. If a
-        // future template adds real placeholders, rebuild the per-lead values —
+        // future template adds real placeholders, rebuild the per-lead values -
         // leadName/brandCtxData.scout_url/scout_area_covered/last_payout_amount/
-        // scout_upi_id — here and pass them via params instead of [].)
+        // scout_upi_id - here and pass them via params instead of [].)
         const SCOUT_EVENT_MAP: Record<string, { template: string; params: Array<{ type: 'text'; text: string }>; body: string }> = {
           signup: {
             template: 'scout_signup',
@@ -1176,20 +1176,20 @@ export async function POST(request: NextRequest) {
         const mapped = SCOUT_EVENT_MAP[canonicalEvent]
         const activeTemplates = activeScoutTemplates
         // Dedup gate. signup/kyc_received/kyc_approved/upi_saved are ONE-TIME
-        // lifecycle stages — a scout can only reach "KYC received" once, ever,
+        // lifecycle stages - a scout can only reach "KYC received" once, ever,
         // so a 5-minute time window isn't enough: confirmed live, the website
         // kept re-sending the same kyc_submitted event hours apart (6:42 PM,
         // 6:50 PM, 7:00 AM next day) and each one slipped past the old
         // 5-minute-only gate as a "new" send. These 4 use an unbounded
-        // (Infinity) window — ANY prior send of this template to this lead,
+        // (Infinity) window - ANY prior send of this template to this lead,
         // no matter how old, blocks another. submission/payout are genuinely
         // repeatable (a scout's 2nd/3rd property, a later payout) so they keep
-        // the 5-minute window — only true back-to-back duplicates are squashed.
+        // the 5-minute window - only true back-to-back duplicates are squashed.
         const ONE_TIME_SCOUT_EVENTS = new Set(['signup', 'kyc_received', 'kyc_approved', 'upi_saved'])
         // "submission received" was firing on EVERY property a scout sent (seen
         // live: 5 identical "we received your submission" in 90 min = spam). The
         // 3h window (2026-07-13) still let an all-day scout collect 4-5 identical
-        // texts per day — re-reported via Report Issue ISS-20260716-qj09j5 (one
+        // texts per day - re-reported via Report Issue ISS-20260716-qj09j5 (one
         // active scout: 16 sends in 4 days). One acknowledgement per DAY is
         // enough; the Scout Portal lists every submission. payout stays
         // repeatable on the default short window (each payout is distinct and
@@ -1209,7 +1209,7 @@ export async function POST(request: NextRequest) {
           console.log(`[inbound] Lokazen scout template SKIPPED as duplicate (sent within last 5 min): ${mapped.template} lead=${leadId}`)
         } else {
           // Fully static templates (params.length === 0) get an empty components
-          // array — Meta hard-fails on a BODY component whose parameter count
+          // array - Meta hard-fails on a BODY component whose parameter count
           // doesn't match the template's placeholder count (seen live: sending 2
           // params to a 0-param template → 132000 error), so don't send a BODY
           // component at all when there's nothing to fill in.
@@ -1243,7 +1243,7 @@ export async function POST(request: NextRequest) {
             console.error(`[inbound] Lokazen scout WA FAILED lead=${leadId} template=${mapped.template} status=${(waRes as any).statusCode} error=${waRes.error}`)
             await supabase.from('all_leads').update({ needs_human_followup: true }).eq('id', leadId)
           } else {
-            // We just reached the scout on WhatsApp — that's the latest touch now
+            // We just reached the scout on WhatsApp - that's the latest touch now
             // (mirrors the brand/owner welcome path above, which already does this;
             // the scout path never did, so the Leads table kept showing "Web" as
             // last touch even after PROXe sent a scout template).
@@ -1270,7 +1270,7 @@ export async function POST(request: NextRequest) {
 
     // ── Webinar registration → confirmation template ─────────────────────────
     // Guarded: dedup window (re-submits / Pabbly retries), soft-fail while the
-    // template is still in Meta review (no needs_human_followup noise — the
+    // template is still in Meta review (no needs_human_followup noise - the
     // reminder cron + counsellors don't depend on this send).
     if (phone && isWebinarReg) {
       const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
@@ -1395,7 +1395,7 @@ export async function POST(request: NextRequest) {
               : 'not-ready'
       const tier = derivedTier
       if (!isNaN(score)) {
-        // AWAIT (not fire-and-forget) — Vercel kills in-flight promises after
+        // AWAIT (not fire-and-forget) - Vercel kills in-flight promises after
         // NextResponse.json() returns. Also always log to conversations,
         // success OR failure, so the dashboard reflects reality.
         const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
@@ -1405,7 +1405,7 @@ export async function POST(request: NextRequest) {
         const score100 = Math.round((score * 100) / 150)
         const renderedBody = renderPATResultBody(firstName, score100, tierLabel, tierMessage)
 
-        // Dedup gate — this webhook can be called more than once for the same
+        // Dedup gate - this webhook can be called more than once for the same
         // PAT submission (retry, double form-submit, page reload after
         // completing the test). Skip the send if already sent within the
         // window; everything else in the function still runs normally.
@@ -1483,7 +1483,7 @@ export async function POST(request: NextRequest) {
       }
     }
     // ── bcon welcome (website forms + AI Lead Machine / Meta feeds) ──────────
-    // Fires INLINE at intake, mirroring windchasers — the first_outreach task
+    // Fires INLINE at intake, mirroring windchasers - the first_outreach task
     // path died with the task-worker. Dedup-guarded against re-submits.
     if (isBconWelcomeLead) {
       const firstName = (leadName !== 'Lead' && leadName ? leadName : 'there').split(' ')[0]
@@ -1548,7 +1548,7 @@ export async function POST(request: NextRequest) {
 
     // ── Pilot / generic / parent welcome (windchasers website + Res1/Pabbly) ──
     // Re-enabled: the v3 welcome templates are Meta-approved. Fires immediately
-    // for a brand-NEW lead that isn't a webinar/cabin/PAT/demo submission — so
+    // for a brand-NEW lead that isn't a webinar/cabin/PAT/demo submission - so
     // pilot_training_hero, generic website forms, and meta_lead_form leads (incl.
     // the Res1 Platform feed that lands as 'manual') get a first touch instead of
     // sitting silent on a dead first_outreach task. Parent enquiries get the
@@ -1581,8 +1581,8 @@ export async function POST(request: NextRequest) {
           welcomeTpl = 'windchasers_pilot_parents_welcome_v1'
           sendResult = await sendParentWelcomeTemplate(phone, firstName)
         } else if (isFlightSchoolLead) {
-          // Flight-school leads get the generic welcome — it carries a "Flight
-          // Schools" button — rather than the pilot-training welcome. (A dedicated
+          // Flight-school leads get the generic welcome - it carries a "Flight
+          // Schools" button - rather than the pilot-training welcome. (A dedicated
           // windchasers_flight_school_welcome_v1 can replace this once approved.)
           welcomeTpl = 'windchasers_generic_welcome_v3'
           sendResult = await sendWelcomeTemplate(phone, firstName, welcomeTpl)
@@ -1715,7 +1715,7 @@ export async function POST(request: NextRequest) {
       } catch (calErr: any) {
         calendarError = calErr?.message || String(calErr)
         console.error('[inbound] Calendar event creation failed:', calendarError)
-        // Swallow — lead is already saved.
+        // Swallow - lead is already saved.
       }
     }
 
@@ -1735,7 +1735,7 @@ export async function POST(request: NextRequest) {
 
         // Resolve demo format. demo_type comes from the website form (or
         // sessionType inside legacy payloads). Default to 'offline' when
-        // unknown — safer than assuming online without a calendar event.
+        // unknown - safer than assuming online without a calendar event.
         const rawDemoType = String(
           cfields.demo_type ||
           cfields.session_type ||
@@ -1748,12 +1748,12 @@ export async function POST(request: NextRequest) {
           ? 'windchasers_demo_online_v2'
           : 'windchasers_demo_offline_v2'
 
-        // AWAIT (not fire-and-forget) — see PAT block above for rationale.
+        // AWAIT (not fire-and-forget) - see PAT block above for rationale.
         const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
         const renderedBody = demoFormat === 'online'
           ? renderDemoOnlineBody(firstName, dateDisplay, timeDisplay)
           : renderDemoOfflineBody(firstName, dateDisplay, timeDisplay)
-        // Dedup gate — this webhook can be called more than once for the same
+        // Dedup gate - this webhook can be called more than once for the same
         // demo booking (retry, double form-submit, page reload after booking).
         // Skip the send if already sent within the window; everything else in
         // the function still runs normally.
@@ -1784,7 +1784,7 @@ export async function POST(request: NextRequest) {
               date: preferredDate,
               time: preferredTime,
               calendar_event_id: eventIdForButton,
-              meet_link: demoMeetLink, // kept for downstream consumers — null for offline
+              meet_link: demoMeetLink, // kept for downstream consumers - null for offline
               send_succeeded: !!result.success,
               send_error: result.success ? null : (result.error || 'unknown'),
               http_status: (result as any).statusCode ?? null,

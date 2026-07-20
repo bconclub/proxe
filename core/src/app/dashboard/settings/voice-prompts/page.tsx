@@ -1,6 +1,6 @@
 'use client'
 
-// Voice Prompts — standalone page. The editor itself lives in a shared component
+// Voice Prompts - standalone page. The editor itself lives in a shared component
 // (VoicePromptsEditor) so it's identical here and embedded in the Voice agent tab.
 
 import VoicePromptsEditor from '@/components/dashboard/VoicePromptsEditor'

@@ -1,4 +1,4 @@
-// PROXE LISTEN — signal intake. "Listen first, engage better."
+// PROXE LISTEN - signal intake. "Listen first, engage better."
 //
 // One POST per signal from any bridge: WhatsApp media-scan group, call centre,
 // volunteer reports, survey pipelines, future social scrapers (twitter/fb/ig/
@@ -6,7 +6,7 @@
 // trending issues / crisis alerts / narratives.
 //
 // Auth: x-api-key = INBOUND_API_KEY (machine-intake pattern, same as d2d/log).
-// ALL enums validated here BEFORE insert — a single off-CHECK value would
+// ALL enums validated here BEFORE insert - a single off-CHECK value would
 // atomically reject the whole row (vapi-webhook lesson).
 
 import { NextRequest, NextResponse } from 'next/server';

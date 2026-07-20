@@ -146,7 +146,7 @@ export default function WarRoomClient() {
   };
 
   // Track in-flight syncs so the header can tell the director the room is
-  // *working*, not frozen — this dataset aggregates tens of thousands of rows.
+  // *working*, not frozen - this dataset aggregates tens of thousands of rows.
   const [busy, setBusy] = useState(false);
   const fetchData = useCallback(async () => {
     const qs = new URLSearchParams(); Object.entries(filters).forEach(([k, v]) => v && v !== 'all' && qs.set(k, v));
@@ -159,7 +159,7 @@ export default function WarRoomClient() {
         setData(json);
         // Stale-while-revalidate: keep the latest payload in the browser so the
         // next open paints instantly instead of waiting ~seconds on the aggregate.
-        try { sessionStorage.setItem(cacheKey, JSON.stringify(json)); } catch { /* quota — skip */ }
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(json)); } catch { /* quota - skip */ }
       }
     } catch {}
     finally { setBusy(false); }
@@ -171,7 +171,7 @@ export default function WarRoomClient() {
     try {
       const cached = sessionStorage.getItem(`warroom:data:${qs.toString()}`);
       if (cached) setData(JSON.parse(cached));
-    } catch { /* corrupt cache — fresh fetch will replace it */ }
+    } catch { /* corrupt cache - fresh fetch will replace it */ }
     fetchData();
   }, [fetchData, filters]);
   useEffect(() => {
@@ -214,7 +214,7 @@ export default function WarRoomClient() {
 
         {/* SCROLL BODY (single-VH scroll on desktop; page scroll on mobile) */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: mobile ? '10px 12px 18px' : '12px 18px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* HEADLINE + 4-PILLAR KPI STRIP — the "main idea" a director reads first:
+          {/* HEADLINE + 4-PILLAR KPI STRIP - the "main idea" a director reads first:
               Reach (are we growing contact?) · Standing (are people with us, which
               way moving?) · Battlegrounds (which seats decided now?) · Loop (are we
               acting?). Deltas are the REAL 7d/14d change, not hardcoded strings. */}
@@ -250,7 +250,7 @@ export default function WarRoomClient() {
                     </div>
                   </div>
                 )}
-                {/* Shared window switcher — drives REACH + RESPONSE LOOP cards. */}
+                {/* Shared window switcher - drives REACH + RESPONSE LOOP cards. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: -2 }}>
                   <span style={{ fontSize: 10.5, color: MUT, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Window</span>
                   {(['today', 'd7', 'd14', 'd28'] as const).map((w) => (
@@ -259,13 +259,13 @@ export default function WarRoomClient() {
                   <div style={{ flex: 1 }} />
                 </div>
                 {(() => {
-                  // Top Issue — the biggest thing people are raising + its size + which way it's moving.
+                  // Top Issue - the biggest thing people are raising + its size + which way it's moving.
                   const ti = (d?.byCategory || []).find((c) => c.category !== 'other') || null;
                   const tiTotal = (d?.byCategory || []).reduce((s, c) => s + c.count, 0) || 1;
                   const tiShare = ti ? Math.round((100 * ti.count) / tiTotal) : 0;
-                  const tiName = ti ? ti.category.replace(/_/g, ' ') : '—';
+                  const tiName = ti ? ti.category.replace(/_/g, ' ') : '-';
                   const tiSpark = ti ? d?.series.byCategory?.[ti.category] : undefined;
-                  // Ground Force — who's ready to act (volunteer / vote / rally intent).
+                  // Ground Force - who's ready to act (volunteer / vote / rally intent).
                   const mob = d?.mobilization || ({} as Record<string, number>);
                   const mobSpark = d?.series.mobilization?.volunteer;
                   return (
@@ -448,7 +448,7 @@ export default function WarRoomClient() {
                       </div>
                       <span style={{ fontSize: 12.5, fontWeight: 700, textAlign: 'right' }}>{n.toLocaleString('en-IN')}</span>
                       <span style={{ textAlign: 'center' }}>
-                        {conv === null ? <span style={{ color: MUT }}>—</span> : (
+                        {conv === null ? <span style={{ color: MUT }}>-</span> : (
                           <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 7, padding: '2px 8px', color: t.color, background: `${t.color}1c`, border: `1px solid ${t.color}45` }}>{conv}%</span>
                         )}
                       </span>
@@ -604,7 +604,7 @@ export default function WarRoomClient() {
                 const mentions = totals.reduce((a, b) => a + b, 0);
                 return (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: MUT, paddingTop: 6 }}>
-                    <span>Peak: <b style={{ color: TXT }}>{days[peakI]?.slice(5) || '—'}</b></span>
+                    <span>Peak: <b style={{ color: TXT }}>{days[peakI]?.slice(5) || '-'}</b></span>
                     <span>Total Mentions <b style={{ color: TXT }}>{mentions.toLocaleString('en-IN')}</b></span>
                   </div>
                 );
@@ -649,9 +649,9 @@ export default function WarRoomClient() {
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6 }}>
                       {[
-                        [<MdOutlineCheckCircle key="a" size={13} color={GREEN} />, 'Highest Support', best ? `${best.constituency} (${best.supp}%)` : '—'],
-                        [<MdMyLocation key="b" size={13} color={AMBER} />, 'Most Volume', most ? `${most.constituency} (${most.total})` : '—'],
-                        [<MdOutlineErrorOutline key="c" size={13} color="#ef4444" />, 'Rising Opposition', risky ? `${risky.constituency} (${risky.opp}%)` : '—'],
+                        [<MdOutlineCheckCircle key="a" size={13} color={GREEN} />, 'Highest Support', best ? `${best.constituency} (${best.supp}%)` : '-'],
+                        [<MdMyLocation key="b" size={13} color={AMBER} />, 'Most Volume', most ? `${most.constituency} (${most.total})` : '-'],
+                        [<MdOutlineErrorOutline key="c" size={13} color="#ef4444" />, 'Rising Opposition', risky ? `${risky.constituency} (${risky.opp}%)` : '-'],
                         [<MdSparkIcon key="d" size={13} color={PURPLE} />, 'Data Quality', '100%'],
                       ].map(([icon, l, v], i) => (
                         <div key={i} style={{ background: TRACK, border: `1px solid ${LINE}`, borderRadius: 9, padding: '6px 7px', textAlign: 'center', minWidth: 0 }}>
@@ -826,7 +826,7 @@ function fmtN(n: number): string { return (n || 0).toLocaleString('en-IN'); }
 
 // The re-dated seed put almost all volume in the last few days, so every trend
 // line reads flat-then-cliff. For DISPLAY, reshape a series into a gentle
-// rising wobble scaled to its real total — deterministic (no Math.random), so
+// rising wobble scaled to its real total - deterministic (no Math.random), so
 // it's stable across renders. Real daily variation still shows through (30%).
 function demoCurve(series?: number[]): number[] | undefined {
   if (!series || series.length < 4) return series;

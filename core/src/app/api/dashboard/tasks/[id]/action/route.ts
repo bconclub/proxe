@@ -52,11 +52,11 @@ export async function POST(
           completed_at: null,
           error_message: null,
           scheduled_at: new Date().toISOString(),
-          metadata: { ...(task as any).metadata, approved: false, timing_reason: 'Retried from dashboard — awaiting approval' },
+          metadata: { ...(task as any).metadata, approved: false, timing_reason: 'Retried from dashboard - awaiting approval' },
         })
         .eq('id', taskId)
       if (error) throw error
-      return NextResponse.json({ success: true, message: `Retried — ${task.task_type} for ${task.lead_name} back in Awaiting Approval` })
+      return NextResponse.json({ success: true, message: `Retried - ${task.task_type} for ${task.lead_name} back in Awaiting Approval` })
     }
 
     if (action === 'skip') {
@@ -123,7 +123,7 @@ export async function POST(
         .eq('id', taskId)
 
       if (error) throw error
-      return NextResponse.json({ success: true, message: `Approved — ${task.task_type} for ${task.lead_name} will fire on next worker run` })
+      return NextResponse.json({ success: true, message: `Approved - ${task.task_type} for ${task.lead_name} will fire on next worker run` })
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

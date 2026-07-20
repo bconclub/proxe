@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient, ensureOrUpdateLead } from '@/lib/services';
 import { getCurrentBrandId, BRAND_ID } from '@/configs';
 
-// D2D (door-to-door) field log — POP campaign only.
-// One POST per door knocked: worker identity, the person met (optional — a
+// D2D (door-to-door) field log - POP campaign only.
+// One POST per door knocked: worker identity, the person met (optional - a
 // knock with nobody home still counts for coverage), the place (constituency/
 // booth/photo/geo), the outcome, and any grievance that came up.
 //
 // A "met" visit with a phone creates/merges a Person (phone = merge key on the
 // POP DB) tagged first_touchpoint 'd2d', magnet 'd2d', engagement_type
-// 'outreach' — so the People table can count and filter D2D arrivals.
+// 'outreach' - so the People table can count and filter D2D arrivals.
 //
-// Photos land in the PRIVATE d2d-photos bucket (signed URLs only — the People
+// Photos land in the PRIVATE d2d-photos bucket (signed URLs only - the People
 // list never surfaces them; access control is a follow-up decision, see
 // brands/pop/docs/campaign-model.md).
 //
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({} as any));
     const {
       worker_name, worker_phone,
-      person, // { name?, phone? } — the citizen met at the door
+      person, // { name?, phone? } - the citizen met at the door
       constituency, district, booth, address_note,
       photo_base64, photo_url,
       latitude, longitude,
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       grievance_category, grievance_text,
       lean, language,
       survey, survey_version, // household survey answers (026: jsonb on the visit)
-      worker_code,            // QR badge code — resolves worker identity from the registry
+      worker_code,            // QR badge code - resolves worker identity from the registry
     } = body || {};
 
     // Badge code → registry identity (field app sends the code it verified).
@@ -75,13 +75,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Person — only when the visit actually reached someone with a phone.
+    // 2. Person - only when the visit actually reached someone with a phone.
     let leadId: string | null = null;
     const personPhone = person?.phone ? String(person.phone).replace(/\D/g, '').slice(-10) : null;
     if (outcome === 'met' && personPhone && personPhone.length === 10) {
       leadId = await ensureOrUpdateLead(person?.name || null, null, personPhone, 'web', undefined, supabase);
       if (leadId) {
-        // D2D-specific columns — channel union has no 'd2d', so stamp the real
+        // D2D-specific columns - channel union has no 'd2d', so stamp the real
         // origin + campaign fields directly. Never overwrite an existing
         // engagement/grievance from a prior interaction.
         const { data: cur } = await supabase
@@ -91,16 +91,16 @@ export async function POST(req: NextRequest) {
         const cols: Record<string, any> = { magnet: 'd2d' };
         if (!cur?.first_touchpoint || cur.first_touchpoint === 'web') cols.first_touchpoint = 'd2d';
         if (!cur?.engagement_type || cur.engagement_type === 'grievance') {
-          // 'grievance' is the column default — treat it as unset unless a real
+          // 'grievance' is the column default - treat it as unset unless a real
           // grievance exists on the row.
           if (!cur?.grievance_text) cols.engagement_type = 'outreach';
         }
         if (constituency && !cur?.constituency) cols.constituency = constituency;
-        // Location/profile enrichment — fill-if-null (a prior channel's data wins).
+        // Location/profile enrichment - fill-if-null (a prior channel's data wins).
         if (district && !cur?.district) cols.district = district;
         if (booth && !cur?.booth) cols.booth = booth;
         if (language && !cur?.language && ['pa', 'hi', 'en'].includes(language)) cols.language = language;
-        // Lean — always overwrite: the doorstep read is the freshest signal
+        // Lean - always overwrite: the doorstep read is the freshest signal
         // ("latest canvass wins").
         if (lean && ['supporter', 'leaning', 'undecided', 'opposed'].includes(lean)) cols.lean = lean;
         if (grievance_category) cols.grievance_category = grievance_category;
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. The visit row itself — always recorded (coverage counts every knock).
+    // 3. The visit row itself - always recorded (coverage counts every knock).
     const { data: visit, error: insErr } = await supabase
       .from('d2d_visits')
       .insert({

@@ -5,7 +5,7 @@ import CallsTable from '@/components/dashboard/CallsTable'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 
 export default function CallsPage() {
-  // Voice/Calls is a per-brand feature toggle (Settings → Features) — a brand
+  // Voice/Calls is a per-brand feature toggle (Settings → Features) - a brand
   // with voice off can't reach this page even by direct URL.
   const { voice } = useFeatureFlags()
   if (!voice) {

@@ -1,5 +1,5 @@
 /**
- * services/instagramSender.ts — Instagram (Meta) Graph API send helpers.
+ * services/instagramSender.ts - Instagram (Meta) Graph API send helpers.
  *
  * Mirrors whatsappSender. Instagram messaging rides the same Graph API:
  *   - DM reply:        POST /{IG_ID}/messages  { recipient:{id}, message:{text} }
@@ -7,8 +7,8 @@
  *   - Comment → DM:    POST /{IG_ID}/messages  { recipient:{comment_id}, message:{text} }
  *
  * Env:
- *   META_IG_ACCESS_TOKEN          — Instagram Business Login / system-user token
- *   META_IG_BUSINESS_ACCOUNT_ID   — the IG account id (optional; falls back to "me")
+ *   META_IG_ACCESS_TOKEN          - Instagram Business Login / system-user token
+ *   META_IG_BUSINESS_ACCOUNT_ID   - the IG account id (optional; falls back to "me")
  */
 
 // Instagram API with Instagram Login uses graph.instagram.com (the IGAA… token
@@ -85,7 +85,7 @@ export async function sendInstagramPrivateReply(commentId: string, text: string)
 
 /**
  * Resolve a human-friendly name for an IGSID. May return null for users who
- * haven't messaged us yet / when the token lacks profile access — callers
+ * haven't messaged us yet / when the token lacks profile access - callers
  * should fall back to "Instagram User".
  */
 export async function fetchInstagramUsername(igsid: string): Promise<string | null> {

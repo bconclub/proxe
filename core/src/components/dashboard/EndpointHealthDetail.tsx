@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { MdRefresh } from 'react-icons/md'
 
 /**
- * EndpointHealthDetail — full /dashboard/status drill-down. Fetches
+ * EndpointHealthDetail - full /dashboard/status drill-down. Fetches
  * /api/dashboard/health and renders one card per service with last-activity
  * timestamp and a recent-failures tail at the bottom.
  *
@@ -88,7 +88,7 @@ export default function EndpointHealthDetail() {
   if (!data) {
     return (
       <div className="mb-6 p-4 rounded-lg text-[12px]" style={{ color: 'var(--text-muted)' }}>
-        {loading ? 'Loading endpoint health…' : '—'}
+        {loading ? 'Loading endpoint health…' : '-'}
       </div>
     )
   }

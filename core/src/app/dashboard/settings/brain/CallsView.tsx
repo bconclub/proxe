@@ -1,8 +1,8 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CallsView — the voice bench. Every call, with Vapi's REAL per-stage latency:
-// who is doing the waiting — the providers (STT/LLM/TTS, "outside") vs our own
+// CallsView - the voice bench. Every call, with Vapi's REAL per-stage latency:
+// who is doing the waiting - the providers (STT/LLM/TTS, "outside") vs our own
 // endpointing config ("inside") vs the network round-trip. Everything in ms.
 // Fills the viewport; only the call list scrolls. Web-test rows hidden by default.
 // Data: /api/dashboard/brain/calls (Vapi, scoped to the brand's assistant).
@@ -43,10 +43,10 @@ function latColor(v: number | null): string {
   if (v < 1500) return '#eab308'
   return '#ef4444'
 }
-const M = (v: number | null) => (v == null ? '—' : `${v} ms`)
+const M = (v: number | null) => (v == null ? '-' : `${v} ms`)
 
 // A call only counts toward the eval aggregates (latency, cost, turn avg) if it
-// was a REAL conversation — more than 20s AND more than one turn. Calls that drop
+// was a REAL conversation - more than 20s AND more than one turn. Calls that drop
 // in the first few seconds with no back-and-forth otherwise flatter the averages
 // and make the system look faster than it is. The call list still shows them all.
 const MIN_QUAL_SECS = 20
@@ -61,17 +61,17 @@ const ENG_TABS = [
   { id: 'sarvam', label: 'V3', color: '#8b5cf6' },
 ] as const
 type Eng = (typeof ENG_TABS)[number]['id']
-const fmtDur = (s: number | null) => (s == null ? '—' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
-const fmtCost = (c: number | null) => (c == null ? '—' : `$${c.toFixed(3)}`)
+const fmtDur = (s: number | null) => (s == null ? '-' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
+const fmtCost = (c: number | null) => (c == null ? '-' : `$${c.toFixed(3)}`)
 const fmtWhen = (iso: string | null) => {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true })
 }
-const fmtEnded = (r: string | null) => (r ? r.replace(/-/g, ' ') : '—')
+const fmtEnded = (r: string | null) => (r ? r.replace(/-/g, ' ') : '-')
 
 // When a call never connected (no duration), surface WHY inline from endedReason.
 function failReason(c: Call): { label: string; color: string } | null {
-  if ((c.durationSec ?? 0) > 0) return null // connected — nothing to flag
+  if ((c.durationSec ?? 0) > 0) return null // connected - nothing to flag
   const r = (c.endedReason || '').toLowerCase()
   if (/did-not-answer|no-answer|noanswer/.test(r)) return { label: 'No answer', color: '#eab308' }
   if (/voicemail/.test(r)) return { label: 'Voicemail', color: '#eab308' }
@@ -82,7 +82,7 @@ function failReason(c: Call): { label: string; color: string } | null {
   return { label: 'Did not connect', color: '#94a3b8' }
 }
 
-// One stage of the latency split — a labelled ms value with an "inside/outside" tag.
+// One stage of the latency split - a labelled ms value with an "inside/outside" tag.
 function StageChip({ label, value, where }: { label: string; value: number | null; where: 'inside' | 'outside' | 'network' }) {
   const tone = where === 'inside' ? '#8b5cf6' : where === 'network' ? '#64748b' : latColor(value)
   return (
@@ -174,17 +174,17 @@ function SplitRow({ engine, split }: { engine: EngineId; split: EngineSplit }) {
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
         <div style={{ fontSize: 19, fontWeight: 800, color: latColor(split.turnAvg), fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>{M(split.turnAvg)}</div>
       </div>
-      {/* permanent cost per engine — total + per-minute, the A/B decision number */}
+      {/* permanent cost per engine - total + per-minute, the A/B decision number */}
       <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 92 }}>
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cost</div>
         <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>${split.cost.toFixed(2)}</div>
-        <div style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{split.costPerMin != null ? `$${split.costPerMin.toFixed(2)}/min` : '—'}</div>
+        <div style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{split.costPerMin != null ? `$${split.costPerMin.toFixed(2)}/min` : '-'}</div>
       </div>
     </div>
   )
 }
 
-// V3 (Sarvam) placeholder row — keeps the V1/V2/V3 stack aligned until live calls exist.
+// V3 (Sarvam) placeholder row - keeps the V1/V2/V3 stack aligned until live calls exist.
 function V3Row() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', opacity: 0.72 }}>
@@ -196,7 +196,7 @@ function V3Row() {
       <StageChip label="Network" value={null} where="network" />
       <div style={{ padding: '8px 14px', borderRadius: 10, background: 'var(--bg-tertiary)', border: '1px solid var(--border-primary)', minWidth: 82 }}>
         <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Turn avg</div>
-        <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>—</div>
+        <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-muted)', fontVariantNumeric: 'tabular-nums', marginTop: 2 }}>-</div>
       </div>
       <span title="Pipeline live (Sarvam STT · Groq LLM · 11Labs voice); stats appear after the first logged call" style={{ fontSize: 10.5, fontWeight: 700, color: '#8b5cf6', background: '#8b5cf618', border: '1px solid #8b5cf644', borderRadius: 999, padding: '4px 10px', cursor: 'help' }}>V3 · no calls yet</span>
     </div>
@@ -228,7 +228,7 @@ function aggregateSplit(list: Call[]): EngineSplit | null {
   }
 }
 
-// One language's latency split — same columns as SplitRow, labelled by language.
+// One language's latency split - same columns as SplitRow, labelled by language.
 function LangSplitRow({ lang, split, netLabel }: { lang: string; split: EngineSplit; netLabel: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-start' }}>
@@ -283,12 +283,12 @@ export default function CallsView() {
     () => Array.from(new Set(calls.map((c) => c.language).filter((x): x is string => !!x))),
     [calls],
   )
-  // filtered view — web-tests toggle + language filter both apply
+  // filtered view - web-tests toggle + language filter both apply
   const shown = useMemo(
     () => calls.filter((c) => (showWeb || c.source === 'phone') && (lang === 'all' || c.language === lang) && (eng === 'all' || c.engine === eng)),
     [calls, showWeb, lang, eng],
   )
-  // "Last 5/10/All" caps BOTH the list and the aggregate stats above it — the
+  // "Last 5/10/All" caps BOTH the list and the aggregate stats above it - the
   // point is "what does the last N calls look like", not just a shorter list
   // under an unrelated fixed-history number.
   const visible = useMemo(() => (limit === 'all' ? shown : shown.slice(0, limit)), [shown, limit])
@@ -301,11 +301,11 @@ export default function CallsView() {
       return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
     }
     const splitFor = (engine: EngineId): EngineSplit | null => {
-      // Last-N is per-ENGINE, not "last N calls overall then split" — the combined
+      // Last-N is per-ENGINE, not "last N calls overall then split" - the combined
       // list interleaves V1/V2 chronologically, so slicing before splitting could
       // give V2 just 1-2 calls' worth of "last 5" stats depending on how the two
       // engines happened to interleave. This takes each engine's own last N.
-      // Only qualified calls (>20s, >1 turn) feed the aggregate — a 5s no-turn
+      // Only qualified calls (>20s, >1 turn) feed the aggregate - a 5s no-turn
       // call must not flatter the turn average.
       const engAll = shown.filter((c) => c.engine === engine && isQualified(c))
       const eng = limit === 'all' ? engAll : engAll.slice(0, limit)
@@ -329,7 +329,7 @@ export default function CallsView() {
     const phones = visible.filter((c) => c.source === 'phone').slice().reverse() // oldest→newest for sparklines
     const vapi = splitFor('vapi'), elevenlabs = splitFor('elevenlabs'), sarvam = splitFor('sarvam')
 
-    // Per-language comparison — Hindi vs English vs Punjabi latency, over the
+    // Per-language comparison - Hindi vs English vs Punjabi latency, over the
     // current engine filter (all engines when eng==='all'), ignoring the language
     // filter so all three always show side by side. Last-N applied per language.
     const engBase = calls.filter((c) => (showWeb || c.source === 'phone') && (eng === 'all' || c.engine === eng) && isQualified(c))
@@ -374,7 +374,7 @@ export default function CallsView() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', borderTop: '1px solid var(--border-primary)' }}>
       {/* ── fixed header: V1/V2/V3 pivot, then stats | per-engine comparison ── */}
       <div style={{ flexShrink: 0, padding: '12px 18px 10px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* PRIMARY PIVOT — the whole eval reorganizes around this */}
+        {/* PRIMARY PIVOT - the whole eval reorganizes around this */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 11, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
             {ENG_TABS.map((t) => {
@@ -446,7 +446,7 @@ export default function CallsView() {
           </div>
         </div>
 
-        {/* engine comparison — full-width block, V1/V2/V3 rows left-aligned into columns */}
+        {/* engine comparison - full-width block, V1/V2/V3 rows left-aligned into columns */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start' }}>
           {view.vapi && <SplitRow engine="vapi" split={view.vapi} />}
           {view.elevenlabs && <SplitRow engine="elevenlabs" split={view.elevenlabs} />}
@@ -462,12 +462,12 @@ export default function CallsView() {
             <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>No latency metrics for this filter.</span>
           )}
           <span style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>
-            Aggregates count only real conversations — &gt;{MIN_QUAL_SECS}s &amp; &gt;{MIN_QUAL_TURNS} turn
+            Aggregates count only real conversations - &gt;{MIN_QUAL_SECS}s &amp; &gt;{MIN_QUAL_TURNS} turn
             {' · '}{view.qualifiedCount} counted{view.excludedCount > 0 ? `, ${view.excludedCount} short call${view.excludedCount === 1 ? '' : 's'} excluded` : ''}
           </span>
         </div>
 
-        {/* per-language comparison — Hindi vs English vs Punjabi latency */}
+        {/* per-language comparison - Hindi vs English vs Punjabi latency */}
         {view.langRows.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'flex-start', marginTop: 4, paddingTop: 10, borderTop: '1px dashed var(--border-primary)' }}>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -491,7 +491,7 @@ export default function CallsView() {
         {!loading && configured && shown.length === 0 && !err && (
           <div style={{ padding: 24, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)', fontSize: 13 }}>
             {eng === 'sarvam'
-              ? 'No V3 calls logged yet. Place a V3 test call from the Voice agent tab — telemetry lands here at hangup.'
+              ? 'No V3 calls logged yet. Place a V3 test call from the Voice agent tab - telemetry lands here at hangup.'
               : 'No calls yet. Place a test call from the Voice agent tab and refresh.'}
           </div>
         )}
@@ -530,8 +530,8 @@ export default function CallsView() {
                       })()}
                     </span>
                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDur(c.durationSec)}</span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{c.turns || '—'}</span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{c.waitSec != null ? `${c.waitSec}s` : '—'}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{c.turns || '-'}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{c.waitSec != null ? `${c.waitSec}s` : '-'}</span>
                     <span style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: latColor(c.perf?.turnAvg ?? null) }}>{M(c.perf?.turnAvg ?? null)}</span>
                     <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: latColor(c.perf?.worst ?? null) }}>{M(c.perf?.worst ?? null)}</span>
                     <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCost(c.cost)}</span>
@@ -553,7 +553,7 @@ export default function CallsView() {
                             <StageChip label="Endpoint" value={c.perf.stages.endpointing} where="inside" />
                             <StageChip label={c.engine === 'sarvam' ? 'Vobiz' : 'Network'} value={c.perf.stages.transport} where="network" />
                           </div>
-                          {/* per-turn totals — coloured RELATIVE to this call:
+                          {/* per-turn totals - coloured RELATIVE to this call:
                               fastest turn green, slowest red, the rest amber, so the
                               worst turn jumps out at a glance. */}
                           {c.perf!.turnsDetail.length > 0 && (() => {
@@ -582,7 +582,7 @@ export default function CallsView() {
                         </>
                       ) : (
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', margin: '8px 0 12px' }}>
-                          {c.source === 'web' ? 'Browser test — no phone-call latency metrics.' : 'No latency metrics for this call.'}
+                          {c.source === 'web' ? 'Browser test - no phone-call latency metrics.' : 'No latency metrics for this call.'}
                         </div>
                       )}
 
@@ -590,14 +590,14 @@ export default function CallsView() {
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
                         {([['STT', c.connector.stt], ['Model', c.connector.model], ['TTS', c.connector.tts], ['Ended', fmtEnded(c.endedReason)]] as const).map(([k, v]) => (
                           <span key={k} style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v || '—'}
+                            <span style={{ color: 'var(--text-muted)' }}>{k}:</span> {v || '-'}
                           </span>
                         ))}
                       </div>
                       {c.costBreakdown && (
                         <div style={{ display: 'flex', gap: 14, fontSize: 12, marginBottom: c.summary ? 10 : 0 }}>
                           {([['stt', c.costBreakdown.stt], ['llm', c.costBreakdown.llm], ['tts', c.costBreakdown.tts], ['vapi', c.costBreakdown.vapi]] as const).map(([k, v]) => (
-                            <div key={k}><span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase' }}>{k} </span><span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{v == null ? '—' : `$${Number(v).toFixed(3)}`}</span></div>
+                            <div key={k}><span style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase' }}>{k} </span><span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{v == null ? '-' : `$${Number(v).toFixed(3)}`}</span></div>
                           ))}
                         </div>
                       )}

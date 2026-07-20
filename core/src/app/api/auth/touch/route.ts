@@ -1,14 +1,14 @@
 /**
  * POST /api/auth/touch
  *
- * Lightweight heartbeat — updates dashboard_users.last_login to NOW() for
+ * Lightweight heartbeat - updates dashboard_users.last_login to NOW() for
  * the currently logged-in user. Called by the dashboard layout on mount
  * and at a 60s interval while the tab is active, giving us a "Last Active"
  * timestamp and a "live now" indicator (last_login within ~2 min).
  *
  * Why reuse `last_login` instead of adding a new column? It already exists
  * in dashboard_users, was empty in practice (no code wrote to it), and
- * the only place it surfaces is the team-members table — renaming the
+ * the only place it surfaces is the team-members table - renaming the
  * header from "Last Login" → "Last Active" captures the new semantics
  * cleanly without a migration.
  *
@@ -33,7 +33,7 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Service-role write — dashboard_users has RLS that only lets users
+    // Service-role write - dashboard_users has RLS that only lets users
     // see/update their own row anyway, but service-role is consistent
     // with the rest of our dashboard write paths.
     const service = getServiceClient() || supabase
@@ -44,7 +44,7 @@ export async function POST() {
 
     if (error) {
       console.warn('[auth/touch] update failed:', error.message)
-      // Soft-fail — the heartbeat is best-effort, never break the caller.
+      // Soft-fail - the heartbeat is best-effort, never break the caller.
     }
     return NextResponse.json({ ok: true })
   } catch (err: any) {

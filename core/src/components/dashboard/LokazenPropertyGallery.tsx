@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 
 /**
  * Property photo gallery for a Lokazen owner lead. Images live on lokazen.in,
- * not in PROXe — so we lazy-fetch them by property_id from our same-origin
+ * not in PROXe - so we lazy-fetch them by property_id from our same-origin
  * media proxy (`/api/dashboard/leads/property-media`) only when the lead is
  * open. Thumbnails; click to open a full-screen lightbox.
  */
@@ -16,7 +16,7 @@ interface MediaResponse {
   title: string | null
 }
 
-// Brand action color — resolves to whatever brand this core is staged as
+// Brand action color - resolves to whatever brand this core is staged as
 // (Lokazen orange fallback). Never hardcode a brand hex in a shared component.
 const ACCENT = 'var(--accent-primary, #FF5200)'
 
@@ -69,7 +69,7 @@ export function LokazenPropertyGallery({ propertyId }: { propertyId: string }) {
 
       {state === 'ready' && (
         // Compact: one small cover thumbnail (with a +N badge when there are
-        // more) that opens the full lightbox — keeps the lead card uncluttered.
+        // more) that opens the full lightbox - keeps the lead card uncluttered.
         <button
           type="button"
           onClick={() => setLightbox(0)}

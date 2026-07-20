@@ -381,7 +381,7 @@ function chanIcon(channel?: string) {
 }
 
 function fmtCountdown(ms: number | null): string {
-  if (ms == null) return '—'
+  if (ms == null) return '-'
   const m = Math.round(ms / 60000)
   if (m < 1) return 'now'
   if (m < 60) return `${m}m`
@@ -581,7 +581,7 @@ function AttnCard({ t, onAction, onLead }: { t: BoardTask; onAction: (id: string
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <button style={btnPrimary} onClick={() => a.act === 'update_contact' ? onLead(t) : a.act === 'fix_template' ? onLead(t) : onAction(t.id, a.act)} title={a.act === 'fix_template' ? 'Fix this template in Meta WhatsApp Manager' : undefined}>{a.label}</button>
-            {/* Small dismiss control — drop the task without sending (skip). */}
+            {/* Small dismiss control - drop the task without sending (skip). */}
             <button
               onClick={() => onAction(t.id, 'skip')}
               title="Remove this task (dismiss without sending)"
@@ -812,7 +812,7 @@ export default function TasksPage() {
 
   return (
     // Lock the page to one viewport (the dashboard <main> is scrollable + has
-    // py-6, so subtract 3rem). Each panel below scrolls internally — no page scroll.
+    // py-6, so subtract 3rem). Each panel below scrolls internally - no page scroll.
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: 'calc(100vh - 3rem)', overflow: 'hidden' }}>
       <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
 
@@ -829,9 +829,9 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* KPI Row — five cards */}
+      {/* KPI Row - five cards */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <KpiCard label="Next fire" value={b.kpis?.nextFiresInMs != null ? fmtCountdown(b.kpis.nextFiresInMs) : '—'} sub={nextFireTime ? `at ${nextFireTime}` : 'Nothing queued'} icon={<MdAccessTime size={20} />} accent="#3b82f6" />
+        <KpiCard label="Next fire" value={b.kpis?.nextFiresInMs != null ? fmtCountdown(b.kpis.nextFiresInMs) : '-'} sub={nextFireTime ? `at ${nextFireTime}` : 'Nothing queued'} icon={<MdAccessTime size={20} />} accent="#3b82f6" />
         <KpiCard label="Completed today" value={String(b.kpis?.completedToday ?? stats.completedToday ?? 0)} sub="Today" icon={<MdCheckCircle size={20} />} accent="#22c55e" />
         <KpiCard label="Queued" value={String(b.kpis?.queued ?? stats.queuedCount ?? 0)} sub="Scheduled actions" icon={<MdFormatListBulleted size={20} />} accent="#3b82f6" />
         <KpiCard label="Awaiting approval" value={String(b.kpis?.awaitingApproval ?? 0)} sub="Needs your review" icon={<MdNotifications size={20} />} accent="#f59e0b" />
@@ -841,7 +841,7 @@ export default function TasksPage() {
       {/* Main: Left (Next to Fire) + Right (split) */}
       <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-        {/* Col 1: Next to Fire — full length (left) */}
+        {/* Col 1: Next to Fire - full length (left) */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <PanelHead title="Next to Fire" viewAll="View all" />
           <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
@@ -860,7 +860,7 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Col 2: Needs Attention — full length, internal scroll */}
+        {/* Col 2: Needs Attention - full length, internal scroll */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <PanelHead title="Needs Attention" count={b.needsAttention.length} viewAll="View all" />
           <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
@@ -875,11 +875,11 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Col 3: right — Upcoming Queue (top) over Recent Activity (bottom).
+        {/* Col 3: right - Upcoming Queue (top) over Recent Activity (bottom).
             Each scrolls internally so nothing pushes the page past one viewport. */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
 
-          {/* Upcoming Queue — top */}
+          {/* Upcoming Queue - top */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <PanelHead title="Upcoming Queue" count={upcomingTotal} viewAll="View all" />
             <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>
@@ -897,7 +897,7 @@ export default function TasksPage() {
             </div>
           </div>
 
-          {/* Recent Activity — bottom (compact feed; fits the narrow column) */}
+          {/* Recent Activity - bottom (compact feed; fits the narrow column) */}
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <PanelHead title="Recent Activity" viewAll="View all logs →" />
             <div style={{ ...colBox, display: 'flex', flexDirection: 'column' }}>

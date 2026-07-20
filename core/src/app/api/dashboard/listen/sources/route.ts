@@ -1,4 +1,4 @@
-// PROXe Listen — SOURCES registry (list / add / toggle / delete). Cookie auth.
+// PROXe Listen - SOURCES registry (list / add / toggle / delete). Cookie auth.
 // The Sources panel on /dashboard/listen manages these; the fetch route pulls
 // their items into listen_signals.
 

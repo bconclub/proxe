@@ -31,7 +31,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     message: string
     details?: string
     errorList?: string[]
-    /** Google Calendar isn't connected — a benign, info-level state, NOT a failure. */
+    /** Google Calendar isn't connected - a benign, info-level state, NOT a failure. */
     notConfigured?: boolean
   } | null>(null)
   const [showErrors, setShowErrors] = useState(false)
@@ -69,7 +69,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     fetchBookings()
   }, [fetchBookings])
 
-  // Auto-sync with Google Calendar on page load (silent — never alarms)
+  // Auto-sync with Google Calendar on page load (silent - never alarms)
   useEffect(() => {
     if (view === 'calendar' || view === 'full') {
       handleSyncCalendar(true)
@@ -97,7 +97,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
         throw new Error('Calendar sync failed - unexpected server response')
       }
 
-      // Google Calendar isn't connected — a benign state, not a failure.
+      // Google Calendar isn't connected - a benign state, not a failure.
       // Stay completely silent on auto-load; show a quiet neutral note only if
       // the user clicked Sync themselves. Never the red "Sync Failed" banner.
       if (data && data.configured === false) {
@@ -122,7 +122,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       // Refresh bookings after sync
       setTimeout(() => { fetchBookings() }, 2000)
     } catch (error: any) {
-      // Don't alarm on the silent page-load sync — only surface a real failure
+      // Don't alarm on the silent page-load sync - only surface a real failure
       // when the user clicked Sync themselves.
       if (!isAuto) {
         setSyncStatus({
@@ -191,7 +191,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
       </div>
     )
 
-    // Error banner for failed sync — never shown for the benign "not connected"
+    // Error banner for failed sync - never shown for the benign "not connected"
     // state (that only surfaces as a quiet neutral pill on manual sync).
     const errorBanner = syncStatus && !syncStatus.success && !syncStatus.notConfigured && !syncing ? (
       <div className="mb-4 p-3 rounded-lg border-l-4 bg-red-500/10 border-red-500">

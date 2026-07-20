@@ -6,9 +6,9 @@
  * Updates unified_context.<brand> with whatever can be confidently inferred.
  *
  * Body (optional):
- *   dryRun: true   — preview without writing
- *   limit: 50      — max leads to process (default 50; bumps Haiku cost)
- *   onlyMissing: true (default) — only leads whose brand context lacks user_type AND course_interest
+ *   dryRun: true   - preview without writing
+ *   limit: 50      - max leads to process (default 50; bumps Haiku cost)
+ *   onlyMissing: true (default) - only leads whose brand context lacks user_type AND course_interest
  *   brand: "windchasers"
  *
  * Auth: x-api-key matches ADMIN_API_KEY / WHATSAPP_API_KEY (skipped if neither set).
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       if (report.examples.length < 10) {
         report.examples.push({
           lead_id: lead.id,
-          name: lead.customer_name || '—',
+          name: lead.customer_name || '-',
           before: {
             user_type: brandCtx.user_type || null,
             course_interest: brandCtx.course_interest || null,

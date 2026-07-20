@@ -32,7 +32,7 @@ import { FaWhatsapp } from 'react-icons/fa'
 import { LEAD_STAGES, getStageColor as getStageColorShared, pipelineGroupForStage } from '@/configs/lead-stages'
 
 // The legacy `status` taxonomy (New Lead / Follow Up / Wrong Enquiry…) is DEAD
-// — the column is null on every lead. The filter below now filters the STAGE
+// - the column is null on every lead. The filter below now filters the STAGE
 // column, using the one canonical list from @/configs/lead-stages.
 
 const getStageColor = (stage: string | null) => {
@@ -276,7 +276,7 @@ export default function LeadsTable({
   const showScouts = Boolean(brandConfig.features?.scouts)
   // Leads | Gigs toggle (lokazen): gigs (scout/connector) sit INSIDE the Leads
   // page as a segment switch, mirroring windchasers' Leads | Webinar tab. Only
-  // on the main leads page — the locked /dashboard/scouts page (which passes
+  // on the main leads page - the locked /dashboard/scouts page (which passes
   // initialUserTypeFilter) already forces gigs, so it hides the toggle.
   const showGigsTab = showScouts && !initialUserTypeFilter
   const searchParams = useSearchParams()
@@ -399,7 +399,7 @@ export default function LeadsTable({
       // Gigs segment: the Gigs tab shows ONLY gig workers (scout/connector); the
       // Leads view excludes them. The toggle drives it on the main leads page;
       // where the toggle isn't shown (the locked scouts page), default to
-      // excluding gigs — that page filters to gigs via userTypeFilter above.
+      // excluding gigs - that page filters to gigs via userTypeFilter above.
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
         const isGig = GIG_TYPES.includes(brandData.user_type)
@@ -728,7 +728,7 @@ export default function LeadsTable({
             </div>
           )}
 
-          {/* Leads | Gigs tab (lokazen scouts) — same pattern as Webinar */}
+          {/* Leads | Gigs tab (lokazen scouts) - same pattern as Webinar */}
           {showGigsTab && (
             <div role="tablist" aria-label="Leads or Gigs" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
               {([{ key: false, label: 'Leads' }, { key: true, label: 'Gigs' }] as const).map((t) => (
@@ -855,7 +855,7 @@ export default function LeadsTable({
                 ) : null
               })()}
 
-              {/* Pipeline deep-link chip — active ?stage= group filter, one tap to clear. */}
+              {/* Pipeline deep-link chip - active ?stage= group filter, one tap to clear. */}
               {stageParam && urlStageActive && statusFilter === 'all' && (
                 <button
                   onClick={() => setUrlStageActive(false)}
@@ -947,7 +947,7 @@ export default function LeadsTable({
           actually stay put. Without min-h-0 the child grows to content height,
           the page scrolls, and the "sticky" header rides away with it. */}
       <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 pb-6 safe-b">
-        {/* Mobile: card list (below md) — same rows, tap opens the same
+        {/* Mobile: card list (below md) - same rows, tap opens the same
             LeadDetailsModal. The full table stays desktop-only. */}
         <div className="md:hidden">
           {filteredLeads.length === 0 ? (
@@ -1005,7 +1005,7 @@ export default function LeadsTable({
         <table className="w-full hidden md:table" style={{ tableLayout: 'fixed', minWidth: 900 }}>
           {/* Same-line trailing comments inside <colgroup> leave whitespace
               text nodes React rejects as colgroup children (hydration warning)
-              — keep comments on their own lines. */}
+              - keep comments on their own lines. */}
           {brandId === 'pop' ? (
             <colgroup>
               {/* POP constituent view - widths sum to 100%:
@@ -1363,7 +1363,7 @@ export default function LeadsTable({
                   srcCfg = channelConfig[source] || channelConfig.unknown
                 }
 
-                // Legacy "Res1 Platform" — the old Pabbly workflow hardcoded
+                // Legacy "Res1 Platform" - the old Pabbly workflow hardcoded
                 // utm_source="Res1 Platform" on Meta lead-form leads. Until those
                 // rows are backfilled, surface them as Meta Forms (Meta blue).
                 if (/res\s*1\s*platform/i.test(srcCfg.label)) {
@@ -1469,7 +1469,7 @@ export default function LeadsTable({
 
                 // Lokazen leads come through the WEBSITE (onboarding forms + the
                 // site chat), so the generic "Web Chat" / "Web Form" first-touch
-                // reads wrong to the team — these ARE website leads. Relabel to
+                // reads wrong to the team - these ARE website leads. Relabel to
                 // "Website". Display-only over the stored first_touch='web', so it
                 // reconciles every existing lead at once with no backfill.
                 if (brandId === 'lokazen' && (subSource === 'Web Chat' || subSource === 'Web Form')) {
@@ -1527,7 +1527,7 @@ export default function LeadsTable({
                       <td className="px-3 py-2 text-center">
                         {/* TYPE is just the intensity tier now. The engagement_type
                             sub-label duplicated the INTENT column (both read
-                            "Volunteer" etc.) and confused more than it helped —
+                            "Volunteer" etc.) and confused more than it helped -
                             intent lives in its own column. */}
                         <span
                           className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"

@@ -30,7 +30,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const uc = lead.unified_context || {}
     const lkz = uc[BRAND_ID] || {}
     const phone = String(lead.phone || '').replace(/\D/g, '')
-    if (!phone) return NextResponse.json({ error: 'Lead has no phone — cannot create a listing' }, { status: 400 })
+    if (!phone) return NextResponse.json({ error: 'Lead has no phone - cannot create a listing' }, { status: 400 })
 
     const size = parseInt(String(lkz.property_size_sqft || '').replace(/[^\d]/g, ''), 10) || undefined
     const rent = parseInt(String(lkz.asking_rent_monthly || '').replace(/[^\d]/g, ''), 10) || undefined

@@ -1,5 +1,5 @@
 /**
- * Dashboard user management — admin only.
+ * Dashboard user management - admin only.
  *
  * GET  /api/dashboard/users           → list dashboard_users + pending invitations
  * POST /api/dashboard/users           → create invite (delegates to /api/auth/invite logic)
@@ -12,7 +12,7 @@ import { brandConfig } from '@/configs'
 import { sanitizeAllowedLeadTypes } from '@/lib/services/leadAccess'
 import crypto from 'crypto'
 
-// features.leadAccess: allowed_lead_types column (migration 036) — selecting
+// features.leadAccess: allowed_lead_types column (migration 036) - selecting
 // or writing it on brands without the migration would error.
 const LEAD_ACCESS_ON = !!brandConfig.features?.leadAccess
 
@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 /**
  * Get the logged-in user from the cookie client, then read their role with
  * the SERVICE-ROLE client. The service-role lookup bypasses any RLS quirks
- * on dashboard_users — we still trust the auth.getUser() identity from the
+ * on dashboard_users - we still trust the auth.getUser() identity from the
  * user's own session cookie.
  */
 async function requireAdmin(userSupabase: any) {
@@ -48,13 +48,13 @@ async function requireAdmin(userSupabase: any) {
     return { error: 'Your account is deactivated', status: 403 as const }
   }
   if (dashboardUser.role !== 'admin') {
-    return { error: 'Forbidden — admins only', status: 403 as const }
+    return { error: 'Forbidden - admins only', status: 403 as const }
   }
   return { user, role: dashboardUser.role, status: 200 as const, service }
 }
 
 /**
- * Like requireAdmin, but does NOT forbid non-admins — it just reports the
+ * Like requireAdmin, but does NOT forbid non-admins - it just reports the
  * caller's role so the route can redact sensitive fields for viewers.
  * Used by GET: everyone may see *who* is on the team, but only admins see
  * activity (last active), status, and pending invitations.
@@ -85,7 +85,7 @@ async function requireUser(userSupabase: any) {
   return { user, role: dashboardUser.role, isAdmin: dashboardUser.role === 'admin', status: 200 as const, service }
 }
 
-// ── GET — list users + pending invitations ────────────────────────────────────
+// ── GET - list users + pending invitations ────────────────────────────────────
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -97,7 +97,7 @@ export async function GET() {
     const isAdmin = (auth as any).isAdmin === true
 
     // Non-admins may see WHO is on the team (name, email, role) but NOT
-    // activity — no last_login, status, created_at, or pending invitations.
+    // activity - no last_login, status, created_at, or pending invitations.
     // Founder: "Only the admin should be able to see all the users / active
     // time. The users can see other users, but not active time or anything."
     const accessCols = LEAD_ACCESS_ON ? ', allowed_lead_types' : ''
@@ -111,7 +111,7 @@ export async function GET() {
       .order(isAdmin ? 'created_at' : 'full_name', { ascending: isAdmin ? false : true })
 
     if (usersRes.error && LEAD_ACCESS_ON) {
-      // Migration 036 not run yet (allowed_lead_types missing) — serve the
+      // Migration 036 not run yet (allowed_lead_types missing) - serve the
       // roster without the access column rather than 500ing the page.
       usersRes = await service
         .from('dashboard_users')
@@ -157,7 +157,7 @@ export async function GET() {
   }
 }
 
-// ── POST — create a new invitation ────────────────────────────────────────────
+// ── POST - create a new invitation ────────────────────────────────────────────
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -235,7 +235,7 @@ export async function POST(request: NextRequest) {
 
     // Send the invite email via Resend. Soft-fail: if the send errors
     // (missing env var, unverified domain, Resend down), the invitation
-    // row is already in the DB and inviteUrl is in the response — the
+    // row is already in the DB and inviteUrl is in the response - the
     // admin can copy-paste it manually. Never block invitation creation
     // on email delivery.
     const emailResult = await sendInvitationEmail({
@@ -259,7 +259,7 @@ export async function POST(request: NextRequest) {
       email: emailResult,
       message: emailResult.sent
         ? 'Invitation created and email sent'
-        : 'Invitation created (email send failed — share inviteUrl manually)',
+        : 'Invitation created (email send failed - share inviteUrl manually)',
     })
   } catch (error) {
     console.error('[users] POST error:', error)

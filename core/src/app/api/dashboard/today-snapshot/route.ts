@@ -36,7 +36,7 @@ function getStartIso(range: 'today' | '7d' | '14d' | '28d'): string {
   if (range === 'today') return getISTMidnightISO();
   const days = range === '7d' ? 7 : range === '14d' ? 14 : 28;
   // For multi-day windows, count back N*24h from now (rolling window).
-  // Each "day" boundary doesn't matter for these aggregates — what matters
+  // Each "day" boundary doesn't matter for these aggregates - what matters
   // is the rolling lookback.
   return new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
 }
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
       .lte('created_at', endIso)
       .order('created_at', { ascending: false });
 
-    // Gig workers (scout + connector) are not sales leads — keep them out of
+    // Gig workers (scout + connector) are not sales leads - keep them out of
     // today's lead total + breakdowns, mirroring the Leads table + Overview.
     const GIG_TYPES = ['scout', 'connector'];
     const leads = brandConfig.features?.scouts
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
       bySource[k] = (bySource[k] || 0) + 1;
     }
 
-    // ── 1b) Lead type breakdown — Parent vs Student ─────────────────────────
+    // ── 1b) Lead type breakdown - Parent vs Student ─────────────────────────
     const leadTypeOf = (l: any): 'Parent' | 'Student' | null => {
       const uc = l?.unified_context || {};
       const raw = String(
@@ -142,15 +142,15 @@ export async function GET(request: Request) {
       else scoreHistogram.cold++;
     }
 
-    // ── 3) Activity events — derived from the LEADS, not conversation rows.
+    // ── 3) Activity events - derived from the LEADS, not conversation rows.
     // Conversation rows only exist if a template send actually logged. Leads
     // have the canonical signal in unified_context, so use that:
     //
-    //   pat_submitted — unified_context.windchasers.pat_completed_at falls in window
-    //   demo_booked   — unified_context.web.booking exists AND was created in window
+    //   pat_submitted - unified_context.windchasers.pat_completed_at falls in window
+    //   demo_booked   - unified_context.web.booking exists AND was created in window
     //                   (or, fallback, lead created in window with form_type=demo_booked)
-    //   calls_logged  — conversations.channel=voice in window (correct as before)
-    //   agent_replies — conversations.channel=whatsapp + sender=agent + ai_generated in window
+    //   calls_logged  - conversations.channel=voice in window (correct as before)
+    //   agent_replies - conversations.channel=whatsapp + sender=agent + ai_generated in window
     //
     // We use the leads we already loaded for "today's leads", AND additionally
     // pull leads where the PAT or booking timestamp falls inside the window
@@ -169,7 +169,7 @@ export async function GET(request: Request) {
     // A booking lives in unified_context.<channel>.booking_date (scalar, the
     // shape storeBooking writes for web/whatsapp/voice) OR, for older web
     // bookings, unified_context.web.booking.date (object). The previous code
-    // only looked at web.booking, so EVERY WhatsApp/voice booking was missed —
+    // only looked at web.booking, so EVERY WhatsApp/voice booking was missed -
     // the count showed 2 (web only) when 6 were booked. Check all channels and
     // both shapes, counting each lead once.
     const BOOKING_CHANNELS = ['web', 'whatsapp', 'voice'] as const;
@@ -210,7 +210,7 @@ export async function GET(request: Request) {
     // Calls are logged via the Log Call action → activities row with
     // activity_type='call' and created_by=<user id>. The old metric counted
     // conversations.channel='voice' (Vapi voice calls only), so manual call
-    // logs never showed up — that's why "Calls logged" stayed at 0.
+    // logs never showed up - that's why "Calls logged" stayed at 0.
     const [
       { data: agentMsgsToday },
       { data: callActsToday },
@@ -303,7 +303,7 @@ export async function GET(request: Request) {
       });
     }
 
-    // ── POP campaign snapshot — replaces the aviation (PAT/demo/parent/student)
+    // ── POP campaign snapshot - replaces the aviation (PAT/demo/parent/student)
     //    view with what a campaign director actually watches. ──
     let pop: any = undefined;
     if (BRAND_ID === 'pop') {

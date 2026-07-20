@@ -1,4 +1,4 @@
-// Leader API auth — the Pulse Punjab leader app authenticates with its own
+// Leader API auth - the Pulse Punjab leader app authenticates with its own
 // key (x-api-key: LEADER_API_KEY) so it can be rotated independently of the
 // machine-intake INBOUND_API_KEY. POP-only, like d2d/log.
 
@@ -11,7 +11,7 @@ import { getCurrentBrandId } from '@/configs';
 // Instead the leader types a passcode (LEADER_PASSCODE) into a login screen;
 // the app exchanges it at POST /api/leader/auth for a short-lived signed token
 // (HMAC over an expiry, keyed by LEADER_API_KEY as the server-side secret). The
-// leader GET routes accept that token — no secret ever ships in the bundle.
+// leader GET routes accept that token - no secret ever ships in the bundle.
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12h
 
 function tokenSecret(): string {
@@ -40,7 +40,7 @@ export function verifyLeaderToken(token: string | null | undefined): boolean {
 }
 
 // The leader app is a separate browser origin (pulse-punjab.vercel.app), so
-// every leader route needs CORS. Read-only aggregates + a soft API-key gate —
+// every leader route needs CORS. Read-only aggregates + a soft API-key gate -
 // wildcard origin is fine (no cookies; the key rides in a custom header).
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +54,7 @@ export function corsJson(data: any, init?: { status?: number }): NextResponse {
   return NextResponse.json(data, { status: init?.status || 200, headers: CORS_HEADERS });
 }
 
-/** Preflight handler — re-export as `OPTIONS` from each leader route. */
+/** Preflight handler - re-export as `OPTIONS` from each leader route. */
 export function leaderOptions(): NextResponse {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }

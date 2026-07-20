@@ -1,12 +1,12 @@
 /**
- * services/attribution.ts — Source / First Touch resolution
+ * services/attribution.ts - Source / First Touch resolution
  *
  * Three orthogonal concepts:
- *   SOURCE       — marketing channel that drove them to us (Instagram, Google, Direct, ...)
+ *   SOURCE       - marketing channel that drove them to us (Instagram, Google, Direct, ...)
  *                  Set ONCE on lead creation. Never updated.
- *   FIRST TOUCH  — first interface/form they engaged with (Demo Form, PAT, WhatsApp Form, ...)
+ *   FIRST TOUCH  - first interface/form they engaged with (Demo Form, PAT, WhatsApp Form, ...)
  *                  Set ONCE on lead creation. Never updated.
- *   LAST TOUCH   — most recent channel (mutates over time, handled by `last_touchpoint` column)
+ *   LAST TOUCH   - most recent channel (mutates over time, handled by `last_touchpoint` column)
  *
  * Stored at: unified_context.attribution
  *
@@ -88,7 +88,7 @@ function titleCase(s: string): string {
  * Channels that represent a marketing source (the place that DROVE the lead
  * to us). Acceptable as the SOURCE column value.
  *
- * Platform channels like 'whatsapp' or 'web' are NOT in this set — they
+ * Platform channels like 'whatsapp' or 'web' are NOT in this set - they
  * describe the surface the lead used to message us, not what brought them
  * here. A WA-Popup lead has channel='whatsapp' but the marketing source
  * is whatever ad they came from (Instagram, Facebook Ads, etc.).
@@ -138,7 +138,7 @@ export function deriveSource(
   channelFallback?: string,
   resolvedChannel?: string | null,
 ): { source: string; source_label: string } {
-  // PRIORITY 1: utm_source (explicit marketing tracking — the gold signal).
+  // PRIORITY 1: utm_source (explicit marketing tracking - the gold signal).
   // When a UTM is present the lead came from a tracked campaign and that's
   // unambiguously the marketing source.
   const utm = (utmSource || '').toLowerCase().trim();
@@ -146,7 +146,7 @@ export function deriveSource(
     return { source: utm, source_label: SOURCE_LABELS[utm] || titleCase(utm) };
   }
 
-  // PRIORITY 2: resolvedChannel — but ONLY if it's a marketing channel.
+  // PRIORITY 2: resolvedChannel - but ONLY if it's a marketing channel.
   // The website's `channel` field also fills in 'whatsapp' / 'web' / 'direct'
   // for un-tracked traffic; those are platforms, not marketing sources, so
   // we reject them here. Useful values that DO win: facebook_ads (resolved
@@ -163,7 +163,7 @@ export function deriveSource(
     return { source: ch, source_label: SOURCE_LABELS[ch] || titleCase(ch) };
   }
 
-  // PRIORITY 4: 'direct' — no marketing signal at all. We deliberately do
+  // PRIORITY 4: 'direct' - no marketing signal at all. We deliberately do
   // NOT surface 'whatsapp' / 'web' here as a source value (they're platforms).
   return { source: 'direct', source_label: 'Direct' };
 }
@@ -179,7 +179,7 @@ export function deriveFirstTouch(
   if (ft) {
     return { first_touch: ft, first_touch_label: titleCase(ft) };
   }
-  // No form_type — use channel
+  // No form_type - use channel
   const ch = channelFallback.toLowerCase().trim();
   return {
     first_touch: ch,
@@ -208,7 +208,7 @@ export function buildAttribution(input: {
   formType?: string | null;
   channel?: string | null;
   /**
-   * Website's resolved channel (custom_fields.channel) — takes priority over
+   * Website's resolved channel (custom_fields.channel) - takes priority over
    * utm_source when present. The website resolves fbclid → facebook_ads,
    * gclid → google_ads, etc., so this catches Meta-ad leads that arrive
    * without UTM tagging.

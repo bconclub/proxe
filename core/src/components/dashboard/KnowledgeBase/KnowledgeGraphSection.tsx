@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * KnowledgeGraphSection — the "highlight" at the top of the Knowledge Base page.
+ * KnowledgeGraphSection - the "highlight" at the top of the Knowledge Base page.
  * Fetches the read-only inventory (/api/knowledge-base/graph) and renders the
  * Obsidian-style map + a legend + a click-to-view side panel. View-only: prompts
  * are surfaced here; the "Open editor" link jumps to the page that owns them.

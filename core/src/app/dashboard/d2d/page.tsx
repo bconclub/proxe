@@ -1,13 +1,13 @@
 'use client'
 
-// Door2Door artifact surface — the field-canvassing monitoring + app-preview
+// Door2Door artifact surface - the field-canvassing monitoring + app-preview
 // page. Reached from the dashboard artifact switcher (brands/pop/config.ts
 // `d2d` entry, href '/dashboard/d2d'). Demo data lives in @/data/mock-d2d.
 //
 // Three tabs:
-//   Field Log      — KPI strip + segregated D2D leads table + visit detail drawer
-//   Booth Campaigns — campaigns running at booth level + booth leaderboard
-//   App Preview     — phone-frame mockups of the volunteer field app
+//   Field Log      - KPI strip + segregated D2D leads table + visit detail drawer
+//   Booth Campaigns - campaigns running at booth level + booth leaderboard
+//   App Preview     - phone-frame mockups of the volunteer field app
 
 import { useState } from 'react'
 import { MdListAlt, MdCampaign, MdPhoneIphone, MdCalendarToday, MdFilterList, MdAdd, MdKeyboardArrowDown } from 'react-icons/md'
@@ -44,10 +44,10 @@ export default function D2DPage() {
               Volunteer household visits, surveys, grievances &amp; support lean.
             </p>
           </div>
-          {/* header controls (visual — demo) */}
+          {/* header controls (visual - demo) */}
           <div className="flex items-center gap-2">
             <button style={hdrBtn}>
-              <MdCalendarToday size={14} /> May 12 – May 18, 2025 <MdKeyboardArrowDown size={16} style={{ color: 'var(--text-muted)' }} />
+              <MdCalendarToday size={14} /> May 12 - May 18, 2025 <MdKeyboardArrowDown size={16} style={{ color: 'var(--text-muted)' }} />
             </button>
             <button style={hdrBtn}><MdFilterList size={14} /> Filters</button>
             <button style={{ ...hdrBtn, backgroundColor: 'var(--accent-primary)', color: '#fff', border: 'none', fontWeight: 600 }}>

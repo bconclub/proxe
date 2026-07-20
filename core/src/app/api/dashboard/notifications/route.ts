@@ -33,7 +33,7 @@ export type NotificationEvent = {
 }
 
 /**
- * POP feed — campaign-level SIGNALS, not per-lead stage churn. At thousands of
+ * POP feed - campaign-level SIGNALS, not per-lead stage churn. At thousands of
  * leads/day the "X entered Qualified" stream is noise; a war room wants the
  * relevant stuff coming in: new directives, external Listen signals (crisis /
  * opposition / positive), and upcoming events. Only POP takes this branch.
@@ -42,7 +42,7 @@ async function popSignalEvents(supabase: any): Promise<NotificationEvent[]> {
   const events: NotificationEvent[] = []
   const since = new Date(Date.now() - 3 * 86400000).toISOString()
 
-  // Directives from the leader app / AI — the "what to do now" feed.
+  // Directives from the leader app / AI - the "what to do now" feed.
   try {
     const { data: recos } = await supabase
       .from('campaign_recommendations')
@@ -121,7 +121,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ events: await popSignalEvents(supabase) })
     }
 
-    // Most recent stage transitions (desc — newest first).
+    // Most recent stage transitions (desc - newest first).
     const { data: changes, error: changesErr } = await supabase
       .from('lead_stage_changes')
       .select('lead_id, old_stage, new_stage, new_score, created_at')
@@ -164,14 +164,14 @@ export async function GET(_request: NextRequest) {
         type: change.old_stage ? 'stage_change' : 'new_lead_scored',
         content: change.old_stage
           ? `${name} entered ${change.new_stage} stage (from ${change.old_stage})`
-          : `${name} scored ${change.new_score || 0} — entered ${change.new_stage} stage`,
+          : `${name} scored ${change.new_score || 0} - entered ${change.new_stage} stage`,
         channel,
         timestamp: change.created_at,
         metadata: { oldStage: change.old_stage, newStage: change.new_stage, score: change.new_score },
       })
     })
 
-    // Score jumps — compare consecutive entries for the same lead (rows are
+    // Score jumps - compare consecutive entries for the same lead (rows are
     // newest-first, so the NEXT row is the older score). ≥20 points = notable.
     rows.forEach((change: any, index: number) => {
       if (change.new_score == null || index >= rows.length - 1) return

@@ -1,4 +1,4 @@
-// 117 Punjab Vidhan Sabha constituencies — generated from src/data/punjab-ac.json
+// 117 Punjab Vidhan Sabha constituencies - generated from src/data/punjab-ac.json
 // (authoritative ECI geometry) by scripts/gen-constituencies.cjs. Read-only.
 export type Region = 'Majha' | 'Doaba' | 'Malwa';
 export interface Constituency { id: string; name: string; district: string; region: Region; no: number; }

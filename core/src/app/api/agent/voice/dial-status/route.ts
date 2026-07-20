@@ -27,12 +27,12 @@ export async function POST(req: NextRequest) {
   const dialStatus = (form.get('DialStatus') || form.get('dialStatus') || '').toLowerCase();
   console.log('[dial-status] attempt', attempt, 'DialStatus', dialStatus, Object.fromEntries(form));
 
-  // Bridge succeeded, caller hung up, or we've exhausted retries — end the call.
+  // Bridge succeeded, caller hung up, or we've exhausted retries - end the call.
   if (!RETRY_STATUSES.has(dialStatus) || attempt > MAX_ATTEMPTS) {
     return xmlResponse('<Response></Response>');
   }
 
-  // Re-dial the Vapi agent — VoBiz re-rolls the egress IP on a fresh attempt.
+  // Re-dial the Vapi agent - VoBiz re-rolls the egress IP on a fresh attempt.
   const vapiSipUri = process.env.VAPI_SIP_URI || 'sip:918046733388@98d57c1f-9133-4f15-a333-b9edff75f2f9.sip.vapi.ai';
   const callerId = process.env.VOBIZ_FROM_NUMBER || '';
 

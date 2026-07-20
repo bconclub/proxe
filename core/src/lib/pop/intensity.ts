@@ -1,4 +1,4 @@
-// The INTENSITY LADDER — POP's central shared model.
+// The INTENSITY LADDER - POP's central shared model.
 //
 // ~3 crore people, ~2 crore voters; each person climbs a ladder of engagement
 // intensity. Every artifact (War Room, Pulse Punjab leader app, D2D, MyVoice,
@@ -9,8 +9,8 @@
 // trigger on all_leads derives the tier from lean/action_intent/
 // engagement_type/lead_stage/constituency/booth + d2d_workers membership, with
 // ratchet semantics (climbs, never silently falls; 'opposed' caps derived at
-// 1). This file is the shared DISPLAY vocabulary only — labels, colors,
-// helpers — so every surface names and colors the tiers identically.
+// 1). This file is the shared DISPLAY vocabulary only - labels, colors,
+// helpers - so every surface names and colors the tiers identically.
 
 export type IntensityTier = 0 | 1 | 2 | 3 | 4
 
@@ -24,7 +24,7 @@ export interface IntensityTierDef {
 }
 
 export const INTENSITY_TIERS: IntensityTierDef[] = [
-  { tier: 0, key: 'contact', label: 'Contact', means: 'Row exists — nothing placeable yet', color: '#7A8AA0' },
+  { tier: 0, key: 'contact', label: 'Contact', means: 'Row exists - nothing placeable yet', color: '#7A8AA0' },
   { tier: 1, key: 'voter', label: 'Voter', means: 'Placeable: seat/booth known, a lean, or vote intent', color: '#3B82F6' },
   { tier: 2, key: 'supporter', label: 'Supporter', means: 'Leans supporter (or leaning + will act)', color: '#22C55E' },
   { tier: 3, key: 'volunteer', label: 'Volunteer', means: 'Raised their hand to work', color: '#F59E0B' },

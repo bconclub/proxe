@@ -331,7 +331,7 @@ export default function StatusPage() {
           </div>
         )}
 
-        {/* Endpoint health strip — at-a-glance per-service status */}
+        {/* Endpoint health strip - at-a-glance per-service status */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
             Endpoint Health

@@ -1,5 +1,5 @@
 /**
- * Token-usage metering — TEST / experimental.
+ * Token-usage metering - TEST / experimental.
  *
  * Records Claude token spend bucketed by category (agent chat, scoring,
  * notes & summaries, vision, …) so the team can see roughly where the spend
@@ -19,8 +19,8 @@ export type TokenCategory =
   | 'chat'          // WhatsApp / web / voice agent replies
   | 'scoring'       // lead scoring
   | 'notes_summary' // note classification + summaries
-  | 'brain'         // Ask PROXe / Brain — TEXT (LLM: briefing words, Q&A)
-  | 'brain_voice'   // Ask PROXe / Brain — VOICE (ElevenLabs TTS, char-billed)
+  | 'brain'         // Ask PROXe / Brain - TEXT (LLM: briefing words, Q&A)
+  | 'brain_voice'   // Ask PROXe / Brain - VOICE (ElevenLabs TTS, char-billed)
   | 'vision'        // screenshot / image reads
   | 'other'
 
@@ -97,7 +97,7 @@ function priceFor(model: string): { in: number; out: number } {
  * Anthropic bills those tiers at very different rates:
  *   - uncached input : 1×   the input price
  *   - cache WRITE    : 1.25× (cache_creation_input_tokens)
- *   - cache READ     : 0.1×  (cache_read_input_tokens) — 10× cheaper
+ *   - cache READ     : 0.1×  (cache_read_input_tokens) - 10× cheaper
  * We cached a large system prompt on every chat call, so most "input" tokens
  * are cache reads. Pricing them all at 1× over-stated chat cost ~2×. Passing
  * cacheRead/cacheWrite (default 0 = treat all input as uncached) fixes it.
@@ -121,7 +121,7 @@ export function estimateCost(
 
 /**
  * Rough USD per 1,000 characters for ElevenLabs TTS. ElevenLabs actually bills
- * in subscription credits, not per-char USD — these are ballpark conversions
+ * in subscription credits, not per-char USD - these are ballpark conversions
  * for the "rough spend" panel (flash models cost ~half the credits of the
  * standard/v3 models). Match by model-id substring like priceFor().
  */
@@ -138,7 +138,7 @@ export function estimateVoiceCost(model: string, chars: number): number {
 }
 
 /**
- * Add a Claude call's token usage to the running aggregate. Fire-and-forget —
+ * Add a Claude call's token usage to the running aggregate. Fire-and-forget -
  * callers should NOT await in a way that blocks the reply (use `void`).
  */
 export async function recordTokenUsage(
@@ -183,13 +183,13 @@ export async function recordTokenUsage(
           key: SETTINGS_KEY,
           value: cur,
           description: 'TEST: Claude token usage by category',
-          // NB: dashboard_settings.updated_by is a UUID column — passing the
+          // NB: dashboard_settings.updated_by is a UUID column - passing the
           // string 'system' 400s (22P02) and silently drops the write. Omit it.
         },
         { onConflict: 'key' },
       )
   } catch (e) {
-    // Best-effort — never throw into a live reply path — but DO log, so a silent
+    // Best-effort - never throw into a live reply path - but DO log, so a silent
     // write failure (like the updated_by UUID bug) is visible next time.
     console.error('[token-usage] write failed:', (e as any)?.message || e)
   }
@@ -210,7 +210,7 @@ function addVoiceToBucket(
 }
 
 /**
- * Record an ElevenLabs TTS call — billed by characters, not tokens. Same
+ * Record an ElevenLabs TTS call - billed by characters, not tokens. Same
  * fire-and-forget contract as recordTokenUsage; writes into the same
  * dashboard_settings 'token_usage' aggregate under a voice category.
  */
@@ -283,7 +283,7 @@ export async function resetTokenUsage(): Promise<void> {
           key: SETTINGS_KEY,
           value: { byCategory: {}, byDay: {}, since: nowIso, updatedAt: nowIso } as TokenUsageDoc,
           description: 'TEST: Claude token usage by category',
-          // NB: dashboard_settings.updated_by is a UUID column — passing the
+          // NB: dashboard_settings.updated_by is a UUID column - passing the
           // string 'system' 400s (22P02) and silently drops the write. Omit it.
         },
         { onConflict: 'key' },

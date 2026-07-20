@@ -1,6 +1,6 @@
 import React from 'react'
 
-// Shared person/lead avatar — a soft brand-tint circle with a thin ring and the
+// Shared person/lead avatar - a soft brand-tint circle with a thin ring and the
 // initials in the brand colour. One source of truth so every dashboard surface
 // (inbox, priority queue, calls, bookings…) renders the exact same avatar, and
 // it stays on-brand automatically (--accent-* is each brand's own colour).

@@ -1,5 +1,5 @@
 /**
- * services/email.ts — Resend transactional email helpers
+ * services/email.ts - Resend transactional email helpers
  *
  * Single entry point for any dashboard-side email send. Today only used by
  * the user invitation flow (/api/auth/invite); easy to extend.
@@ -10,7 +10,7 @@
  *   RESEND_FROM_NAME      friendly sender name, e.g. "Windchasers PROXe"
  *
  * The Resend sandbox FROM (`onboarding@resend.dev`) only delivers to the
- * Resend account owner's verified email — fine for the first test loop,
+ * Resend account owner's verified email - fine for the first test loop,
  * not fine for inviting customers. Swap to a verified subdomain before
  * onboarding real users.
  */
@@ -48,7 +48,7 @@ export async function sendEmail(opts: {
 }): Promise<SendResult> {
   const client = getClient()
   if (!client) {
-    console.warn('[email] RESEND_API_KEY not set — skipping send')
+    console.warn('[email] RESEND_API_KEY not set - skipping send')
     return { sent: false, error: 'RESEND_API_KEY not configured' }
   }
 

@@ -1,4 +1,4 @@
-// ─── LEAD STAGES — the ONE canonical taxonomy ────────────────────────────────
+// ─── LEAD STAGES - the ONE canonical taxonomy ────────────────────────────────
 // `all_leads.lead_stage` is the single pipeline field. Every surface that
 // shows, filters, or edits a stage MUST read this list:
 //   • LeadsTable stage chips + the stage filter dropdown
@@ -6,7 +6,7 @@
 //   • LeadStageSelector
 //   • /api/dashboard/leads/[id]/stage (ALLOWED_STAGES)
 // The legacy `status` column ("New Lead"/"Follow Up"/"Wrong Enquiry"…) is DEAD
-// — null on every lead, written by nothing. Do not resurrect it.
+// - null on every lead, written by nothing. Do not resurrect it.
 //
 // Ordered as the funnel reads left→right; terminal/parking states last.
 
@@ -28,7 +28,7 @@ export const LEAD_STAGES: LeadStageDef[] = [
   { value: 'Proposal Sent', label: 'Proposal Sent', description: 'Offer in their hands',             color: '#eab308', bg: 'rgba(234,179,8,0.15)' },
   { value: 'Booking Made',  label: 'Booking Made',  description: 'Call/demo scheduled',              color: '#22c55e', bg: 'rgba(34,197,94,0.15)' },
   { value: 'In Sequence',   label: 'In Sequence',   description: 'Automated follow-up running',      color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
-  { value: 'Nurture',       label: 'Nurture',       description: 'Long-game — check in later',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
+  { value: 'Nurture',       label: 'Nurture',       description: 'Long-game - check in later',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
   { value: 'Closed Won',     label: 'Closed Won',     description: 'Won',                              color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
   { value: 'Closed Lost',   label: 'Closed Lost',   description: 'Lost / disqualified by decision',  color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Wrong fit',                        color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
@@ -38,7 +38,7 @@ export const LEAD_STAGES: LeadStageDef[] = [
 
 export const LEAD_STAGE_VALUES = LEAD_STAGES.map((s) => s.value)
 
-// ─── PIPELINE GROUPS — how the pipeline page rolls stages up ────────────────
+// ─── PIPELINE GROUPS - how the pipeline page rolls stages up ────────────────
 // The pipeline funnel shows GROUPS of stages (Qualified = Qualified + High
 // Intent, Lost = every lost-ish value…). Clicking a group deep-links to
 // /dashboard/leads?stage=<first value>; LeadsTable expands that value back to

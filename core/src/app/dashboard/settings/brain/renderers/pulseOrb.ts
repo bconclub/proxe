@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pulse Orb — the classic Brain: a neural particle sphere in brand colors.
+// Pulse Orb - the classic Brain: a neural particle sphere in brand colors.
 //
 // Extracted verbatim from VoiceOrb's original draw loop; the only semantic
 // deltas are ripple/ring timing converted from frames to wall-clock ms (so all
@@ -84,7 +84,7 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
     ctx.lineWidth = dpr2
     const wave = env.getWaveform()
     if (wave && m === 'speaking') {
-      // live waveform rides the spine while the brain talks — full width,
+      // live waveform rides the spine while the brain talks - full width,
       // brightest near the orb, fading to the edges via the same gradient
       const lg2 = ctx.createLinearGradient(0, cy, w, cy)
       lg2.addColorStop(0, `rgba(${ar},${ag},${ab},0)`)
@@ -119,7 +119,7 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
     }
     ctx.setLineDash([])
 
-    // ── THE COVERING — a glassy shell the particle cloud lives INSIDE: faint
+    // ── THE COVERING - a glassy shell the particle cloud lives INSIDE: faint
     // inner glass toward the rim + a breathing accent rim + a small specular
     // highlight. Same radius the loading ring rides, so the ring reads as
     // charge running along the shell.
@@ -163,7 +163,7 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
       ctx.lineCap = 'butt'
     }
 
-    // radar sweep along the spine — one slow arm
+    // radar sweep along the spine - one slow arm
     const [sr, sg2, sb] = sweepRgb
     const sweepA = t * 0.0035
     const sg = ctx.createLinearGradient(cx, cy, cx + Math.cos(sweepA) * R * 1.9, cy + Math.sin(sweepA) * R * 1.9)
@@ -180,7 +180,7 @@ export const createPulseOrb: CreateRenderer = (canvas, env) => {
       ctx.beginPath(); ctx.arc(ox, oy, 1.3 * dpr2, 0, Math.PI * 2); ctx.fill()
     }
 
-    // core glow + nucleus — accent-inked on light so it never smudges white
+    // core glow + nucleus - accent-inked on light so it never smudges white
     const glowR = R * (1.7 + amp * 0.7 + think * 0.3)
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR)
     const glowA = (m === 'speaking' ? 0.14 + amp * 0.16 : m === 'thinking' ? 0.12 + think * 0.06 : 0.09) * glowMul

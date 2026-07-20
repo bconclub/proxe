@@ -1,6 +1,6 @@
 'use client';
 
-// Appearance — dashboard mode + accent theme + live preview. Extracted from the
+// Appearance - dashboard mode + accent theme + live preview. Extracted from the
 // old single-scroll settings page when Configure became a card grid.
 
 import { useState, useEffect } from 'react';

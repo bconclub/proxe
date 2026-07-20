@@ -9,7 +9,7 @@ import { BRAND_ID } from '@/configs';
 // from the Vapi API and REPLAY each finished one through our own /vapi-webhook
 // as a synthetic end-of-call-report. The webhook UPSERTS (keyed on the call id),
 // so this creates the row if the initiation-time persist never landed AND fills
-// in status / duration / transcript / recording / summary — all through the one
+// in status / duration / transcript / recording / summary - all through the one
 // already-tested enrichment path (no logic duplicated here).
 //
 // Brand-safe on the shared Vapi account: we only replay calls placed with THIS
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   for (const call of calls) {
     if (call.status !== 'ended') { continue; }
     // Only REAL phone calls belong on the Calls dashboard. `webCall` sessions are
-    // the Vapi dashboard's "Talk to Assistant" browser tester — they have no phone
+    // the Vapi dashboard's "Talk to Assistant" browser tester - they have no phone
     // number or direction, so they'd surface as bogus "Inbound / Unknown caller"
     // rows. Tests stay in the Vapi dashboard; the dashboard shows only inbound +
     // outbound PSTN calls to/from the number.

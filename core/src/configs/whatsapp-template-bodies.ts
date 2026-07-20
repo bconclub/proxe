@@ -2,7 +2,7 @@
 // keyed by the exact template name we send. Source of truth = what Meta stores
 // (fetched from the WABA message_templates API). We log the RENDERED body +
 // buttons to the conversation so the dashboard inbox shows the ACTUAL template
-// the customer received — not a hand-written one-line mirror.
+// the customer received - not a hand-written one-line mirror.
 //
 // Windchasers-scoped: every name here is a `windchasers_*` template and is only
 // referenced from windchasers-gated send paths, mirroring whatsappSender.ts
@@ -80,7 +80,7 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
   // Webinar day-of + follow-up templates (v3 = clean copy with a real button;
   // the join link lives in the button, never inline). The _v1 day-of names are
   // kept as aliases because our earliest sends logged that name even though the
-  // v3 template is what actually went out — so the inbox renders them identically.
+  // v3 template is what actually went out - so the inbox renders them identically.
   windchasers_webinar_live_now_v3: {
     body: `Hi {{customer_name}}, we are live now. *{{webinar_name}}* has started.\n\nTap *Join webinar* below to come straight in.`,
     footer: 'Team WindChasers',
@@ -126,7 +126,7 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
 }
 
 export type RenderedTemplate = {
-  /** Body with params substituted — store this as the conversation `content`. */
+  /** Body with params substituted - store this as the conversation `content`. */
   content: string
   footer?: string
   buttons?: string[]
@@ -137,7 +137,7 @@ export type RenderedTemplate = {
 /**
  * Render an approved template body with its params filled, ready to log as the
  * conversation `content` (+ buttons/footer for the inbox). Returns null when the
- * template name isn't in the registry — callers fall back to their old stub so a
+ * template name isn't in the registry - callers fall back to their old stub so a
  * missing entry never breaks a send-log.
  *
  * A missing/blank param is replaced with an empty string; callers pass a real

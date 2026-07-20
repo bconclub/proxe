@@ -1,5 +1,5 @@
 /**
- * Learning readout — rolls up the decision_log records the log-call hub writes
+ * Learning readout - rolls up the decision_log records the log-call hub writes
  * into unified_context.decision_log on each lead. This is where we watch the
  * brain learn: how often its proposal matched the human, what humans actually
  * chose, and the patterns by lead context ("this kind of lead → humans did X").

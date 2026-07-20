@@ -5,13 +5,13 @@ import { MdClose, MdSend, MdRefresh } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 
 /**
- * WhatsAppTemplatePicker — popover that lists approved Meta WhatsApp message
+ * WhatsAppTemplatePicker - popover that lists approved Meta WhatsApp message
  * templates and lets the operator send one to the currently-open lead. Used
  * in the inbox reply bar as a fallback when the 24h conversation window has
  * expired (templates are the only sanctioned way to re-open the window).
  *
  * The template list is fetched lazily on first open and cached in localStorage
- * for 10 minutes — Meta's API is slow and the list rarely changes.
+ * for 10 minutes - Meta's API is slow and the list rarely changes.
  *
  * Variable extraction: Meta returns templates with components that may contain
  * placeholders like {{1}}, {{2}}. We parse those out of the BODY component
@@ -22,7 +22,7 @@ const TEMPLATE_CACHE_KEY = 'wc-wa-template-cache-v1'
 const TEMPLATE_CACHE_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
 /**
- * Owner test phone — when "Test mode" is on, every send routes here instead
+ * Owner test phone - when "Test mode" is on, every send routes here instead
  * of the lead's actual number. Avoids accidentally firing tests at real
  * customers. Override via NEXT_PUBLIC_TEST_WHATSAPP_PHONE if needed.
  */
@@ -80,14 +80,14 @@ function saveCache(templates: MetaTemplate[]) {
       JSON.stringify({ templates, cachedAt: Date.now() } satisfies CachedResponse),
     )
   } catch {
-    /* localStorage full / disabled — silently fall back to in-memory */
+    /* localStorage full / disabled - silently fall back to in-memory */
   }
 }
 
 /**
  * Extract every placeholder from a template body. Handles BOTH
  *   {{1}}, {{2}}, …       (positional)
- *   {{customer_name}}, …  (named — what Meta's "named params" templates use)
+ *   {{customer_name}}, …  (named - what Meta's "named params" templates use)
  *
  * Returns the ordered, deduped list. Numbered placeholders are kept in numeric
  * order; named placeholders in first-appearance order. If a template mixes
@@ -177,7 +177,7 @@ export default function WhatsAppTemplatePicker({
     }
   }, [open, leadId])
 
-  // Initial fetch — use cache when available
+  // Initial fetch - use cache when available
   useEffect(() => {
     if (!open) return
     const cached = loadCache()
@@ -263,7 +263,7 @@ export default function WhatsAppTemplatePicker({
       }
       setSentMessage(
         testMode
-          ? `Test sent to ${TEST_WHATSAPP_PHONE} — "${selectedTemplate.name}".`
+          ? `Test sent to ${TEST_WHATSAPP_PHONE} - "${selectedTemplate.name}".`
           : `Template "${selectedTemplate.name}" sent to lead.`,
       )
       onSent?.()
@@ -289,7 +289,7 @@ export default function WhatsAppTemplatePicker({
 
   return (
     <>
-      {/* backdrop — clicking it closes the popover */}
+      {/* backdrop - clicking it closes the popover */}
       <div
         className="fixed inset-0 z-[70]"
         onClick={onClose}
@@ -481,7 +481,7 @@ export default function WhatsAppTemplatePicker({
                 </div>
               )}
 
-              {/* Test mode toggle — locks send to TEST_WHATSAPP_PHONE when on */}
+              {/* Test mode toggle - locks send to TEST_WHATSAPP_PHONE when on */}
               <div
                 className="mb-3 p-2 rounded-lg border flex items-center gap-2"
                 style={{
@@ -497,7 +497,7 @@ export default function WhatsAppTemplatePicker({
                     className="cursor-pointer"
                   />
                   <span className="text-[11px] font-semibold" style={{ color: testMode ? '#f59e0b' : 'var(--text-primary)' }}>
-                    {testMode ? `Test mode — sending to ${TEST_WHATSAPP_PHONE}` : 'Live mode — sending to lead'}
+                    {testMode ? `Test mode - sending to ${TEST_WHATSAPP_PHONE}` : 'Live mode - sending to lead'}
                   </span>
                 </label>
               </div>

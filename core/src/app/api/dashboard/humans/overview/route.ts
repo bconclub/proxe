@@ -2,8 +2,8 @@
  * GET /api/dashboard/humans/overview  (features.leadAccess)
  *
  * Team-activity overview for the Humans page: every active dashboard user
- * with what they're working — allowed lead types, owned-lead count, pipeline
- * stage breakdown — plus the unclaimed open-pool count. lastActive is
+ * with what they're working - allowed lead types, owned-lead count, pipeline
+ * stage breakdown - plus the unclaimed open-pool count. lastActive is
  * admin-only (founder: viewers may see WHO is on the team, not activity).
  *
  * One minimal-column all_leads scan + one dashboard_users select, aggregated
@@ -38,7 +38,7 @@ export async function GET() {
       .maybeSingle()
     const isAdmin = me?.role === 'admin'
 
-    // Owned leads are the minority, so fetch only rows with an owner (paged —
+    // Owned leads are the minority, so fetch only rows with an owner (paged -
     // PostgREST caps every response at ~1000 rows regardless of .limit()) and
     // head-count the rest. Counting from one capped scan silently undercounts.
     const PAGE = 1000

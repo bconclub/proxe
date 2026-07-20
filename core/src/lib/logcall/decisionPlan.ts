@@ -1,4 +1,4 @@
-// Log-call chat DECISION PLAN — the trust boundary between PROXe's chat output
+// Log-call chat DECISION PLAN - the trust boundary between PROXe's chat output
 // and the commit route that actually executes. Modeled on lib/brain/actions.ts:
 // the model emits a trailing "PLAN: {...}" line; the server strips it, validates
 // every step against whitelists, and only a validated plan can reach Confirm.
@@ -19,7 +19,7 @@ export interface DecisionDetail {
   date?: string
   time?: string
   note?: string
-  // action: message — an APPROVED WhatsApp template (open text can't be sent
+  // action: message - an APPROVED WhatsApp template (open text can't be sent
   // outside the 24h window). param_names are the template's named body vars,
   // resolved from the lead server-side at send time.
   template?: string

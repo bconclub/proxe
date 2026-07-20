@@ -518,7 +518,7 @@ function getEventColor(booking: Booking): string {
                     >
                       {format(day, 'd')}
                     </div>
-                    {/* Phone: text pills are unreadable in ~48px cells — show
+                    {/* Phone: text pills are unreadable in ~48px cells - show
                         count dots instead; the tap-day agenda below lists them. */}
                     <div className="md:hidden flex flex-wrap gap-0.5 items-start">
                       {dayBookings.slice(0, 4).map((booking) => (
@@ -547,7 +547,7 @@ function getEventColor(booking: Booking): string {
                 )
               })}
             </div>
-            {/* Phone: tap-day agenda — lists the selected day's bookings the
+            {/* Phone: tap-day agenda - lists the selected day's bookings the
                 dot cells can't show. Tap → same booking modal. */}
             <div className="md:hidden flex-shrink-0 max-h-[40%] overflow-y-auto border-t mt-1 pt-1" style={{ borderColor: 'var(--border-primary)' }}>
               <div className="text-[10px] font-semibold uppercase tracking-wide px-1 py-1" style={{ color: 'var(--text-secondary)' }}>

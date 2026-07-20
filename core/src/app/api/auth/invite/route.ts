@@ -8,7 +8,7 @@
  * whatever this invitation specified).
  *
  * Body: { email: string, role?: 'viewer' | 'admin' }
- *   role defaults to 'viewer' and is validated against an allowlist —
+ *   role defaults to 'viewer' and is validated against an allowlist -
  *   never trust whatever the caller sent.
  *
  * Response: { invitation, inviteUrl, email: { sent, id?, error? } }
@@ -23,7 +23,7 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-// Allowlist — never trust caller-supplied role values.
+// Allowlist - never trust caller-supplied role values.
 const ALLOWED_ROLES = new Set(['viewer', 'admin'])
 
 export async function POST(request: NextRequest) {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       email: emailResult,
       message: emailResult.sent
         ? 'Invitation created and email sent'
-        : 'Invitation created (email send failed — share inviteUrl manually)',
+        : 'Invitation created (email send failed - share inviteUrl manually)',
     })
   } catch (error) {
     console.error('Error creating invitation:', error)

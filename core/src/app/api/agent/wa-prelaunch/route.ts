@@ -8,7 +8,7 @@
  * When the lead actually messages on WhatsApp, the Meta webhook dedupes by
  * phone and attaches the conversation to this already-attributed lead.
  *
- * No auth — this is a public lead-capture endpoint. CORS-friendly.
+ * No auth - this is a public lead-capture endpoint. CORS-friendly.
  *
  * Body:
  *   name (required)
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (existing) {
       leadId = existing.id;
       const ctx = existing.unified_context || {};
-      // Update — but DO NOT overwrite an existing source. Source is immutable.
+      // Update - but DO NOT overwrite an existing source. Source is immutable.
       const mergedAttribution = ctx.attribution
         ? ctx.attribution // keep existing
         : attributionPayload; // first time we have attribution data

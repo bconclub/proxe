@@ -1,4 +1,4 @@
-// LEADER API — "Contact WAR ROOM": the leader app pushes a recommendation /
+// LEADER API - "Contact WAR ROOM": the leader app pushes a recommendation /
 // directive to the war-room team. Lands in the War Room's Directives tab
 // (realtime). Auth: x-api-key = LEADER_API_KEY.
 
@@ -10,7 +10,7 @@ import { BRAND_ID } from '@/configs';
 export const dynamic = 'force-dynamic';
 export const OPTIONS = leaderOptions;
 
-// GET — the leader's live Feed: every directive pushed to the team (his own
+// GET - the leader's live Feed: every directive pushed to the team (his own
 // pushes + AI suggestions) with its current status (new → acked → actioned).
 export async function GET(req: NextRequest) {
   const denied = leaderAuthGate(req);

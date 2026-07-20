@@ -34,7 +34,7 @@ import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId } from '@/configs'
 import { WA_TEMPLATE_BODIES, renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
-// One brand per build — resolves statically. bcon's inbox carries extra
+// One brand per build - resolves statically. bcon's inbox carries extra
 // fork-specific UI (full Meta-form card, planned follow-ups timeline) and a
 // form parser tuned to its question-sentence Meta forms.
 const IS_BCON = getCurrentBrandId() === 'bcon'
@@ -43,7 +43,7 @@ const IS_BCON = getCurrentBrandId() === 'bcon'
 // as the Lokazen "Property Owner", etc.
 const IS_LOKAZEN = getCurrentBrandId() === 'lokazen'
 
-// Channel icons — plain SVG, no container. Tinted with the channel brand
+// Channel icons - plain SVG, no container. Tinted with the channel brand
 // colour via CSS filter (for img tags) or stroke (for inline SVG). The old
 // version wrapped each icon in a coloured square which looked busy in the
 // conversation list; this version is just the icon at the channel colour.
@@ -51,7 +51,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
   const opacity = active ? 1 : 0.45;
 
   // We tint white SVG line-art assets to the brand colour using a precomputed
-  // CSS filter. (`filter:invert(1)` on its own only makes them white — not the
+  // CSS filter. (`filter:invert(1)` on its own only makes them white - not the
   // channel colour we want.) Each filter below was generated to map a black
   // source SVG to the listed hex; ok-ish approximation, fine at 16px.
   const TINT: Record<string, string> = {
@@ -110,7 +110,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 const ALL_CHANNELS = ['web', 'whatsapp'];
 
 // Score Ring - circular progress indicator with score inside
-// Score color/label scheme — kept in sync with LeadDetailsModal.getHealthColor
+// Score color/label scheme - kept in sync with LeadDetailsModal.getHealthColor
 // so a "Warm" lead reads the same color everywhere in the dashboard.
 //   90+   Hot   green
 //   70-89 Warm  orange
@@ -144,7 +144,7 @@ const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }
   );
 };
 
-// WhatsApp-style contact avatar — a colored circle of initials (we don't
+// WhatsApp-style contact avatar - a colored circle of initials (we don't
 // capture real profile photos yet), with a tiny channel badge tucked into the
 // bottom-right corner (WhatsApp/web/voice), so the row reads like a WA chat.
 // Background hue is derived from the name so each contact keeps a stable color.
@@ -228,13 +228,13 @@ interface Message {
 
 
 // Audience type badge for a conversation (Lokazen: owner / scout / brand).
-// Same resolution order as the right-panel badge — brand-namespaced context
+// Same resolution order as the right-panel badge - brand-namespaced context
 // first, windchasers fallback for legacy rows, then channel contexts. Shown in
 // the conversation list so the agent knows who each chat is with at a glance.
 function audienceOf(uc: Record<string, any> | null | undefined): { label: string; color: string } | null {
   // Lokazen-only taxonomy (Owner/Scout/Brand). On other brands a user_type
   // like "business_owner" substring-matched 'owner' and painted OWNER chips
-  // all over the bcon inbox — never render this outside lokazen.
+  // all over the bcon inbox - never render this outside lokazen.
   if (getCurrentBrandId() !== 'lokazen') return null
   if (!uc) return null
   const bc = { ...(uc.windchasers || {}), ...(uc[getCurrentBrandId()] || {}) }
@@ -246,7 +246,7 @@ function audienceOf(uc: Record<string, any> | null | undefined): { label: string
   return null
 }
 
-// Lead-category chips for the conversation list — the lead's segment at a glance:
+// Lead-category chips for the conversation list - the lead's segment at a glance:
 // their program (Webinar / course interest) + who they are (Student / Parent /
 // Professional). Reads generic fields with no hardcoded taxonomy, so it degrades
 // gracefully on any brand (shows whatever user_type/course_interest is stored).
@@ -289,7 +289,7 @@ function cleanMessageContent(text: string): string {
   return text
     .replace(/\[User's name is [^\]]+\]\s*/g, '')
     .replace(/\[Button intent:[^\]]*\]\s*/gi, '')
-    // Widget quick-reply markup — the widget renders these as buttons for the
+    // Widget quick-reply markup - the widget renders these as buttons for the
     // customer; the inbox must never show the raw markers.
     .replace(/\[BTN:\s*[^\]]*\]\s*/gi, '')
     .trim();
@@ -316,7 +316,7 @@ function renderMarkdown(text: string) {
 }
 
 /**
- * Render WhatsApp-style markdown — what Meta's templates use natively:
+ * Render WhatsApp-style markdown - what Meta's templates use natively:
  *   *text*  → bold
  *   _text_  → italic
  *   ~text~  → strikethrough
@@ -327,7 +327,7 @@ function renderWhatsAppMarkdown(text: string): React.ReactNode {
   if (!text) return null;
   const cleanedText = cleanMessageContent(text);
   // Handles both **double** (Markdown) and *single* (WhatsApp) bold, _italic_,
-  // ~strike~, and newlines — so messages render identically on every channel.
+  // ~strike~, and newlines - so messages render identically on every channel.
   const re = /(\*\*[^*\n]+?\*\*|\*[^*\n]+?\*|_[^_\n]+?_|~[^~\n]+?~|\n)/g;
   const segments = cleanedText.split(re).filter((s) => s !== undefined && s !== '');
   return segments.map((seg, i) => {
@@ -357,12 +357,12 @@ function parseFormFields(content: string): { intro: string; fields: { key: strin
   // email, city). The old pattern only matched snake_case keys, so the simple labels
   // mashed into the previous value and an apostrophe split one key into two.
   // Trailing [?_]* handles Meta's "what_is_your_age?_:" shape (question mark AND
-  // a stray underscore before the colon) — otherwise that field mashed into the
+  // a stray underscore before the colon) - otherwise that field mashed into the
   // previous value.
   // bcon: Meta "click to WhatsApp" forms arrive as ONE run-on line of English
   // question sentences ("How are you managing leads?: answer ..."). A key is
   // EITHER a question that STARTS with a question-word and ends in "?", OR a
-  // known plain label, OR a snake_case (Pabbly) key — anchoring questions to a
+  // known plain label, OR a snake_case (Pabbly) key - anchoring questions to a
   // leading question-word lets the parser skip over multi-word answers.
   // Other brands keep the snake_case-first pattern their forms produce.
   const fieldPattern = IS_BCON
@@ -440,7 +440,7 @@ function getFormFieldLabel(key: string): string {
   if (k.includes('education')) return 'Education';
   if (k.includes('child')) return 'Child';
   if (k.includes('name')) return 'Name';
-  // Fallback: show the full label (don't hard-truncate to 15 chars — that's what
+  // Fallback: show the full label (don't hard-truncate to 15 chars - that's what
   // produced unreadable "WHAT IS YOUR PR…" labels). Cap generously instead.
   return key.length > 48 ? key.substring(0, 48) + '…' : key;
 }
@@ -527,7 +527,7 @@ function DeliveryStatusIcon({ deliveredAt, readAt, failed }: { deliveredAt?: str
   // Red warning icon ONLY for a REAL, confirmed send/delivery failure (caller
   // passes this from metadata.send_succeeded===false or delivery_status===
   // 'failed'). This used to be inferred from "no delivery/read confirmation
-  // within 10 minutes" — but Meta's status webhook not calling back yet is
+  // within 10 minutes" - but Meta's status webhook not calling back yet is
   // normal and common (batched receipts, recipient hasn't opened WhatsApp,
   // etc.), NOT evidence the message failed to send. That false positive
   // painted plenty of genuinely-sent messages with a scary red icon.
@@ -584,7 +584,7 @@ export default function InboxPage() {
   const [formCardExpanded, setFormCardExpanded] = useState(false)
   const [plannedActions, setPlannedActions] = useState<any[]>([])
   const [loadingPlanned, setLoadingPlanned] = useState(false)
-  // Mobile: WhatsApp-style stack — list full-screen until a chat is picked,
+  // Mobile: WhatsApp-style stack - list full-screen until a chat is picked,
   // then the thread takes over. The details sidebar becomes an overlay.
   const isMobile = useIsMobile()
   const [showDetailsMobile, setShowDetailsMobile] = useState(false)
@@ -611,7 +611,7 @@ export default function InboxPage() {
   }, [channelFilter])
 
   // Auto-select first conversation when loaded (if none selected via URL).
-  // On mobile the list IS the landing view — auto-selecting would skip
+  // On mobile the list IS the landing view - auto-selecting would skip
   // straight into a thread, so only deep links (?lead=) open one there.
   useEffect(() => {
     if (isMobile) return
@@ -631,7 +631,7 @@ export default function InboxPage() {
   useEffect(() => { setFormCardExpanded(false) }, [selectedLeadId])
 
   // bcon: load this lead's planned follow-ups (the sequence they're in) for the
-  // right-panel timeline — every upcoming agent_task with its message preview,
+  // right-panel timeline - every upcoming agent_task with its message preview,
   // date-wise. Reuses the tasks board API (already resolves the template body).
   useEffect(() => {
     if (!IS_BCON) return
@@ -758,7 +758,7 @@ export default function InboxPage() {
   }
 
   // Recalculate lead score client-side whenever lead details change
-  // (DB lead_score is often stale/0 — calculator looks at messages + context)
+  // (DB lead_score is often stale/0 - calculator looks at messages + context)
   useEffect(() => {
     if (!leadDetails?.id) { setCalculatedLeadScore(null); return }
     let cancelled = false
@@ -775,7 +775,7 @@ export default function InboxPage() {
   }, [leadDetails])
 
   // Calculate scores for every conversation in the list. The DB lead_score
-  // is often null or stale (set to 0 when never recomputed) — without this
+  // is often null or stale (set to 0 when never recomputed) - without this
   // the conversation list shows missing or zero scores even for engaged
   // leads. Runs once per conversations refresh.
   useEffect(() => {
@@ -786,7 +786,7 @@ export default function InboxPage() {
     let cancelled = false
     ;(async () => {
       const next: Record<string, number> = {}
-      // Run in parallel — each call queries conversations for the lead.
+      // Run in parallel - each call queries conversations for the lead.
       // For dozens of leads this is acceptable; if it grows, batch later.
       await Promise.all(conversations.map(async (conv) => {
         try {
@@ -879,7 +879,7 @@ export default function InboxPage() {
         }
       }
 
-      // Fetch ALL conversations — including anonymous web chats (lead_id=null).
+      // Fetch ALL conversations - including anonymous web chats (lead_id=null).
       // Anonymous web visitors are grouped below by their session_id (in
       // metadata) so they surface in the inbox even before they share
       // phone/email. Without this, 100+ web chats can be active and the
@@ -1043,7 +1043,7 @@ export default function InboxPage() {
 
       console.log('Unique conversations:', conversationMap.size)
 
-      // Get lead details for all conversations — but exclude the synthetic
+      // Get lead details for all conversations - but exclude the synthetic
       // 'session:*' keys (those have no row in all_leads, they're anonymous
       // web visitors). Only query Supabase for real lead UUIDs.
       const leadIds = Array.from(conversationMap.keys()).filter((k) => !k.startsWith('session:'))
@@ -1056,7 +1056,7 @@ export default function InboxPage() {
 
       console.log('Looking up lead IDs:', leadIds.length, 'leads (plus', anonymousKeys.size, 'anonymous sessions)')
 
-      // Only query Supabase when there are real lead IDs — empty .in() blows
+      // Only query Supabase when there are real lead IDs - empty .in() blows
       // up some Postgres queries. Anonymous sessions skip the lookup entirely.
       const { data: leadsData, error: leadsError } = leadIds.length > 0
         ? await supabase
@@ -1204,7 +1204,7 @@ export default function InboxPage() {
           next_touchpoint: nextTouchpoint,
           // Surface the FULL captured submission in the inbox card. The rich CRE
           // fields (category, areas, size, budget, outlets / property type, rent,
-          // floor) live in unified_context.lokazen, not form_data — merge them in
+          // floor) live in unified_context.lokazen, not form_data - merge them in
           // so the card shows the real requirement, not just the brand name.
           form_data: (() => {
             const base: Record<string, any> = (uc as any)?.form_data && typeof (uc as any).form_data === 'object' ? { ...(uc as any).form_data } : {}
@@ -1357,7 +1357,7 @@ export default function InboxPage() {
         }
       } catch (anonErr) {
         console.warn('[fetchMessages] Could not fetch anonymous messages:', anonErr)
-        // Non-fatal — we still show the lead messages fetched above
+        // Non-fatal - we still show the lead messages fetched above
       }
 
       const messagesData = allRaw.map((msg: any): Message => ({
@@ -1716,7 +1716,7 @@ export default function InboxPage() {
           z-index: 10;
         }
         .template-status-tag:hover::after { opacity: 1; }
-        /* WhatsApp-style bubble tails — a small triangle at the top corner of
+        /* WhatsApp-style bubble tails - a small triangle at the top corner of
            the first bubble in a run. Incoming tail on the left, outgoing on
            the right, tinted to match the bubble background. */
         .wa-bubble { position: relative; }
@@ -1821,7 +1821,7 @@ export default function InboxPage() {
               const displayScore: number | null = calcScore != null
                 ? Math.max(calcScore, conv.lead_score ?? 0)
                 : conv.lead_score
-              // Temperature helpers — use the shared scoreVisual so the
+              // Temperature helpers - use the shared scoreVisual so the
               // conversation list, the right panel, and the lead modal all
               // agree on what "Warm" looks like.
               const scoreColor = displayScore != null ? scoreVisual(displayScore).color : null;
@@ -1850,7 +1850,7 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
                     <div className="px-4 py-3 pl-5">
-                      {/* Line 1: just the avatar — no score in the chat list (the
+                      {/* Line 1: just the avatar - no score in the chat list (the
                           right panel already carries the score). */}
                       <div className="flex items-center gap-2.5">
                         <WaAvatar name={conv.lead_name} phone={conv.lead_phone} channel={conv.channels[0]} size={46} />
@@ -1997,7 +1997,7 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Mobile thread header — back to list, lead name, details toggle.
+            {/* Mobile thread header - back to list, lead name, details toggle.
                 Desktop keeps its chrome-less thread (md:hidden). */}
             <div
               className="md:hidden flex items-center gap-2 px-2 border-b flex-shrink-0"
@@ -2098,7 +2098,7 @@ export default function InboxPage() {
                 backgroundSize: '24px 24px'
               }}
             >
-            {/* Messages were capped at 700px — too narrow for the chat panel,
+            {/* Messages were capped at 700px - too narrow for the chat panel,
                 producing dead space on both sides. Cap raised to 1100px and
                 outer padding bumped to px-6 so messages breathe but don't
                 stretch into long unreadable lines. */}
@@ -2114,7 +2114,7 @@ export default function InboxPage() {
                 {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
                 {messageChannelFilter === 'all' && selectedConversation?.form_data && !parseFormFields(filteredMessages[0]?.content) && (() => {
                   const fd = selectedConversation.form_data!
-                  // Show the WHOLE submission — every question they answered,
+                  // Show the WHOLE submission - every question they answered,
                   // not a cherry-picked subset (a form that only matched
                   // "urgency" used to render a card with one lonely field).
                   const NICE: Record<string, string> = {
@@ -2175,7 +2175,7 @@ export default function InboxPage() {
                   ) : null;
 
                   if (formData && IS_BCON) {
-                    // bcon Meta-form card — shows the form EXACTLY as submitted
+                    // bcon Meta-form card - shows the form EXACTLY as submitted
                     // (real question text + answer, original order), merges in any
                     // raw_form_fields the message text dropped, collapsible past 6.
                     const withFields = formData.fields
@@ -2189,7 +2189,7 @@ export default function InboxPage() {
                       .filter(f => f.value && f.value !== '+');
 
                     // The message text only carries the fields that got formatted
-                    // into it — the FULL Meta submission (every question) is kept
+                    // into it - the FULL Meta submission (every question) is kept
                     // in unified_context.raw_form_fields. Merge in any of those not
                     // already shown so the card is the complete form, not half of it.
                     const rawFF = (selectedConversation?.unified_context?.raw_form_fields || {}) as Record<string, any>;
@@ -2241,7 +2241,7 @@ export default function InboxPage() {
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* The complete form — every submitted field, collapsible */}
+                          {/* The complete form - every submitted field, collapsible */}
                           <div>
                             {visibleFields.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
@@ -2262,7 +2262,7 @@ export default function InboxPage() {
                   }
 
                   if (formData) {
-                    // Meta-form card — clean, ordered, blue-tinted (so it reads as
+                    // Meta-form card - clean, ordered, blue-tinted (so it reads as
                     // "came from Meta" the way agent bubbles read green).
                     const withLabels = formData.fields.map(f => ({ value: f.value, label: getFormFieldLabel(f.key) }))
                     const ORDER = ['Name', 'Email', 'Phone', 'City', 'Timeline']
@@ -2302,7 +2302,7 @@ export default function InboxPage() {
                             </div>
                             <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
                           </div>
-                          {/* Ordered fields — one per row */}
+                          {/* Ordered fields - one per row */}
                           <div className="space-y-1">
                             {priorityOrdered.map((f, i) => <FieldRow key={i} f={f} />)}
                           </div>
@@ -2323,11 +2323,11 @@ export default function InboxPage() {
                   // Regular message bubble
                   const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
                   const taskTag = !isCustomer ? getTaskTypeTag(msg.metadata?.task_type) : null;
-                  // Template messages render in a compact "card" — narrower,
+                  // Template messages render in a compact "card" - narrower,
                   // smaller padding, distinct from the big chat bubbles. Matches
                   // the WhatsApp-style template feel (header strip + body + foot).
                   const isTemplate = !isCustomer && !!msg.metadata?.template_name
-                  // A human on the dashboard sent this (inbox/reply sets human:true) —
+                  // A human on the dashboard sent this (inbox/reply sets human:true) -
                   // show a "Manual" badge so it's distinct from the bot's auto-replies.
                   const isManual = !isCustomer && msg.metadata?.human === true
 
@@ -2374,7 +2374,7 @@ export default function InboxPage() {
                           ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
                           : `max-w-[440px] rounded-2xl px-3 py-2 shadow-sm border wa-bubble ${isCustomer ? 'wa-in' : 'wa-out'}`}
                         style={{
-                          // WhatsApp bubble tints — incoming (customer) neutral,
+                          // WhatsApp bubble tints - incoming (customer) neutral,
                           // outgoing (agent/template) WhatsApp-green. The tail
                           // pseudo-element reads --wa-in-bg / --wa-out-bg so its
                           // colour tracks the bubble. Reduced corner radius on
@@ -2404,7 +2404,7 @@ export default function InboxPage() {
                       >
                         {isTemplate && (
                           <>
-                            {/* WA-green template header strip — uses the
+                            {/* WA-green template header strip - uses the
                                WhatsApp dark-green header colour so the
                                bubble instantly reads as a Meta-approved
                                template (vs a free-form AI reply). */}
@@ -2438,7 +2438,7 @@ export default function InboxPage() {
                             )}
                           </>
                         )}
-                        {/* WhatsApp bubbles carry no per-message header — just the
+                        {/* WhatsApp bubbles carry no per-message header - just the
                             text, with the time (and ticks) tucked bottom-right. */}
                         <div
                           className={isTemplate
@@ -2457,7 +2457,7 @@ export default function InboxPage() {
                             ? renderWhatsAppMarkdown(isTemplate ? templateBody : msg.content)
                             : renderMarkdown(msg.content)}
                         </div>
-                        {/* Widget quick replies ([BTN: x] markup) — shown as chips
+                        {/* Widget quick replies ([BTN: x] markup) - shown as chips
                             so the operator sees the choices the customer got. */}
                         {(() => {
                           const btns = [...String(msg.content || '').matchAll(/\[BTN:\s*([^\]]+)\]/gi)].map((m) => m[1].trim()).filter(Boolean)
@@ -2537,7 +2537,7 @@ export default function InboxPage() {
                             >
                               {/* Footer pill carries delivery STATUS (Sent /
                                   Delivered / Read / Failed). Drop the
-                                  redundant "Template" word — the template
+                                  redundant "Template" word - the template
                                   header strip already labels the bubble as
                                   a template, and the template_name shows
                                   right next to this pill. */}
@@ -2564,7 +2564,7 @@ export default function InboxPage() {
                                 <span
                                   className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded cursor-help"
                                   style={{ background: 'rgba(245,158,11,0.20)', color: '#fbbf24' }}
-                                  title={testRecipient ? `Test send — went to ${testRecipient}, NOT this lead` : 'Test send — did not go to this lead'}
+                                  title={testRecipient ? `Test send - went to ${testRecipient}, NOT this lead` : 'Test send - did not go to this lead'}
                                 >
                                   {testRecipient ? `TEST → ${testRecipient}` : 'TEST'}
                                 </span>
@@ -2576,7 +2576,7 @@ export default function InboxPage() {
                                   title={prettyError}
                                   data-tooltip={prettyError}
                                 >
-                                  Send failed — hover for reason
+                                  Send failed - hover for reason
                                 </span>
                               )}
                               {!sendFailed && (
@@ -2587,7 +2587,7 @@ export default function InboxPage() {
                             </div>
                           )
                         })()}
-                        {/* Meta-approved template FOOTER (e.g. "Team Windchasers") —
+                        {/* Meta-approved template FOOTER (e.g. "Team Windchasers") -
                             small grey line under the body, above the buttons, mirroring
                             how WhatsApp shows the real template. */}
                         {isTemplate && effFooter && (
@@ -2597,11 +2597,11 @@ export default function InboxPage() {
                         )}
                         {effButtons && effButtons.length > 0 && (
                           isTemplate ? (
-                            // WhatsApp-style buttons — stacked, divided by hairlines.
+                            // WhatsApp-style buttons - stacked, divided by hairlines.
                             // Theme-aware: uses var(--accent-primary) for label + var(--border-primary)
                             // for dividers so it renders correctly in light AND dark mode.
                             // A URL button (opens a link, no reply sent) gets an
-                            // external-link icon instead of the quick-reply arrow —
+                            // external-link icon instead of the quick-reply arrow -
                             // its destination is baked into the approved template on
                             // Meta's side, not something we send, so it's shown as a
                             // label only (no href) rather than guessing a link.
@@ -2669,12 +2669,12 @@ export default function InboxPage() {
                         )}
                         {/* Template messages already render their delivery tick in
                             the footer (next to the time), so skip this bottom block
-                            for them — otherwise the receipt shows TWICE (one by the
+                            for them - otherwise the receipt shows TWICE (one by the
                             time, one below the buttons). */}
                         {!isCustomer && msg.channel === 'whatsapp' && !msg.metadata?.template_name && (() => {
                           // Real failure = the send itself failed (no message ID ever
                           // existed, e.g. Graph API rejected it) OR Meta's own delivery
-                          // webhook reported 'failed'. NOT "no delivery/read receipt yet" —
+                          // webhook reported 'failed'. NOT "no delivery/read receipt yet" -
                           // that's Meta not having called back, which is normal and common.
                           const realSendFailed = msg.metadata?.send_succeeded === false || msg.metadata?.delivery_status === 'failed'
                           return (
@@ -2743,7 +2743,7 @@ export default function InboxPage() {
                 >
                   <MdAutoAwesome size={18} className={isGenerating ? 'animate-spin' : ''} />
                 </button>
-                {/* Approved-template picker — WhatsApp only. Lets the operator
+                {/* Approved-template picker - WhatsApp only. Lets the operator
                     bypass the 24h reply window by sending a Meta-approved
                     template when the auto-reply path is blocked. */}
                 {selectedChannel === 'whatsapp' && (
@@ -2822,7 +2822,7 @@ export default function InboxPage() {
             </button>
           </div>
           {isAnonymousSession ? (
-            // Anonymous web visitor — no all_leads row to render. Show a
+            // Anonymous web visitor - no all_leads row to render. Show a
             // tiny stub so the panel doesn't sit on "Loading details..."
             // forever. The session id is in selectedConversation.lead_id
             // (the synthetic 'session:<sid>' key the conversation list uses).
@@ -2893,7 +2893,7 @@ export default function InboxPage() {
             const score = calculatedLeadScore != null
               ? Math.max(calculatedLeadScore, dbScore)
               : dbScore
-            // Same Hot/Warm/Cold scheme as the lead modal — Warm is orange,
+            // Same Hot/Warm/Cold scheme as the lead modal - Warm is orange,
             // not green, regardless of how high the score is below 90.
             const { color: scoreColor, label: scoreLabel } = scoreVisual(score)
 
@@ -2925,9 +2925,9 @@ export default function InboxPage() {
             const agentMsgs = messages.filter(m => m.sender === 'agent').length
             const customerMsgs = messages.filter(m => m.sender === 'customer').length
             // Response rate = share of customer messages that got an agent reply
-            // before the customer spoke again (bounded 0–100%). The old formula was
+            // before the customer spoke again (bounded 0-100%). The old formula was
             // agentMsgs / customerMsgs, which runs over 100% whenever the agent sends
-            // more bubbles than the customer (greetings, follow-ups, split replies) —
+            // more bubbles than the customer (greetings, follow-ups, split replies) -
             // a message ratio, not a real "rate".
             const responseRate = (() => {
               if (customerMsgs === 0) return null
@@ -2981,7 +2981,7 @@ export default function InboxPage() {
               <>
               {/* ── HERO HEADER ── */}
               <div className="px-5 pt-5 pb-4" style={{ background: 'var(--bg-primary)' }}>
-                {/* Score ring + name row — the ring REPLACES the old initials-on-coloured-square avatar.
+                {/* Score ring + name row - the ring REPLACES the old initials-on-coloured-square avatar.
                     Lead score is shown as the ring fill + number inside; tier label sits with name. */}
                 <div className="flex items-start gap-3 mb-3">
                   {(() => {
@@ -3014,7 +3014,7 @@ export default function InboxPage() {
                           className="absolute inset-0 flex items-center justify-center text-[14px] font-bold"
                           style={{ color: hasScore ? scoreColor : 'var(--text-muted)' }}
                         >
-                          {hasScore ? score : '—'}
+                          {hasScore ? score : '-'}
                         </div>
                       </div>
                     )
@@ -3044,11 +3044,11 @@ export default function InboxPage() {
                           {leadDetails.lead_stage}
                         </span>
                       )}
-                      {/* Audience badge — who we're talking to (Lokazen: owner /
+                      {/* Audience badge - who we're talking to (Lokazen: owner /
                           scout / brand). So the agent knows the conversation type
                           at a glance instead of inferring it from the messages. */}
                       {(() => {
-                        // Lokazen-only taxonomy — never render it for other brands
+                        // Lokazen-only taxonomy - never render it for other brands
                         // (a BCON business "owner" is NOT a Lokazen "Property Owner").
                         if (!IS_LOKAZEN) return null
                         const ut = String(userType || '').toLowerCase()
@@ -3160,7 +3160,7 @@ export default function InboxPage() {
               <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
-                    {/* Count agent (PROXe) replies across ALL channels — web chat + whatsapp.
+                    {/* Count agent (PROXe) replies across ALL channels - web chat + whatsapp.
                         `agentMsgs` is derived from the full `messages` thread (both channels),
                         so every web-chat and whatsapp agent reply is included. */}
                     <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{agentMsgs}</p>
@@ -3168,13 +3168,13 @@ export default function InboxPage() {
                   </div>
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
                     <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                      {responseRate !== null ? `${responseRate}%` : '—'}
+                      {responseRate !== null ? `${responseRate}%` : '-'}
                     </p>
                     <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Response</p>
                   </div>
                   <div className="rounded-lg px-3 py-2.5 text-center" style={{ background: 'var(--bg-primary)' }}>
                     <p className="text-base font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>
-                      {daysInPipeline !== null ? `${daysInPipeline}d` : '—'}
+                      {daysInPipeline !== null ? `${daysInPipeline}d` : '-'}
                     </p>
                     <p className="text-[9px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Pipeline</p>
                   </div>
@@ -3203,7 +3203,7 @@ export default function InboxPage() {
                   value={leadDetails?.unified_context?.owner?.id || ''}
                   onChange={(e) => setLeadOwner(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
-                  // colorScheme makes the native dropdown render dark in dark mode —
+                  // colorScheme makes the native dropdown render dark in dark mode -
                   // without it the options were white-on-white (only the highlighted
                   // row showed), so the list looked empty. Options also get explicit
                   // bg/color for browsers that honour it.
@@ -3272,7 +3272,7 @@ export default function InboxPage() {
                 )}
               </div>
 
-              {/* ── PLANNED FOLLOW-UPS (bcon — the sequence this lead is in) ── */}
+              {/* ── PLANNED FOLLOW-UPS (bcon - the sequence this lead is in) ── */}
               {IS_BCON && (
                 <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
                   <div className="flex items-center justify-between mb-2">

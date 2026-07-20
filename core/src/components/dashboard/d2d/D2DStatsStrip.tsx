@@ -1,6 +1,6 @@
 'use client'
 
-// KPI strip for the D2D Field Log — six rich cards computed from the visit set,
+// KPI strip for the D2D Field Log - six rich cards computed from the visit set,
 // matching the campaign mockup: icon tile + label, big value, trend vs last
 // week, and a per-card footer (sparkline / progress bar / stacked lean bar /
 // review action).
@@ -68,7 +68,7 @@ function Card({ icon: Icon, tint, label, value, trend, footer, spark }: CardProp
         <span style={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: 'var(--text-primary)' }}>{value}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#22C55E', fontWeight: 600 }}>
-        <MdArrowUpward size={12} /> {trend} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>vs May 5–11</span>
+        <MdArrowUpward size={12} /> {trend} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>vs May 5-11</span>
       </div>
       <div style={{ marginTop: 2 }}>{footer}</div>
     </div>

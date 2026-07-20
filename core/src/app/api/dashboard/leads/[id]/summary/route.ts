@@ -8,35 +8,35 @@ export const dynamic = 'force-dynamic'
 
 // The lead-summary Claude prompt was hardcoded for Windchasers (aviation), so a
 // lokazen commercial-real-estate lead (owner listing a shop, brand seeking space,
-// scout) had NO domain that fit — Claude found no "course/pilot" info in a
+// scout) had NO domain that fit - Claude found no "course/pilot" info in a
 // property-details chat and fell back to the trivial "…in the In Sequence stage"
 // line. This makes the framing brand-aware so the summary reflects what the lead
 // actually said.
 function summaryDomain(brand: string): { who: string; s1: string; s2: string; dont: string; ex1: string; ex2: string } {
   if (brand === 'pop') {
     return {
-      who: 'a political campaign (Pulse of Punjab). Every lead is a PERSON in the constituency — a voter, supporter, volunteer, or cadre — not a customer.',
+      who: 'a political campaign (Pulse of Punjab). Every lead is a PERSON in the constituency - a voter, supporter, volunteer, or cadre - not a customer.',
       s1: 'Sentence 1: Who they are, where they stand on the frontline ladder (voter / supporter / volunteer / cadre) and their constituency if known.',
       s2: 'Sentence 2: The grievance or issue they raised (water, jobs, drugs, farm debt, power, roads, education, health) and any specifics they gave.',
-      dont: 'This is a voter / constituent, NOT a sales lead. Never use sales words — no "customer", "deal", "pipeline", "booking", "purchase", or sales stages like "Qualified" / "In Sequence".',
+      dont: 'This is a voter / constituent, NOT a sales lead. Never use sales words - no "customer", "deal", "pipeline", "booking", "purchase", or sales stages like "Qualified" / "In Sequence".',
       ex1: 'Sachin is a supporter in Jalalabad (Firozpur) who raised unemployment as the biggest issue. Engaged over a voice call; next: log the jobs grievance and route it to the team.',
       ex2: 'Manjit is a volunteer in Talwandi Sabo raising farm debt and MSP concerns, active on WhatsApp. Next: connect them to the local cadre for follow-up.',
     }
   }
   if (brand === 'lokazen') {
     return {
-      who: 'Lokazen — a commercial real-estate marketplace in Bangalore. Every lead is one of three: an OWNER listing a commercial property, a BRAND looking for retail/commercial space, or a SCOUT (a gig worker who spots empty "to-let" shops).',
-      s1: 'Sentence 1: Who they are and which type (owner / brand / scout), with the ONE headline fact — e.g. "owner listing a 950 sqft ground-floor shop on BH Road, Nelamangala" or "brand seeking 600–1500 sqft in South Bangalore" or "scout onboarding, asked about the app".',
-      s2: 'Sentence 2: The concrete details they shared — owner: area, size, floor, rent, deposit/lock-in, availability; brand: area, size, budget, timeline; scout: their question or where they are in KYC/onboarding.',
-      dont: 'This is a commercial real-estate lead — NOT aviation, pilots, courses, or "business solutions". Never mention any of those.',
+      who: 'Lokazen - a commercial real-estate marketplace in Bangalore. Every lead is one of three: an OWNER listing a commercial property, a BRAND looking for retail/commercial space, or a SCOUT (a gig worker who spots empty "to-let" shops).',
+      s1: 'Sentence 1: Who they are and which type (owner / brand / scout), with the ONE headline fact - e.g. "owner listing a 950 sqft ground-floor shop on BH Road, Nelamangala" or "brand seeking 600-1500 sqft in South Bangalore" or "scout onboarding, asked about the app".',
+      s2: 'Sentence 2: The concrete details they shared - owner: area, size, floor, rent, deposit/lock-in, availability; brand: area, size, budget, timeline; scout: their question or where they are in KYC/onboarding.',
+      dont: 'This is a commercial real-estate lead - NOT aviation, pilots, courses, or "business solutions". Never mention any of those.',
       ex1: 'Praveen is an owner listing a 950 sqft ground-floor shop on BH Road, Nelamangala (Atri Square). Rent ₹1.5L fixed, 6-month advance, 3-year lock-in, no bargain; shared photos and a Maps link. Next: verify details and match to brands searching that area.',
-      ex2: 'Karan is a brand looking for ~600–1500 sqft commercial space in South Bangalore. Asked about availability and pricing but hasn\'t locked a requirement. Next: confirm budget and preferred micro-market, then share matching options.',
+      ex2: 'Karan is a brand looking for ~600-1500 sqft commercial space in South Bangalore. Asked about availability and pricing but hasn\'t locked a requirement. Next: confirm budget and preferred micro-market, then share matching options.',
     }
   }
   if (brand === 'windchasers') {
     return {
       who: 'an aviation training academy (Windchasers)',
-      s1: 'Sentence 1: Who they are and which course/program they\'re interested in (e.g. CPL, PPL, helicopter, cabin crew) — only if actually known.',
+      s1: 'Sentence 1: Who they are and which course/program they\'re interested in (e.g. CPL, PPL, helicopter, cabin crew) - only if actually known.',
       s2: 'Sentence 2: What they asked about or what was discussed.',
       dont: 'This is a pilot-training lead, not a business. Do not write that they "haven\'t shared information about their business".',
       ex1: 'Aarav is exploring a CPL (commercial pilot) path and asked about eligibility and the total timeline before committing. Agreed to a counselling call but no slot is locked yet - follow up to confirm a time.',
@@ -45,11 +45,11 @@ function summaryDomain(brand: string): { who: string; s1: string; s2: string; do
   }
   return {
     who: 'a business',
-    s1: 'Sentence 1: Who they are and what product/service they\'re interested in — only if actually known.',
+    s1: 'Sentence 1: Who they are and what product/service they\'re interested in - only if actually known.',
     s2: 'Sentence 2: What they asked about or what was discussed.',
     dont: 'Only state what the conversation actually shows.',
     ex1: 'Priya asked about pricing and what\'s included, and wanted to see a demo before deciding. Next: send options and confirm a demo time.',
-    ex2: 'Rahul compared two plans and asked about support and onboarding. Went quiet after the quote — follow up with a nudge.',
+    ex2: 'Rahul compared two plans and asked about support and onboarding. Went quiet after the quote - follow up with a nudge.',
   }
 }
 
@@ -66,7 +66,7 @@ If anything went wrong (booking failed, frustrated, asked for a human), say it c
 IMPORTANT: If a call was logged with notes (see TEAM NOTES & CALL LOGS below), treat those notes as the source of truth about what happened on the call, and reflect the key points + the next step.
 
 CRITICAL: Only state what the conversation or profile actually shows. NEVER invent or assume details. ${d.dont} If you don't know something, simply leave it out.
-If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet — more interaction needed to summarize this lead."
+If there isn't enough real information to say who they are or what they want, reply with EXACTLY this and nothing else: "Not enough context yet - more interaction needed to summarize this lead."
 
 Example:
 ${d.ex1}
@@ -106,7 +106,7 @@ export async function GET(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -153,17 +153,17 @@ export async function GET(
     const standingPhrase = isPopBrand
       ? `a ${popTier}${popGrievance ? ` raising a ${popGrievance} grievance` : ''}`
       : `in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}`
-    // Attribution action: a campaign has no sales "stage" — say it plainly for POP.
+    // Attribution action: a campaign has no sales "stage" - say it plainly for POP.
     const stageActionText = (newStage: string | null | undefined) =>
       isPopBrand ? 'updated their status' : `changed stage to ${newStage}`
 
     // ============================================
-    // STEP 0: Hallucination guard — refuse to summarize with no real signal
+    // STEP 0: Hallucination guard - refuse to summarize with no real signal
     // ============================================
     // A lead with only outbound outreach (no reply) and no captured profile,
     // key info, or booking has nothing to honestly summarize. Letting Claude
     // run here invents facts ("no info about their business shared", "still
-    // waiting for reply") — so we short-circuit with an honest line. This runs
+    // waiting for reply") - so we short-circuit with an honest line. This runs
     // before the cached-summary step so a previously-fabricated cached summary
     // is replaced too.
     const guardProfile = {
@@ -204,7 +204,7 @@ export async function GET(
     const hasEnoughContext = guardInbound > 0 || guardHasProfile || guardHasKeyInfo || guardHasBooking
 
     if (!hasEnoughContext) {
-      const honestSummary = `Not enough context yet to summarize ${lead.customer_name || 'this lead'} — no reply or details captured so far${guardTotal > 0 ? ' (only outreach sent)' : ''}. Currently ${standingPhrase}.`
+      const honestSummary = `Not enough context yet to summarize ${lead.customer_name || 'this lead'} - no reply or details captured so far${guardTotal > 0 ? ' (only outreach sent)' : ''}. Currently ${standingPhrase}.`
 
       const lastInteraction = lead.last_interaction_at || lead.created_at
       const daysInactive = lastInteraction
@@ -239,7 +239,7 @@ export async function GET(
         attribution = `Last updated by ${creator?.name || creator?.email || 'Team Member'} ${formatTimeAgo(a.created_at)} - ${a.activity_type}`
       }
 
-      console.log('Insufficient context for summary — returning honest placeholder for lead:', leadId)
+      console.log('Insufficient context for summary - returning honest placeholder for lead:', leadId)
       return NextResponse.json({
         summary: honestSummary,
         attribution,

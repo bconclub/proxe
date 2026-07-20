@@ -1,6 +1,6 @@
 'use client';
 /**
- * ConnectWhatsAppCard — Agents → WhatsApp connection panel.
+ * ConnectWhatsAppCard - Agents → WhatsApp connection panel.
  *
  * Shows the brand's live WhatsApp connection (from /api/dashboard/whatsapp/
  * connection) and runs Meta's Embedded Signup: the "Connect WhatsApp" button
@@ -10,8 +10,8 @@
  * tokens ever touch our UI.
  *
  * Frontend env (public):
- *   NEXT_PUBLIC_META_APP_ID        — Meta app id
- *   NEXT_PUBLIC_META_ES_CONFIG_ID  — Embedded Signup configuration id
+ *   NEXT_PUBLIC_META_APP_ID        - Meta app id
+ *   NEXT_PUBLIC_META_ES_CONFIG_ID  - Embedded Signup configuration id
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,7 +62,7 @@ export default function ConnectWhatsAppCard({ onStatus }: { onStatus?: (s: Conne
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   // waba_id/phone_number_id arrive via postMessage from the popup; the auth
-  // code arrives via FB.login's callback — whichever lands last completes.
+  // code arrives via FB.login's callback - whichever lands last completes.
   const signupData = useRef<{ wabaId?: string; phoneNumberId?: string; code?: string }>({});
 
   const refresh = useCallback(async () => {
@@ -86,7 +86,7 @@ export default function ConnectWhatsAppCard({ onStatus }: { onStatus?: (s: Conne
     const { code, wabaId, phoneNumberId } = signupData.current;
     if (!code || !wabaId || !phoneNumberId) return;
     signupData.current = {};
-    setMessage('Finishing setup — exchanging tokens, subscribing webhook, registering number…');
+    setMessage('Finishing setup - exchanging tokens, subscribing webhook, registering number…');
     try {
       const res = await fetch('/api/dashboard/whatsapp/connection', {
         method: 'POST',
@@ -125,7 +125,7 @@ export default function ConnectWhatsAppCard({ onStatus }: { onStatus?: (s: Conne
           setBusy(false);
           setMessage(`Meta reported an error: ${data.data?.error_message || 'unknown'}`);
         }
-      } catch { /* non-JSON frames from other embeds — ignore */ }
+      } catch { /* non-JSON frames from other embeds - ignore */ }
     };
     window.addEventListener('message', listener);
     return () => window.removeEventListener('message', listener);
@@ -142,7 +142,7 @@ export default function ConnectWhatsAppCard({ onStatus }: { onStatus?: (s: Conne
           const code = response?.authResponse?.code;
           if (code) {
             signupData.current.code = code;
-            setMessage('Authorized — waiting for account details…');
+            setMessage('Authorized - waiting for account details…');
             maybeComplete();
           } else {
             setBusy(false);

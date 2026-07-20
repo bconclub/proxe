@@ -24,7 +24,7 @@ const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || 'Asia/Kolkata';
 
 export type BookingSessionType = 'online' | 'offline';
 
-// Online runs three fixed start times only — 3:00, 4:00, 5:00 PM (hourly step,
+// Online runs three fixed start times only - 3:00, 4:00, 5:00 PM (hourly step,
 // last start 5 PM since each session is 60 min). Offline keeps 30-min granularity.
 const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string; stepMinutes: number }> = {
   online: { start: '15:00', end: '18:00', stepMinutes: 60 },
@@ -87,7 +87,7 @@ export function isAllowedBookingTime(time: string, sessionType?: string | null):
 /**
  * Slot starts that are still bookable for a SPECIFIC date.
  * For any future date this is the full window. For TODAY (IST) we drop slots
- * whose start time has already passed — otherwise a customer messaging at
+ * whose start time has already passed - otherwise a customer messaging at
  * 8:30 PM would be offered (or booked into) a 3:00 PM slot that is long gone.
  */
 export function getBookableSlotStartsForDate(dateStr: string, sessionType?: string | null): string[] {
@@ -258,7 +258,7 @@ export async function storeBooking(
 
   const tableName = getChannelTable(channel);
 
-  // Update session profile if contact info is provided. Wrapped — updateLeadProfile
+  // Update session profile if contact info is provided. Wrapped - updateLeadProfile
   // resolves the session by external_session_id, which whatsapp_sessions doesn't
   // have, so it can fail/throw for WhatsApp; that must NOT abort the booking save.
   let currentLeadId: string | null = null;
@@ -275,7 +275,7 @@ export async function storeBooking(
   }
 
   // Fetch current session for merging. whatsapp_sessions has neither `metadata`
-  // nor `external_session_id`, so this select errors there — keep it best-effort.
+  // nor `external_session_id`, so this select errors there - keep it best-effort.
   let currentSession: any = null;
   try {
     const sel = tableName === 'web_sessions'
@@ -358,7 +358,7 @@ export async function storeBooking(
     leadId = sessionLookup?.lead_id || null;
   }
 
-  // Phone fallback — the reliable resolver for WhatsApp (phone is always known)
+  // Phone fallback - the reliable resolver for WhatsApp (phone is always known)
   // and a safety net for any channel where the session lookup didn't resolve a
   // lead. Without this the booking is silently dropped: leadId stays null, the
   // all_leads update below is skipped, and nothing is ever saved.
@@ -426,11 +426,11 @@ export async function storeBooking(
       },
     };
 
-    // all_leads has NO scalar booking_date/booking_time columns — the booking
+    // all_leads has NO scalar booking_date/booking_time columns - the booking
     // lives in unified_context.<channel>.booking_date (set in mergedCtx above),
     // which is exactly what the dashboard/pipeline/score routes read. Previously
     // this update also set booking_date/booking_time, and because those columns
-    // don't exist Supabase rejected the ENTIRE update — so unified_context never
+    // don't exist Supabase rejected the ENTIRE update - so unified_context never
     // got written and the booking silently vanished (agent said "Done", nothing
     // saved). The error wasn't even checked. Persist via unified_context only.
     const { error: leadUpdateError } = await client
@@ -444,7 +444,7 @@ export async function storeBooking(
       .eq('id', leadId);
 
     // THROW on a failed persist so the caller (book_consultation) knows the
-    // booking did NOT save and can return success:false — otherwise the agent
+    // booking did NOT save and can return success:false - otherwise the agent
     // confirms "recorded" while nothing was stored.
     if (leadUpdateError) {
       console.error('[bookingManager] Failed to persist booking to all_leads', { leadId, error: leadUpdateError });
@@ -452,7 +452,7 @@ export async function storeBooking(
     }
     console.log('[bookingManager] Updated all_leads with booking info', { leadId, bookingDate: booking.date, bookingTime: booking.time });
   } else {
-    // No lead resolved despite phone + sessionId fallbacks — the booking cannot
+    // No lead resolved despite phone + sessionId fallbacks - the booking cannot
     // be saved. THROW so the agent does not falsely confirm it.
     console.error('[bookingManager] CRITICAL: could not resolve lead for booking', { externalSessionId, channel, phone: booking.phone });
     throw new Error('Could not resolve a lead to save the booking');
@@ -528,7 +528,7 @@ export async function getAvailableSlots(date: string, sessionType?: string | nul
   const allowedSlots = getBookableSlotStartsForDate(dateStr, sessionType);
   if (allowedSlots.length === 0) return [];
 
-  // DB-level conflict check — a slot already booked by ANY lead is unavailable.
+  // DB-level conflict check - a slot already booked by ANY lead is unavailable.
   // This is what prevents two customers being booked into the same time.
   const bookedTimes = await getBookedTime24sForDate(dateStr);
 
@@ -537,7 +537,7 @@ export async function getAvailableSlots(date: string, sessionType?: string | nul
     !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
 
   if (!hasCredentials) {
-    // No calendar configured — availability is driven purely by existing DB bookings.
+    // No calendar configured - availability is driven purely by existing DB bookings.
     return allowedSlots.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
@@ -833,7 +833,7 @@ export async function createCalendarEvent(booking: {
 
 /**
  * Delete a Google Calendar event by id. Returns true on success (or if the
- * event is already gone — 404/410). Best-effort; never throws.
+ * event is already gone - 404/410). Best-effort; never throws.
  */
 export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
   if (!eventId) return false;
@@ -909,7 +909,7 @@ export async function cancelBooking(
   }
   await supabase.from('all_leads').update({ unified_context: newUc }).eq('id', leadId);
 
-  // web_sessions is the only session table with booking columns — clear it too
+  // web_sessions is the only session table with booking columns - clear it too
   // so founder-metrics' session-booking fallback doesn't resurrect it.
   await supabase
     .from('web_sessions')

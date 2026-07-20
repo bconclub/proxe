@@ -1,10 +1,10 @@
 import React from 'react'
 
-// Shared lead-score ring — a donut whose arc + colour encode the lead's score
+// Shared lead-score ring - a donut whose arc + colour encode the lead's score
 // tier (Hot ≥90 green · Warm ≥70 orange · Cold blue) with the score number in
 // the centre. Used as the lead "avatar" across dashboards: a score reads at a
 // glance far better than a name initial. When a lead has no score yet, the ring
-// shows a neutral "—". One source of truth so every surface matches.
+// shows a neutral "-". One source of truth so every surface matches.
 
 export function scoreVisual(score: number | null | undefined): { color: string; label: string } {
   const s = score ?? 0
@@ -70,7 +70,7 @@ export default function ScoreRing({
           userSelect: 'none',
         }}
       >
-        {hasScore ? s : '—'}
+        {hasScore ? s : '-'}
       </span>
     </span>
   )

@@ -21,7 +21,7 @@ export async function searchKnowledgeBase(
   console.log('[kb-search] query:', query, filterCategory ? `(category=${filterCategory})` : '');
   try {
     const allResults: KnowledgeResult[] = [];
-    // supabase.rpc() resolves { data, error } for a Postgres-level error — it
+    // supabase.rpc() resolves { data, error } for a Postgres-level error - it
     // does NOT throw. A prior version of this function only handled the
     // thrown-exception case, so a returned RPC error silently produced zero
     // results and never reached the ILIKE fallback below. Track success
@@ -64,7 +64,7 @@ export async function searchKnowledgeBase(
     }
 
     if (!rpcSucceeded) {
-      // 2. Fallback to ILIKE search on parent table — still respects the
+      // 2. Fallback to ILIKE search on parent table - still respects the
       //    audience category filter so a broken RPC never leaks Scout
       //    content into a brand/owner reply or vice versa.
       try {

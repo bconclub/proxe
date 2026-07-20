@@ -1,9 +1,9 @@
-// LEADER API — grievance routing. Moves a grievance's loop_status forward
+// LEADER API - grievance routing. Moves a grievance's loop_status forward
 // (raised -> routed -> resolved) and optionally assigns it to a d2d_workers
 // ground-team member. This is the write path that never existed: every intake
 // path (022) only ever wrote loop_status='raised'.
 //
-// POST not PATCH — the leader app's CORS allowlist (leaderAuth.ts) only opens
+// POST not PATCH - the leader app's CORS allowlist (leaderAuth.ts) only opens
 // GET/POST, matching the existing leader/intake convention.
 // Auth: x-api-key = LEADER_API_KEY.
 

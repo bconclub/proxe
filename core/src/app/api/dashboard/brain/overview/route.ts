@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  *  - stages:        pipeline distribution (Map badges)
  *  - activity:      a mixed real-time feed (leads / chats / stage moves / sends /
  *                   notes) that drives the region firing on the brain hero
- * Counts only — no model calls. Brand filter matches the decisions route
+ * Counts only - no model calls. Brand filter matches the decisions route
  * (brand + 'default') so legacy rows aren't invisible.
  */
 
@@ -107,7 +107,7 @@ export async function GET() {
     }
 
     // ── Leads: distributions, temps, in-flight, bookings, notes ─────────────
-    // Scouts/connectors are GIG WORKERS, not sales leads — they spot vacant
+    // Scouts/connectors are GIG WORKERS, not sales leads - they spot vacant
     // shops and get paid, they don't convert through a funnel. They must NEVER
     // be counted in the lead totals, stages, or hot/warm/cold (that's exactly
     // what inflated "total leads"). Split them out here so the Brain reports
@@ -120,7 +120,7 @@ export async function GET() {
     let notesTotal = 0, notesToday = 0, leadsToday = 0
     let leadsTotal = 0, gigsTotal = 0, gigsToday = 0
     const noteEvents: Event[] = []
-    // Property-listing area tally (real-estate brands only — property_zone lives
+    // Property-listing area tally (real-estate brands only - property_zone lives
     // in unified_context.<channel> for OWNER leads; brands without that field
     // simply never populate this, so the highlight stays empty and unmentioned).
     const areaCounts: Record<string, number> = {}
@@ -218,7 +218,7 @@ export async function GET() {
         // leads = owners/brands only (gigs/scouts excluded). Reported separately.
         leads_total: leadsTotal,
         leads_today: leadsToday,
-        // gig counts exist only where scouts do — keep the taxonomy out of
+        // gig counts exist only where scouts do - keep the taxonomy out of
         // every other brand's context so the model never learns the word
         ...(SCOUTS_ON ? { gigs_total: gigsTotal, gigs_today: gigsToday } : {}),
         notes_total: notesTotal,

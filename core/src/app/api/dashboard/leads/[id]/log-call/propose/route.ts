@@ -1,5 +1,5 @@
 /**
- * Log-call PROPOSE — read-only. Given a draft call note + outcome, return:
+ * Log-call PROPOSE - read-only. Given a draft call note + outcome, return:
  *   - context_snapshot : the lead's intent/stage/temperature at this moment
  *   - ai_proposed_plan : what the worker WOULD do (via the shared classifier)
  *

@@ -45,7 +45,7 @@ interface Lead {
 }
 
 // Extra columns that exist ONLY on POP's all_leads (migration 022). Appended to
-// the select string for the pop brand only — keeps the shared query intact for
+// the select string for the pop brand only - keeps the shared query intact for
 // every other brand whose schema lacks these columns.
 const POP_COLUMNS =
   ', constituency, district, booth, language, lean, magnet, grievance_category, grievance_text, salience, action_intent, loop_status, engagement_type, intensity'
@@ -119,7 +119,7 @@ export function useRealtimeLeads() {
           stage_override: lead.stage_override ?? null,
           last_scored_at: lead.last_scored_at || null,
           is_active_chat: lead.is_active_chat ?? null,
-          // POP constituent fields — only attached for the pop brand (undefined
+          // POP constituent fields - only attached for the pop brand (undefined
           // and harmless for everyone else).
           ...(isPop ? {
             constituency: lead.constituency ?? null,
@@ -150,7 +150,7 @@ export function useRealtimeLeads() {
 
     fetchLeads()
 
-    // Poll every 30s — Realtime postgres_changes on all_leads caused 19s lock
+    // Poll every 30s - Realtime postgres_changes on all_leads caused 19s lock
     // contention that made the entire DB unresponsive (ShareLock death spiral)
     const interval = setInterval(fetchLeads, 30_000)
 

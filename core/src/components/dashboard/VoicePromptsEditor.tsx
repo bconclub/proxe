@@ -1,6 +1,6 @@
 'use client'
 
-// The per-language voice-prompt editor — the ONE core place, reused BOTH as a
+// The per-language voice-prompt editor - the ONE core place, reused BOTH as a
 // standalone page and embedded directly in the Voice agent tab. Per language
 // (pa/hi/en): Opening (start line) · Prompt (body) · Closing (end lines). Saved
 // to dashboard_settings; read by V1 (Vapi), V2 (ElevenLabs), V3 (Sarvam).
@@ -96,8 +96,8 @@ export default function VoicePromptsEditor({ compact = false }: { compact?: bool
     <div>
       {!compact && (
         <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          The one place the grievance call reads from — used by <b>V1</b>, <b>V2</b>, and <b>V3</b> alike.
-          Saves apply to the next call — no deploy. Blank a field to use the default.
+          The one place the grievance call reads from - used by <b>V1</b>, <b>V2</b>, and <b>V3</b> alike.
+          Saves apply to the next call - no deploy. Blank a field to use the default.
         </p>
       )}
       {data && (
@@ -118,7 +118,7 @@ export default function VoicePromptsEditor({ compact = false }: { compact?: bool
           </div>
 
           {field('opening', 'Opening (start line)', 'The first line the agent says. Vapi calls this the first message.', 3)}
-          {field('body', 'Prompt (body)', 'The full instructions — identity, question flow, rules, guardrails.', compact ? 12 : 18)}
+          {field('body', 'Prompt (body)', 'The full instructions - identity, question flow, rules, guardrails.', compact ? 12 : 18)}
           {field('closing', 'Closing (end lines)', 'The exact lines said, verbatim, as the final turn before ending the call.', 5)}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 }}>
@@ -126,7 +126,7 @@ export default function VoicePromptsEditor({ compact = false }: { compact?: bool
               style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 800, cursor: saving ? 'default' : 'pointer', background: 'var(--button-bg)', color: 'var(--text-button)', opacity: saving ? 0.6 : 1 }}>
               <MdSave size={17} /> {saving ? 'Saving…' : 'Save prompts'}
             </button>
-            {saved && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#22c55e' }}><MdCheckCircle size={16} /> Saved — live on the next call</span>}
+            {saved && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#22c55e' }}><MdCheckCircle size={16} /> Saved - live on the next call</span>}
             {err && <span style={{ fontSize: 13, color: '#ef4444' }}>{err}</span>}
           </div>
         </>

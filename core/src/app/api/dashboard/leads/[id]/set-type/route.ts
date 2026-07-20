@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * unified_context namespace (+ a visible admin note) so it works without any
  * table dependency. Once set, LeadsTable routes the lead into the right view.
  *
- * - lokazen types ('brand' / 'owner' / 'scout'): the original use — move a
+ * - lokazen types ('brand' / 'owner' / 'scout'): the original use - move a
  *   lead between the Leads and Gigs views / correct a mis-tag. These write
  *   to unified_context.lokazen (unchanged behavior).
  * - 'lead' (windchasers "Move to Leads"): promotes a webinar registrant into
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (isPromoteToLead) {
       // "Move to Leads": clear the segment tag (webinar today; event later)
       // so the lead re-enters the main Leads view. user_type (student/parent)
-      // stays — that's who they are, not which segment they're in.
+      // stays - that's who they are, not which segment they're in.
       brandKey = BRAND_ID
       const prev = { ...(ctx[brandKey] || {}) }
       const prevSegment = prev.lead_type || null
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       userType = mapped!.user_type
     }
 
-    // Visible audit note (kept in unified_context — no table dependency).
+    // Visible audit note (kept in unified_context - no table dependency).
     const adminNotes: any[] = Array.isArray(ctx.admin_notes) ? ctx.admin_notes : []
     adminNotes.push({
       id: `type_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,

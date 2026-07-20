@@ -4,7 +4,7 @@
  * POST /api/agent/instagram/meta - Incoming Instagram DMs + comments
  *
  * Bridges Meta's Instagram webhook into the PROXe unified agent engine, the
- * same way the WhatsApp meta route does — Instagram leads use channel 'social'
+ * same way the WhatsApp meta route does - Instagram leads use channel 'social'
  * and are identified by their IGSID (Instagram-scoped ID), since IG users have
  * no phone/email.
  *
@@ -33,7 +33,7 @@ export const maxDuration = 60;
 
 const DEFAULT_VERIFY_TOKEN = 'windchasers-ig-proxe-verify';
 
-// In-memory dedup — Meta re-delivers webhooks.
+// In-memory dedup - Meta re-delivers webhooks.
 const processedIds = new Set<string>();
 function seen(id: string): boolean {
   if (!id) return false;
@@ -185,7 +185,7 @@ async function handleComment(value: any, ourIgId: string, supabase: any): Promis
   const fromUsername: string | null = value?.from?.username || null;
   const mediaId: string = value?.media?.id || '';
   if (!commentId || !fromId) return;
-  if (fromId === ourIgId) return; // our own reply — ignore
+  if (fromId === ourIgId) return; // our own reply - ignore
 
   const leadId = await ensureInstagramLead(fromId, fromUsername, supabase);
   if (leadId) {
@@ -193,7 +193,7 @@ async function handleComment(value: any, ourIgId: string, supabase: any): Promis
   }
 
   // Generate a tailored reply to the comment, deliver it privately (comment → DM)
-  // — the lead-capture move — and post a short public reply pointing to the DM.
+  // - the lead-capture move - and post a short public reply pointing to the DM.
   let dmReply = '';
   try {
     const input: AgentInput = {
@@ -211,7 +211,7 @@ async function handleComment(value: any, ourIgId: string, supabase: any): Promis
   } catch (e: any) {
     console.error('[instagram/webhook] comment engine error:', e?.message || e);
   }
-  if (!dmReply) dmReply = "Thanks for your interest in Windchasers! Tell me what you'd like to know — eligibility, timeline, or fees?";
+  if (!dmReply) dmReply = "Thanks for your interest in Windchasers! Tell me what you'd like to know - eligibility, timeline, or fees?";
 
   const priv = await sendInstagramPrivateReply(commentId, dmReply);
   if (priv.success && leadId) {

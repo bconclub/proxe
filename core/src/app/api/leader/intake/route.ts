@@ -1,4 +1,4 @@
-// LEADER API — citizen intake from the Pulse Punjab app (grievance / subscribe
+// LEADER API - citizen intake from the Pulse Punjab app (grievance / subscribe
 // / volunteer / event signup). Single leader key for the whole app (avoids
 // shipping the machine INBOUND_API_KEY in a public web bundle). Person-merges
 // by phone and stamps POP campaign fields; the intensity trigger (026) then
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const normPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : null;
     // Anonymous subscribe/info with no phone still counts as a signal but can't
-    // be a person row — record nothing merge-able, just accept.
+    // be a person row - record nothing merge-able, just accept.
     if (!normPhone || normPhone.length !== 10) {
       // Allow anonymous only for non-grievance info taps; grievances need contact.
       if (engagement_type === 'grievance') {

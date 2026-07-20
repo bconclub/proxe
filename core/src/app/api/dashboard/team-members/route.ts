@@ -27,7 +27,7 @@ export async function GET() {
     // allowed_lead_types (features.leadAccess) rides along so the client knows
     // the caller's own access profile without a second endpoint.
     // The allowed_lead_types column only exists on brands running the flag
-    // (migration 036) — selecting it elsewhere would error and silently drop
+    // (migration 036) - selecting it elsewhere would error and silently drop
     // admin detection into the catch.
     const leadAccessOn = !!getBrandConfig().features?.leadAccess
     let isAdmin = false
@@ -39,7 +39,7 @@ export async function GET() {
         .eq('id', user.id)
         .maybeSingle()
       if (meErr && leadAccessOn) {
-        // Migration 036 not run yet (42703 column missing) — fall back to
+        // Migration 036 not run yet (42703 column missing) - fall back to
         // role-only so admin detection keeps working.
         ;({ data: me } = await supabase
           .from('dashboard_users')

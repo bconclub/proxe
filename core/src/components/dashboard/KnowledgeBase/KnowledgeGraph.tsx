@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * KnowledgeGraph — an Obsidian-style force-directed map of everything the agent
+ * KnowledgeGraph - an Obsidian-style force-directed map of everything the agent
  * "knows": the uploaded knowledge base + every prompt across the system, in one
  * highlight view. Self-contained canvas (no graph library), theme-aware via CSS
  * variables, with drag / zoom / pan, hover-to-highlight neighbours, and
@@ -140,7 +140,7 @@ export default function KnowledgeGraph({
     wakeRef.current(false)
   }, [selectedId])
 
-  // Physics + render loop (demand-driven — see file header).
+  // Physics + render loop (demand-driven - see file header).
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -193,7 +193,7 @@ export default function KnowledgeGraph({
           l.s.vx += fx; l.s.vy += fy
           l.t.vx -= fx; l.t.vy -= fy
         }
-        // Gravity to center + integrate. Pinned nodes (fixed) stay put — the
+        // Gravity to center + integrate. Pinned nodes (fixed) stay put - the
         // user placed them there deliberately, so we never move them again.
         for (const n of N) {
           if (n.fixed || dragRef.current.node === n) { n.vx = 0; n.vy = 0; continue }
@@ -207,7 +207,7 @@ export default function KnowledgeGraph({
 
       // Collision resolution (position-based, every frame the loop runs). Keeps
       // labels legible by never letting node discs overlap. A fixed/pinned or
-      // dragged node acts as immovable — the other node yields the full push, so
+      // dragged node acts as immovable - the other node yields the full push, so
       // dragging a node into a cluster shoves the free ones aside instead of
       // stacking on top of them.
       const SEP = 26
@@ -275,7 +275,7 @@ export default function KnowledgeGraph({
         ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2)
         ctx.fillStyle = GROUP_COLORS[n.group] || '#A3E635'
         ctx.fill()
-        // Pin ring — shows a node the user has parked (drag pins; dbl-click frees).
+        // Pin ring - shows a node the user has parked (drag pins; dbl-click frees).
         if (n.fixed && n.kind !== 'root') {
           ctx.globalAlpha = dim ? 0.3 : 0.9
           ctx.lineWidth = 1.5 / scale

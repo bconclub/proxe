@@ -92,7 +92,7 @@ export {
   TEMPLATE_HEADERS,
   TEMPLATE_BUTTONS,
   TEMPLATE_BUTTON_TYPES,
-  sendDemoBookedConfirmation, // @deprecated — use sendDemoConfirmation
+  sendDemoBookedConfirmation, // @deprecated - use sendDemoConfirmation
   sendDemoConfirmation,
   type DemoFormat,
   sendPATResult,

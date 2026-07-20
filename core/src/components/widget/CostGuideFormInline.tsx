@@ -107,7 +107,7 @@ export function CostGuideFormInline({
         fontSize: 12,
         color: 'var(--text-secondary, rgba(255,255,255,0.7))',
       }}>
-        We'll send it instantly — no calls.
+        We'll send it instantly - no calls.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

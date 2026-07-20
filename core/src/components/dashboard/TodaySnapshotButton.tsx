@@ -11,7 +11,7 @@ import { getCurrentBrandId } from '@/configs'
 const IS_WINDCHASERS = getCurrentBrandId() === 'windchasers'
 
 /**
- * TodaySnapshotButton — top-right floating button that opens a quick-glance
+ * TodaySnapshotButton - top-right floating button that opens a quick-glance
  * popup showing today's activity (midnight IST → now). Designed for the
  * founder to click once and immediately see what happened today.
  */
@@ -86,7 +86,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
 
   return (
     <>
-      {/* Trigger — small icon-only button, top-right. No text label.
+      {/* Trigger - small icon-only button, top-right. No text label.
           User feedback: 'A button is too far away from the actual design.
           We can just have an eye button.' */}
       <button
@@ -116,7 +116,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
-          {/* Modal — centered on desktop */}
+          {/* Modal - centered on desktop */}
           <div
             role="dialog"
             aria-label="Today's snapshot"
@@ -141,18 +141,18 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
               <MdVisibility size={16} style={{ color: '#C9A961' }} />
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] font-semibold leading-tight truncate">
-                  {range === 'today' ? "Today's snapshot" : `Snapshot — ${data?.window?.label || 'Loading…'}`}
+                  {range === 'today' ? "Today's snapshot" : `Snapshot - ${data?.window?.label || 'Loading…'}`}
                 </div>
                 <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                   {range === 'today'
                     ? new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
                     : data?.window?.startIso
                       ? `Since ${new Date(data.window.startIso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`
-                      : '—'}
+                      : '-'}
                 </div>
               </div>
 
-              {/* Range pills — segmented control */}
+              {/* Range pills - segmented control */}
               <div
                 role="tablist"
                 aria-label="Time range"
@@ -216,7 +216,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
 
               {data && (
                 <>
-                  {/* Top KPI strip — 4 hero numbers across (POP: campaign view) */}
+                  {/* Top KPI strip - 4 hero numbers across (POP: campaign view) */}
                   <div className="grid grid-cols-4 gap-2 mb-1">
                     {data.pop ? (
                       <>
@@ -273,7 +273,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                         </ul>
                       )}
 
-                      {/* Person type — POP: intensity tiers; else Parent/Student */}
+                      {/* Person type - POP: intensity tiers; else Parent/Student */}
                       {data.pop ? (
                         <div className="mt-3 pt-2.5 border-t space-y-1" style={{ borderColor: 'var(--border-primary)' }}>
                           <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>Person type</p>
@@ -377,7 +377,7 @@ export default function TodaySnapshotButton({ inline = false, label }: { inline?
                                 <div className="flex-1 min-w-0">
                                   <div className="text-[11px] font-semibold truncate">{l.name}</div>
                                   <div className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
-                                    {l.phone || '—'} · score {l.score == null ? '—' : l.score}
+                                    {l.phone || '-'} · score {l.score == null ? '-' : l.score}
                                   </div>
                                 </div>
                                 <span
@@ -466,7 +466,7 @@ function ScorePill({ label, n, color }: { label: string; n: number; color: strin
 }
 
 /**
- * Full-layout skeleton for the snapshot modal — mirrors the final shape
+ * Full-layout skeleton for the snapshot modal - mirrors the final shape
  * (4-KPI strip + 2×2 section grid) so the modal "expands into" the real
  * data instead of jumping from a tiny "Loading…" box. A rotating status
  * line at the bottom tells the user what's being fetched so the wait
@@ -474,7 +474,7 @@ function ScorePill({ label, n, color }: { label: string; n: number; color: strin
  */
 function SnapshotSkeleton({ range }: { range: RangeKey }) {
   // Status messages cycle every 700ms while loading. Picked to match what
-  // the snapshot endpoint actually does in order — see /api/dashboard/
+  // the snapshot endpoint actually does in order - see /api/dashboard/
   // today-snapshot/route.ts (leads → events → score histogram → top active).
   const MESSAGES: Record<RangeKey, string[]> = {
     today: [
@@ -509,7 +509,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
     return () => clearInterval(id)
   }, [messages.length])
 
-  // Shared pulse box — uses bg-tokens so it works in both themes.
+  // Shared pulse box - uses bg-tokens so it works in both themes.
   const SkelBox = ({ className = '', style = {} }: { className?: string; style?: React.CSSProperties }) => (
     <div
       className={`animate-pulse rounded ${className}`}
@@ -519,7 +519,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
 
   return (
     <>
-      {/* KPI strip — 4 cells matching real layout */}
+      {/* KPI strip - 4 cells matching real layout */}
       <div className="grid grid-cols-4 gap-2 mb-1">
         {[0, 1, 2, 3].map((i) => (
           <div
@@ -557,7 +557,7 @@ function SnapshotSkeleton({ range }: { range: RangeKey }) {
         ))}
       </div>
 
-      {/* Rotating status line — the "what's happening" hint */}
+      {/* Rotating status line - the "what's happening" hint */}
       <div className="flex items-center justify-center gap-2 pt-3 pb-1" aria-live="polite">
         <span
           className="inline-block w-1.5 h-1.5 rounded-full animate-pulse"

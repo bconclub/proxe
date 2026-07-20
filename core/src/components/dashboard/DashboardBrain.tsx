@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * DashboardBrain — ask-anything panel over the live dashboard data.
+ * DashboardBrain - ask-anything panel over the live dashboard data.
  *
  * Floating button (home page, stacked under the eye + bell) opens a right
  * slide-out chat. Questions go to /api/dashboard/brain, which gathers
@@ -17,17 +17,17 @@ import ProxeMark from '@/components/ProxeMark'
 import { BRAND_ID } from '@/configs'
 import { PAGE_ROUTES, type BrainAction } from '@/lib/brain/actions'
 
-// The full brain the dock expands into — the talking spiral orb. Loaded lazily
+// The full brain the dock expands into - the talking spiral orb. Loaded lazily
 // (canvas/window heavy) and only when the dock is clicked.
 const VoiceOrb = dynamic(() => import('@/app/dashboard/settings/brain/VoiceOrb'), { ssr: false })
 
 // Quick actions revealed when the dock wakes on hover.
 const DOCK_QUICK: { label: string; q?: string; auto: boolean; listen?: boolean; chat?: boolean }[] = [
   // Catch me up = just the latest/most-recent activity, not the full briefing.
-  { label: 'Catch me up', q: "Catch me up — what's happened most recently? Just the latest updates, kept short.", auto: true },
+  { label: 'Catch me up', q: "Catch me up - what's happened most recently? Just the latest updates, kept short.", auto: true },
   { label: 'Anything urgent?', q: 'What most needs my attention right now?', auto: true },
   { label: 'Ask something…', auto: false, listen: true },          // opens the orb, mic first
-  // The typed surface — the slide-out chat panel. Also where dial consent
+  // The typed surface - the slide-out chat panel. Also where dial consent
   // lives (Call buttons); the voice orb never dials.
   { label: 'Type instead…', auto: false, chat: true },
 ]
@@ -178,11 +178,11 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   // ── Draggable dock bubble ────────────────────────────────────────────────
   // The persistent bottom-right bubble can be picked up and dropped anywhere;
   // its position is remembered across page changes and reloads. Only active in
-  // `dock` mode — the inline "Ask PROXe" button is unaffected.
+  // `dock` mode - the inline "Ask PROXe" button is unaffected.
   const DOCK_SIZE = 52
   const DOCK_MARGIN = 16
-  const MINI = 144 // docked orb — roughly 2× the dock bubble; expressive but compact
-  const PANEL_W = 320    // docked CONTAINER width — orb + words + controls in one panel
+  const MINI = 144 // docked orb - roughly 2× the dock bubble; expressive but compact
+  const PANEL_W = 320    // docked CONTAINER width - orb + words + controls in one panel
   const PANEL_EST_H = 440 // rough panel height for on-screen clamping
   const ORB_IN_PANEL = 140 // free-floating orb circle (the glowing shell IS the container)
   const dockRef = useRef<HTMLButtonElement | null>(null)
@@ -190,7 +190,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const [dragging, setDragging] = useState(false)
   const drag = useRef({ active: false, moved: false, startX: 0, startY: 0, offX: 0, offY: 0 })
 
-  // Singleton guard — only ONE dock may render. Several dashboard pages wrap
+  // Singleton guard - only ONE dock may render. Several dashboard pages wrap
   // themselves in <DashboardLayout> while the segment layout (dashboard/
   // layout.tsx) already does, nesting two layouts → two identical draggable
   // bubbles stacked at the same spot. The first mounted dock claims a global
@@ -221,10 +221,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const openOrb = useCallback((pill: { q?: string; auto: boolean; listen?: boolean; chat?: boolean }, view: 'docked' | 'full' = 'docked') => {
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null }
     setWaking(false)
-    if (pill.chat) { setOpen(true); return } // typed surface — the slide-out panel
+    if (pill.chat) { setOpen(true); return } // typed surface - the slide-out panel
     setOrb({ q: pill.q, auto: pill.auto, listen: pill.listen, view })
   }, [])
-  // The orb renderers size their canvas from clientWidth on WINDOW resize only —
+  // The orb renderers size their canvas from clientWidth on WINDOW resize only -
   // toggling docked ⇄ full changes the CONTAINER, not the window, so without
   // this kick the canvas stays at the old resolution (fullscreen = giant blur).
   useEffect(() => {
@@ -299,7 +299,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
       if (!cur) return cur
       // On release after an actual drag, snap the dock home to the RIGHT edge
       // (keep the vertical position); the left/top CSS transition animates the
-      // slide. A plain click (no move) leaves it where it is — that opens the panel.
+      // slide. A plain click (no move) leaves it where it is - that opens the panel.
       const rightX = window.innerWidth - DOCK_SIZE - DOCK_MARGIN
       const next = d.moved ? { x: rightX, y: cur.y } : cur
       try { localStorage.setItem('proxe-brain-dock-pos', JSON.stringify(next)) } catch { /* quota */ }
@@ -320,7 +320,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
     if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, open])
 
-  // ── Brain actions — the brain drives the dashboard ───────────────────────
+  // ── Brain actions - the brain drives the dashboard ───────────────────────
   // Validated actions come back with the answer (features.brainActions brands).
   // Navigation keeps the dock alive (it's mounted in DashboardLayout); the
   // full-screen orb collapses to the corner so the opened page is visible.
@@ -394,7 +394,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
 
   return (
     <>
-      {/* Brain button — stacked under the eye (14) + bell (54). Hidden while the
+      {/* Brain button - stacked under the eye (14) + bell (54). Hidden while the
           orb is open (the widget has "become" the brain). */}
       {!(dock && orb) && <button
         ref={dockRef}
@@ -412,7 +412,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           ...(inline
             ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
             : dock
-              // Persistent, draggable frosted-glass "drop" — icon only, blurred
+              // Persistent, draggable frosted-glass "drop" - icon only, blurred
               // translucent bubble. Position remembered across pages/reloads;
               // mounted in the dashboard layout so it survives navigation.
               ? {
@@ -426,7 +426,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
                   backdropFilter: 'blur(16px) saturate(160%)',
                   WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-                  // Hover: just a clean accent ring around the circle — subtle,
+                  // Hover: just a clean accent ring around the circle - subtle,
                   // no glow halo. Idle is a hairline.
                   border: waking
                     ? '1.5px solid color-mix(in srgb, var(--accent-primary) 70%, transparent)'
@@ -450,14 +450,14 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           ...(dock ? {} : { height: '36px' }),
           ...(inline && label ? { padding: '0 12px' } : (dock ? {} : { width: '36px' })),
         }}
-        aria-label={dock ? 'Ask PROXe — drag to move' : 'Ask PROXe'}
+        aria-label={dock ? 'Ask PROXe - drag to move' : 'Ask PROXe'}
         title={dock ? 'Ask PROXe (drag to move)' : 'Ask PROXe'}
       >
         <ProxeMark size={dock ? 40 : 18} />
         {inline && label && <span className="text-xs font-semibold whitespace-nowrap">{label}</span>}
       </button>}
 
-      {/* Hover-wake fan — quick actions that slide up-left from the dock. Anchored
+      {/* Hover-wake fan - quick actions that slide up-left from the dock. Anchored
           to the dock's top-right corner; a plain click on the bubble runs the
           first action (the update) without needing the fan. */}
       {dock && isPrimaryDock && waking && !dragging && !orb && dockPos && (
@@ -495,7 +495,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
         </div>
       )}
 
-      {/* Voice aura — while the brain is interacting (docked), the WHOLE
+      {/* Voice aura - while the brain is interacting (docked), the WHOLE
           dashboard lights up with a Google-Lens-style ambient glow hugging the
           viewport edges: a blurred multi-color rim whose hues drift and
           breathe. Pure decoration: pointer-events-none, sits under the orb. */}
@@ -517,10 +517,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
             ? { inset: 0, background: 'var(--bg-primary)', animation: 'wc-fade-in 200ms ease' }
             : {
                 // Open IN PLACE: the orb blooms exactly where the dock bubble
-                // sits (its center on the bubble's center) — never jumping to a
+                // sits (its center on the bubble's center) - never jumping to a
                 // corner. Clamped only so the pill/controls stay on-screen.
                 // Clamp by the ORB (what must stay visible), not the full panel
-                // width — the subtitle pill is fit-content and narrow, so the
+                // width - the subtitle pill is fit-content and narrow, so the
                 // orb can hug the bubble even at the screen corner.
                 left: dockPos ? Math.min(Math.max(8 - (PANEL_W - ORB_IN_PANEL) / 2, dockPos.x + DOCK_SIZE / 2 - PANEL_W / 2), (typeof window !== 'undefined' ? window.innerWidth : 9999) - PANEL_W - 8 + (PANEL_W - ORB_IN_PANEL) / 2) : undefined,
                 top: dockPos ? Math.min(Math.max(8, dockPos.y + DOCK_SIZE / 2 - ORB_IN_PANEL / 2), (typeof window !== 'undefined' ? window.innerHeight : 9999) - (ORB_IN_PANEL + 52)) : undefined,
@@ -530,7 +530,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               }}
           aria-modal={orb.view === 'full' ? true : undefined} role="dialog"
         >
-          {/* THE CONTAINER — docked: one frosted panel holding the orb, the
+          {/* THE CONTAINER - docked: one frosted panel holding the orb, the
               words, and the controls (no more naked orb + floating card).
               Full: transparent full-bleed. Same element both ways so toggling
               view never remounts the orb (voice keeps playing). */}
@@ -539,7 +539,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               ? { display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }
               : { position: 'absolute', inset: 0 }}
           >
-            {/* orb slot — circle-clipped inside the panel; full-bleed in full view */}
+            {/* orb slot - circle-clipped inside the panel; full-bleed in full view */}
             <div style={orb.view === 'docked'
               ? { position: 'relative', width: ORB_IN_PANEL, height: ORB_IN_PANEL, margin: '0 auto', flexShrink: 0 }
               : { position: 'absolute', inset: 0 }}
@@ -552,7 +552,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                 />
               </div>
               {/* controls: ONE "+" at the orb's top-right; tapping it drops a
-                  VERTICAL stack below — expand + close, real icons (the old
+                  VERTICAL stack below - expand + close, real icons (the old
                   ⤢/× glyphs read as "two x's"). */}
               {orb.view === 'docked' && (
                 <div style={{ position: 'absolute', top: -2, right: -2, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'center', opacity: orbHover || orbCtlOpen ? 1 : 0, transition: 'opacity .15s ease', zIndex: 6 }}>
@@ -588,8 +588,8 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               )}
             </div>
 
-            {/* the words — ack first, then the answer, INSIDE the container */}
-            {/* SUBTITLES — 2-3 words at a time, coming and going under the orb */}
+            {/* the words - ack first, then the answer, INSIDE the container */}
+            {/* SUBTITLES - 2-3 words at a time, coming and going under the orb */}
             {orb.view === 'docked' && orbSubtitle && (
               <div
                 style={{
@@ -752,7 +752,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                   >
                     {m.role === 'assistant' ? renderRich(m.content) : m.content}
                   </div>
-                  {/* Brain actions — filled accent buttons (vs outline followup
+                  {/* Brain actions - filled accent buttons (vs outline followup
                       chips): tap to open the lead/page or place the call. */}
                   {m.role === 'assistant' && (m.actions?.length ?? 0) > 0 && (
                     <div className="flex flex-wrap gap-2 mt-1.5 max-w-[85%]">
@@ -764,7 +764,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
                             onClick={() => executeAction(a)}
                             disabled={!!dialing && a.type === 'dial'}
                             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition disabled:opacity-60"
-                            // accent fill (not --button-bg — that var doesn't resolve in the
+                            // accent fill (not --button-bg - that var doesn't resolve in the
                             // dashboard's brand-var scope). Filled = action, outline = followup.
                             style={{ backgroundColor: 'var(--accent-primary)', color: 'var(--bg-primary)' }}
                           >
@@ -849,7 +849,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
           from { opacity: 0; transform: translateY(12px) scale(0.9); transform-origin: bottom right; }
           to   { opacity: 1; transform: translateY(0) scale(1); transform-origin: bottom right; }
         }
-        /* Voice aura: a LIGHT full-page gradient wash — the whole background
+        /* Voice aura: a LIGHT full-page gradient wash - the whole background
            takes a gentle Lens-style tint while the brain is interacting. No
            rims, no hard overlay: screen-blended, heavily blurred, low opacity,
            colors drifting slowly. */

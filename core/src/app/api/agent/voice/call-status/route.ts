@@ -17,8 +17,8 @@ function friendlyReason(reason: string | null): string | null {
   if (r.includes('assistant-ended') || r.includes('assistant-said-end')) return 'Agent wrapped up';
   if (r.includes('customer-busy')) return 'Line was busy';
   if (r.includes('no-answer') || r.includes('customer-did-not-answer')) return 'No answer';
-  if (r.includes('480')) return 'Carrier unavailable — retry';
-  if (r.includes('408')) return 'Carrier timeout — retry';
+  if (r.includes('480')) return 'Carrier unavailable - retry';
+  if (r.includes('408')) return 'Carrier timeout - retry';
   if (r.includes('wallet') || r.includes('credit')) return 'Out of Vapi credits';
   if (r.includes('error')) return 'Call error';
   return reason;
@@ -33,10 +33,10 @@ function normalizePhone(raw?: string | null): { full: string | null; norm: strin
 }
 
 // The client's `engine` query param is just what the browser remembers picking
-// — nothing ties a callId to its engine server-side, so a page refresh (which
+// - nothing ties a callId to its engine server-side, so a page refresh (which
 // drops that client state) silently falls through to the Vapi status lookup
 // below. test-call/route.ts stamps a `call_summary: 'engine:<name>'` marker on
-// the voice_sessions row for V2/V3 (there's none for V1/Vapi) — use that as
+// the voice_sessions row for V2/V3 (there's none for V1/Vapi) - use that as
 // the source of truth when a session row exists, falling back to the query
 // param only when there's no row yet (e.g. status polled before the insert
 // lands, or Supabase is unreachable).
@@ -60,7 +60,7 @@ async function resolveEngine(callId: string, clientEngine: string | null): Promi
 }
 
 // V1 (Vapi) gets full post-call enrichment via vapi-webhook's end-of-call-report.
-// V2 (ElevenLabs) and V3 (Sarvam) have no equivalent webhook — this status
+// V2 (ElevenLabs) and V3 (Sarvam) have no equivalent webhook - this status
 // poller is the only place that ever learns a call ended, so it runs the same
 // enrichment once, when `ended` flips true. Guarded on the session's own
 // call_status so repeated polls (this route is hit every couple seconds while
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
   const engine = await resolveEngine(id || '', req.nextUrl.searchParams.get('engine'));
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
 
-  // V3 (Sarvam pipeline) tracks its own live state — poll it instead of Vapi.
+  // V3 (Sarvam pipeline) tracks its own live state - poll it instead of Vapi.
   if (engine === 'sarvam') {
     const base = process.env.V3_PIPELINE_URL;
     if (!base) return NextResponse.json({ error: 'V3_PIPELINE_URL not configured' }, { status: 500 });
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
         summary: null,
       });
     } catch {
-      // Pipeline unreachable — report as still connecting so the UI doesn't error out.
+      // Pipeline unreachable - report as still connecting so the UI doesn't error out.
       return NextResponse.json({ status: 'ringing', ended: false });
     }
   }

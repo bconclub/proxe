@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Bookings are written in several shapes depending on the path that created
     // them: flat keys under the channel (web.booking_date) OR a nested booking
     // object (web.booking.date), across web / whatsapp / voice. Check all of them
-    // so every booked lead is detected — previously only web/whatsapp flat keys
+    // so every booked lead is detected - previously only web/whatsapp flat keys
     // were checked, so ~2/3 of booked leads never reached Key Events.
     const bookingDate =
       leadUc?.web?.booking_date || leadUc?.web?.booking?.date ||
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     const touchpoints = activities?.length || 0
 
     // Check for booking
-    // A booking_date alone is enough to count as booked (a key event) — some
+    // A booking_date alone is enough to count as booked (a key event) - some
     // bookings store only a date, or the time lives in a different shape.
     const hasBooking = !!bookingDate
 
@@ -250,18 +250,18 @@ Respond with ONLY a JSON object in this exact format:
       aiScore = Math.min(100, score)
     }
 
-    // Auto-assign stage — HYBRID (score AND replies).
+    // Auto-assign stage - HYBRID (score AND replies).
     // Auto-staging only ever sets the EARLY, behaviour-detectable stages:
     //   New → Engaged → Qualified, plus Key Events (Booking Made) when a call is booked.
     // The post-call stages (Call Done, Proposal Sent, Won/Converted, Lost) are real-world
-    // facts only a human knows — they are MANUAL-only and never set here. Leads in those
+    // facts only a human knows - they are MANUAL-only and never set here. Leads in those
     // stages carry is_manual_override and are skipped at the top of this handler, so we
     // can never clobber them.
-    //   - Booking exists      → 'Booking Made'  (Key Events — the one event we can detect)
-    //   - 3+ replies AND score ≥ 50 → 'Qualified' (real, sustained interest — both required)
+    //   - Booking exists      → 'Booking Made'  (Key Events - the one event we can detect)
+    //   - 3+ replies AND score ≥ 50 → 'Qualified' (real, sustained interest - both required)
     //   - 1+ reply            → 'Engaged'        (lead has started replying)
     //   - otherwise           → 'New'           (form-only / in-sequence / no reply yet)
-    // Thresholds (3 replies, score 50) are intentionally simple — tune as we learn.
+    // Thresholds (3 replies, score 50) are intentionally simple - tune as we learn.
     let newStage: string
     if (hasBooking) {
       newStage = 'Booking Made'

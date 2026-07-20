@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     //   - 'button'      → tap on a template Quick Reply (e.g. "Book a Demo Class")
     //   - 'interactive' → tap on an interactive button or list (button_reply / list_reply)
     // For button/interactive types we extract the visible label and treat it as
-    // a text message — the agent then handles it via normal conversation flow.
+    // a text message - the agent then handles it via normal conversation flow.
     for (const msg of messages) {
       const customerPhone = msg.from;
       const whatsappMessageId = msg.id;
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
 
       let messageText: string | undefined;
       let triggerKind: 'text' | 'button' | 'interactive_button' | 'interactive_list' = 'text';
-      // Media (photo / document) the customer sent — captured AFTER the lead is
+      // Media (photo / document) the customer sent - captured AFTER the lead is
       // created (see below), downloaded from Meta and stored so it shows on the
       // lead. Previously image messages hit the `else` and were dropped whole.
       let mediaToCapture: { id?: string; mime?: string; kind: 'image' | 'document' } | null = null;
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
         messageText = (media?.caption && String(media.caption).trim())
           || (msg.type === 'image' ? '[shared a photo]' : '[shared a document]');
       } else if (msg.type === 'location') {
-        // WhatsApp location pin — owners drop these instead of a Maps URL. Turn
+        // WhatsApp location pin - owners drop these instead of a Maps URL. Turn
         // lat/lng into a Google Maps link and stash it so it's captured onto the
         // lead below (previously dropped, so the "map link" never arrived).
         const loc = msg.location || {};
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Capture a Google Maps link the customer PASTES as text (owners often send
-      // a share link instead of dropping a pin). Deterministic — doesn't rely on
+      // a share link instead of dropping a pin). Deterministic - doesn't rely on
       // the agent calling a tool. A pin already set locationToCapture; don't
       // overwrite it. Stored to google_maps_url below, so "View on Google Maps"
       // is the exact link they shared.
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Pull profile name from WhatsApp contact metadata. Only trust it if
-      // it looks like a real person name — otherwise leave blank so we
+      // it looks like a real person name - otherwise leave blank so we
       // don't store "WhatsApp User" or other placeholders on the lead.
       const rawWaName = contacts.find((c: any) => c.wa_id === msg.from)?.profile?.name || '';
       const customerName = isLikelyRealPersonName(rawWaName) ? rawWaName.trim() : '';
@@ -319,7 +319,7 @@ async function captureWhatsAppMedia(
   brand: string,
 ): Promise<void> {
   const token = (await getWhatsAppCreds())?.accessToken;
-  if (!token) { console.warn('[meta/media] no WhatsApp credentials — cannot download media'); return; }
+  if (!token) { console.warn('[meta/media] no WhatsApp credentials - cannot download media'); return; }
   const supabase = getServiceClient();
   if (!supabase) return;
 
@@ -551,8 +551,8 @@ interface IncomingMessage {
 }
 
 /**
- * Send a WA reply AND log it to conversations. Always logs — even if the Graph
- * API send fails — so the dashboard reflects what we *tried* to say. When
+ * Send a WA reply AND log it to conversations. Always logs - even if the Graph
+ * API send fails - so the dashboard reflects what we *tried* to say. When
  * isFallback=true, also flips the lead's needs_human_followup flag so the
  * dashboard surfaces it for a human to pick up.
  */
@@ -583,7 +583,7 @@ async function sendAndLogReply(
     // Interactive (quick-reply buttons) path
     const result = await sendWhatsAppInteractiveButtons(customerPhone, message, opts.buttons);
     if (!result.success) {
-      console.error('[meta/webhook] Interactive send failed for', customerPhone, '— falling back to text:', result.error);
+      console.error('[meta/webhook] Interactive send failed for', customerPhone, '- falling back to text:', result.error);
       // Fall back to text-only send so the customer at least gets the message
       waReplyId = await sendWhatsAppReply(customerPhone, message);
     } else {
@@ -594,7 +594,7 @@ async function sendAndLogReply(
   }
 
   if (!waReplyId) {
-    console.error('[meta/webhook] Graph API send failed for', customerPhone, '— still logging to DB');
+    console.error('[meta/webhook] Graph API send failed for', customerPhone, '- still logging to DB');
   } else {
     updateChannelPerformance(supabase, leadId, 'whatsapp', 'sent').catch(() => {});
   }
@@ -654,7 +654,7 @@ function parseFormPrefill(text: string): Record<string, string> {
  * Meta-form click-through handler: (1) stamps the click-through attribution and
  * (2) captures the form fields (NAME, EMAIL, CITY, timeline, age, education) onto
  * the lead. The form data only arrives in the prefill message, so without this
- * the lead model shows the WhatsApp account name and no email/city. Idempotent —
+ * the lead model shows the WhatsApp account name and no email/city. Idempotent -
  * never clobbers an existing real marketing source, and only fills empty fields.
  */
 async function tagMetaFormClickThrough(leadId: string, messageText: string, supabase: any): Promise<void> {
@@ -782,7 +782,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     // A returning lokazen scout/owner/brand texting "Hi" has NO conversation
     // history in this session, so detectLokazenAudience() (which only reads the
-    // live conversation) has nothing to detect — the generic brand/owner welcome
+    // live conversation) has nothing to detect - the generic brand/owner welcome
     // fired instead, even for a known, active scout. Recover the audience from
     // the lead's OWN stored record instead of re-asking every time they text in.
     let knownLokazenAudience: 'brand' | 'owner' | 'scout' | null = null;
@@ -799,7 +799,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         : null;
     }
 
-    // 1b–4. Parallelize: dedup checks + session creation + cross-channel context
+    // 1b-4. Parallelize: dedup checks + session creation + cross-channel context
     const dedupCutoff30s = new Date(Date.now() - 30_000).toISOString();
     const [
       { data: recentAgentMsg },
@@ -847,7 +847,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 2–6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
+    // 2-6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
     const [, , conversationHistory, summaryResult] = await Promise.all([
       addUserInput(
         sessionId,
@@ -893,16 +893,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     const userMessageCount = conversationHistory.filter(m => m.role === 'user').length;
     console.log(`[meta/webhook] lead=${leadId} messageCount=${userMessageCount} historyLen=${conversationHistory.length}`);
 
-    // 7a. QUICK-REPLY FAST PATH — short customer messages matching a known
+    // 7a. QUICK-REPLY FAST PATH - short customer messages matching a known
     // keyword (CPL / PPL / helicopter / cost / demo / etc.) get a pre-defined
     // interactive button reply instantly, no Claude call. Skips on button
     // taps themselves (triggerKind=button/interactive_*) because those ARE
-    // a button reply — generating ANOTHER button menu would loop.
+    // a button reply - generating ANOTHER button menu would loop.
     const isCustomerButtonTap = triggerKind === 'button'
       || triggerKind === 'interactive_button'
       || triggerKind === 'interactive_list';
 
-    // 7-pre. FORM / AD LEAD FIRST RESPONSE — DETERMINISTIC, never the LLM.
+    // 7-pre. FORM / AD LEAD FIRST RESPONSE - DETERMINISTIC, never the LLM.
     // These leads came from a pilot-training ad, so we must NOT describe the
     // academy or list programs (helicopter / cabin crew / type rating). The LLM
     // kept doing exactly that despite prompt rules, so we hard-intercept the
@@ -927,7 +927,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     // Deterministic quick-replies (findQuickReplyFor) are ALL Windchasers aviation
     // content (pilot/DGCA/helicopter pricing). They must NEVER fire for other
-    // brands — a BCON/Lokazen customer texting "how much?" would get pilot pricing.
+    // brands - a BCON/Lokazen customer texting "how much?" would get pilot pricing.
     if (!isCustomerButtonTap && brand === 'windchasers') {
       const quickReply = findQuickReplyFor(messageText);
       if (quickReply) {
@@ -947,8 +947,8 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
-    // WhatsApp never freshly CLASSIFIED the incoming message — it only recovered
-    // a stored type — so a new scout ("interested in becoming a Lokazen Scout")
+    // WhatsApp never freshly CLASSIFIED the incoming message - it only recovered
+    // a stored type - so a new scout ("interested in becoming a Lokazen Scout")
     // never got stamped and sat in the Leads tab. Classify from this message and
     // let SCOUT win even over a stale stored owner/brand: the product rule is
     // "the moment scout is mentioned, they're a scout lead." Owner/brand stay
@@ -977,7 +977,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       lokazenAudience: resolvedLokazenAudience,
     };
 
-    // FINAL DEDUP CHECK — race protection.
+    // FINAL DEDUP CHECK - race protection.
     // If the customer fires multiple webhook events in quick succession (e.g.
     // double-tap on a Quick Reply button), the parallel-Promise dedup above
     // can let both invocations through because neither has finished logging
@@ -1002,10 +1002,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
-    // HUMAN HANDLING — is a teammate actively working this lead (replied from the
+    // HUMAN HANDLING - is a teammate actively working this lead (replied from the
     // dashboard inbox / Slack in the last day)? We no longer hard-pause the bot on
     // a blunt timer. The bot still runs WITH the human's messages in context
-    // (labelled in fetchRecentHistory) so it's aware a colleague stepped in — and
+    // (labelled in fetchRecentHistory) so it's aware a colleague stepped in - and
     // we only suppress its reply below if it has NOTHING useful to add (a generic
     // escalation). That way it never talks over the human with a canned
     // "flagged to the team" line, but a genuine, contextual answer still goes out.
@@ -1025,11 +1025,11 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     let result = await processMessage(agentInput, supabase);
 
     // Empty responses are usually a transient LLM hiccup (especially on long,
-    // multi-part questions). Retry ONCE before giving up — a single retry recovers
+    // multi-part questions). Retry ONCE before giving up - a single retry recovers
     // the large majority of these, so the lead gets a real answer instead of the
     // dead-end "someone will get in touch" that nothing follows up on.
     if (!result.response) {
-      console.warn('[meta/webhook] Empty AI response — retrying once before fallback');
+      console.warn('[meta/webhook] Empty AI response - retrying once before fallback');
       try {
         result = await processMessage(agentInput, supabase);
       } catch (retryErr: any) {
@@ -1040,16 +1040,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 
     // A teammate is handling this lead and the bot only produced a generic
     // "nothing useful → flagged to the team" fallback (or nothing at all). Stay
-    // SILENT and let the human run it — a redundant escalation talks over them.
+    // SILENT and let the human run it - a redundant escalation talks over them.
     // (The team was already pinged inside the engine, and the human is on it.)
     // A real, substantive answer is not `escalated`, so it still sends below.
     if (humanHandlingLead && (!result.response || result.escalated)) {
-      console.log(`[meta/webhook] Teammate handling lead ${leadId}; bot had no useful reply (escalated=${result.escalated}) — staying silent`);
+      console.log(`[meta/webhook] Teammate handling lead ${leadId}; bot had no useful reply (escalated=${result.escalated}) - staying silent`);
       return;
     }
 
     if (!result.response) {
-      console.error('[meta/webhook] Empty AI response after retry — sending fallback');
+      console.error('[meta/webhook] Empty AI response after retry - sending fallback');
       await sendAndLogReply(
         supabase,
         leadId,
@@ -1088,7 +1088,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       },
     );
 
-    // 10. Update lead context — merge extracted intent into brand namespace
+    // 10. Update lead context - merge extracted intent into brand namespace
     //
     //   user_type      = student / parent / professional
     //   course_interest = DGCA / Flight / Heli / Cabin (mapped from intent)
@@ -1110,7 +1110,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     if (result.intent?.userType) intentUpdate.user_type = result.intent.userType;
     // Lokazen: persist the resolved audience as user_type/lead_type so the lead
     // lands in the right tab (scout/connector → Gigs, owner/brand → Leads). This
-    // is what was missing — the WhatsApp scout was never stamped, so a clear
+    // is what was missing - the WhatsApp scout was never stamped, so a clear
     // "become a Scout" lead sat in Leads. Lokazen audience wins over the generic
     // intent userType above for this brand.
     if (brand === 'lokazen' && resolvedLokazenAudience) {
@@ -1176,7 +1176,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         .eq('brand', brand);
     }
 
-    // 11b. Capture an email the customer typed in chat — independent of booking.
+    // 11b. Capture an email the customer typed in chat - independent of booking.
     // Email used to be persisted ONLY when book_consultation fired, so a customer
     // who shared their email but didn't complete a booking had it dropped (it never
     // showed on the lead). Detect any email in the message and persist it right away
@@ -1197,7 +1197,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // Runs every 2nd customer message (so it learns more as the chat progresses
     // without burning Haiku on every single ping). Picks up casual phrasing the
     // keyword extractor misses ("I wanna fly planes", "my son is in 12th", etc.)
-    // Fire-and-forget — never block the response.
+    // Fire-and-forget - never block the response.
     const customerMsgCount = userMessageCount; // we computed this earlier
     if (customerMsgCount >= 2 && customerMsgCount % 2 === 0) {
       (async () => {
@@ -1254,14 +1254,14 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     console.error('[meta/webhook] handleIncomingMessage error:', error?.message || error);
     const fallbackMsg = "Hey! Give me a moment, I'll have someone from the team get in touch with you shortly.";
     if (leadId) {
-      // We know the lead — send + log fallback, flag for human follow-up.
+      // We know the lead - send + log fallback, flag for human follow-up.
       await sendAndLogReply(supabase, leadId, customerPhone, fallbackMsg, {
         isFallback: true,
         fallbackReason: 'engine_exception',
         sessionId,
       }).catch(() => {});
     } else {
-      // No leadId yet — best-effort send only (can't log without leadId).
+      // No leadId yet - best-effort send only (can't log without leadId).
       await sendWhatsAppReply(customerPhone, fallbackMsg).catch(() => {});
     }
   }
@@ -1286,7 +1286,7 @@ async function fetchRecentHistory(
 
     // A human teammate's manual reply (inbox/reply sets metadata.human) is stored
     // as sender='agent', so without a marker the model reads it as its OWN prior
-    // turn. Label it so the bot KNOWS a colleague stepped in — it can then defer to
+    // turn. Label it so the bot KNOWS a colleague stepped in - it can then defer to
     // them ("Rahul will confirm the time") or stay quiet, instead of re-answering.
     return data.map((row: any) => ({
       role: row.sender === 'customer' ? 'user' as const : 'assistant' as const,

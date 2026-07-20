@@ -52,7 +52,7 @@ export async function GET(
     const callId = session.external_session_id || id
 
     // Transcript turns + summary row for this call (channel='voice', matched by
-    // call_id, not lead_id — loads even with no lead linkage). Also capture the
+    // call_id, not lead_id - loads even with no lead linkage). Also capture the
     // lead the transcript is linked to + the real duration, as fallbacks for a
     // stale/un-enriched session row.
     let turns: Array<{ sender: string; content: string; createdAt: string }> = []

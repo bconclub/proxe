@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Report Issue — one modal, every brand. A teammate hits the sidebar button,
+ * Report Issue - one modal, every brand. A teammate hits the sidebar button,
  * pastes/drops a screenshot, says what's wrong, and the report lands in the
  * brand's own Supabase storage (`issue-reports` bucket) via
  * /api/dashboard/report-issue. HQ pulls every brand's bucket into the
@@ -19,7 +19,7 @@ import { MdClose, MdOutlineImage, MdCheckCircle } from 'react-icons/md'
 // ---------------------------------------------------------------------------
 // Console-error ring buffer. Installed once on first import (dashboard layout
 // imports this file, so it's armed on every dashboard page). Reports carry the
-// last few runtime errors — often the actual bug, for free.
+// last few runtime errors - often the actual bug, for free.
 // ---------------------------------------------------------------------------
 const errorBuffer: string[] = []
 const ERROR_BUFFER_MAX = 8
@@ -86,7 +86,7 @@ export default function ReportIssueModal({ open, onClose }: ReportIssueModalProp
     })
   }, [])
 
-  // Paste-to-attach anywhere while the modal is open — the core flow:
+  // Paste-to-attach anywhere while the modal is open - the core flow:
   // PrtScn / Win+Shift+S, then Ctrl+V straight into the modal.
   useEffect(() => {
     if (!open) return
@@ -241,7 +241,7 @@ export default function ReportIssueModal({ open, onClose }: ReportIssueModalProp
             </div>
             <div className="text-[13px]" style={{ color: 'var(--text-secondary)' }}>
               Logged as <span className="font-mono">{doneId}</span>. The team reviews every
-              report — fixes ship in updates.
+              report - fixes ship in updates.
             </div>
             <button
               onClick={onClose}

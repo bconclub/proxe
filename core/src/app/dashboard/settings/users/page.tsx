@@ -92,7 +92,7 @@ export default function UserManagementPage() {
   // "Last active" reflect the team's actual activity in near-real time.
   // The DashboardLayout heartbeats every 60s, so a 30s refresh here gives
   // us a worst-case ~90s lag from a teammate's last action → us seeing it.
-  // Pause while the tab is hidden — no point polling for a background user.
+  // Pause while the tab is hidden - no point polling for a background user.
   useEffect(() => {
     const id = setInterval(() => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -106,7 +106,7 @@ export default function UserManagementPage() {
   const formatLastActive = (iso: string | null): { label: string; live: boolean } => {
     if (!iso) return { label: 'Never logged in', live: false }
     const then = new Date(iso).getTime()
-    if (isNaN(then)) return { label: '—', live: false }
+    if (isNaN(then)) return { label: '-', live: false }
     const diffSec = Math.floor((Date.now() - then) / 1000)
     if (diffSec < 120) return { label: 'Live now', live: true }
     if (diffSec < 60 * 60) return { label: `${Math.floor(diffSec / 60)} min ago`, live: false }
@@ -479,7 +479,7 @@ export default function UserManagementPage() {
                                   style={active
                                     ? { background: 'rgba(59,130,246,0.18)', color: '#60a5fa', borderColor: 'rgba(59,130,246,0.4)' }
                                     : { background: 'transparent', color: unrestricted ? 'var(--text-secondary)' : 'var(--text-muted)', borderColor: 'var(--border-primary)' }}
-                                  title={unrestricted ? 'No restriction — click to limit to this course' : active ? 'Allowed — click to remove' : 'Not allowed — click to add'}
+                                  title={unrestricted ? 'No restriction - click to limit to this course' : active ? 'Allowed - click to remove' : 'Not allowed - click to add'}
                                 >
                                   {course}
                                 </button>

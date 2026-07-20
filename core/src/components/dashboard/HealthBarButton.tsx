@@ -5,7 +5,7 @@ import { MdFavorite, MdClose, MdRefresh, MdOpenInNew } from 'react-icons/md'
 import Link from 'next/link'
 
 /**
- * HealthBarButton — fixed top-right chip on every dashboard page. Click to
+ * HealthBarButton - fixed top-right chip on every dashboard page. Click to
  * open a popover with full per-service health. Replaces the in-Today-snapshot
  * health strip (per user feedback: 'doesn't need to sit in Today snapshot').
  *
@@ -42,7 +42,7 @@ const STATUS_LABEL: Record<Status, string> = {
   ok: 'Healthy',
   degraded: 'Degraded',
   down: 'Down',
-  unknown: '—',
+  unknown: '-',
 }
 
 function relativeIdle(min: number | null | undefined): string {
@@ -65,7 +65,7 @@ function prettyError(raw: any): string {
 }
 
 interface HealthBarButtonProps {
-  /** Controlled mode — when defined, component hides its own chip and uses this for open/close */
+  /** Controlled mode - when defined, component hides its own chip and uses this for open/close */
   open?: boolean
   onClose?: () => void
 }
@@ -92,7 +92,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
     } catch { /* ignore */ } finally { setLoading(false) }
   }
 
-  // Always-on poller — the chip color reflects current overall status even
+  // Always-on poller - the chip color reflects current overall status even
   // before the popover is opened.
   useEffect(() => {
     void fetchHealth()
@@ -113,7 +113,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
 
   return (
     <>
-      {/* Trigger chip — only in uncontrolled mode. When parent passes `open`,
+      {/* Trigger chip - only in uncontrolled mode. When parent passes `open`,
           parent owns the trigger UI (e.g. sidebar three-dot menu item). */}
       {!isControlled && (
         <button
@@ -129,7 +129,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
             backdropFilter: 'blur(8px)',
           }}
           aria-label="System health"
-          title={`System health: ${STATUS_LABEL[overall]} — click for detail`}
+          title={`System health: ${STATUS_LABEL[overall]} - click for detail`}
         >
           <span className="inline-block rounded-full" style={{ width: 7, height: 7, background: overallColor, boxShadow: `0 0 6px ${overallColor}` }} />
           Health
@@ -138,7 +138,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
 
       {open && (
         <>
-          {/* Backdrop — clicking closes */}
+          {/* Backdrop - clicking closes */}
           <div
             className="fixed inset-0 z-[70]"
             style={{ background: 'rgba(0,0,0,0.35)' }}
@@ -189,7 +189,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {!data && (
                 <div className="text-[12px] py-6 text-center" style={{ color: 'var(--text-muted)' }}>
-                  {loading ? 'Checking endpoints…' : '—'}
+                  {loading ? 'Checking endpoints…' : '-'}
                 </div>
               )}
 
@@ -239,7 +239,7 @@ export default function HealthBarButton(props: HealthBarButtonProps = {}) {
                 )
               })}
 
-              {/* Recent failure samples — only render if outbound has failures */}
+              {/* Recent failure samples - only render if outbound has failures */}
               {data?.services?.outbound_meta?.recent_failure_samples && data.services.outbound_meta.recent_failure_samples.length > 0 && (
                 <div className="p-2.5 rounded-lg border mt-2" style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.30)' }}>
                   <div className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#fca5a5' }}>

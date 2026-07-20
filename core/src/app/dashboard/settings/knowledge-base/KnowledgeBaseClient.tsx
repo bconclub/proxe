@@ -71,7 +71,7 @@ export default function KnowledgeBaseClient() {
             Knowledge Base
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Everything your AI agent knows — knowledge sources and prompts — in one place.
+            Everything your AI agent knows - knowledge sources and prompts - in one place.
           </p>
         </div>
 

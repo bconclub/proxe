@@ -1,21 +1,21 @@
 /**
  * Lead ownership on touch.
  *
- * Default (flag off): whoever takes an action on a lead — replies, sends a
- * template, logs a call, adds a note — becomes its owner. This intentionally
+ * Default (flag off): whoever takes an action on a lead - replies, sends a
+ * template, logs a call, adds a note - becomes its owner. This intentionally
  * REASSIGNS: the owner follows whoever is actively working the lead (founder
  * request: "owner should change based on whoever is touching the lead").
  *
- * features.leadAccess (windchasers): STICKY FIRST TOUCH — the first user to
+ * features.leadAccess (windchasers): STICKY FIRST TOUCH - the first user to
  * touch an unowned lead claims it permanently; a later touch by someone else
  * only refreshes last_actor, never steals ownership. Release/reassign go
  * through the /owner route (self-release or admin). Ownership is dual-written:
  * unified_context.owner (display: name/email) + the all_leads.owner_id column
- * (SQL filtering — the column only exists on flagged brands, migration 036).
+ * (SQL filtering - the column only exists on flagged brands, migration 036).
  *
  * No-ops when:
  *   • there is no authenticated user (system / automated paths must NEVER
- *     claim ownership — they have no user.id), or
+ *     claim ownership - they have no user.id), or
  *   • the acting user already owns the lead (avoids a needless write).
  *
  * Always non-fatal: ownership is a convenience, never a reason to fail the
@@ -26,7 +26,7 @@ import { getBrandConfig } from '@/configs'
  * Stamp PROXe (the AI) as the last actor on a lead. Call this right after the
  * agent auto-sends a WhatsApp/web reply, so the leads-table "Last Touch" badge
  * shows @proxe. A later human touch (assignOwnerOnTouch) overwrites it, and a
- * later AI touch overwrites that — whoever acted last wins. Non-fatal.
+ * later AI touch overwrites that - whoever acted last wins. Non-fatal.
  */
 export async function stampProxeActor(supabase: any, leadId: string): Promise<void> {
   try {
@@ -77,7 +77,7 @@ export async function assignOwnerOnTouch(
     // reflects the most recent toucher (a human action supersedes PROXe).
     const last_actor = { type: 'user', name: actorName, email: du?.email || user.email || null, at: now }
 
-    // Same person already owns it — only refresh last_actor, skip rewriting owner.
+    // Same person already owns it - only refresh last_actor, skip rewriting owner.
     if (ctx.owner && ctx.owner.id === user.id) {
       await supabase
         .from('all_leads')
@@ -86,7 +86,7 @@ export async function assignOwnerOnTouch(
       return
     }
 
-    // Sticky mode: someone else already owns this lead — first touch locked
+    // Sticky mode: someone else already owns this lead - first touch locked
     // it. Refresh last_actor only; ownership never moves on touch.
     if (sticky && ctx.owner?.id) {
       await supabase
@@ -105,7 +105,7 @@ export async function assignOwnerOnTouch(
       auto: true,
     }
 
-    // owner_id column exists only on flagged brands (migration 036) — writing
+    // owner_id column exists only on flagged brands (migration 036) - writing
     // it elsewhere would error the whole update.
     const update: Record<string, any> = { unified_context: { ...ctx, owner, last_actor } }
     if (sticky) update.owner_id = user.id

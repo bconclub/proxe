@@ -1,5 +1,5 @@
 /**
- * Slack Web API client — for the INTERACTIVE Slack app (buttons + two-way
+ * Slack Web API client - for the INTERACTIVE Slack app (buttons + two-way
  * replies), which the incoming-webhook notifier can't do. Uses a bot token
  * (SLACK_BOT_TOKEN, xoxb-…) so we can:
  *   - post messages and get back the `ts` (thread id) to map Slack ↔ lead,

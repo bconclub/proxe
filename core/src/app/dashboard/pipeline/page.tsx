@@ -28,7 +28,7 @@ type Counts = Record<GroupKey, number> & { total: number }
 
 const BLUE = '#3B82F6', PURPLE = '#8b5cf6', INDIGO = '#6366f1', GREEN = '#22c55e', AMBER = '#f59e0b', GRAY = '#8a8a8a', RED = '#ef4444'
 
-// The chevron flow — order matters; the % under each step is that stage's
+// The chevron flow - order matters; the % under each step is that stage's
 // share of ALL leads.
 const FLOW: Array<{ key: GroupKey; label: string; color: string }> = [
   { key: 'new',       label: 'New',        color: BLUE },
@@ -41,7 +41,7 @@ const FLOW: Array<{ key: GroupKey; label: string; color: string }> = [
   { key: 'lost',      label: 'Lost',       color: RED },
 ]
 
-// The "Lost" DB values double as the loss reason — Cold and Not Qualified say
+// The "Lost" DB values double as the loss reason - Cold and Not Qualified say
 // why, the rest are unspecified. Extend once brands log richer reasons.
 const LOST_REASON_LABELS: Record<string, string> = {
   'Cold': 'Went cold',
@@ -74,7 +74,7 @@ function Sparkline({ points, color }: { points: number[]; color: string }) {
   )
 }
 
-// Progress ring — dashed track (the mock's dashed circle at 0), solid arc when
+// Progress ring - dashed track (the mock's dashed circle at 0), solid arc when
 // >0. stroke-dasharray over pathLength so it never degenerates at 100%.
 function MiniRing({ pct, color }: { pct: number; color: string }) {
   const p = Math.max(0, Math.min(100, pct))
@@ -92,7 +92,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return <div className="text-[10px] font-bold uppercase tracking-[0.08em] flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>{children}</div>
 }
 
-// A pipeline stat card — tinted by its accent, clicks through to the leads list.
+// A pipeline stat card - tinted by its accent, clicks through to the leads list.
 function StageCard({ icon, label, value, color, onClick, ring, right, extra }: {
   icon: React.ReactNode; label: string; value: number; color: string
   onClick?: () => void; ring?: number; right?: React.ReactNode; extra?: React.ReactNode
@@ -154,7 +154,7 @@ function Skeleton() {
 
 // --- Main Page ---
 
-// features.leadAccess: the pipeline becomes per-user — non-admins see their
+// features.leadAccess: the pipeline becomes per-user - non-admins see their
 // own claimed leads ("My Pipeline") plus the unclaimed open pool; admins get a
 // selector to view any team member's pipeline (deep-linkable via ?user=<id>).
 const LEAD_ACCESS_ON = !!brandConfig.features?.leadAccess
@@ -173,7 +173,7 @@ export default function PipelinePage() {
   const [lostReasons, setLostReasons] = useState<Array<{ reason: string; count: number }>>([])
   const [reloadKey, setReloadKey] = useState(0)
 
-  // Key event label — brand default, admin-overridable. The override persists
+  // Key event label - brand default, admin-overridable. The override persists
   // per brand in dashboard_settings so it sticks across users and sessions.
   const [keyEventLabel, setKeyEventLabel] = useState(DEFAULT_KEY_EVENT)
   const [cfgAdmin, setCfgAdmin] = useState(false)
@@ -224,7 +224,7 @@ export default function PipelinePage() {
     ;(async () => {
       try {
         const supabase = createClient()
-        // Gig workers (scout + connector) are not sales leads — exclude them
+        // Gig workers (scout + connector) are not sales leads - exclude them
         // from every count, mirroring the Leads table + Overview exclusion.
         const gigPath = `unified_context->${BRAND_ID}->>user_type`
         const scope = (q: any) => {
@@ -311,11 +311,11 @@ export default function PipelinePage() {
   }
 
   const pctNum = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 1000) / 10 : 0)
-  const pctStr = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—')
+  const pctStr = (n: number, d: number) => (d > 0 ? `${Math.round((n / d) * 100)}%` : '-')
 
   // Chevron % = the stage's share of all leads.
   const flowPcts = useMemo(
-    () => FLOW.map((f) => (c.total > 0 ? `${Math.round((c[f.key] / c.total) * 100)}%` : '—')),
+    () => FLOW.map((f) => (c.total > 0 ? `${Math.round((c[f.key] / c.total) * 100)}%` : '-')),
     [c],
   )
 
@@ -389,7 +389,7 @@ export default function PipelinePage() {
           </button>
         </div>
 
-        {/* Top row — New / Engaged / Qualified / key event, each with sparkline */}
+        {/* Top row - New / Engaged / Qualified / key event, each with sparkline */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <StageCard icon={<MdPersonOutline size={19} />} label="New" value={c.new} color={BLUE} onClick={() => goStage('new')} right={<Sparkline points={sparks.new} color={BLUE} />} />
           <StageCard icon={<MdChatBubbleOutline size={19} />} label="Engaged" value={c.engaged} color={PURPLE} onClick={() => goStage('engaged')} right={<Sparkline points={sparks.engaged} color={PURPLE} />} />
@@ -491,7 +491,7 @@ export default function PipelinePage() {
           </div>
         </div>
 
-        {/* PIPELINE FLOW — chevrons, % of all leads under each */}
+        {/* PIPELINE FLOW - chevrons, % of all leads under each */}
         <div>
           <SectionLabel>
             Pipeline flow

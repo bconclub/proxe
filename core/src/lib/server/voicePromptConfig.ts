@@ -1,15 +1,15 @@
 /**
- * Voice-prompt config — the ONE core place for the grievance call prompts.
+ * Voice-prompt config - the ONE core place for the grievance call prompts.
  *
  * Per-language (pa/hi/en) opening / body / closing, editable from the dashboard
  * (Configure → Voice Prompts) and stored per-brand in dashboard_settings (jsonb,
  * key `voice_prompts`). Read by BOTH engines:
- *   - V1  (Vapi test-call)  — server-side, via resolveVoicePrompt()
- *   - V3  (Sarvam pipeline) — over HTTP, via /api/agent/voice/prompt
+ *   - V1  (Vapi test-call)  - server-side, via resolveVoicePrompt()
+ *   - V3  (Sarvam pipeline) - over HTTP, via /api/agent/voice/prompt
  *
  * When a field is blank/unsaved it falls back to the file defaults in
  * brands/pop/prompts/voice-langs.ts, so behaviour is unchanged until someone
- * saves an override. No migration — dashboard_settings already exists (same
+ * saves an override. No migration - dashboard_settings already exists (same
  * key/value pattern as agent_prompt / widget_style).
  */
 
@@ -88,7 +88,7 @@ export async function resolveVoicePrompt(lang?: string | null): Promise<VoicePro
   };
 }
 
-/** All three languages as editable fields (override merged over default) — for the editor. */
+/** All three languages as editable fields (override merged over default) - for the editor. */
 export async function getEditableVoicePrompts(): Promise<
   Record<VoiceLang, { opening: string; body: string; closing: string; default: VoicePromptFields }>
 > {

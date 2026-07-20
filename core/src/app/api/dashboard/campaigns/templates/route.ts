@@ -1,5 +1,5 @@
 /**
- * GET /api/dashboard/campaigns/templates — the Templates rail on the campaign
+ * GET /api/dashboard/campaigns/templates - the Templates rail on the campaign
  * workspace. Approved = the brand's Meta-approved registry; Draft = template
  * drafts saved on planned campaigns. Each entry carries a `kind` derived from
  * its name (reminder / nudge / welcome / promo) so the rail's filter pills work.
@@ -27,7 +27,7 @@ export async function GET() {
     const { data: { user } } = await authClient.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Approved registry — windchasers content, gated by brand (other brands
+    // Approved registry - windchasers content, gated by brand (other brands
     // start with drafts only).
     const approved = BRAND_ID === 'windchasers'
       ? Object.entries(WA_TEMPLATE_BODIES).map(([name, t]) => ({

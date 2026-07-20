@@ -1,12 +1,12 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CommunicationsView — the CORE COMMUNICATIONS checklist (Eval → Communications).
+// CommunicationsView - the CORE COMMUNICATIONS checklist (Eval → Communications).
 //
 // Every message the brand's agent must handle autonomously, as a slot that is
 // visibly FILLED or not: welcome messages per lead source, AI replies to
 // incoming messages, confirmations, reminders, follow-ups. Content comes from
-// the brand pack (brain.communications — display truth mirroring the senders);
+// the brand pack (brain.communications - display truth mirroring the senders);
 // this view renders the scorecard, per-category sections, WhatsApp-style
 // previews, and the "Send to my WhatsApp" test bench (free-form send to the
 // hardcoded test number via /api/dashboard/brain/test-stage).
@@ -29,14 +29,14 @@ const STATUS_META: Record<CoreCommunication['status'], { label: string; color: s
 }
 
 const CATEGORIES: Array<{ id: CoreCommunication['category']; title: string; sub: string }> = [
-  { id: 'welcome', title: 'Welcome messages', sub: 'New leads — one per source, sent the moment they arrive' },
+  { id: 'welcome', title: 'Welcome messages', sub: 'New leads - one per source, sent the moment they arrive' },
   { id: 'inbound', title: 'Incoming message replies', sub: 'AI answers from the brand prompt + knowledge base' },
-  { id: 'confirmation', title: 'Confirmations', sub: 'Transactional — bookings, demos, results' },
+  { id: 'confirmation', title: 'Confirmations', sub: 'Transactional - bookings, demos, results' },
   { id: 'reminder', title: 'Reminders', sub: 'Time-driven, before the thing happens' },
   { id: 'followup', title: 'Follow-ups', sub: 'Re-engagement when the lead goes quiet' },
 ]
 
-// Generic sample fill for {{vars}} — per-entry sampleParams override these.
+// Generic sample fill for {{vars}} - per-entry sampleParams override these.
 const DEFAULT_SAMPLE: Record<string, string> = {
   customer_name: 'Rahul',
   parent_name: 'Mrs. Sharma',

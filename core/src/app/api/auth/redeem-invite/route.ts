@@ -4,17 +4,17 @@
  * Server-side completion of the dashboard invitation flow. Replaces the
  * previous client-side `supabase.auth.signUp()` call in /auth/accept-invite,
  * which created an unconfirmed user and dumped them on the login page with
- * "Please verify your email" — even though clicking the invite link IS the
+ * "Please verify your email" - even though clicking the invite link IS the
  * proof of email ownership.
  *
  * What this does:
  *   1. Validate the invitation token (exists, not accepted, not expired)
  *   2. Create the auth user via the service-role admin API with
  *      email_confirm:true so they can log in immediately
- *      (idempotent — if the auth.users row already exists from a prior
+ *      (idempotent - if the auth.users row already exists from a prior
  *       attempt, we just update the password + confirm the email)
  *   3. handle_new_user DB trigger creates the dashboard_users row
- *      (default role='viewer') — we then UPDATE to the invitation's role
+ *      (default role='viewer') - we then UPDATE to the invitation's role
  *   4. Mark the invitation accepted
  *
  * Body: { token, password, fullName }
@@ -24,7 +24,7 @@
  * After this resolves the client should call `supabase.auth.signInWithPassword`
  * with the email + password to establish the cookie session.
  *
- * No auth required on this endpoint — the invitation token IS the auth.
+ * No auth required on this endpoint - the invitation token IS the auth.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -35,10 +35,10 @@ import { sanitizeAllowedLeadTypes } from '@/lib/services/leadAccess'
 export const dynamic = 'force-dynamic'
 
 // features.leadAccess: allowed_lead_types columns exist only on flagged
-// brands (migration 036) — selecting/writing them elsewhere would error.
+// brands (migration 036) - selecting/writing them elsewhere would error.
 const LEAD_ACCESS_ON = !!getBrandConfig().features?.leadAccess
 
-// Same allowlist as the invite-create endpoint. Defence-in-depth — even if
+// Same allowlist as the invite-create endpoint. Defence-in-depth - even if
 // the user_invitations row has a junk role somehow, we cap what gets applied.
 const ALLOWED_ROLES = new Set(['viewer', 'admin'])
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
     // ── 1. Validate the invitation ─────────────────────────────────────────
     // Conditional column list (allowed_lead_types exists only on flagged
-    // brands) — typed as a plain string so PostgREST's literal-type parser
+    // brands) - typed as a plain string so PostgREST's literal-type parser
     // doesn't choke on the union.
     const inviteCols: string = LEAD_ACCESS_ON
       ? 'id, email, role, expires_at, accepted_at, allowed_lead_types'
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       .select(inviteCols)
       .eq('token', token)
       .maybeSingle()
-    // Dynamic column list defeats PostgREST's literal-type inference — the
+    // Dynamic column list defeats PostgREST's literal-type inference - the
     // row shape is the invited-user record either way.
     const invitation = invitationRow as any
 
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     let userId: string
     let action: 'created' | 'updated'
 
-    // Look up by email first — Supabase admin API doesn't have a clean
+    // Look up by email first - Supabase admin API doesn't have a clean
     // "get by email" helper, so query auth.users directly via SQL.
     const { data: existingRow } = await supabase
       .from('auth_users_by_email')
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 
     let existingUserId: string | null = existingRow?.id || null
     if (!existingUserId) {
-      // The view above may not exist in every project — fall back to the
+      // The view above may not exist in every project - fall back to the
       // admin listUsers API filtered by email.
       const { data: listed, error: listErr } = await (supabase.auth as any).admin.listUsers({
         page: 1,
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!updRows || updRows.length === 0) {
-      // Trigger didn't fire or row got removed — upsert to be safe.
+      // Trigger didn't fire or row got removed - upsert to be safe.
       const { error: upsertErr } = await supabase
         .from('dashboard_users')
         .upsert(
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
       .eq('id', invitation.id)
 
     if (acceptErr) {
-      // Non-fatal — user has been created and can log in. We log so an
+      // Non-fatal - user has been created and can log in. We log so an
       // admin can clean up the orphan invitation row if it keeps mattering.
       console.error('[redeem-invite] Failed to mark accepted:', acceptErr.message)
     }

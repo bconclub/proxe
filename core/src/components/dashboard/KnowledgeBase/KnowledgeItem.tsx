@@ -155,7 +155,7 @@ export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
         </div>
       </td>
 
-      {/* View modal — full content of this KB item (portaled to body to escape the table) */}
+      {/* View modal - full content of this KB item (portaled to body to escape the table) */}
       {viewing && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -190,7 +190,7 @@ export default function KnowledgeItem({ item, onDelete }: KnowledgeItemProps) {
                 <MdClose size={18} style={{ color: 'var(--text-secondary)' }} />
               </button>
             </div>
-            {/* Body — full content */}
+            {/* Body - full content */}
             <div className="overflow-y-auto px-5 py-4">
               {item.content ? (
                 <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>

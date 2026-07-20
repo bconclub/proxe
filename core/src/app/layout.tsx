@@ -48,7 +48,7 @@ export default function RootLayout({
                 try {
                   var el = document.documentElement;
                   // Widget routes render inside a TRANSPARENT iframe on brand
-                  // sites — never force the dashboard's dark theme there: the
+                  // sites - never force the dashboard's dark theme there: the
                   // .dark body paint + color-scheme:dark make WebViews render
                   // an opaque dark canvas around the widget (Instagram bug).
                   if (location.pathname.indexOf('/widget') === 0) {

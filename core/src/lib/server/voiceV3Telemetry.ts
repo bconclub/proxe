@@ -14,8 +14,8 @@ export interface V3TurnRecord {
   stt?: number;       // ms TTFB per stage
   llm?: number;
   tts?: number;
-  endpoint?: number;  // ms — our VAD turn-taking wait (silence before we finalize)
-  transport?: number | null; // ms — Vobiz carrier + network leg (residual), null if unmeasured
+  endpoint?: number;  // ms - our VAD turn-taking wait (silence before we finalize)
+  transport?: number | null; // ms - Vobiz carrier + network leg (residual), null if unmeasured
 }
 
 export interface V3CallRecord {

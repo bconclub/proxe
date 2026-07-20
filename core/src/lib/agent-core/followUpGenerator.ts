@@ -197,7 +197,7 @@ function generateBookingAwareButtons(
 
 /**
  * Generate 2 buttons for the first message
- * NOTE: Currently unused — first message uses config.quickButtons directly
+ * NOTE: Currently unused - first message uses config.quickButtons directly
  */
 async function generateFirstMessageButtons(
   userMessage: string,

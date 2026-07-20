@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
 
     if (!serviceAccountEmail || !privateKey) {
-      // Not an error — Google Calendar simply isn't connected. Return 200 with a
+      // Not an error - Google Calendar simply isn't connected. Return 200 with a
       // typed `configured: false` flag so the dashboard can stay quiet instead of
       // flashing a red "Sync Failed" banner on every page load. (Bookings are
       // recorded in our own DB regardless; the calendar sync is optional.)

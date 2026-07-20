@@ -102,7 +102,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
       if (!res.ok) throw new Error(data.error || 'Could not read the screenshot')
 
       const ex = data.extracted || {}
-      // Only fill fields the operator hasn't already typed — never clobber input.
+      // Only fill fields the operator hasn't already typed - never clobber input.
       if (ex.name) setName((p) => p || ex.name)
       if (ex.phone) setPhone((p) => p || ex.phone)
       if (ex.email) setEmail((p) => p || ex.email)
@@ -128,7 +128,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
       setExtractMsg(
         found > 0
           ? `Read ${found} field${found > 1 ? 's' : ''} from the screenshot. Review before saving.`
-          : 'Couldn’t pull clear details — please fill them in manually.',
+          : 'Couldn’t pull clear details - please fill them in manually.',
       )
     } catch (err: any) {
       setError(err?.message || 'Failed to read the screenshot')
@@ -156,7 +156,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
     reader.readAsDataURL(file)
   }, [runExtraction])
 
-  // Paste an image straight into the modal (Ctrl/Cmd+V) — only on the Details step.
+  // Paste an image straight into the modal (Ctrl/Cmd+V) - only on the Details step.
   useEffect(() => {
     if (!isOpen || step !== 1) return
     const onPaste = (e: ClipboardEvent) => {
@@ -208,7 +208,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to add lead')
       // Lead saved. If a welcome was requested but failed, keep the modal open
-      // and surface it — the lead is safe, only the message didn't go.
+      // and surface it - the lead is safe, only the message didn't go.
       if (sendWelcome && data.welcome_sent === false) {
         setError(`Lead saved, but the welcome message failed: ${data.welcome_error || 'unknown'}. You can message them from the inbox.`)
         setSaving(false)
@@ -274,7 +274,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
           </div>
 
           <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-            {/* ───────── STEP 1 — Details ───────── */}
+            {/* ───────── STEP 1 - Details ───────── */}
             {step === 1 && (
               <>
                 {/* Screenshot dropzone */}
@@ -302,7 +302,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                     <div className="flex flex-col items-center gap-1.5 py-2">
                       <MdImage size={26} style={{ color: 'var(--text-secondary)' }} />
                       <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{showAgencyFields ? 'Drop a chat / form screenshot' : 'Drop a WhatsApp screenshot'}</span>
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{showAgencyFields ? 'or click / paste — we’ll read name, number & business details' : 'or click / paste — we’ll read name, number & details'}</span>
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{showAgencyFields ? 'or click / paste - we’ll read name, number & business details' : 'or click / paste - we’ll read name, number & details'}</span>
                     </div>
                   )}
                 </div>
@@ -340,7 +340,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
               </>
             )}
 
-            {/* ───────── STEP 2 — More ───────── */}
+            {/* ───────── STEP 2 - More ───────── */}
             {step === 2 && showAgencyFields && (
               <>
                 <div className="grid grid-cols-2 gap-3">
@@ -355,7 +355,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                   <div>
                     <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Service interest</label>
                     <select className={inputClass} value={serviceInterest} onChange={(e) => setServiceInterest(e.target.value)} disabled={saving}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {SERVICE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
@@ -374,7 +374,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                   <div className="col-span-2">
                     <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Urgency</label>
                     <select className={inputClass} value={urgency} onChange={(e) => setUrgency(e.target.value)} disabled={saving}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {URGENCY_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
                   </div>
@@ -398,7 +398,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                     <div>
                       <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Course interest</label>
                       <select className={inputClass} value={courseInterest} onChange={(e) => setCourseInterest(e.target.value)} disabled={saving}>
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {COURSE_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
@@ -407,7 +407,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                     <div>
                       <label className={labelClass} style={{ color: 'var(--text-primary)' }}>Type</label>
                       <select className={inputClass} value={userType} onChange={(e) => setUserType(e.target.value)} disabled={saving}>
-                        <option value="">—</option>
+                        <option value="">-</option>
                         {USER_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                       </select>
                     </div>
@@ -434,7 +434,7 @@ export default function AddLeadModal({ isOpen, onClose, onCreated }: AddLeadModa
                       <FaWhatsapp style={{ color: '#22C55E' }} /> Send welcome message now
                     </span>
                     <span className="block text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-                      Sends the approved welcome template — safe even if they haven’t messaged us yet.
+                      Sends the approved welcome template - safe even if they haven’t messaged us yet.
                     </span>
                   </span>
                 </label>

@@ -1,5 +1,5 @@
 /**
- * Per-brand FEATURE FLAGS — runtime on/off toggles for promoted features.
+ * Per-brand FEATURE FLAGS - runtime on/off toggles for promoted features.
  *
  * The brand config (getBrandConfig().features) is the DEFAULT; this row in
  * dashboard_settings (key 'feature_flags') overrides it at runtime so the
@@ -31,7 +31,7 @@ export interface FeatureFlags {
   logCallChat?: boolean
 }
 
-// The known flag keys — anything posted outside this set is ignored so the
+// The known flag keys - anything posted outside this set is ignored so the
 // settings panel can't write arbitrary junk into the row. leadAccess / scouts /
 // warRoom are deliberately NOT here: they need per-brand DB setup (migrations,
 // views), so they stay config-locked and display-only in the panel.
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
         {
           key: FEATURES_KEY,
           value: merged,
-          description: 'Per-brand feature flags (voice/brain/pipelineFunnel/followUpSequence) — runtime overrides of the brand config defaults',
+          description: 'Per-brand feature flags (voice/brain/pipelineFunnel/followUpSequence) - runtime overrides of the brand config defaults',
           updated_by: user.id,
         },
         { onConflict: 'key' },

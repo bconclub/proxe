@@ -4,14 +4,14 @@
  * (body + up to 3 buttons) instead of calling the LLM. Faster, deterministic,
  * and matches how customers actually communicate (tap-driven, not type-driven).
  *
- * Trigger rules (deliberately conservative — we only short-circuit on SHORT
+ * Trigger rules (deliberately conservative - we only short-circuit on SHORT
  * messages so multi-sentence questions still go through Claude):
  *   - Message is ≤ 4 words AND matches a trigger regex
  *
  * Button labels are capped at 20 chars by sendWhatsAppInteractiveButtons.
  *
  * When a customer TAPS a button, Meta echoes the title back to our webhook
- * as the next inbound message — so a tap on "Timeline" arrives as a text
+ * as the next inbound message - so a tap on "Timeline" arrives as a text
  * message "Timeline", which Claude then handles normally with the existing
  * conversation history for context.
  */
@@ -21,7 +21,7 @@ export interface QuickReplyConfig {
   header?: string;
   /** Main body text shown above the buttons (≤ 1024 chars) */
   body: string;
-  /** 1–3 button labels (each ≤ 20 chars) */
+  /** 1-3 button labels (each ≤ 20 chars) */
   buttons: string[];
   /** Used for analytics + logging; identifies which trigger fired */
   triggerKey: string;
@@ -77,7 +77,7 @@ const TRIGGERS: QuickReplyTrigger[] = [
       buttons: ['4 vs 6 subjects', 'Talk to counsellor', 'Full journey cost'],
     },
   },
-  // ── DGCA subjects (4 vs 6) — formatted breakdown with price + duration. After
+  // ── DGCA subjects (4 vs 6) - formatted breakdown with price + duration. After
   //     the fee trigger so a fee question still wins; this catches bare
   //     "4 vs 6 subjects" / "which subjects" with no cost word. ─────────────────
   {
@@ -90,21 +90,21 @@ const TRIGGERS: QuickReplyTrigger[] = [
   },
   // ── Cost ──────────────────────────────────────────────────────────────────
   // A bare "fees"/"cost" has NO course context here (findQuickReplyFor only sees
-  // the message, not the lead's course_interest) — so it must NOT assert Pilot
-  // ₹60–70L, which was quoting pilot fees to cabin-crew / flight-school leads.
+  // the message, not the lead's course_interest) - so it must NOT assert Pilot
+  // ₹60-70L, which was quoting pilot fees to cabin-crew / flight-school leads.
   // Keep the programs' fees separate: ask which one, or offer a counsellor.
   // Course-specific fee questions still fast-path via the CPL/DGCA triggers above.
   {
     match: /\b(cost|fees?|price|pricing|how much|charges?)\b/i,
     config: {
       triggerKey: 'cost',
-      body: 'Happy to share fees — they differ by program (pilot training, DGCA ground classes, cabin crew, flight schools abroad). Which are you looking at, or shall I have a counsellor call you with the exact numbers?',
+      body: 'Happy to share fees - they differ by program (pilot training, DGCA ground classes, cabin crew, flight schools abroad). Which are you looking at, or shall I have a counsellor call you with the exact numbers?',
       buttons: ['Pilot training', 'Cabin crew', 'Talk to counsellor'],
     },
   },
   // ── Demo / Booking ──────────────────────────────────────────────────────
   // NO static booking quick-reply. Booking intent ("book a call", "demo",
-  // "schedule") must flow into the LLM booking flow instead — it is time-aware
+  // "schedule") must flow into the LLM booking flow instead - it is time-aware
   // (won't offer "Today" after the window closes), resolves dates correctly,
   // offers the real slot buttons, AND wires the check_availability /
   // book_consultation tools so the call actually gets booked. A hardcoded
@@ -165,13 +165,13 @@ const normTime = (s: string) => s.toUpperCase().replace(/\s+/g, '');
  * The LLM is told to offer ONLY the open times check_availability returns, but
  * it sometimes parrots the prompt's example menu (3:00/4:00/5:00) and offers a
  * slot that is actually taken. The customer then taps it and gets a "that's
- * booked" bounce — a bad experience. Given the open times from the tool, this
+ * booked" bounce - a bad experience. Given the open times from the tool, this
  * strips any time-slot [BTN: …] for a slot that is NOT open, and (only when it
  * actually removed one) scrubs that time from the prose enumeration too.
  *
  * Non-time buttons (How to start, Timeline, …) are always preserved. When
  * `openTimes` is null (check_availability was not called this turn) the text is
- * returned untouched — we never invent availability.
+ * returned untouched - we never invent availability.
  */
 export function stripBookedTimeSlots(raw: string, openTimes: string[] | null): string {
   if (!raw || openTimes === null) return raw;
@@ -181,12 +181,12 @@ export function stripBookedTimeSlots(raw: string, openTimes: string[] | null): s
   let out = raw.replace(/\[BTN:\s*([^\]]+)\]/gi, (marker, label) => {
     const l = String(label).trim();
     if (!TIME_SLOT_LABEL.test(l)) return marker; // keep non-time buttons
-    if (open.has(normTime(l))) return marker;     // slot is open — keep
-    bookedOffered.push(l);                         // booked — drop the button
+    if (open.has(normTime(l))) return marker;     // slot is open - keep
+    bookedOffered.push(l);                         // booked - drop the button
     return '';
   });
 
-  // Only touch the prose if we actually removed a booked button — keeps every
+  // Only touch the prose if we actually removed a booked button - keeps every
   // normal message byte-identical.
   for (const bt of bookedOffered) {
     const esc = bt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\?\s+/g, '\\s*');

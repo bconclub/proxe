@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       leadCounts[stageId] = (leadCounts[stageId] || 0) + 1
     })
 
-    // 2. Query follow_up_templates table — scoped to THIS brand only.
+    // 2. Query follow_up_templates table - scoped to THIS brand only.
     // (Shared table: without this filter Windchasers was counting BCON rows.)
     const { data: templates, error: templatesError } = await supabase
       .from('follow_up_templates')

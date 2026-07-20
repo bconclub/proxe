@@ -1,7 +1,7 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EvalView — plain-language message studio.
+// EvalView - plain-language message studio.
 // Pick how a lead arrives + what happens next → see the EXACT WhatsApp
 // conversation that follows (nudges included), each message as a WhatsApp-style
 // bubble with its Meta template name, real buttons, and a "Send to my WhatsApp"
@@ -29,7 +29,7 @@ const GATES = IS_POP ? POP_GATES : IS_LOKAZEN ? LOKAZEN_GATES : BCON_GATES
 const TEMPLATE_BUTTONS = IS_POP ? POP_TEMPLATE_BUTTONS : IS_LOKAZEN ? LOKAZEN_TEMPLATE_BUTTONS : BCON_BUTTONS
 const bodyFor = IS_POP ? popBodyFor : IS_LOKAZEN ? lokazenBodyFor : bconBodyFor
 
-// The sample every preview is filled with — a citizen for POP, a CRE lead for
+// The sample every preview is filled with - a citizen for POP, a CRE lead for
 // Lokazen, a business lead for everyone else (same fixture as the test bench).
 const SAMPLE: Record<string, string> = IS_POP ? POP_SAMPLE : IS_LOKAZEN ? LOKAZEN_SAMPLE : {
   customer_name: 'Shiv',
@@ -45,7 +45,7 @@ const VAR_LABEL: Record<string, string> = IS_POP ? POP_VAR_LABEL : IS_LOKAZEN ? 
   service_interest: 'goal', booking_time: 'time', pain_point: 'challenge', probe_question: 'probe',
 }
 
-/** Fill {{vars}} with sample values (plain string — used for the actual test send). */
+/** Fill {{vars}} with sample values (plain string - used for the actual test send). */
 function fillPlain(text: string): string {
   return text.replace(/\{\{\s*([\w]+)\s*\}\}/g, (_, k) => SAMPLE[k] || k)
 }
@@ -244,7 +244,7 @@ export default function EvalView() {
         )}
 
         <div style={{ margin: '0 0 14px 90px', fontSize: 11.5, fontWeight: 800, color: chosen.tone }}>
-          ↓ {chosen.trigger} — {chosen.stop}
+          ↓ {chosen.trigger} - {chosen.stop}
         </div>
 
         {(outcome === 'nudge' ? nudgeJourney : chosen).steps.map((s, i) => (

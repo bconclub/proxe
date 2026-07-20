@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
     const d28 = now - 28 * 86400000;
     const pctChg = (cur: number, prev: number) => (prev > 0 ? Math.round((100 * (cur - prev)) / prev) : cur > 0 ? 100 : 0);
     const momentum = { reach7dPct: 0, reach14dPct: 0 };
-    // Switchable-window KPIs — reach (touchpoints) + resolved per today/7d/14d/28d,
+    // Switchable-window KPIs - reach (touchpoints) + resolved per today/7d/14d/28d,
     // so the REACH and RESPONSE LOOP cards can flip between windows.
     const reachWindows = { today: 0, d7: 0, d14: 0, d28: 0 };
     const loopWindows = { today: 0, d7: 0, d14: 0, d28: 0 }; // resolved count per window
@@ -277,7 +277,7 @@ export async function GET(req: NextRequest) {
       label: net > 0.1 ? 'Positive' : net < -0.1 ? 'Negative' : 'Neutral',
     };
 
-    // ── D2D coverage (d2d_visits — the field tool's knocks) ──
+    // ── D2D coverage (d2d_visits - the field tool's knocks) ──
     // Separate table, separate try/catch: a d2d failure must never take the
     // War Room down, so this degrades to d2d: null. Worker phone stays server-side.
     let d2d: any = null;
@@ -337,7 +337,7 @@ export async function GET(req: NextRequest) {
       d2d = null;
     }
 
-    // ── INTENSITY LADDER (026) — the campaign's central funnel ──
+    // ── INTENSITY LADDER (026) - the campaign's central funnel ──
     // contact → voter → supporter → volunteer → cadre, from the same filtered
     // rows (view carries intensity since 026). Null-degrading like d2d.
     let intensity: any = null;
@@ -361,7 +361,7 @@ export async function GET(req: NextRequest) {
       intensity = { tiers, conversion };
     } catch (e) { console.error('[war-room/data] intensity failed:', (e as Error).message); }
 
-    // ── VOLUNTEER PULSE — tier-3+ people: where they are + who just joined ──
+    // ── VOLUNTEER PULSE - tier-3+ people: where they are + who just joined ──
     let volunteers: any = null;
     try {
       const vols = R.filter((r) => (r.intensity ?? 0) >= 3);
@@ -374,7 +374,7 @@ export async function GET(req: NextRequest) {
       };
     } catch (e) { console.error('[war-room/data] volunteers failed:', (e as Error).message); }
 
-    // ── EVENT MONITOR — campaign_events + RSVP counts (first consumer of 023) ──
+    // ── EVENT MONITOR - campaign_events + RSVP counts (first consumer of 023) ──
     let events: any = null;
     try {
       const { data: evs, error: evErr } = await sb
@@ -400,13 +400,13 @@ export async function GET(req: NextRequest) {
       } else events = [];
     } catch (e) { console.error('[war-room/data] events failed:', (e as Error).message); }
 
-    // ── DAILY TARGETS — dashboard_settings 'daily_targets' vs today's actuals ──
+    // ── DAILY TARGETS - dashboard_settings 'daily_targets' vs today's actuals ──
     let targets: any = null;
     try {
       const { data: trow } = await sb.from('dashboard_settings').select('value').eq('key', 'daily_targets').maybeSingle();
       const t = trow?.value || null;
       // Actuals: voices = captures today (already computed); volunteers = tier-3+
-      // rows whose latest activity is today (v1 approximation — the ladder has no
+      // rows whose latest activity is today (v1 approximation - the ladder has no
       // per-tier timestamps yet); knocks = today's d2d visits; events = RSVPs
       // confirmed today.
       const volunteersToday = R.filter((r) => (r.intensity ?? 0) >= 3 && new Date(r.updated_at || r.created_at).getTime() >= todayStart).length;
@@ -422,7 +422,7 @@ export async function GET(req: NextRequest) {
       };
     } catch (e) { console.error('[war-room/data] targets failed:', (e as Error).message); }
 
-    // ── DIRECTIVES — recommendations pushed from the leader app / AI (027) ──
+    // ── DIRECTIVES - recommendations pushed from the leader app / AI (027) ──
     let recommendations: any = null;
     try {
       const { data: recos, error: rErr } = await sb
@@ -435,7 +435,7 @@ export async function GET(req: NextRequest) {
       recommendations = recos || [];
     } catch (e) { console.error('[war-room/data] recommendations failed:', (e as Error).message); }
 
-    // ── LISTEN digest — external signals (027): trending, crisis, sources ──
+    // ── LISTEN digest - external signals (027): trending, crisis, sources ──
     let listen: any = null;
     try {
       const since14 = new Date(now - 14 * 86400000).toISOString();

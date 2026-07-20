@@ -11,7 +11,7 @@ interface SeatStat { constituency: string; count: number; topCategory: string | 
 const SAFFRON = '#F06C18';
 const GREEN = '#4EB457';
 const BLUE = '#3B82F6';
-// Issue (categorical) palette — slightly desaturated so it reads clean on white.
+// Issue (categorical) palette - slightly desaturated so it reads clean on white.
 const ISSUE_COLORS: Record<string, string> = {
   jobs: '#3B82F6', water: '#14B8A6', power: '#F59E0B', roads: '#8B7BFF',
   drugs: '#F43F5E', farm_debt: '#22A152', health: '#F06C18', education: '#A855F7', other: '#94A3B8',
@@ -32,7 +32,7 @@ function isLightHex(hex: string): boolean {
 }
 
 // Theme-aware map palettes. Light: empty seats fade to near-white and each mode
-// ramps within ONE clean hue (proper choropleth — intensity = saturation, not
+// ramps within ONE clean hue (proper choropleth - intensity = saturation, not
 // darkness). Dark: keep depth against the black canvas.
 const LIGHT_P = {
   empty: '#EAEDF1', heatLo: '#FFE0C2', heatHi: '#E2570A',

@@ -1,7 +1,7 @@
 'use client'
 
 // Right analytics rail for the D2D Field Log: Top Issues Today, Photo Evidence
-// Collected, and Visit Outcome Split (donut) — all derived from the visit set.
+// Collected, and Visit Outcome Split (donut) - all derived from the visit set.
 
 import { useMemo } from 'react'
 import {

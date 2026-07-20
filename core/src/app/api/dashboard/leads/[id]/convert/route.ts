@@ -11,16 +11,16 @@ import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
  * converted and the deal details, stops all autonomous follow-ups, and logs it.
  *
  * Body: { converted_at?: ISO date, program?, amount?, currency?, notes? }
- *   converted_at — the conversion date (defaults to now).
- *   program      — what they converted to (e.g. "October CPL batch").
- *   amount       — deal value (number, optional).
- *   notes        — free text.
+ *   converted_at - the conversion date (defaults to now).
+ *   program      - what they converted to (e.g. "October CPL batch").
+ *   amount       - deal value (number, optional).
+ *   notes        - free text.
  *
  * Effects:
  *   - lead_stage = 'Closed Won' (stage_override=true)
- *   - converted_at column (soft-fail if a brand's DB lacks it — migration 037)
+ *   - converted_at column (soft-fail if a brand's DB lacks it - migration 037)
  *   - unified_context.conversion = { at, program, amount, currency, notes, by }
- *     (always stored, no migration needed — the durable source of truth)
+ *     (always stored, no migration needed - the durable source of truth)
  *   - cancels pending follow-up tasks
  *   - logs a stage change + an activity note
  */
@@ -80,7 +80,7 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to convert lead' }, { status: 500 })
     }
 
-    // 2. converted_at column — separate soft-fail write (brands may not have run
+    // 2. converted_at column - separate soft-fail write (brands may not have run
     //    migration 037 yet; never block the conversion on a missing column).
     const { error: colErr } = await supabase
       .from('all_leads')
@@ -88,7 +88,7 @@ export async function POST(
       .eq('id', leadId)
     if (colErr) console.warn(`[convert] converted_at column not written (run migration 037): ${colErr.message}`)
 
-    // 3. Stop autonomous follow-ups — a won lead shouldn't get nudged.
+    // 3. Stop autonomous follow-ups - a won lead shouldn't get nudged.
     const { data: cancelled } = await supabase
       .from('agent_tasks')
       .update({ status: 'cancelled', completed_at: new Date().toISOString(), error_message: 'Cancelled: lead converted' })
@@ -108,7 +108,7 @@ export async function POST(
       lead_id: leadId,
       activity_type: 'note',
       created_by: user.id || null,
-      note: `Closed Won on ${convertedAt.slice(0, 10)}${detailParts.length ? ' — ' + detailParts.join(' · ') : ''}`,
+      note: `Closed Won on ${convertedAt.slice(0, 10)}${detailParts.length ? ' - ' + detailParts.join(' · ') : ''}`,
     }).then(() => {}, () => {})
 
     if (oldStage !== 'Closed Won') {

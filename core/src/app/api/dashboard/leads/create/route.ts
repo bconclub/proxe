@@ -17,13 +17,13 @@ export const dynamic = 'force-dynamic'
 /**
  * POST /api/dashboard/leads/create
  *
- * Manual "Add Lead" from the dashboard — either typed in by hand or prefilled
+ * Manual "Add Lead" from the dashboard - either typed in by hand or prefilled
  * from a WhatsApp screenshot (the extract-screenshot route reads the image,
  * the operator reviews, then this saves it).
  *
  * Dedup is by (normalized phone, brand): if the lead already exists we UPDATE
  * it (fill blanks, append the note) rather than create a duplicate. This is
- * what makes "add a screenshot to update that lead" work — re-adding a known
+ * what makes "add a screenshot to update that lead" work - re-adding a known
  * number lands on the existing record.
  *
  * Optional `send_welcome`: fire the Meta-approved welcome template to the lead.
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     const courseInterest = clean(body.course_interest)
     const userType = clean(body.user_type).toLowerCase()
     const education = clean(body.education)
-    // Agency-business intake (bcon/pop AddLeadModal) — only those brands send these.
+    // Agency-business intake (bcon/pop AddLeadModal) - only those brands send these.
     const businessName = clean(body.business_name)
     const businessType = clean(body.business_type)
     const serviceInterest = clean(body.service_interest)
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid phone number format' }, { status: 400 })
     }
 
-    // Only persist a name that looks like a real person — never a referral code
+    // Only persist a name that looks like a real person - never a referral code
     // or a phone number that slipped into the name field. (Same guard the Meta
     // form lead path uses.)
     const cleanName = name && isLikelyRealPersonName(name) ? name : ''
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString()
     const createdBy = user.email || 'system'
 
-    // Build the note object once (if any) — stored in unified_context.admin_notes[]
+    // Build the note object once (if any) - stored in unified_context.admin_notes[]
     // and the activities table, the same shape the Notes tab + admin-notes route use.
     const noteObj = note
       ? {
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     if (['student', 'parent', 'professional', 'early_stage'].includes(userType)) {
       brandCtx.user_type = userType
     }
-    // bcon/pop agency-business fields — same shape conversation-intelligence writes.
+    // bcon/pop agency-business fields - same shape conversation-intelligence writes.
     if (businessName) brandCtx.business_name = businessName
     if (businessType) brandCtx.business_type = businessType
     if (serviceInterest) brandCtx.service_interest = serviceInterest
@@ -142,11 +142,11 @@ export async function POST(request: NextRequest) {
           ...(Object.keys(mergedBrandCtx).length > 0 ? { [brand]: mergedBrandCtx } : {}),
           manual: manualBlock,
           ...(noteObj ? { admin_notes: [...existingNotes, noteObj] } : {}),
-          // Attribution is immutable — keep whatever the lead already had.
+          // Attribution is immutable - keep whatever the lead already had.
           attribution: existingCtx.attribution ?? buildAttribution({ formType: 'manual', channel: 'manual' }),
         },
       }
-      // Only fill blanks — never overwrite a real existing name/email.
+      // Only fill blanks - never overwrite a real existing name/email.
       if (cleanName && !existing.customer_name) updates.customer_name = cleanName
       if (email && !existing.email) updates.email = email
 
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (insErr || !created) {
-        // Lost a race to a concurrent insert — fall back to the existing row.
+        // Lost a race to a concurrent insert - fall back to the existing row.
         if (insErr?.code === '23505' || insErr?.message?.includes('duplicate')) {
           const { data: dup } = await supabase
             .from('all_leads')
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
       const { error: actErr } = await supabase.from('activities').insert({
         lead_id: leadId,
         activity_type: 'note',
-        // created_by is a UUID column — user id or null, never email/'system'.
+        // created_by is a UUID column - user id or null, never email/'system'.
         created_by: user.id || null,
         note: noteObj.text,
       })
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
 
     // ── Optional welcome message ──────────────────────────────────────────────
     // Fires the Meta-approved welcome template (allowed cold). Soft-fail: a send
-    // failure never blocks the lead from being saved — we just report it.
+    // failure never blocks the lead from being saved - we just report it.
     let welcomeSent = false
     let welcomeError: string | null = null
     if (sendWelcome) {

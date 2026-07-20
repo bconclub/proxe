@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// resolvePalette() — the Brain's colour system, shared by every renderer.
+// resolvePalette() - the Brain's colour system, shared by every renderer.
 //
 // A brand may supply brain.orbPalette (chrome rgb + weighted particle-hue mix
 // + sweep color); without it everything derives from the brand's own primary
 // colour (NOT the dashboard --accent-primary, which is monochrome in the bw
 // themes). Light themes swap glowing whites for accent-weighted inks so the
-// visualization never reads as a smudge on white. Client-side only — reads
+// visualization never reads as a smudge on white. Client-side only - reads
 // getComputedStyle; call from inside a mount effect.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ function rgbToHsl(r: number, g: number, b: number): { h: number; s: number } {
 function accentColor(): { h: number; s: number; rgb: [number, number, number] } {
   const fallback = { h: 262, s: 83, rgb: [139, 92, 246] as [number, number, number] }
   try {
-    // The visualization is a BRAND element — always render in the brand's own
+    // The visualization is a BRAND element - always render in the brand's own
     // colour regardless of the light/dark theme.
     let hex = ''
     try {

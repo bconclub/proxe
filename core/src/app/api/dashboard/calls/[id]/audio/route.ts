@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 // GET /api/dashboard/calls/[id]/audio
 // Streams a call recording. V1 (Vapi) exposes a public recording URL directly,
-// but V2 (ElevenLabs) audio is behind the API key — so we proxy it here (fetch
+// but V2 (ElevenLabs) audio is behind the API key - so we proxy it here (fetch
 // with xi-api-key, stream back) so the dashboard's <audio> can play it. `id` is
 // the external_session_id (the ElevenLabs conversation_id for V2).
 export async function GET(

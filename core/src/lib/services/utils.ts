@@ -107,7 +107,7 @@ export function formatDate(dateString: string): string {
 
 // ── Name validation ─────────────────────────────────────────────────────────
 // Words that have shown up in customer_name in the wild because the lead-
-// capture modal didn't validate input — usually UI labels, page headers, or
+// capture modal didn't validate input - usually UI labels, page headers, or
 // stray tokens that the user typed by accident. When the lead row is created
 // the agent then greets them by that "name" ("Interior! Happy to help…") which
 // is embarrassing. Both the capture endpoint and the prompt-builder use
@@ -128,7 +128,7 @@ const JUNK_NAME_DENYLIST = new Set([
 ]);
 
 // WhatsApp profile names are often a business / shop name rather than a real
-// person — usually a single all-caps word ("INTERIOR", "SHOP", "OFFICE") or a
+// person - usually a single all-caps word ("INTERIOR", "SHOP", "OFFICE") or a
 // multi-word string with a business suffix ("Sharma Enterprises", "Joshi
 // Traders Pvt Ltd"). When the WhatsApp webhook stores those as customer_name,
 // the agent later greets the lead as "Interior!" which looks broken. The
@@ -153,7 +153,7 @@ const EMOJI_REGEX =
  * values / things that are clearly not a person ("Interior", "Pilot Training",
  * "Submit", etc.), ALL-CAPS single words, multi-word values with business
  * suffixes ("Sharma Enterprises"), or emoji-heavy strings. Multi-word values
- * that pass the basic shape check are trusted — we'd rather accept an unusual
+ * that pass the basic shape check are trusted - we'd rather accept an unusual
  * real name than reject it.
  */
 /**
@@ -167,7 +167,7 @@ const EMOJI_REGEX =
  *   "Ƒ𝒂𝒏𝒄𝒚 𝓝𝓪𝓶𝒆"        → "Fancy Name"
  *   "  john   doe   "    → "John Doe"
  *
- * Never destructive — surfaces the result for the operator to confirm in an
+ * Never destructive - surfaces the result for the operator to confirm in an
  * editable field, doesn't auto-save.
  */
 export function cleanDisplayName(raw: string): string {
@@ -221,7 +221,7 @@ export function isLikelyRealPersonName(value: unknown): boolean {
   // Must contain at least one letter.
   if (!/[a-zA-ZÀ-ɏ]/.test(trimmed)) return false;
 
-  // Strip emoji and re-check — a string that is mostly emoji shouldn't count
+  // Strip emoji and re-check - a string that is mostly emoji shouldn't count
   // as a name even if it has a stray letter.
   const noEmoji = trimmed.replace(EMOJI_REGEX, '').trim();
   if (noEmoji.length < 2) return false;

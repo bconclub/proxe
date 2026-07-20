@@ -1,4 +1,4 @@
-// LEADER AUTH — the login-gate endpoint. OPEN (no key): the leader app POSTs
+// LEADER AUTH - the login-gate endpoint. OPEN (no key): the leader app POSTs
 // the passcode a leader typed; if it matches LEADER_PASSCODE we return a
 // short-lived session token. The secret never ships in the public bundle.
 //

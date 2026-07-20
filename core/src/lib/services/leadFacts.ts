@@ -1,4 +1,4 @@
-// ─── LEAD FACTS — what the lead actually SAID, distilled for templates ──────
+// ─── LEAD FACTS - what the lead actually SAID, distilled for templates ──────
 // The goal / brand / pain that fill template variables must come from the
 // lead's own words: their form answers, the campaign they responded to, what
 // they typed in chat. Fallbacks are last resort, never the default.
@@ -8,7 +8,7 @@
 // lead's reality, not "[goal]".
 
 export interface LeadFacts {
-  /** what they're after — "AI Lead Machine", their stated goal, etc. */
+  /** what they're after - "AI Lead Machine", their stated goal, etc. */
   goal: string | null
   /** their company/brand name */
   brandName: string | null
@@ -42,7 +42,7 @@ export function resolveLeadFacts(lead: {
   const webProfile: Record<string, any> = uc.web?.profile || {}
   const waProfile: Record<string, any> = uc.whatsapp?.profile || {}
 
-  // GOAL — their words first, then the campaign they answered, then nothing.
+  // GOAL - their words first, then the campaign they answered, then nothing.
   const goal =
     clean(lead?.service_interest) ||
     clean(uc.bcon?.service_interest) ||
@@ -52,7 +52,7 @@ export function resolveLeadFacts(lead: {
     clean(uc.attribution?.utm?.campaign) || // the product/campaign they enquired on
     null
 
-  // BRAND — their company, from any field they gave it in.
+  // BRAND - their company, from any field they gave it in.
   const brandName =
     clean(uc.company) || clean(uc.bcon?.company) ||
     clean(fd.brand_name) || clean(fd.company) || clean(fd.business_name) ||
@@ -60,7 +60,7 @@ export function resolveLeadFacts(lead: {
     clean(webProfile.company) || clean(waProfile.company) ||
     null
 
-  // PAIN — the headache they described, mapped from known form vocab.
+  // PAIN - the headache they described, mapped from known form vocab.
   const sysKey = String(fd.current_system || raw.current_system || '').toLowerCase()
   const painPoint =
     clean(fd.pain_point) || clean(uc.pain_point) || clean(uc.bcon?.pain_point) ||

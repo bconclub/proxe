@@ -1,4 +1,4 @@
-// DASHBOARD — recommendations (directives) list + ack/actioned.
+// DASHBOARD - recommendations (directives) list + ack/actioned.
 // The War Room's Directives tab reads via war-room/data; this route is the
 // team's response path. Cookie auth.
 

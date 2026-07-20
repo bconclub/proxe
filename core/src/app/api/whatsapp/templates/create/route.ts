@@ -1,5 +1,5 @@
 /**
- * POST /api/whatsapp/templates/create — create a WhatsApp message template on Meta.
+ * POST /api/whatsapp/templates/create - create a WhatsApp message template on Meta.
  *
  * Submits a new template to the WhatsApp Business Management API
  * (POST /{waba-id}/message_templates). The template then goes through Meta's
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     // PASSTHROUGH: if the caller already built a components array, submit it
-    // verbatim — don't strip or rebuild anything (the BODY example values etc.
+    // verbatim - don't strip or rebuild anything (the BODY example values etc.
     // are already inside). Used when a full payload is forwarded in.
     if (Array.isArray(b.components) && b.components.length) {
       const wabaId = await resolveWaba(c)
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Body text is required.' }, { status: 400 })
     }
 
-    // Variable format — Meta supports either positional {{1}} (NUMBER) or
+    // Variable format - Meta supports either positional {{1}} (NUMBER) or
     // named {{order_id}} (NAMED). A template uses one style throughout.
     const varType = String(b.varType || 'NUMBER').toUpperCase() === 'NAMED' ? 'NAMED' : 'NUMBER'
     const NUM_RE = /\{\{\s*\d+\s*\}\}/g
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     const components: any[] = []
 
-    // HEADER (TEXT) — optional, at most one variable.
+    // HEADER (TEXT) - optional, at most one variable.
     if (b.header && String(b.header.text || '').trim()) {
       const headerText = String(b.header.text).trim()
       const comp: any = { type: 'HEADER', format: 'TEXT', text: headerText }
@@ -125,14 +125,14 @@ export async function POST(request: NextRequest) {
       } else {
         const vars = headerText.match(NUM_RE) || []
         if (vars.length) {
-          if (!b.header.example) return NextResponse.json({ error: 'Header has a variable — provide a sample value.' }, { status: 400 })
+          if (!b.header.example) return NextResponse.json({ error: 'Header has a variable - provide a sample value.' }, { status: 400 })
           comp.example = { header_text: [String(b.header.example)] }
         }
       }
       components.push(comp)
     }
 
-    // BODY — variables need a sample value each.
+    // BODY - variables need a sample value each.
     const bodyComp: any = { type: 'BODY', text: bodyText }
     if (varType === 'NAMED') {
       const names = Array.from(new Set(Array.from(bodyText.matchAll(NAME_RE)).map((m) => m[1])))
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       if (vars.length) {
         const ex = Array.isArray(b.bodyExample) ? b.bodyExample.map((s: any) => String(s)) : []
         if (ex.length !== vars.length || ex.some((s: string) => !s.trim())) {
-          return NextResponse.json({ error: `Body has ${vars.length} variable(s) — provide a sample value for each.` }, { status: 400 })
+          return NextResponse.json({ error: `Body has ${vars.length} variable(s) - provide a sample value for each.` }, { status: 400 })
         }
         bodyComp.example = { body_text: [ex] }
       }
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       components.push({ type: 'FOOTER', text: String(b.footer).trim() })
     }
 
-    // BUTTONS — quick reply (Custom), URL (Visit website), phone (Call), and
+    // BUTTONS - quick reply (Custom), URL (Visit website), phone (Call), and
     // copy-code (Copy offer code). Up to 10 (Meta shows >3 as a list).
     if (Array.isArray(b.buttons) && b.buttons.length > 0) {
       const buttons = b.buttons.slice(0, 10).map((btn: any) => {

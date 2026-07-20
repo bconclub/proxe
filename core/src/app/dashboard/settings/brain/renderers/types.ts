@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Brain renderer contract — VoiceOrb is the container (voice engine, captions,
+// Brain renderer contract - VoiceOrb is the container (voice engine, captions,
 // quick-ask, language pills); a renderer is a pure canvas animation that reads
 // the live voice state through RendererEnv each frame. Three renderers ship:
 // cortex (side-profile neural brain), pulseOrb (the classic orb), mandala

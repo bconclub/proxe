@@ -5,7 +5,7 @@
 
 import { Channel, HistoryEntry } from './types';
 // Active brand's prompt, loaded via @brand (→ /brands/<id>/prompts). Adding a
-// brand needs NO edit here — the alias resolves its prompt at build time.
+// brand needs NO edit here - the alias resolves its prompt at build time.
 import { getSystemPrompt, getWebSystemPrompt } from '@brand/prompts';
 import { isLikelyRealPersonName } from '../services/utils';
 import { getCurrentBrandId } from '@/configs';
@@ -29,7 +29,7 @@ interface PromptOptions {
   formData?: Record<string, any> | null;
 }
 
-/** The hardcoded brand prompt file output — the default/seed shown in the Configure editor when no DB override is saved. Exported for the settings API. */
+/** The hardcoded brand prompt file output - the default/seed shown in the Configure editor when no DB override is saved. Exported for the settings API. */
 export function getDefaultBrandPrompt(brand: string, channel?: Channel, context = ''): string {
   return getBrandSystemPrompt(brand, context, undefined, channel);
 }
@@ -40,7 +40,7 @@ export function getDefaultBrandPrompt(brand: string, channel?: Channel, context 
  * prompt module + one case here (no other core edits).
  */
 function getBrandSystemPrompt(_brand: string, context: string, messageCount?: number, channel?: Channel): string {
-  // @brand IS the active brand — no switch needed. Its prompt is picked at build.
+  // @brand IS the active brand - no switch needed. Its prompt is picked at build.
   return channel === 'web'
     ? getWebSystemPrompt(context, messageCount)
     : getSystemPrompt(context, messageCount);
@@ -119,7 +119,7 @@ function buildSystemPrompt(
     ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.`
     : '';
 
-  // KNOWN CONTACT block — tells the LLM exactly which fields are already
+  // KNOWN CONTACT block - tells the LLM exactly which fields are already
   // captured so it never re-asks for them. Aligns the booking gate, the
   // cost-guide ask, and any other "drop your contact" prompt to the actual
   // state of the lead row instead of a static "name and email" string.
@@ -135,7 +135,7 @@ function buildSystemPrompt(
     if (!phoneKnown) missing.push('phone');
     if (!emailKnown) missing.push('email');
     const fmtMissing =
-      missing.length === 0 ? '(none — all three captured)'
+      missing.length === 0 ? '(none - all three captured)'
       : missing.length === 1 ? missing[0]
       : missing.length === 2 ? `${missing[0]} and ${missing[1]}`
       : `${missing[0]}, ${missing[1]}, and ${missing[2]}`;
@@ -225,7 +225,7 @@ function buildUserPrompt(params: {
         const [h, m] = hm.split(':').map(Number);
         const nowMin = h * 60 + m;
         // Booking windows IST: online starts 15:00/16:00/17:00 (last start 17:00),
-        // offline 11:00–19:00 (last start 18:00). With the 60-min lead rule,
+        // offline 11:00-19:00 (last start 18:00). With the 60-min lead rule,
         // "today" is bookable only while now + 60 ≤ last start.
         // Lokazen is a phone-callback model: NO in-person / offline facility
         // visits exist. The offline window is a facility-visit concept for other
@@ -238,7 +238,7 @@ function buildUserPrompt(params: {
         const todayOpen = onlineOpenToday || offlineOpenToday;
 
         // Day axis for choosing which day buttons to show. We are CLOSED Sundays,
-        // so "Tomorrow" must be skipped when tomorrow is a Sunday — offer the next
+        // so "Tomorrow" must be skipped when tomorrow is a Sunday - offer the next
         // working day (e.g. Monday) instead.
         const [ty, tmo, td] = isoDate.split('-').map(Number);
         const baseUTC = Date.UTC(ty, tmo - 1, td, 12, 0, 0);
@@ -257,16 +257,16 @@ function buildUserPrompt(params: {
         let todayRule: string;
         if (!todayOpen) {
           const reason = isSunday ? 'today is Sunday and we are closed' : "today's booking window has already closed";
-          todayRule = `Do NOT offer a "Today" button and do NOT say you will check what's open today — ${reason}. For the date question, offer EXACTLY these buttons: ${dayButtons}, and briefly mention today's slots are done.`;
+          todayRule = `Do NOT offer a "Today" button and do NOT say you will check what's open today - ${reason}. For the date question, offer EXACTLY these buttons: ${dayButtons}, and briefly mention today's slots are done.`;
         } else if (!onlineOpenToday) {
           todayRule = `Today's online slots are done; only an in-person facility visit may still fit today. For the date question, offer EXACTLY these buttons: ${dayButtons}; only check today if the user explicitly asks for an in-person visit.`;
         } else {
           todayRule = `Today is still bookable. For the date question, offer EXACTLY these buttons: ${dayButtons}. When offering today's times, never propose a slot earlier than 60 minutes from now.`;
         }
-        const closedRule = 'We are CLOSED on Sundays. NEVER offer, check, or confirm a Sunday date — if "tomorrow" or a requested date lands on a Sunday, use the next working day (Monday) instead.';
+        const closedRule = 'We are CLOSED on Sundays. NEVER offer, check, or confirm a Sunday date - if "tomorrow" or a requested date lands on a Sunday, use the next working day (Monday) instead.';
 
         // Deterministic upcoming-date map. The model was resolving "next Monday"
-        // by doing calendar math and getting it wrong — give it an exact lookup,
+        // by doing calendar math and getting it wrong - give it an exact lookup,
         // with Sundays explicitly flagged as closed.
         const upcoming: string[] = [];
         for (let i = 0; i <= 13; i++) {
@@ -274,17 +274,17 @@ function buildUserPrompt(params: {
           const iso = d.toISOString().slice(0, 10);
           const wd = weekdayAt(i);
           const tag = i === 0 ? ' (today)' : i === 1 ? ' (tomorrow)' : '';
-          const closedTag = wd === 'Sunday' ? ' — CLOSED' : '';
+          const closedTag = wd === 'Sunday' ? ' - CLOSED' : '';
           upcoming.push(`  ${wd} ${iso}${tag}${closedTag}`);
         }
-        const dateRef = `Upcoming dates — resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
+        const dateRef = `Upcoming dates - resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
-        const upcomingRule = `TIME AWARENESS — a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
+        const upcomingRule = `TIME AWARENESS - a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
         const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. Online slots are 3:00 PM, 4:00 PM, 5:00 PM. The moment the user taps or states a specific time (for example "3:00 PM"), that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns (for example the user tapped "3:00 PM" and then "Tomorrow"), do NOT ask anything else: call book_consultation right away with that day and time, then confirm. Never switch to the 11 AM to 7 PM offline window after offering the 3/4/5 PM slots, because mixing windows is what restarts the loop.`;
-        const bookingRegisterRule = `BOOKING MUST BE REGISTERED (critical). The ONLY way a call is actually booked is by calling the book_consultation tool. NEVER type a confirmation like "the team will confirm and call you", "you're booked", or "works, the team will call you then" unless book_consultation has ALREADY returned success this turn — a typed confirmation with no tool call registers nothing and the customer is left stranded. If book_consultation returns an error, tell the user honestly in ONE line that you have flagged it to the team who will call them to confirm, do NOT claim it is booked, and do NOT re-offer slots. Once a booking is registered (or you have told the user the team will call), it is DONE: if the user then asks a follow-up like "what if they don't call" or "will they actually call", reassure them briefly and, if needed, that you have noted it as priority — NEVER restart slot selection, never re-offer times, never send the slot buttons again.`;
+        const bookingRegisterRule = `BOOKING MUST BE REGISTERED (critical). The ONLY way a call is actually booked is by calling the book_consultation tool. NEVER type a confirmation like "the team will confirm and call you", "you're booked", or "works, the team will call you then" unless book_consultation has ALREADY returned success this turn - a typed confirmation with no tool call registers nothing and the customer is left stranded. If book_consultation returns an error, tell the user honestly in ONE line that you have flagged it to the team who will call them to confirm, do NOT claim it is booked, and do NOT re-offer slots. Once a booking is registered (or you have told the user the team will call), it is DONE: if the user then asks a follow-up like "what if they don't call" or "will they actually call", reassure them briefly and, if needed, that you have noted it as priority - NEVER restart slot selection, never re-offer times, never send the slot buttons again.`;
         const windowsLine = callbackOnly
           ? `Booking is a phone callback at an online slot only: 3:00 PM, 4:00 PM, or 5:00 PM IST, Monday to Saturday. There are NO in-person visits, NO facility or site-visit bookings, and NO 11 AM to 7 PM window. NEVER offer an in-person visit or an offline slot. If today's callback slots are already done, offer the next working day, never a later in-person time.`
-          : `Booking windows IST (Mon–Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM–7:00 PM.`;
+          : `Booking windows IST (Mon-Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM-7:00 PM.`;
         return `Current IST: ${time} on ${weekday}, ${isoDate}. ${windowsLine} ${todayRule} ${closedRule}\n\n${bookingSequenceRule}\n\n${bookingRegisterRule}\n\n${upcomingRule}\n\n${dateRef}`;
       })()
     : channel === 'voice'
@@ -293,7 +293,7 @@ function buildUserPrompt(params: {
         const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
         const weekday = now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
         const isoDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-        return `Current IST: ${time} on ${weekday}, ${isoDate}. A call or booking scheduled for later today is UPCOMING, not missed — never apologize for a missed call for a time that has not passed yet.`;
+        return `Current IST: ${time} on ${weekday}, ${isoDate}. A call or booking scheduled for later today is UPCOMING, not missed - never apologize for a missed call for a time that has not passed yet.`;
       })()
     : '';
 

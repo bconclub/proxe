@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 
 // Shared viewport check for behavior-only switches (state defaults, handlers,
-// drag). For pure styling prefer CSS breakpoint pairs — they don't flicker on
+// drag). For pure styling prefer CSS breakpoint pairs - they don't flicker on
 // hydration. SSR-safe: always false on the server and first client render.
 export function useIsMobile(bp = 768) {
   const [isMobile, setIsMobile] = useState(false)

@@ -1,16 +1,16 @@
 'use client'
 
-// POP EVENTS — the campaign calendar, laid out to the reference design:
+// POP EVENTS - the campaign calendar, laid out to the reference design:
 // KPI strip (Confirmed / Leadership Proposed / AI Suggested / Awaiting Sign-off),
 // legend + filters, month grid with typed multi-day pills and day-count badges,
 // and the Event Intelligence rail (selected day breakdown, AI rationale,
 // quick actions, overlap detection, upcoming approvals).
 // Event kinds:
-//   • confirmed   (solid saffron)     — locked in and happening
-//   • leadership  (blue outline)      — the leader proposes from the field
-//   • ai          (dashed purple)     — PROXe suggests from listen signals / gaps
-//   • awaiting    (dashed orange)     — proposal escalated, needs sign-off
-// Mock data for now — swap for campaign_events once the planning flow lands.
+//   • confirmed   (solid saffron)     - locked in and happening
+//   • leadership  (blue outline)      - the leader proposes from the field
+//   • ai          (dashed purple)     - PROXe suggests from listen signals / gaps
+//   • awaiting    (dashed orange)     - proposal escalated, needs sign-off
+// Mock data for now - swap for campaign_events once the planning flow lands.
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdAutoAwesome, MdCampaign, MdCheckCircle, MdSchedule, MdFilterList, MdExpandMore, MdEventAvailable, MdFlag, MdWarningAmber, MdCalendarToday, MdPersonAddAlt } from 'react-icons/md'
@@ -100,7 +100,7 @@ const LANE_H = 22
 const LANE_GAP = 3
 
 export default function CampaignCalendar() {
-  // avoid SSR/CSR date mismatch — compute after mount
+  // avoid SSR/CSR date mismatch - compute after mount
   const [today, setToday] = useState<Date | null>(null)
   const [monthAnchor, setMonthAnchor] = useState<Date | null>(null)
   const [selectedSerial, setSelectedSerial] = useState<number | null>(null)
@@ -251,7 +251,7 @@ export default function CampaignCalendar() {
                   {bars.map((b) => (
                     <div
                       key={b.id}
-                      title={`${b.title}${b.place ? ' · ' + b.place : ''} — ${KIND_META[b.kind].label}`}
+                      title={`${b.title}${b.place ? ' · ' + b.place : ''} - ${KIND_META[b.kind].label}`}
                       onClick={() => setSelectedSerial(Math.max(b.s, weekStart))}
                       style={{
                         gridColumn: `${b.startCol + 1} / span ${b.span}`,

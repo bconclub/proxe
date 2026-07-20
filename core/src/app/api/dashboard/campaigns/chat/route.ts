@@ -1,5 +1,5 @@
 /**
- * POST /api/dashboard/campaigns/chat — the campaign builder's brain.
+ * POST /api/dashboard/campaigns/chat - the campaign builder's brain.
  *
  * The user describes who they want to reach in plain words. Claude (tool loop)
  * queries the brand's real leads (query_audience) and the approved WhatsApp
@@ -64,7 +64,7 @@ async function queryAudience(input: Record<string, any>): Promise<string> {
     rows = rows.filter((l) => String(brandCtx(l).user_type || '').toLowerCase() === want)
   }
   if (input.city) {
-    // city is not a column on every brand's all_leads — read it from the
+    // city is not a column on every brand's all_leads - read it from the
     // brand's unified_context blob instead.
     const want = String(input.city).toLowerCase()
     rows = rows.filter((l) => String(brandCtx(l).city || '').toLowerCase().includes(want))
@@ -105,9 +105,9 @@ async function queryAudience(input: Record<string, any>): Promise<string> {
 
 async function listTemplates(): Promise<string> {
   // The registry is Meta-APPROVED windchasers content; other brands have no
-  // registry yet — the model falls through to drafting fresh templates.
+  // registry yet - the model falls through to drafting fresh templates.
   if (BRAND_ID !== 'windchasers') {
-    return JSON.stringify({ templates: [], note: 'No approved template registry for this brand yet — draft new templates.' })
+    return JSON.stringify({ templates: [], note: 'No approved template registry for this brand yet - draft new templates.' })
   }
   const templates = Object.entries(WA_TEMPLATE_BODIES).map(([name, t]) => ({
     name,
@@ -122,7 +122,7 @@ async function listTemplates(): Promise<string> {
 // ─── Tools + prompt ──────────────────────────────────────────────────────────
 
 // Tools are built per brand so a brand's taxonomy never bleeds into another's
-// prompt. course/user_type/webinar are Windchasers-aviation filters — off
+// prompt. course/user_type/webinar are Windchasers-aviation filters - off
 // elsewhere; every brand keeps the neutral stage/source/city/recency filters.
 function buildTools(): ToolDefinition[] {
   const props: Record<string, any> = {
@@ -158,7 +158,7 @@ function buildTools(): ToolDefinition[] {
 // The ONLY personalization variables the brain may put in drafts for this brand.
 // customer_name is always safe; the brand's config vars + (for windchasers) the
 // real registry template vars extend it. A brand with no registry/config gets
-// customer_name only — so nothing like {{course_name}} bleeds onto a non-aviation
+// customer_name only - so nothing like {{course_name}} bleeds onto a non-aviation
 // brand just because the LLM had no template to anchor to.
 function allowedVariables(): string[] {
   const set = new Set<string>(['customer_name'])
@@ -187,14 +187,14 @@ RULES
   - marketing-safe copy (no spam bait, includes a clear next step)
 - PERSONALIZATION VARIABLES: the ONLY variables you may put in any draft body, footer or button are: ${allowed.map((v) => `{{${v}}}`).join(', ')}. Do NOT invent any other variable (never {{course_name}}, {{product}}, {{offer}}, etc.). If you want to reference a detail that is not in this list, write it in plain words instead of a placeholder. When unsure, use only {{customer_name}}.
 - Keep "message" short and practical (2-4 sentences). No markdown headings.
-- NEVER use em dashes or en dashes (— or –) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".${BRAND_ID === 'lokazen' ? `
+- NEVER use em dashes or en dashes (- or -) anywhere, in messages, drafts, footers or the goal. Use a comma, a period, or the word "and".${BRAND_ID === 'lokazen' ? `
 - LOKAZEN AUDIENCES (critical): there are THREE separate audiences that must NEVER be mixed in one campaign , their needs and messaging are completely different:
     - brand: a business looking for commercial space (wants matches, plans, site visits)
     - owner: a property owner listing space (wants qualified tenants, listing help)
     - scout: a gig worker who spots empty shops for payouts (wants gigs, KYC, payouts)
   Every campaign targets exactly ONE user_type. If the teammate's description maps to one segment, filter query_audience by that user_type. If it does NOT name a segment (e.g. "everyone who went quiet"), do NOT lump them , run query_audience once per segment and present the per-audience breakdown (count + with_phone for brand / owner / scout) in "message" so they pick which audience to send, then draft copy for THAT audience only. A brand-seeker and a property owner must never get the same message.` : ''}
 
-OUTPUT — your FINAL reply must be STRICT JSON only (no prose around it, no code fences):
+OUTPUT - your FINAL reply must be STRICT JSON only (no prose around it, no code fences):
 {
   "message": string,
   "audience": { "description": string, "filters": object, "count": number, "with_phone": number, "sample": [{"name": string, "phone": string, "stage": string}] } | null,

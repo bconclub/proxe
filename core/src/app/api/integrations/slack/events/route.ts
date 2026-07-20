@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/integrations/slack/events
  * Slack Events request URL. When the team REPLIES in the thread of a lead alert,
- * we send that text to the customer on WhatsApp — two-way from Slack.
+ * we send that text to the customer on WhatsApp - two-way from Slack.
  * Subscribe to `message.channels` (public) or `message.groups` (private) and set
  * this as the Events request URL in the Slack app.
  */

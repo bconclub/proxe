@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Honor a `next` destination (e.g. password-recovery links point at
-  // /auth/reset-password). Restrict to same-origin absolute PATHS only — never
-  // an attacker-supplied absolute URL — so this can't become an open redirect.
+  // /auth/reset-password). Restrict to same-origin absolute PATHS only - never
+  // an attacker-supplied absolute URL - so this can't become an open redirect.
   const nextParam = requestUrl.searchParams.get('next')
   const safeNext =
     nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')

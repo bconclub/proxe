@@ -1,6 +1,6 @@
 'use client';
 
-// Widget Appearance — search bar vs chat bubble. Extracted from the old
+// Widget Appearance - search bar vs chat bubble. Extracted from the old
 // single-scroll settings page when Configure became a card grid.
 
 import { useState, useEffect } from 'react';

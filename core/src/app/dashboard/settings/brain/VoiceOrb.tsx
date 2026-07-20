@@ -1,8 +1,8 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VoiceOrb — the Brain tab container: voice engine + overlays + the variant
-// picker. The visualization itself is pluggable — three renderers live in
+// VoiceOrb - the Brain tab container: voice engine + overlays + the variant
+// picker. The visualization itself is pluggable - three renderers live in
 // ./renderers (cortex / pulseOrb / mandala), selected by the dot picker at the
 // bottom and persisted in localStorage. Renderers read the live voice state
 // (mode, amplitude, waveform, ripples) through a small env object each frame,
@@ -31,7 +31,7 @@ import type { OrbMode, Ripple, RendererEnv, VariantId } from './renderers/types'
 type Mode = OrbMode | 'listening'
 
 // Per-brand content: questions, languages, thinking-step captions, palette.
-// Resolved once at module scope — the brand is fixed for the build.
+// Resolved once at module scope - the brand is fixed for the build.
 const BRAIN = getBrainConfig()
 const QUICK_QUESTIONS = BRAIN.quickQuestions
 const LANGS = BRAIN.languages
@@ -48,7 +48,7 @@ function splitSentences(text: string): string[] {
   return (text.match(/[^.!?।]+[.!?।]+["']?|\S[^.!?।]*$/g) || [text]).map((s) => s.trim()).filter(Boolean)
 }
 
-// Karaoke chunks — 1–3 words that swap as the audio plays, so the caption
+// Karaoke chunks - 1-3 words that swap as the audio plays, so the caption
 // stays as narrow as the orb instead of a long sentence. Punctuation-ending
 // words get their own short chunk so the line breathes at natural pauses.
 function chunkWords(text: string): string[] {
@@ -65,14 +65,14 @@ function chunkWords(text: string): string[] {
 }
 
 // Props let the orb be embedded as a full-screen overlay (dock → brain wakes):
-//   autoStart       — run on mount (the dock click IS the gesture)
-//   initialQuestion — if set, autoStart asks THIS instead of the daily briefing
-//   conversational  — after it finishes speaking, open the mic and listen for a
-//                     spoken reply, then answer it — a back-and-forth voice loop
-//   listenFirst     — skip the opening briefing; go straight to listening
-//   onClose         — show a close button; the overlay unmounts the orb
-//   compact         — tiny embed (dock-sized): just the glowing orb, no caption,
-//                     no close button, no language switcher — it IS the light
+//   autoStart       - run on mount (the dock click IS the gesture)
+//   initialQuestion - if set, autoStart asks THIS instead of the daily briefing
+//   conversational  - after it finishes speaking, open the mic and listen for a
+//                     spoken reply, then answer it - a back-and-forth voice loop
+//   listenFirst     - skip the opening briefing; go straight to listening
+//   onClose         - show a close button; the overlay unmounts the orb
+//   compact         - tiny embed (dock-sized): just the glowing orb, no caption,
+//                     no close button, no language switcher - it IS the light
 export type VoiceOrbProps = {
   autoStart?: boolean
   initialQuestion?: string
@@ -81,11 +81,11 @@ export type VoiceOrbProps = {
   onClose?: () => void
   compact?: boolean
   // Brain-drives-UI: validated nav actions from the briefing route land here
-  // (open lead / open page). The host (DashboardBrain) executes them — the page
+  // (open lead / open page). The host (DashboardBrain) executes them - the page
   // loads behind the orb while it keeps speaking. Dial never comes via voice.
   onAction?: (a: BrainAction) => void
   // Voice-OFF text answer emitted up to the host so it can render a readable
-  // panel (the docked orb is a tiny clipped circle — text won't fit inside it).
+  // panel (the docked orb is a tiny clipped circle - text won't fit inside it).
   // '' means clear. onVoiceChange lets the host reflect the on/off state.
   onAnswer?: (text: string) => void
   onVoiceChange?: (on: boolean) => void
@@ -99,7 +99,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   const [caption, setCaption] = useState('')
   const [subtitle, setSubtitle] = useState('')
   // Voice toggle: OFF (default) = the brain READS its answer as text (no TTS,
-  // no mic — works without an ElevenLabs key); ON = it speaks + the mic listens
+  // no mic - works without an ElevenLabs key); ON = it speaks + the mic listens
   // so you can just talk. Persisted per browser.
   const [voiceOn, setVoiceOn] = useState(false)
   const voiceOnRef = useRef(false)
@@ -119,7 +119,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   // loading ring: fills while the brain connects, completes when audio starts
   const thinkStartRef = useRef<number | null>(null)
   const ringDoneAtRef = useRef<number | null>(null)
-  // voice-off answers stream into the card word by word — this drives it
+  // voice-off answers stream into the card word by word - this drives it
   const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // shared per-frame buffers for the analyser reads (one alloc, all renderers)
   const ampBufRef = useRef(new Uint8Array(64))
@@ -129,7 +129,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
 
   // Restore the voice-on/off preference once mounted (hydration-safe).
   useEffect(() => {
-    // Voice defaults ON — the brain speaks unless the user muted it. (New key
+    // Voice defaults ON - the brain speaks unless the user muted it. (New key
     // so everyone's stored 'off' from the silent-key era resets to speaking.)
     try { const st = localStorage.getItem('proxe-brain-voice2'); const v = st == null ? true : st === '1'; setVoiceOn(v); voiceOnRef.current = v } catch { setVoiceOn(true); voiceOnRef.current = true }
   }, [])
@@ -148,7 +148,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   useEffect(() => { onVoiceRef.current?.(voiceOn) }, [voiceOn])
   useEffect(() => { onSubtitleRef.current?.(subtitle) }, [subtitle])
 
-  // Conversation turns (voice loop) — sent with each mode:'text' request so the
+  // Conversation turns (voice loop) - sent with each mode:'text' request so the
   // brain can resolve "yes" / "that one" against what it just said. onAction
   // rides in a ref so engage() never re-creates over a new callback identity.
   const historyRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([])
@@ -156,7 +156,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   onActionRef.current = onAction
 
   // ── mic (talk back) ────────────────────────────────────────────────────────
-  // Browser Web Speech API via the shared hook — no key, no server. Used only
+  // Browser Web Speech API via the shared hook - no key, no server. Used only
   // in conversational overlay mode; the brain-page orb never listens.
   const { isSupported: micSupported, transcript: heard, startListening, stopListening, resetTranscript } = useSpeechRecognition()
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -189,7 +189,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
   }, [])
 
   // ── renderer mount: one env closure, re-created only when the variant flips.
-  // The voice engine has ZERO dependency on the variant — audio keeps playing
+  // The voice engine has ZERO dependency on the variant - audio keeps playing
   // across switches and the new renderer picks up live amp on its first frame.
   useEffect(() => {
     const canvas = canvasRef.current
@@ -216,12 +216,12 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       getRingDoneAt: () => ringDoneAtRef.current,
       palette: resolvePalette(BRAIN.orbPalette),
     }
-    // One brain for now — the pulse orb (cortex/mandala parked; they read rough).
+    // One brain for now - the pulse orb (cortex/mandala parked; they read rough).
     const r = createPulseOrb(canvas, env)
     return () => r.destroy()
   }, [variant])
 
-  // ── stop everything — ONE voice, always ────────────────────────────────────
+  // ── stop everything - ONE voice, always ────────────────────────────────────
   const stop = useCallback(() => {
     abortRef.current?.abort()
     for (const a of [audioRef.current, ...queueRef.current]) {
@@ -273,32 +273,32 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     const ac = new AbortController()
     abortRef.current = ac
     const t0 = performance.now()
-    // Live elapsed-seconds counter while the brain gathers + writes — so the
+    // Live elapsed-seconds counter while the brain gathers + writes - so the
     // wait reads as real progress, not a ring that seems to hang.
     const secTimer = setInterval(() => {
       if (modeRef.current === 'thinking') setSubtitle(`${((performance.now() - t0) / 1000).toFixed(1)}s`)
       else clearInterval(secTimer)
     }, 100)
-    // Shared TTS helpers — defined up-front so the instant greeting can use them.
+    // Shared TTS helpers - defined up-front so the instant greeting can use them.
     const tts = (chunk: string) => fetch('/api/dashboard/brain/briefing', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'tts', text: chunk }), signal: ac.signal,
     }).then((r) => r.json())
-    // retry once — a failed rest-chunk must NOT stop the briefing mid-thought
+    // retry once - a failed rest-chunk must NOT stop the briefing mid-thought
     const ttsRetry = async (chunk: string) => {
       const a = await tts(chunk).catch(() => null)
       if (a?.audio) return a
       return tts(chunk).catch(() => null)
     }
     try {
-      // 0. INSTANT greeting — a canned personalized opener ("Hi <name>, let me
+      // 0. INSTANT greeting - a canned personalized opener ("Hi <name>, let me
       // pull together everything from today…") voiced in ~1.5s (one TTS hop, no
       // LLM), so the orb starts talking almost immediately instead of sitting
       // silent behind a spinning ring. It plays FIRST; the real briefing follows
       // seamlessly once it's ready. greetDone resolves when the greeting audio
       // ends, so the briefing never overlaps it.
       let greetDone: Promise<void> = Promise.resolve()
-      // ALWAYS fetch the greet — it's the fast, input-aware acknowledgment
+      // ALWAYS fetch the greet - it's the fast, input-aware acknowledgment
       // ("Okay <name>, let me check on those leads"). Voice ON → play it;
       // voice OFF → it becomes the FIRST caption, held a beat before the
       // generic thinking steps resume.
@@ -312,7 +312,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
           if (!voiceOnRef.current) {
             if (g?.text && modeRef.current === 'thinking') {
               // The ack is a one-line subtitle ("Okay Z, catching you up now.")
-              // that comes and goes — never a text box.
+              // that comes and goes - never a text box.
               clearInterval(stepTimer)
               setCaption(g.text)
               stepTimer = setInterval(stepTick, 1600)
@@ -336,7 +336,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
           ga.play().catch(() => {})
         }).catch(() => {})
 
-      // 1. the words (fast — Groq when configured)
+      // 1. the words (fast - Groq when configured)
       const tr = await fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -379,7 +379,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         return
       }
 
-      // Brain-drives-UI: execute the first validated nav action now — the page
+      // Brain-drives-UI: execute the first validated nav action now - the page
       // opens BEHIND the orb while the voice keeps talking (the orb lives in
       // the layout and survives in-dashboard navigation). Dial is filtered
       // server-side for voice; skip it here too, belt and suspenders.
@@ -411,7 +411,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
 
       const first = await firstP
       clearInterval(stepTimer); clearInterval(secTimer)
-      if (first?.error || !first?.audio) throw new Error(first?.error || 'voice unavailable right now — try again in a moment')
+      if (first?.error || !first?.audio) throw new Error(first?.error || 'voice unavailable right now - try again in a moment')
       const ttfaMs = Math.round(performance.now() - t0)
       // Wait for the instant greeting to finish so the briefing never talks over
       // it. If the greeting never played (failed), greetDone is already resolved.
@@ -419,8 +419,8 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       await greetP.catch(() => {}); await greetDone
       if (modeRef.current === 'idle' || modeRef.current === 'error') return
 
-      // subtitles per short chunk (1–3 words), driven by audio progress so the
-      // words swap in time with the voice — narrow, never a long line
+      // subtitles per short chunk (1-3 words), driven by audio progress so the
+      // words swap in time with the voice - narrow, never a long line
       const firstSents = chunkWords(firstChunk)
       const restSents = restChunk ? chunkWords(restChunk) : []
       const subs = (audio: HTMLAudioElement, sents: string[]) => {
@@ -445,7 +445,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
       ringDoneAtRef.current = performance.now() // ring completes + fades
       setModeBoth('speaking')
 
-      // 3. log the run's latency metadata — the "brain voice" eval record
+      // 3. log the run's latency metadata - the "brain voice" eval record
       fetch('/api/dashboard/brain/briefing', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: 'log', meta: {
@@ -527,7 +527,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     return () => { if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null } }
   }, [heard, submitSpoken])
 
-  // Conversational loop: only while VOICE IS ON — after it finishes speaking,
+  // Conversational loop: only while VOICE IS ON - after it finishes speaking,
   // reopen the mic for the next turn. Voice off never listens.
   useEffect(() => {
     const prev = prevModeRef.current
@@ -542,7 +542,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     if (didAutoStart.current) return
     // Deferred one tick: React StrictMode (dev) mounts -> cleans up -> mounts
     // again, and the unmount cleanup calls stop() which ABORTS a briefing that
-    // started on the first pass — while didAutoStart (a ref) survives, so the
+    // started on the first pass - while didAutoStart (a ref) survives, so the
     // second pass never retried. The timer makes the first pass cancellable
     // BEFORE any fetch starts: cleanup clears it, the second pass runs once.
     const t = setTimeout(() => {
@@ -577,7 +577,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
     >
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
 
-      {/* Close (overlay embed only) — collapse the brain back to the dock */}
+      {/* Close (overlay embed only) - collapse the brain back to the dock */}
       {onClose && !compact && (
         <button
           onClick={(e) => { e.stopPropagation(); stop(); stopListening(); onClose() }}
@@ -595,7 +595,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         </button>
       )}
 
-      {/* VOICE TOGGLE — the one control on the docked orb. Just below the light.
+      {/* VOICE TOGGLE - the one control on the docked orb. Just below the light.
           OFF: the brain reads its answer as text, you click to get things (works
           with no ElevenLabs key). ON: it speaks and the mic listens so you can
           just talk. Accent + pulse while listening. */}
@@ -606,7 +606,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
             if (voiceOnRef.current) { setVoice(false); stop(); stopListening(); setModeBoth('idle') }
             else {
               setVoice(true); beginListening()
-              // Can it actually SPEAK? If not, turn back off and say exactly why —
+              // Can it actually SPEAK? If not, turn back off and say exactly why -
               // a silently-dead voice toggle is the worst failure mode.
               fetch('/api/dashboard/brain/briefing', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -615,21 +615,21 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
                 if (h && h.ok === false) {
                   const bad = (h.checks || []).filter((c: any) => !c.ok).map((c: any) => `• ${c.name}: ${c.detail}`).join('\n')
                   setVoice(false); stopListening(); setModeBoth('idle')
-                  emitAnswer(`Voice can't speak yet — needs fixing:\n${bad}`)
+                  emitAnswer(`Voice can't speak yet - needs fixing:\n${bad}`)
                 }
               }).catch(() => { /* health check is advisory */ })
             }
           }}
           onPointerMove={(e) => e.stopPropagation()}
-          aria-label={voiceOn ? 'Voice on — tap to turn off' : 'Voice off — tap to talk'}
-          title={voiceOn ? (mode === 'listening' ? 'Listening… tap to turn voice off' : 'Voice on — tap to turn off') : 'Tap to talk (voice off — answers show as text)'}
+          aria-label={voiceOn ? 'Voice on - tap to turn off' : 'Voice off - tap to talk'}
+          title={voiceOn ? (mode === 'listening' ? 'Listening… tap to turn voice off' : 'Voice on - tap to turn off') : 'Tap to talk (voice off - answers show as text)'}
           style={{
-            // small frosted chip — must never dominate the orb (was a solid
+            // small frosted chip - must never dominate the orb (was a solid
             // 34px disc that read as a big white blob over the light)
             position: 'absolute', left: '50%', bottom: 6, transform: 'translateX(-50%)', zIndex: 5,
             width: 30, height: 30, borderRadius: 999, cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            // Never a SOLID accent fill — bcon's accent is near-white and the
+            // Never a SOLID accent fill - bcon's accent is near-white and the
             // chip turned into a glowing blob. ON = accent ring + tinted glass.
             background: voiceOn
               ? 'color-mix(in srgb, var(--accent-primary) 18%, rgba(10,10,10,0.65))'
@@ -661,7 +661,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         </button>
       )}
 
-      {/* ONE line under the orb — short karaoke words while speaking (blob-wide),
+      {/* ONE line under the orb - short karaoke words while speaking (blob-wide),
           hint/steps otherwise (wider). Hidden in compact (the light says it all). */}
       {!compact && <div style={{
         position: 'absolute', left: '50%', bottom: '8%', transform: 'translateX(-50%)',
@@ -679,7 +679,7 @@ export default function VoiceOrb({ autoStart = false, initialQuestion, conversat
         {mode === 'thinking' && <span style={{ display: 'inline-block', marginLeft: 6, animation: 'voPulse 1.1s ease infinite' }}>●</span>}
       </div>}
 
-      {/* language switcher (bottom right) — only when the brand speaks >1 language */}
+      {/* language switcher (bottom right) - only when the brand speaks >1 language */}
       {LANGS.length > 1 && !compact && <div
         onClick={(e) => e.stopPropagation()}
         onPointerMove={(e) => e.stopPropagation()}

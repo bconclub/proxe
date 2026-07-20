@@ -2,7 +2,7 @@
  * GET  /api/dashboard/token-usage → the running token-usage aggregate (TEST).
  * POST /api/dashboard/token-usage → { action: 'reset' } clears it.
  *
- * Experimental — see lib/token-usage.ts for the storage caveats.
+ * Experimental - see lib/token-usage.ts for the storage caveats.
  */
 
 import { NextRequest, NextResponse } from 'next/server'

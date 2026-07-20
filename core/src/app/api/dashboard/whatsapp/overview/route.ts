@@ -1,5 +1,5 @@
 /**
- * GET /api/dashboard/whatsapp/overview — the WhatsApp health header for the
+ * GET /api/dashboard/whatsapp/overview - the WhatsApp health header for the
  * Configure → WhatsApp page.
  *
  * Pulls the number's live status from Meta (quality rating + messaging tier +
@@ -69,7 +69,7 @@ export async function GET() {
 
     const tierKey = phone?.messaging_limit_tier || null
     const tier = tierKey
-      ? { key: tierKey, ...(TIER_INFO[tierKey] || { label: tierKey, cap: '—' }) }
+      ? { key: tierKey, ...(TIER_INFO[tierKey] || { label: tierKey, cap: '-' }) }
       : null
 
     // ── Send volume from our own log ──

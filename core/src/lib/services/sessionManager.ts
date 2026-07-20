@@ -205,7 +205,7 @@ export async function ensureSession(
 
   if (data) return mapSession(data);
 
-  // Create new session — `brand` is NOT NULL on web_sessions / whatsapp_sessions /
+  // Create new session - `brand` is NOT NULL on web_sessions / whatsapp_sessions /
   // etc., so include it on every insert. This codebase is the windchasers fork,
   // brand is locked to BRAND_ID.
   const insertData: Record<string, any> = {

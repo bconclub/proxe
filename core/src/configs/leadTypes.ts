@@ -6,7 +6,7 @@
  * value to it, and which unified_context field the brand stores its segment in.
  *
  * Windchasers/BCON segment by COURSE (course_interest). Lokazen segments by
- * AUDIENCE — owner / brand / scout — stored in unified_context[BRAND_ID].user_type.
+ * AUDIENCE - owner / brand / scout - stored in unified_context[BRAND_ID].user_type.
  * For every non-Lokazen brand this module returns the exact course values +
  * normalizer, so behaviour there is unchanged.
  */

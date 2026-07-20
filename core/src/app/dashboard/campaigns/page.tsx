@@ -1,10 +1,10 @@
 'use client'
 
-// Campaigns — the AI campaign workspace (mock-faithful structure, brand theme
+// Campaigns - the AI campaign workspace (mock-faithful structure, brand theme
 // colors): chat on the left, Templates / Audience summary / Campaign setup /
 // Personalization rail on the right. "Previous Campaigns" opens the overview
 // list. The chat pulls real audiences and templates; Review & Schedule saves
-// the campaign as 'ready' with a send time — actual sending stays separate.
+// the campaign as 'ready' with a send time - actual sending stays separate.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -85,11 +85,11 @@ interface SentCampaign {
 
 const GREEN = '#22c55e', AMBER = '#f59e0b', PURPLE = '#8b5cf6', BLUE = '#3b82f6', RED = '#ef4444'
 
-// The agent is PROXe everywhere — the product's assistant, brand-neutral.
+// The agent is PROXe everywhere - the product's assistant, brand-neutral.
 const ASSISTANT = 'PROXe'
 
 // Smart-suggestion chips. Neutral defaults ship to every brand; a brand can
-// override with its own audience language via config.campaigns.suggestions —
+// override with its own audience language via config.campaigns.suggestions -
 // shared core never hardcodes one brand's taxonomy (no-bleed rule).
 const DEFAULT_SUGGESTIONS = [
   'Reach people who replied once but never connected',
@@ -218,7 +218,7 @@ function TemplateCard({ t, selected, onSelect }: { t: Tpl; selected: boolean; on
   )
 }
 
-// ─── Schedule picker — a calendar + sorted hour/minute/AM-PM columns ─────────
+// ─── Schedule picker - a calendar + sorted hour/minute/AM-PM columns ─────────
 // Value is a naive "YYYY-MM-DDTHH:mm" string (same shape as datetime-local) so
 // the rest of the page is unchanged.
 
@@ -242,7 +242,7 @@ function fmtDisplay(v: string): string {
   return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
-// A vertical, sorted, scrollable column — the "sorted picker" columns.
+// A vertical, sorted, scrollable column - the "sorted picker" columns.
 function WheelColumn({ items, value, onPick, width }: {
   items: Array<{ label: string; value: number }>; value: number; onPick: (v: number) => void; width: number
 }) {
@@ -280,7 +280,7 @@ function SchedulePicker({ value, onChange }: { value: string; onChange: (v: stri
   const wrapRef = useRef<HTMLDivElement>(null)
 
   const selected = parseValue(value).d
-  // Working state — defaults to the next round hour from now (stamped when opened).
+  // Working state - defaults to the next round hour from now (stamped when opened).
   const [draft, setDraft] = useState<Date | null>(selected)
   const [viewYM, setViewYM] = useState<{ y: number; m: number }>(() => {
     const base = selected || new Date()
@@ -421,7 +421,7 @@ function SchedulePicker({ value, onChange }: { value: string; onChange: (v: stri
 function MdChevronLeftIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z" /></svg> }
 function MdChevronRightIcon() { return <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8.6 7.4 10 6l6 6-6 6-1.4-1.4L13.2 12z" /></svg> }
 
-// PROXe agent mark — the "cycle": an orbit ring with an accent node, in the
+// PROXe agent mark - the "cycle": an orbit ring with an accent node, in the
 // brand accent. Used as the assistant avatar (the agent is PROXe, not a robot).
 function ProxeMark({ size = 30 }: { size?: number }) {
   return (
@@ -438,7 +438,7 @@ function ProxeMark({ size = 30 }: { size?: number }) {
   )
 }
 
-// Two-segment reach donut — stroke-dasharray over pathLength (never degenerates).
+// Two-segment reach donut - stroke-dasharray over pathLength (never degenerates).
 function ReachDonut({ pct }: { pct: number }) {
   const p = Math.max(0, Math.min(100, pct))
   return (
@@ -516,7 +516,7 @@ function CampaignsRoot() {
   )
 }
 
-// ═══ WORKSPACE — chat left, rail right ═══════════════════════════════════════
+// ═══ WORKSPACE - chat left, rail right ═══════════════════════════════════════
 
 function Workspace({ onSaved }: { onSaved: () => void }) {
   // Chat
@@ -680,7 +680,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
-          {/* Assistant intro — always first */}
+          {/* Assistant intro - always first */}
           <div className="flex gap-2.5">
             <ProxeMark size={36} />
             <div className="max-w-[80%]">
@@ -725,7 +725,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
             )
           ))}
 
-          {/* Smart suggestions — under the latest assistant turn */}
+          {/* Smart suggestions - under the latest assistant turn */}
           {!busy && (
             <div className="pl-[46px]">
               <div className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>Smart suggestions</div>
@@ -958,7 +958,7 @@ function Workspace({ onSaved }: { onSaved: () => void }) {
   )
 }
 
-// ═══ PREVIOUS CAMPAIGNS — the overview list ══════════════════════════════════
+// ═══ PREVIOUS CAMPAIGNS - the overview list ══════════════════════════════════
 
 function PreviousCampaigns() {
   const [saved, setSaved] = useState<SavedCampaign[]>([])
@@ -1123,7 +1123,7 @@ function PreviousCampaigns() {
           </div>
         ) : (
           rows.map((r) => {
-            // Webinar group header — a collapsible title bar summarising all its
+            // Webinar group header - a collapsible title bar summarising all its
             // template cards. Clicking folds/unfolds the group.
             if (r.kind === 'header') {
               const pct = r.totals.sent > 0 ? Math.round((r.totals.delivered / r.totals.sent) * 100) : 0

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 // GET /api/agent/voice/prompt?lang=pa|hi|en
 // The V3 pipeline (Sarvam, on the VPS) fetches its per-language prompt from here
-// at call start, so the dashboard-edited prompt applies to V3 too — one core
+// at call start, so the dashboard-edited prompt applies to V3 too - one core
 // place across both engines. Protected with the same key the pipeline already
 // uses to ship telemetry (x-v3-key). Returns the composed system prompt + the
 // opening + closing so the pipeline can greet, run, and close on the live copy.

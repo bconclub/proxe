@@ -13,7 +13,7 @@ const BRAIN_MODEL = 'claude-sonnet-4-6'
 /**
  * POST /api/dashboard/brain
  *
- * The dashboard "brain" — a Q&A endpoint over the live dashboard data. Gathers
+ * The dashboard "brain" - a Q&A endpoint over the live dashboard data. Gathers
  * compact aggregates (lead counts, pipeline, today's activity, upcoming
  * bookings) and asks Sonnet 4.6 to answer the operator's question from that
  * snapshot. Read-only; answers strictly from the data we pass in.
@@ -95,7 +95,7 @@ async function gatherCommandContext(sb: any, command: string | null, mentions: s
     ctx.command = 'directives'
     ctx.directives = (recos || []).map((r: any) => ({ title: r.title, source: r.source, constituency: r.constituency, status: r.status }))
   } else if (command) {
-    // Unknown command — tell the model so it can list the valid ones.
+    // Unknown command - tell the model so it can list the valid ones.
     ctx.command = 'unknown'
     ctx.unknown_command = command
     ctx.available_commands = ['/warroom', '/d2d', '/listener', '/directives']
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
     // ── Gather leads (aggregate in-process) ──────────────────────────────────
     const { data: leads } = await supabase
       .from('all_leads')
-      // POP campaign columns (022/026) exist only for pop — append conditionally
+      // POP campaign columns (022/026) exist only for pop - append conditionally
       // so other brands' schemas don't error on the select.
       .select('id, customer_name, phone, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context'
         + (isPop ? ', intensity, grievance_category, magnet, lean' : ''))
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     let today = 0, week = 0, hot = 0, warm = 0, cold = 0
     const todayLeads: any[] = []
     const upcoming: any[] = []
-    // POP campaign accumulators — the intensity ladder + grievances + channel,
+    // POP campaign accumulators - the intensity ladder + grievances + channel,
     // so the brain answers in campaign terms, not sales lead_stage names.
     const tierCounts = [0, 0, 0, 0, 0]
     const grievanceCounts: Record<string, number> = {}
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
       const b = bookingFromCtx(l.unified_context)
       const dt = parseBookingIST(b.date, b.time)
       if (dt && dt.getTime() >= now) {
-        // Pass a human IST string — NOT a UTC ISO. The model was reading the UTC
+        // Pass a human IST string - NOT a UTC ISO. The model was reading the UTC
         // hour as IST (4:00 PM IST = 10:30 UTC → "10:30 AM IST"), so every
         // upcoming time was wrong. Format in IST here so it can't be misread.
         const when = dt.toLocaleString('en-IN', {
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
     upcoming.sort((a, b) => a._ms - b._ms)
     const upcomingTop = upcoming.slice(0, 25).map(({ _ms, ...rest }) => rest)
 
-    // ── Top leads by score (actions only) — makes "show me the top lead"
+    // ── Top leads by score (actions only) - makes "show me the top lead"
     // resolvable: the model needs a ranked list WITH ids to point at. ─────────
     const topLeads = actionsOn
       ? [...safe]
@@ -302,19 +302,19 @@ export async function POST(request: NextRequest) {
       upcoming_bookings: upcomingTop,
       ...(actionsOn && topLeads.length ? { top_leads: topLeads } : {}),
     }
-    const systemPrompt = `You are PROXe Brain — the analyst for the ${brand} ${isPop ? 'campaign dashboard' : 'sales dashboard'}.
-${isPop ? 'This is a political campaign. Use campaign vocabulary ONLY: people / voters / supporters / volunteers / cadre / grievances / constituencies / events — NEVER sales terms (leads, pipeline, deals, bookings, customers, prospects, stages like "Qualified" or "Booking Made"). The DATA JSON is already campaign-shaped: intensity_ladder is the frontline funnel (Contact→Voter→Supporter→Volunteer→Cadre); top_grievances is issues raised by category; by_channel is how people were reached; engagement_heat is how active they are; upcoming_events is the event calendar. Answer strictly from these fields — do not invent sales stages.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet — do not invent figures. Today (IST) is ${istDate}.
+    const systemPrompt = `You are PROXe Brain - the analyst for the ${brand} ${isPop ? 'campaign dashboard' : 'sales dashboard'}.
+${isPop ? 'This is a political campaign. Use campaign vocabulary ONLY: people / voters / supporters / volunteers / cadre / grievances / constituencies / events - NEVER sales terms (leads, pipeline, deals, bookings, customers, prospects, stages like "Qualified" or "Booking Made"). The DATA JSON is already campaign-shaped: intensity_ladder is the frontline funnel (Contact→Voter→Supporter→Volunteer→Cadre); top_grievances is issues raised by category; by_channel is how people were reached; engagement_heat is how active they are; upcoming_events is the event calendar. Answer strictly from these fields - do not invent sales stages.\n' : ''}Answer the operator's question using ONLY the DATA JSON below. Be concise and lead with the number/answer. Use plain language, short. If the question asks for something not present in DATA, say you don't have that yet - do not invent figures. Today (IST) is ${istDate}.
 
-Times in DATA (e.g. upcoming_bookings "when") are already formatted IST strings — show them EXACTLY as given. Never convert, recompute, or restate a time in a different value.
+Times in DATA (e.g. upcoming_bookings "when") are already formatted IST strings - show them EXACTLY as given. Never convert, recompute, or restate a time in a different value.
 
 FORMAT (built for a phone-sized panel, ~360px wide):
-- For ANY numeric breakdown (counts by stage / source / score bucket, all-time splits) use a COMPACT markdown table: a header row + 2-3 columns max (e.g. "| Stage | Count |"). It renders as a clean table — always prefer this over listing numbers in prose.
+- For ANY numeric breakdown (counts by stage / source / score bucket, all-time splits) use a COMPACT markdown table: a header row + 2-3 columns max (e.g. "| Stage | Count |"). It renders as a clean table - always prefer this over listing numbers in prose.
 - Keep prose to 1-2 short lines around each table. Use **bold** for standout numbers/names. Use "- " bullets only for non-numeric lists (e.g. lead names).
 - No "---" divider lines, no "###" headings, no long paragraphs. Skimmable, not a report.
 
-SHORTCUTS: if DATA has a "command_context", the operator used a shortcut. A leading /command (command_context.command = war_room / d2d / listener / directives) means "summarize that artifact" — answer from command_context.<that> and lead with the headline number. If command_context.command = "unknown", tell them the command isn't recognized and list command_context.available_commands. @mentions (command_context.mentions[]) ask about specific people/workers: for each, report what they've done from .worker (visits/met/constituencies/last_active) and/or .people (tier/grievance/lean/channel); if .not_found is true, say you couldn't find anyone by that name. Show names and times exactly as given.
+SHORTCUTS: if DATA has a "command_context", the operator used a shortcut. A leading /command (command_context.command = war_room / d2d / listener / directives) means "summarize that artifact" - answer from command_context.<that> and lead with the headline number. If command_context.command = "unknown", tell them the command isn't recognized and list command_context.available_commands. @mentions (command_context.mentions[]) ask about specific people/workers: for each, report what they've done from .worker (visits/met/constituencies/last_active) and/or .people (tier/grievance/lean/channel); if .not_found is true, say you couldn't find anyone by that name. Show names and times exactly as given.
 
-This is a click-through tool — the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: ${isPop ? '"Breakdown by constituency | Frontline today | Top grievances"' : '"Breakdown by source | Lead quality today | Show hot leads"'}. Put FOLLOWUPS only on that last line, nowhere else.
+This is a click-through tool - the founder taps follow-ups instead of typing. After your answer, output ONE final line starting with "FOLLOWUPS:" then 2-3 short next questions (under 6 words each) separated by " | ", each a natural drill-down from your answer and answerable from DATA. Examples: ${isPop ? '"Breakdown by constituency | Frontline today | Top grievances"' : '"Breakdown by source | Lead quality today | Show hot leads"'}. Put FOLLOWUPS only on that last line, nowhere else.
 ${actionsOn ? `\n${actionsPromptSpec(false)}\n` : ''}
 DATA:
 ${JSON.stringify(data)}`
@@ -332,7 +332,7 @@ ${JSON.stringify(data)}`
       return NextResponse.json({ error: 'The brain is unavailable right now. Try again in a moment.' }, { status: 502 })
     }
 
-    // Strip the ACTIONS trailer FIRST — the FOLLOWUPS regex below matches
+    // Strip the ACTIONS trailer FIRST - the FOLLOWUPS regex below matches
     // across newlines and would swallow a trailing ACTIONS line into the chips.
     const parsedActions = actionsOn ? parseActionsTrailer(raw) : { text: raw, actions: [] }
     const actions = actionsOn ? validateActions(parsedActions.actions, buildLeadIndex(safe)) : []

@@ -1,7 +1,7 @@
-// LEADER API — individual grievances (not category rollups — leader/issues
+// LEADER API - individual grievances (not category rollups - leader/issues
 // already covers that). Lets the leader app list actionable grievance rows
-// (id, text, seat, loop_status) so a specific one — "contaminated drinking
-// water" — can be routed to a ground-team worker via
+// (id, text, seat, loop_status) so a specific one - "contaminated drinking
+// water" - can be routed to a ground-team worker via
 // POST /api/leader/grievances/:id.
 // Auth: x-api-key = LEADER_API_KEY.
 

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import ThemeProvider from '@/components/dashboard/ThemeProvider'
 
-// War Room now lives inside the dashboard shell — same left sidebar + artifact
+// War Room now lives inside the dashboard shell - same left sidebar + artifact
 // switcher as the rest of PROXe (the "make War Room like the dashboard" ask).
 // Auth mirrors app/dashboard/layout.tsx; the page still keeps its own feature
 // gate + isolated error fallback so a war-room failure can't take PROXe down.
@@ -16,7 +16,7 @@ export default async function WarRoomLayout({ children }: { children: React.Reac
     if (error) {
       const status = (error as any)?.status
       if (status === 429) {
-        // rate limited — allow through with degraded experience
+        // rate limited - allow through with degraded experience
       } else {
         redirect('/auth/login')
       }

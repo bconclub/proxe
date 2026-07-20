@@ -1,9 +1,9 @@
 /**
- * Agent-prompt config — brand divergence as DATA, not code.
+ * Agent-prompt config - brand divergence as DATA, not code.
  *
  * The agent's system prompt (per channel) is editable from the dashboard
  * Configure section and stored per-brand in dashboard_settings (key/value, jsonb)
- * — each brand has its own Supabase, so the row is automatically brand-scoped.
+ * - each brand has its own Supabase, so the row is automatically brand-scoped.
  *
  * promptBuilder reads the override via getPromptOverride(); when the row is empty
  * it falls back to the hardcoded brand prompt file, so behaviour is unchanged

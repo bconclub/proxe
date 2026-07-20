@@ -72,12 +72,12 @@ function WhatsAppOverview({ overview, templateCount }: { overview: any; template
     },
     {
       key: 'tier', label: 'Messaging tier',
-      value: overview?.tier?.label || '—', valueColor: 'var(--text-primary)',
+      value: overview?.tier?.label || '-', valueColor: 'var(--text-primary)',
       sub: overview?.tier?.cap ? `Up to ${overview.tier.cap}` : 'Business-initiated limit',
     },
     {
       key: 'sent30', label: 'Sent · 30 days',
-      value: overview?.sent30 != null ? overview.sent30.toLocaleString() : '—', valueColor: 'var(--text-primary)',
+      value: overview?.sent30 != null ? overview.sent30.toLocaleString() : '-', valueColor: 'var(--text-primary)',
       sub: overview?.sent7 != null ? `${overview.sent7.toLocaleString()} in the last 7 days` : 'Template + session messages',
     },
     {
@@ -175,22 +175,22 @@ export default function WhatsAppTemplatesPage() {
     return m ? m[1] : null
   }, [headerText, effType])
 
-  // ── Pre-flight validation — mirror Meta's rules so an invalid template can
+  // ── Pre-flight validation - mirror Meta's rules so an invalid template can
   // NEVER be submitted. Rejections hurt the WhatsApp number's quality rating,
   // so we block locally instead of letting Meta reject it.
   const errors = useMemo(() => {
     const e: string[] = []
     const bt = body.trim()
     if (!name) e.push('Add a template name.')
-    else if (!/^[a-z0-9_]+$/.test(name)) e.push('Name: lowercase letters, digits and underscores only — no spaces or capitals.')
-    if (category === 'AUTHENTICATION') e.push('Authentication templates need Meta’s special OTP format (not supported here yet) — use Marketing or Utility.')
+    else if (!/^[a-z0-9_]+$/.test(name)) e.push('Name: lowercase letters, digits and underscores only - no spaces or capitals.')
+    if (category === 'AUTHENTICATION') e.push('Authentication templates need Meta’s special OTP format (not supported here yet) - use Marketing or Utility.')
     if (!bt) e.push('Body text is required.')
     if (bt.length > 1024) e.push('Body is too long (max 1024 characters).')
-    if (mixedVars) e.push('Don’t mix named ({{name}}) and numbered ({{1}}) variables — pick one style.')
-    if (/\}\}\s*\{\{/.test(bt)) e.push('Two variables can’t be back-to-back — put some text between them.')
+    if (mixedVars) e.push('Don’t mix named ({{name}}) and numbered ({{1}}) variables - pick one style.')
+    if (/\}\}\s*\{\{/.test(bt)) e.push('Two variables can’t be back-to-back - put some text between them.')
     if (bodyVars.length) {
       const stripped = bt.replace(effType === 'NAMED' ? /\{\{\s*[a-zA-Z][a-zA-Z0-9_]*\s*\}\}/g : /\{\{\s*\d+\s*\}\}/g, '').trim()
-      if (!stripped) e.push('Body can’t be only variables — add some words around them.')
+      if (!stripped) e.push('Body can’t be only variables - add some words around them.')
     }
     if (effType === 'NUMBER' && bodyVars.length) {
       const nums = bodyVars.map(Number)
@@ -223,12 +223,12 @@ export default function WhatsAppTemplatesPage() {
     return e
   }, [name, category, body, effType, mixedVars, bodyVars, samples, headerText, headerVarKey, headerSample, footer, buttons])
 
-  // Category vs content — transactional copy (appointment/order/booking/OTP)
+  // Category vs content - transactional copy (appointment/order/booking/OTP)
   // gets REJECTED under Marketing; nudge to Utility. Non-blocking (a judgment
   // call), but prominent, since a rejection hurts the number's quality rating.
   const categoryWarning = category === 'MARKETING'
     && /\b(appointment|confirm(ed|ation|s)?|order|booking|booked|reschedul|cancel|reminder|receipt|invoice|delivery|deliver(ed|y)|shipp(ed|ing)|otp|passcode|verification|payment|due|schedule[d]?)\b/i.test(`${body} ${headerText}`)
-    ? 'This reads like a transactional message (appointment / order / booking / reminder). Meta usually REJECTS this under Marketing — Utility is the right category.'
+    ? 'This reads like a transactional message (appointment / order / booking / reminder). Meta usually REJECTS this under Marketing - Utility is the right category.'
     : null
 
   const addVariable = () => {
@@ -247,7 +247,7 @@ export default function WhatsAppTemplatesPage() {
 
   const submit = async () => {
     setSubmitError(null); setSubmitOk(null)
-    // Never send an invalid template to Meta — a rejection hurts the number's
+    // Never send an invalid template to Meta - a rejection hurts the number's
     // quality rating. The issues are listed in the panel above the button.
     if (errors.length) { setSubmitError(`Fix ${errors.length} issue${errors.length > 1 ? 's' : ''} before submitting (listed above).`); return }
 
@@ -274,13 +274,13 @@ export default function WhatsAppTemplatesPage() {
       const res = await fetch('/api/whatsapp/templates/create', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       })
-      // Parse defensively — a 504/500 returns a non-JSON page, and res.json()
+      // Parse defensively - a 504/500 returns a non-JSON page, and res.json()
       // would throw a cryptic "Unexpected token" instead of a useful message.
       const text = await res.text()
       let data: any = {}
       try { data = text ? JSON.parse(text) : {} } catch {
         throw new Error(res.status === 504
-          ? 'Timed out talking to Meta — please try again (the server was waking up).'
+          ? 'Timed out talking to Meta - please try again (the server was waking up).'
           : `Server error (${res.status}). Please try again.`)
       }
       if (!res.ok || !data.success) throw new Error(data.error || `Submission failed (${res.status}).`)
@@ -290,7 +290,7 @@ export default function WhatsAppTemplatesPage() {
       await load()
       setComposerOpen(false)
       setSentPayload(data.payload || null)
-      setSubmitOk(`“${data.name}” submitted — status ${String(data.status || 'PENDING').toLowerCase()}. Meta is reviewing it.`)
+      setSubmitOk(`“${data.name}” submitted - status ${String(data.status || 'PENDING').toLowerCase()}. Meta is reviewing it.`)
     } catch (e: any) {
       setSubmitError(e?.message || 'Submission failed.')
     } finally {
@@ -335,10 +335,10 @@ export default function WhatsAppTemplatesPage() {
 
       {submitOk && <div className="mb-3 rounded-lg px-4 py-3 text-sm flex items-start gap-2" style={{ background: 'rgba(34,197,94,.12)', color: '#22c55e' }}><MdCheckCircle size={18} /> {submitOk}</div>}
 
-      {/* Exactly what Meta received — so there's zero doubt about category + components. */}
+      {/* Exactly what Meta received - so there's zero doubt about category + components. */}
       {sentPayload && (
         <div className="mb-5 rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
-          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Sent to Meta — verification</p>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Sent to Meta - verification</p>
           <div className="text-[12px] space-y-1" style={{ color: 'var(--text-primary)' }}>
             <div><span style={{ color: 'var(--text-muted)' }}>category:</span> <b>{sentPayload.category}</b> · <span style={{ color: 'var(--text-muted)' }}>language:</span> {sentPayload.language}</div>
             {(sentPayload.components || []).map((c: any, i: number) => {
@@ -347,7 +347,7 @@ export default function WhatsAppTemplatesPage() {
               return (
                 <div key={i} className="flex items-start gap-2">
                   <MdCheckCircle size={14} style={{ color: '#22c55e', marginTop: 2 }} />
-                  <span><b>{c.type}</b>{c.type === 'BUTTONS' ? ` (${btns})` : ''}{ex ? ` — ${ex} example value${ex > 1 ? 's' : ''}` : ''}{c.text ? `: “${String(c.text).slice(0, 60)}${String(c.text).length > 60 ? '…' : ''}”` : ''}</span>
+                  <span><b>{c.type}</b>{c.type === 'BUTTONS' ? ` (${btns})` : ''}{ex ? ` - ${ex} example value${ex > 1 ? 's' : ''}` : ''}{c.text ? `: “${String(c.text).slice(0, 60)}${String(c.text).length > 60 ? '…' : ''}”` : ''}</span>
                 </div>
               )
             })}
@@ -395,8 +395,8 @@ export default function WhatsAppTemplatesPage() {
               <div>
                 <label style={labelStyle}>Type of variable</label>
                 <select value={varType} onChange={(e) => { setVarType(e.target.value as VarType); setSamples({}); setBody(''); setHeaderText(''); setHeaderSample('') }} style={inputStyle}>
-                  <option value="NUMBER">Number — {'{{1}}'}, {'{{2}}'}</option>
-                  <option value="NAMED">Named — {'{{order_id}}'}</option>
+                  <option value="NUMBER">Number - {'{{1}}'}, {'{{2}}'}</option>
+                  <option value="NAMED">Named - {'{{order_id}}'}</option>
                 </select>
                 <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>A template uses one style throughout. Changing it clears the body.</p>
               </div>
@@ -446,7 +446,7 @@ export default function WhatsAppTemplatesPage() {
                       {BTN_LABELS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                     {btn.type === 'COPY_CODE' ? (
-                      <input value={btn.example || ''} onChange={(e) => setButtons((b) => b.map((x, j) => j === i ? { ...x, example: e.target.value } : x))} placeholder="Offer code — e.g. SAVE20" maxLength={15} style={{ ...inputStyle, flex: 1, minWidth: 140, padding: '6px 9px', fontSize: 13 }} />
+                      <input value={btn.example || ''} onChange={(e) => setButtons((b) => b.map((x, j) => j === i ? { ...x, example: e.target.value } : x))} placeholder="Offer code - e.g. SAVE20" maxLength={15} style={{ ...inputStyle, flex: 1, minWidth: 140, padding: '6px 9px', fontSize: 13 }} />
                     ) : (
                       <input value={btn.text} onChange={(e) => setButtons((b) => b.map((x, j) => j === i ? { ...x, text: e.target.value } : x))} placeholder="Button text" maxLength={25} style={{ ...inputStyle, flex: 1, minWidth: 120, padding: '6px 9px', fontSize: 13 }} />
                     )}
@@ -458,7 +458,7 @@ export default function WhatsAppTemplatesPage() {
               </div>
             </div>
 
-            {/* Pre-flight issues — block submission until clean so Meta never rejects it */}
+            {/* Pre-flight issues - block submission until clean so Meta never rejects it */}
             {errors.length > 0 && (!!name || !!body.trim()) && (
               <div className="rounded-lg px-3 py-2.5 text-sm" style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)' }}>
                 <p className="text-xs font-semibold mb-1.5 flex items-center gap-1" style={{ color: '#ef4444' }}><MdError size={14} /> Fix before submitting ({errors.length})</p>
@@ -468,7 +468,7 @@ export default function WhatsAppTemplatesPage() {
               </div>
             )}
             {errors.length === 0 && !!name && !!body.trim() && (
-              <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-1.5" style={{ background: 'rgba(34,197,94,.1)', color: '#22c55e' }}><MdCheckCircle size={14} /> Looks good — passes Meta’s basic checks.</div>
+              <div className="rounded-lg px-3 py-2 text-xs flex items-center gap-1.5" style={{ background: 'rgba(34,197,94,.1)', color: '#22c55e' }}><MdCheckCircle size={14} /> Looks good - passes Meta’s basic checks.</div>
             )}
             {submitError && <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'rgba(239,68,68,.12)', color: '#ef4444' }}>{submitError}</div>}
             <button onClick={submit} disabled={submitting || errors.length > 0} className="w-full rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={ctaStyle}>
@@ -507,7 +507,7 @@ export default function WhatsAppTemplatesPage() {
       ) : loadError ? (
         <div className="rounded-lg px-4 py-3 text-sm" style={{ background: 'rgba(239,68,68,.1)', color: '#ef4444' }}>{loadError}</div>
       ) : list.length === 0 ? (
-        <p className="text-sm py-8 text-center" style={{ color: 'var(--text-secondary)' }}>No templates yet — create your first one.</p>
+        <p className="text-sm py-8 text-center" style={{ color: 'var(--text-secondary)' }}>No templates yet - create your first one.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {list.map((t) => {

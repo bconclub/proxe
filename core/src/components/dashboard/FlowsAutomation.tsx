@@ -45,7 +45,7 @@ function triggerDot(t: Trigger, map: Map<string, string>): string {
 }
 
 function TemplateChip({ name, map }: { name: string | null; map: Map<string, string> }) {
-  if (!name) return <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>no template — routes internally</span>
+  if (!name) return <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>no template - routes internally</span>
   const st = templateStatus(name, map)!
   const Icon = st.icon
   return (
@@ -130,7 +130,7 @@ function TriggerDetail({ t, map }: { t: Trigger; map: Map<string, string> }) {
           </div>
         ) : t.template
           ? <TemplateChip name={t.template} map={map} />
-          : <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>No WhatsApp template — this trigger routes internally (kicks off a sequence or schedules a task).</p>}
+          : <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>No WhatsApp template - this trigger routes internally (kicks off a sequence or schedules a task).</p>}
       </DetailCard>
 
       <DetailCard title="When it fires">
@@ -200,7 +200,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
   const trigger = TRIGGERS.find(t => t.id === selTrigger) || TRIGGERS[0]
   const sequence = SEQUENCES.find(s => s.id === selSequence) || SEQUENCES[0]
 
-  // A brand may have no triggers/sequences configured yet (empty brand config) —
+  // A brand may have no triggers/sequences configured yet (empty brand config) -
   // render a friendly empty state instead of crashing on TRIGGERS[0]/SEQUENCES[0].
   if ((mode === 'triggers' ? TRIGGERS.length : SEQUENCES.length) === 0) {
     return (
@@ -241,7 +241,7 @@ export default function FlowsAutomation({ section }: { section?: 'triggers' | 's
       <div style={{ minWidth: 0 }}>
         {mode === 'triggers' ? <TriggerDetail t={trigger} map={map} /> : <SequenceDetail s={sequence} map={map} />}
         <p style={{ margin: '12px 2px 0', fontSize: 11, color: 'var(--text-muted)' }}>
-          {loading ? 'Checking template status…' : 'Templates marked “Not created” or “Pending” won’t send — create/approve them in Settings → Message templates.'}
+          {loading ? 'Checking template status…' : 'Templates marked “Not created” or “Pending” won’t send - create/approve them in Settings → Message templates.'}
         </p>
       </div>
     </div>

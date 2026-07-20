@@ -34,7 +34,7 @@ Return ONLY a single JSON object, no prose, no markdown fences. Schema:
   "business_name": string | null,    // the company/brand name if mentioned
   "business_type": string | null,    // what the business does (e.g. "interior design", "dental clinic")
   "service_interest": string | null, // what they want from BCON (e.g. "lead automation", "AI brand audit", "ads", "website")
-  "website_status": string | null,   // e.g. "has a website", "no website", a URL — if mentioned
+  "website_status": string | null,   // e.g. "has a website", "no website", a URL - if mentioned
   "lead_volume": string | null,      // any volume of leads/enquiries/customers mentioned (e.g. "around 100 leads a month")
   "urgency": string | null,          // how soon they want to start, if stated (e.g. "asap", "next month")
   "summary": string | null           // one or two short sentences summarising what they want
@@ -46,7 +46,7 @@ Rules:
 - Phone: keep country code if shown (e.g. +91...). Strip spaces and dashes. If no digits are visible, use null.
 - If a field isn't present, use null. Do not guess.`
 
-const AVIATION_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers — pilot training, DGCA, cabin crew, helicopter).
+const AVIATION_SYSTEM_PROMPT = `You read a screenshot of a WhatsApp (or similar messaging) chat and pull out lead details for an aviation-training CRM (Windchasers - pilot training, DGCA, cabin crew, helicopter).
 
 Return ONLY a single JSON object, no prose, no markdown fences. Schema:
 {

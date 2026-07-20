@@ -1,9 +1,9 @@
 /**
- * Stage Test Bench — fire any follow-up STAGE's real message to the test phone
+ * Stage Test Bench - fire any follow-up STAGE's real message to the test phone
  * so we can read exactly how it lands before a real lead ever sees it.
  *
  * Sends as a free-form interactive message (body + quick-reply buttons) via the
- * 24h window — no Meta template approval needed — so we can iterate copy freely.
+ * 24h window - no Meta template approval needed - so we can iterate copy freely.
  * Every send goes ONLY to TEST_NUMBER and threads into that number's own chat
  * (stamped test_mode so the inbox shows the TEST badge). Real leads never touched.
  *
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
 // The test phone (its lead is "Thanzeel"); ALL bench sends land here.
 const TEST_NUMBER = '919731660933'
 
-// A realistic engaged lead — we "know" their name, interest and stated pain —
+// A realistic engaged lead - we "know" their name, interest and stated pain -
 // so the previews read like the real thing. Tune freely; this is the test fixture.
 const SAMPLE = { name: 'Shiv', business: 'a laundry business', service_interest: 'AI customer acquisition', pain_point: 'getting consistent leads' }
 

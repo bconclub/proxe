@@ -6,13 +6,13 @@ export const dynamic = 'force-dynamic'
  * GET /api/dashboard/leads/property-media?property_id=<id>
  *
  * Lazily fetches a Lokazen property's photos for the lead gallery. Images live
- * on the Loka side (lokazen.in), NOT in PROXe — so instead of bloating every
+ * on the Loka side (lokazen.in), NOT in PROXe - so instead of bloating every
  * lead with image blobs at inbound time, the lead only stores property_id and
  * this endpoint pulls the media on demand from Loka's PUBLIC property API.
  * Same-origin for the dashboard (no CORS); server-side (no Loka creds needed).
  *
  * Loka stores images as base64 data-URIs (verified: ~all listings), which
- * render directly in <img src> but are large — so we cap the count and skip any
+ * render directly in <img src> but are large - so we cap the count and skip any
  * single image over ~3MB to keep the response sane.
  */
 const LOKA_BASE = process.env.LOKAZEN_SITE_URL || 'https://www.lokazen.in'

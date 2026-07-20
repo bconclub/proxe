@@ -1,5 +1,5 @@
 /**
- * Admin notes — thin wrapper around the shared noteOrchestrator.
+ * Admin notes - thin wrapper around the shared noteOrchestrator.
  * Saves the note + delegates classification & actions to lib/services/noteOrchestrator.
  */
 
@@ -23,7 +23,7 @@ export async function POST(
   try {
     // Auth check via cookie-bound client (so we can capture user.email
     // for the note's created_by). DB writes use service-role to bypass RLS
-    // — the cookie client occasionally returns 0 affected rows + no error
+    // - the cookie client occasionally returns 0 affected rows + no error
     // when RLS quirks (e.g. PostgREST scoping) hit, leaving the note in
     // limbo. Service-role is consistent with other dashboard routes.
     const authClient = await createClient()
@@ -64,7 +64,7 @@ export async function POST(
     const existingCtx = lead.unified_context || {}
     const existingNotes: any[] = existingCtx.admin_notes || []
 
-    // 2. Duplicate guard — same text in last 30 seconds
+    // 2. Duplicate guard - same text in last 30 seconds
     const thirtySecsAgo = new Date(Date.now() - 30000).toISOString()
     const isDuplicate = existingNotes.some(
       (n: any) => n.text === trimmedNote && n.created_at > thirtySecsAgo,
@@ -74,7 +74,7 @@ export async function POST(
         success: true,
         note: existingNotes[existingNotes.length - 1],
         actions: [],
-        actions_taken: ['Duplicate note — skipped'],
+        actions_taken: ['Duplicate note - skipped'],
         classification: { category: 'INFO_ONLY', summary: null },
         new_stage: null,
         new_score: null,
@@ -99,7 +99,7 @@ export async function POST(
       .eq('id', leadId)
     if (updateError) throw updateError
 
-    // 4. Insert into activities table. created_by is a UUID column — pass the
+    // 4. Insert into activities table. created_by is a UUID column - pass the
     // user id or null, never the email/'system' (that throws 22P02 and 500s).
     // The readable author lives on the unified_context.admin_notes entry above.
     const { error: activityError } = await supabase.from('activities').insert({
@@ -145,7 +145,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
-    // Same service-role bypass as POST — RLS occasionally swallows the
+    // Same service-role bypass as POST - RLS occasionally swallows the
     // update without surfacing an error.
     const supabase = getServiceClient() || (await createClient())
     const leadId = params.id

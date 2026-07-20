@@ -3,7 +3,7 @@
  * GET /api/cron/follow-up-sequence
  *
  * The note orchestrator schedules follow-up tasks when a call is RNR (rang/no
- * response) — missed_call_followup (+30m) and follow_up_day1/3/5 + re_engage —
+ * response) - missed_call_followup (+30m) and follow_up_day1/3/5 + re_engage -
  * but nothing was SENDING them. This processor fires the Meta-approved
  * re-engagement templates on due tasks:
  *   - first touch  → rnr_{pilot|generic}_1_v1
@@ -34,7 +34,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const RNR_TASK_TYPES = ['missed_call_followup', 'follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage']
-const MAX_RNR_SENDS = 2 // two approved RNR touches per lead — everything else is standard cadence
+const MAX_RNR_SENDS = 2 // two approved RNR touches per lead - everything else is standard cadence
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   for (const task of due || []) {
     results.due++
     try {
-      // Lead replied since the task was created? Then they re-engaged — cancel
+      // Lead replied since the task was created? Then they re-engaged - cancel
       // the whole remaining sequence and stop (the agent is handling them).
       const { data: replied } = await supabase
         .from('conversations')
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
 
       // The cap applies to RNR-template sends only. On bcon, day 1/3/5 use
       // the standard cadence and must keep flowing even after both RNR
-      // touches went (windchasers sends RNR copy on every type — cap all).
+      // touches went (windchasers sends RNR copy on every type - cap all).
       const capApplies = BRAND_ID === 'bcon' ? task.task_type === 'missed_call_followup' : true
       if (capApplies && rnrSends >= MAX_RNR_SENDS) {
         await markDone(supabase, task.id, nowIso)
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
         // scheduled day 1/3/5 retries send the STANDARD follow-up template,
         // and re_engage closes on the re-engagement template.
         // Fill variables from what the lead actually SAID (form answers, the
-        // campaign they responded to, their chat) — fallbacks are last resort.
+        // campaign they responded to, their chat) - fallbacks are last resort.
         const facts = resolveLeadFacts(lead as any)
         const serviceName = facts.goal || 'our services'
         const brandName = facts.brandName || 'your business'
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
             { name: 'brand_name', value: brandName },
           ])
         } else {
-          // follow_up_day1 / day3 / day5 — the DAY-WISE ladders (each day has
+          // follow_up_day1 / day3 / day5 - the DAY-WISE ladders (each day has
           // its own approved copy). Engaged (replied before) -> lowtouch;
           // ghost -> onetouch. Day 5 borrows the d7 body (no day-5 template).
           const { count: custCount } = await supabase

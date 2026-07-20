@@ -5,7 +5,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { resolveModel } from '@/lib/agent-core';
 
 // Translate a call's transcript turns to English on demand. Grievance calls are
-// in Punjabi/Hindi; dashboard staff read English — listening (recording) and
+// in Punjabi/Hindi; dashboard staff read English - listening (recording) and
 // reading (transcript) are different needs. Cached back onto the transcript rows'
 // metadata (content_en) so a second open is instant and free.
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const resp = await (anthropic.messages.create as any)({
       model,
       max_tokens: 2000,
-      system: 'You translate call-transcript turns (Punjabi/Hindi, Gurmukhi or Devanagari) into natural English. Return ONLY a JSON array of strings — the English of each numbered line, in order, same length as the input. No commentary.',
+      system: 'You translate call-transcript turns (Punjabi/Hindi, Gurmukhi or Devanagari) into natural English. Return ONLY a JSON array of strings - the English of each numbered line, in order, same length as the input. No commentary.',
       messages: [{ role: 'user', content: `Translate each line to English:\n\n${numbered}\n\nReturn a JSON array of ${turns.length} English strings.` }],
     });
     const text = (resp.content || []).map((b: any) => b.text || '').join('').trim();

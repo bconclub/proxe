@@ -1,4 +1,4 @@
-// Artifacts — brand-level surfaces built ON TOP of the PROXe engine (e.g. POP's
+// Artifacts - brand-level surfaces built ON TOP of the PROXe engine (e.g. POP's
 // War Room, leader app, D2D field tool). All artifacts share the same person
 // variables in all_leads; each is a different lens/tool over that data. Brands
 // that define `artifacts` get an artifact switcher dropdown on the sidebar
@@ -17,10 +17,10 @@ export interface ArtifactDef {
   href?: string;             // internal route ('/war-room') or full URL; omit = not navigable yet
   external?: boolean;        // true → open in new tab
   icon?: string;             // string key mapped to an icon inside the switcher component (config stays serializable)
-  features?: ArtifactFeature[]; // full feature checklist — rendered on /dashboard/artifacts
+  features?: ArtifactFeature[]; // full feature checklist - rendered on /dashboard/artifacts
 }
 
-// CORE COMMUNICATIONS — the checklist of every message the brand's agent must
+// CORE COMMUNICATIONS - the checklist of every message the brand's agent must
 // handle autonomously, surfaced on Brain → Eval → Communications. Each entry is
 // hand-curated DISPLAY TRUTH (same philosophy as configs/journeys.ts): it
 // mirrors send-truth in whatsappSender.ts + the intake routes, with `status`
@@ -28,7 +28,7 @@ export interface ArtifactDef {
 export interface CoreCommunication {
   id: string;                       // stable slug, e.g. 'fb_pilot_welcome'
   category: 'welcome' | 'inbound' | 'confirmation' | 'reminder' | 'followup';
-  title: string;                    // 'FB Lead Ad welcome — pilot'
+  title: string;                    // 'FB Lead Ad welcome - pilot'
   trigger: string;                  // plain words: what makes this fire
   channel: 'whatsapp' | 'webchat';
   template?: string;                // Meta template name, when templated
@@ -48,7 +48,7 @@ export interface BrandConfig {
   iconPath?: string;         // favicon/app icon path in the brand's public/ (defaults to /logo.png)
   markPath?: string;         // transparent logo mark for loading screens (defaults to iconPath); use a PNG/SVG with no background box
   // Widget chrome + copy. Everything here used to be hardcoded windchasers
-  // strings in ChatWidget — brand identity lives in the pack, not in core.
+  // strings in ChatWidget - brand identity lives in the pack, not in core.
   widget?: {
     headerName?: string;                              // chat header title (defaults to `name`)
     welcomeSequence?: { text: string; delay: number }[]; // opening AI bubbles
@@ -56,7 +56,7 @@ export interface BrandConfig {
     assessmentUrl?: string;                           // external assessment flow (windchasers)
   };
   // Per-brand feature toggles. Code for these features ships to ALL brands
-  // (promoted via master), but each brand switches them on/off here — e.g.
+  // (promoted via master), but each brand switches them on/off here - e.g.
   // Windchasers carries the Voice/Calls code but keeps voice:false until they
   // want outbound calling, BCON runs voice:true.
   features?: {
@@ -67,17 +67,17 @@ export interface BrandConfig {
     followUpSequence?: boolean; // re-engagement follow-up cron (needs approved template)
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)
     scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
-    leadAccess?: boolean;       // Per-user lead ownership + type access: sticky first-touch claim, allowed_lead_types filtering, per-user pipeline, Humans overview (needs migration 036 columns — windchasers)
-    campaigns?: boolean;        // /dashboard/campaigns — chat-driven campaign builder (audience pull + template match/draft)
+    leadAccess?: boolean;       // Per-user lead ownership + type access: sticky first-touch claim, allowed_lead_types filtering, per-user pipeline, Humans overview (needs migration 036 columns - windchasers)
+    campaigns?: boolean;        // /dashboard/campaigns - chat-driven campaign builder (audience pull + template match/draft)
     logCallChat?: boolean;      // after logging a call, chat with PROXe (vs the static decision hub)
   };
-  // The Brain (voice orb + insights) — per-brand CONTENT for a shared
+  // The Brain (voice orb + insights) - per-brand CONTENT for a shared
   // functionality. Every field is optional; core/src/lib/brain/brainConfig.ts
   // fills generic business defaults, so a brand can enable features.brain with
   // no block at all and still get a working, neutral Brain. POP moves its
   // campaign persona/vocabulary/languages/palette here instead of hardcoding.
   brain?: {
-    persona?: string;            // appended to "You are the living Brain of <name>" (e.g. ' — the intelligence behind a political campaign operation in Punjab')
+    persona?: string;            // appended to "You are the living Brain of <name>" (e.g. ' - the intelligence behind a political campaign operation in Punjab')
     vocabularyRule?: string;     // full "Vocabulary:" prompt paragraph
     quickQuestions?: string[];   // the ?-button fan-out
     thinkingSteps?: { briefing: string[]; question: string[] }; // orb captions while gathering
@@ -102,7 +102,7 @@ export interface BrandConfig {
     };
   };
   // Pipeline page content. keyEventLabel is the brand's DEFAULT name for the
-  // key milestone stage ("Demo Booked", "Site Visit Booked"…) — admins can
+  // key milestone stage ("Demo Booked", "Site Visit Booked"…) - admins can
   // override it from the dashboard (stored in dashboard_settings key
   // 'pipeline_config'), and the stored value wins over this default.
   pipeline?: {
@@ -111,14 +111,14 @@ export interface BrandConfig {
   // Campaigns workspace CONTENT. Shared core must never hardcode a brand's
   // audience taxonomy (pilot/cabin-crew…), so the smart-suggestion chips and
   // the personalization variables come from here. Both fall back to neutral,
-  // brand-agnostic defaults — a brand only sets these to speak its own language.
+  // brand-agnostic defaults - a brand only sets these to speak its own language.
   campaigns?: {
     suggestions?: string[];  // smart-suggestion chips (audience prompts in the brand's words)
     variables?: string[];    // default personalization vars when no template is picked ({{name}} etc.)
   };
   // Dashboard vocabulary overrides. The dashboard shell was written in
   // business-CRM English (Leads, High Intent, Booked Calls, Priority Lead
-  // Queue…) — a brand whose audience isn't "sales leads" (e.g. pop = voters/
+  // Queue…) - a brand whose audience isn't "sales leads" (e.g. pop = voters/
   // citizens) remaps just the words here. Key = the default English string
   // (or a dotted key where noted at the call site), value = the brand's term.
   // Missing keys fall back to the default, so other brands are untouched.
@@ -141,7 +141,7 @@ export interface BrandConfig {
     themePath?: string; // Path to theme CSS file (e.g., '@/styles/themes/proxe.css')
     customStyles?: string; // Inline custom styles if needed
     // Widget pages derive their CSS variables from config.colors instead of
-    // theme.css. For brands without a hand-tuned theme.css block — otherwise
+    // theme.css. For brands without a hand-tuned theme.css block - otherwise
     // they render in another brand's defaults (bw-dark white / PROXe purple).
     colorVarsFromConfig?: boolean;
   };

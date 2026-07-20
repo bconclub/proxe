@@ -1,6 +1,6 @@
 'use client'
 
-// Segregated D2D leads table — one row per household knocked. Columns match the
+// Segregated D2D leads table - one row per household knocked. Columns match the
 // campaign mockup: Household · Worker · Booth/Area · Visit Outcome · Members
 // Spoken To · Grievance · Support Lean · Photos (real thumbnails) · Last Visit.
 // Client-side pagination. Row click → visit drawer.
@@ -60,7 +60,7 @@ function GrievancePill({ cat }: { cat: keyof typeof D2D_GRIEVANCE }) {
 }
 
 function LeanCell({ lean }: { lean?: D2DLean }) {
-  if (!lean) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+  if (!lean) return <span style={{ color: 'var(--text-muted)' }}>-</span>
   const l = D2D_LEAN[lean]
   const up = lean === 'supporter' || lean === 'leaning'
   const flat = lean === 'undecided'
@@ -73,7 +73,7 @@ function LeanCell({ lean }: { lean?: D2DLean }) {
 }
 
 function PhotoThumbs({ v }: { v: D2DVisit }) {
-  if (!v.photos.length) return <span style={{ color: 'var(--text-muted)' }}>—</span>
+  if (!v.photos.length) return <span style={{ color: 'var(--text-muted)' }}>-</span>
   const shown = v.photos.slice(0, 2)
   const extra = v.photos.length - shown.length
   return (
@@ -115,7 +115,7 @@ export default function D2DLeadsTable({ visits, onRowClick }: { visits: D2DVisit
 
   return (
     <div style={{ border: '1px solid var(--border-primary)', borderRadius: 12, overflow: 'hidden', backgroundColor: 'var(--bg-secondary)' }}>
-      {/* Mobile: card list — same visits, tap opens the same drawer */}
+      {/* Mobile: card list - same visits, tap opens the same drawer */}
       <div className="md:hidden">
         {rows.length === 0 && (
           <div style={{ padding: '32px 12px', textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>No visits match these filters.</div>
@@ -208,10 +208,10 @@ export default function D2DLeadsTable({ visits, onRowClick }: { visits: D2DVisit
                   <td style={TD}>
                     {v.survey ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>{v.survey.membersSpokenTo}<MdGroups size={13} color="var(--text-muted)" /></span>
-                    ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    ) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                   </td>
                   <td style={TD}>
-                    {v.survey?.grievanceCategory ? <GrievancePill cat={v.survey.grievanceCategory} /> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    {v.survey?.grievanceCategory ? <GrievancePill cat={v.survey.grievanceCategory} /> : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                   </td>
                   <td style={TD}><LeanCell lean={v.survey?.lean} /></td>
                   <td style={TD}><PhotoThumbs v={v} /></td>

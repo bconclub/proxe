@@ -1,9 +1,9 @@
 /**
- * POST /api/dashboard/report-issue — store a teammate's issue report
- * GET  /api/dashboard/report-issue — list this brand's reports (Support page)
+ * POST /api/dashboard/report-issue - store a teammate's issue report
+ * GET  /api/dashboard/report-issue - list this brand's reports (Support page)
  *
  * Stores a teammate's issue report (screenshots + description + auto-context)
- * in the brand's OWN Supabase storage — private bucket `issue-reports`, one
+ * in the brand's OWN Supabase storage - private bucket `issue-reports`, one
  * folder per report:
  *
  *   issue-reports/<yyyy-mm>/<ISS-id>/report.json
@@ -34,11 +34,11 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/gif': 'gif',
 }
 
-// Newest N months scanned + hard cap on reports returned — the Support page is
+// Newest N months scanned + hard cap on reports returned - the Support page is
 // a recent-history surface, not an archive browser.
 const MAX_MONTHS = 6
 const MAX_REPORTS = 200
-const SIGNED_URL_TTL = 60 * 60 // 1h — page refetch re-signs
+const SIGNED_URL_TTL = 60 * 60 // 1h - page refetch re-signs
 
 export async function GET() {
   try {
@@ -55,7 +55,7 @@ export async function GET() {
 
     const store = supabase.storage.from(BUCKET)
 
-    // Month folders, newest first. A brand with no reports yet has no bucket —
+    // Month folders, newest first. A brand with no reports yet has no bucket -
     // that's an empty list, not an error.
     const { data: months, error: monthsErr } = await store.list('', { limit: 100 })
     if (monthsErr) {
@@ -107,7 +107,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Dashboard-auth only — this is an internal team surface, not public.
+    // Dashboard-auth only - this is an internal team surface, not public.
     const authClient = await createClient()
     const {
       data: { user },
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     try {
       context = JSON.parse(String(form.get('context') || '{}'))
     } catch {
-      /* context stays {} — never block a report over bad metadata */
+      /* context stays {} - never block a report over bad metadata */
     }
     const screenshots = form
       .getAll('screenshots')
@@ -157,9 +157,9 @@ export async function POST(request: NextRequest) {
     const folder = `${now.toISOString().slice(0, 7)}/${id}`
 
     // Upload with one bucket-not-found retry: first report on a fresh brand
-    // creates the private bucket via the storage API (service key — no DDL).
+    // creates the private bucket via the storage API (service key - no DDL).
     // cacheControl '0': report.json gets REWRITTEN by the vault sync (--push
-    // status/fix updates) — the default 1h CDN cache serves stale reports back
+    // status/fix updates) - the default 1h CDN cache serves stale reports back
     // to the next sync run. Reports are low-traffic; skip caching entirely.
     const upload = async (path: string, body: Blob | string, contentType: string) => {
       const payload = typeof body === 'string' ? new Blob([body], { type: contentType }) : body
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
       description,
       context,
       screenshots: shotNames,
-      // Lifecycle fields — the vault (Obsidian) is the working surface; the
+      // Lifecycle fields - the vault (Obsidian) is the working surface; the
       // sync script writes status/fix changes back here so this stays truth.
       status: 'new',
       fix: null as string | null,

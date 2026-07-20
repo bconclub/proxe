@@ -1,5 +1,5 @@
 /**
- * Lokazen conversation-audience detection — shared by the web chat and
+ * Lokazen conversation-audience detection - shared by the web chat and
  * WhatsApp routes (and by engine.ts for KB scoping) so brand/owner/scout
  * detection has one source of truth instead of drifting per channel.
  */
@@ -79,17 +79,17 @@ export function detectLokazenAudience(
     previousAssistant.includes("what's your name and phone number") ||
     previousAssistant.includes('would you like the team to help you get started') ||
     previousAssistant.includes('join us as a scout') ||
-    // Once the agent is in the scout flow, its replies mention these — keeps the
+    // Once the agent is in the scout flow, its replies mention these - keeps the
     // audience sticky across follow-ups like "send me the app link".
     previousAssistant.includes('scout app') ||
     previousAssistant.includes('scouts spot') ||
     previousAssistant.includes('scouts help');
 
-  // General scout intent in the user's own words — e.g. "help with my Lokazen
+  // General scout intent in the user's own words - e.g. "help with my Lokazen
   // Scout account", "the scout app", "i want to be a scout", "join as a scout".
   // Requires the word "scout" so a brand/owner mentioning it in passing is safe.
   const hasScoutWord = /\bscout\b/.test(answerLower);
-  // Gig-worker scout intent even without the word "scout" — the tell-tale
+  // Gig-worker scout intent even without the word "scout" - the tell-tale
   // phrases are unique to the scout product (KYC/verification to get paid,
   // per-listing earnings, spotting empty "To Let" shops, UPI payout). Brand
   // and owner intent is matched FIRST below, so a space-seeker/landlord that
@@ -122,11 +122,11 @@ export function detectLokazenAudience(
     scoutPhrase ||
     buttons.some((b) => b.includes('scout'));
 
-  // Owner intent in the user's OWN words — anyone OFFERING / LISTING a property,
+  // Owner intent in the user's OWN words - anyone OFFERING / LISTING a property,
   // not just the exact "List My Property" button. This was missing, so a clear
   // owner ("I was not able to list the property on your site") went unclassified,
   // then drifted to 'brand' the moment the agent asked a brand-flavoured question
-  // (size/area). Offering language only — a space-SEEKER ("looking to rent a
+  // (size/area). Offering language only - a space-SEEKER ("looking to rent a
   // shop") is a brand and is matched by the brand branch below.
   const ownerIntent =
     answerLower.includes('list my property') ||

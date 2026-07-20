@@ -1,7 +1,7 @@
 /**
- * Pipeline page settings — ONE config per brand, shared by every user.
+ * Pipeline page settings - ONE config per brand, shared by every user.
  *
- * The key event stage ("Demo Booked") is a name, not a behavior — brands whose
+ * The key event stage ("Demo Booked") is a name, not a behavior - brands whose
  * milestone isn't a demo (site visit, trial class…) rename it here once and it
  * sticks. Stored in dashboard_settings (key 'pipeline_config') in the brand's
  * own Supabase, so each brand keeps its own label.
@@ -41,7 +41,7 @@ export async function GET() {
     const { data: { user } } = await authClient.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Union of service/auth client narrows to `never` on chained builders —
+    // Union of service/auth client narrows to `never` on chained builders -
     // same any-cast the sibling settings routes rely on.
     const supabase: any = getServiceClient() || authClient
     const { data, error } = await supabase

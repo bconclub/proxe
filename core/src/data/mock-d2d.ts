@@ -286,13 +286,13 @@ function mkVisit(s: VisitSpec): D2DVisit {
   if (s.priorKnock) {
     timeline.push({
       at: hoursAgo(s.priorKnock.hoursAgo),
-      label: s.priorKnock.label || (s.priorKnock.outcome === 'not_home' ? 'First knock — not home' : `First knock — ${D2D_OUTCOME[s.priorKnock.outcome].label.toLowerCase()}`),
+      label: s.priorKnock.label || (s.priorKnock.outcome === 'not_home' ? 'First knock - not home' : `First knock - ${D2D_OUTCOME[s.priorKnock.outcome].label.toLowerCase()}`),
       outcome: s.priorKnock.outcome,
     });
   }
   timeline.push({
     at: visitedAt,
-    label: s.outcome === 'met' ? `${s.priorKnock ? 'Revisit — met' : 'Met'}${s.flagHung ? ', flag hung' : ''}` : D2D_OUTCOME[s.outcome].label,
+    label: s.outcome === 'met' ? `${s.priorKnock ? 'Revisit - met' : 'Met'}${s.flagHung ? ', flag hung' : ''}` : D2D_OUTCOME[s.outcome].label,
     outcome: s.outcome,
   });
   return {
@@ -513,14 +513,14 @@ export const CAMPAIGN_STATS = computeCampaignStats();
 
 // ── campaigns ────────────────────────────────────────────────────────────────
 export const CAMPAIGNS: BoothCampaign[] = [
-  { id: 'c1', name: 'Har Ghar Jhanda', description: 'Flag & poster drive — every supporter household hangs the campaign flag',
+  { id: 'c1', name: 'Har Ghar Jhanda', description: 'Flag & poster drive - every supporter household hangs the campaign flag',
     constituency: 'Amritsar East', district: 'Amritsar', booths: [42, 51, 47], startDate: daysAgo(12), endDate: daysAgo(-4), targetDoors: 400, doorsDone: 268, workerIds: ['w1', 'w2'], status: 'active' },
   { id: 'c2', name: 'Booth Parivar Survey', description: 'Household headcount + voter-ID match + grievance capture, booth by booth',
     constituency: 'Jalandhar West', district: 'Jalandhar', booths: [118, 122], startDate: daysAgo(9), endDate: daysAgo(-6), targetDoors: 300, doorsDone: 182, workerIds: ['w3', 'w7'], status: 'active' },
-  { id: 'c3', name: 'Naujawan Voter-ID Drive', description: 'Register first-time & missing young voters (18–25) at the doorstep',
+  { id: 'c3', name: 'Naujawan Voter-ID Drive', description: 'Register first-time & missing young voters (18-25) at the doorstep',
     constituency: 'Ludhiana South', district: 'Ludhiana', booths: [88, 91], startDate: daysAgo(6), endDate: daysAgo(-10), targetDoors: 250, doorsDone: 97, workerIds: ['w4'], status: 'active' },
   { id: 'c5', name: 'Nasha-Mukt Ward Drive', description: 'De-addiction awareness + at-risk household mapping, ward by ward',
     constituency: 'Bathinda Urban', district: 'Bathinda', booths: [63, 67], startDate: daysAgo(8), endDate: daysAgo(-9), targetDoors: 350, doorsDone: 213, workerIds: ['w6', 'w2'], status: 'active' },
-  { id: 'c4', name: 'Revisit Undecided — Doaba', description: 'Second-touch on undecided households flagged in first pass',
+  { id: 'c4', name: 'Revisit Undecided - Doaba', description: 'Second-touch on undecided households flagged in first pass',
     constituency: 'Patiala Rural', district: 'Patiala', booths: [12, 19], startDate: daysAgo(20), endDate: daysAgo(3), targetDoors: 150, doorsDone: 150, workerIds: ['w5', 'w6'], status: 'completed' },
 ];

@@ -19,8 +19,8 @@ export interface FeatureFlags {
 /**
  * Runtime feature flags for the dashboard.
  *
- * Starts from the brand config defaults (getBrandConfig().features) — synchronous,
- * so there's NO flash for the common case where the DB matches the default — then
+ * Starts from the brand config defaults (getBrandConfig().features) - synchronous,
+ * so there's NO flash for the common case where the DB matches the default - then
  * overrides from /api/dashboard/settings/features once it loads. Gates (nav, the
  * Calls page, the Brain button) read this instead of the static config so the
  * Settings → Features toggles take effect without a redeploy.

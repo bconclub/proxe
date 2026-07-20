@@ -1,8 +1,8 @@
 /**
- * DAILY TARGETS — the War Room's target-vs-actual gauges.
+ * DAILY TARGETS - the War Room's target-vs-actual gauges.
  *
  * One brand-global row in dashboard_settings (key 'daily_targets'):
- *   { voices, volunteers, knocks, events }  — numbers per day.
+ *   { voices, volunteers, knocks, events }  - numbers per day.
  *
  *   GET  → { targets }          (cookie auth)
  *   POST → merge partial → { targets }  (service-role write, features pattern)

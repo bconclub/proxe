@@ -1,10 +1,10 @@
 /**
- * Campaigns store — GET list / POST save / PATCH update-status / DELETE.
+ * Campaigns store - GET list / POST save / PATCH update-status / DELETE.
  *
  * Campaigns live as ONE JSON document in dashboard_settings (key
- * 'campaigns_v1') in the brand's own Supabase — same zero-migration pattern as
+ * 'campaigns_v1') in the brand's own Supabase - same zero-migration pattern as
  * dashboard prefs. Volume is small (a team plans campaigns by hand); cap 100,
- * newest first. Sending is NOT here — a campaign saves as 'ready' and the send
+ * newest first. Sending is NOT here - a campaign saves as 'ready' and the send
  * wiring stays an explicit, separate step.
  */
 
@@ -63,7 +63,7 @@ async function writeAll(service: any, campaigns: Campaign[], userId: string) {
       {
         key: KEY,
         value: { campaigns: campaigns.slice(0, MAX_CAMPAIGNS) },
-        description: 'Campaign builder — saved campaigns (audience + template + status)',
+        description: 'Campaign builder - saved campaigns (audience + template + status)',
         updated_by: userId,
       },
       { onConflict: 'key' },

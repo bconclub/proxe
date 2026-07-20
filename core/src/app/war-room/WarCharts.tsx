@@ -1,6 +1,6 @@
 'use client';
 
-// Premium War Room charts on Apache ECharts (v6) — gradient fills, rounded caps,
+// Premium War Room charts on Apache ECharts (v6) - gradient fills, rounded caps,
 // soft glow/shadow, smooth animation. Theme-aware: text/track colors follow the
 // app's light/dark tokens; the data hues stay vivid on the frosted-glass panels.
 import { useEffect, useState } from 'react';
@@ -43,7 +43,7 @@ const hGrad = (l: string, r: string) => ({ type: 'linear' as const, x: 0, y: 0, 
 
 const base = { renderer: 'canvas' as const };
 
-// ── Support / Lean / Opposed — thick gradient ring with center total ──────────
+// ── Support / Lean / Opposed - thick gradient ring with center total ──────────
 export function LeanDonut({ data, total }: { data: Record<string, number>; total: number }) {
   const c = useThemeColors();
   const seg = [
@@ -67,7 +67,7 @@ export function LeanDonut({ data, total }: { data: Record<string, number>; total
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} opts={base} notMerge lazyUpdate />;
 }
 
-// ── Sentiment — rounded gradient gauge arc ────────────────────────────────────
+// ── Sentiment - rounded gradient gauge arc ────────────────────────────────────
 export function SentimentGauge({ value }: { value: number }) {
   const c = useThemeColors();
   const pos = value >= 0;

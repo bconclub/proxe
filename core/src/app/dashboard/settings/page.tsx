@@ -1,6 +1,6 @@
 'use client';
 
-// Configure — a card grid launcher. Every setting area is one card; the inline
+// Configure - a card grid launcher. Every setting area is one card; the inline
 // sections that used to live on this page moved to their own routes:
 //   Appearance → /dashboard/settings/appearance
 //   Widget Appearance → /dashboard/settings/widget
@@ -29,7 +29,7 @@ export default function SettingsPage() {
   const CARDS: Card[] = [
     {
       href: '/dashboard/settings/brain', title: 'The Brain',
-      desc: 'The living brain — tap the orb and it speaks today’s briefing in the agent’s voice.',
+      desc: 'The living brain - tap the orb and it speaks today’s briefing in the agent’s voice.',
       icon: <MdPsychology size={22} />, color: '#8b5cf6',
       chips: [{ label: '● Alive', tone: '#22c55e' }], gated: !brain,
     },
@@ -40,7 +40,7 @@ export default function SettingsPage() {
     },
     {
       href: '/dashboard/settings/features', title: 'Features',
-      desc: 'Switch Voice/Calls, Dashboard Brain and other features on or off — no redeploy.',
+      desc: 'Switch Voice/Calls, Dashboard Brain and other features on or off - no redeploy.',
       icon: <MdGridView size={22} />, color: '#22c55e',
     },
     {
@@ -65,12 +65,12 @@ export default function SettingsPage() {
     },
     {
       href: '/dashboard/settings/widget', title: 'Widget Appearance',
-      desc: 'How the widget appears on your website — search bar or floating chat bubble.',
+      desc: 'How the widget appears on your website - search bar or floating chat bubble.',
       icon: <MdChatBubbleOutline size={22} />, color: '#a855f7',
     },
     {
       href: '/dashboard/settings/support', title: 'Support',
-      desc: 'Every issue the team has reported — status, screenshots, and fix notes in one place.',
+      desc: 'Every issue the team has reported - status, screenshots, and fix notes in one place.',
       icon: <MdSupportAgent size={22} />, color: '#0ea5e9',
     },
     {

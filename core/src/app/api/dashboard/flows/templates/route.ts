@@ -1,11 +1,11 @@
 /**
- * Flow template CRUD — backs the "Create Flow" / "Flow Settings" modals on the
+ * Flow template CRUD - backs the "Create Flow" / "Flow Settings" modals on the
  * Flows page. Operates on the shared `follow_up_templates` table, always scoped
  * to this brand (BRAND_ID) so Windchasers never reads or writes BCON rows.
  *
- *   POST   — create a new template (meta_status defaults to 'pending')
- *   PATCH  — update an existing template (status, content, active flag, schedule)
- *   DELETE — remove a template by id (brand-guarded)
+ *   POST   - create a new template (meta_status defaults to 'pending')
+ *   PATCH  - update an existing template (status, content, active flag, schedule)
+ *   DELETE - remove a template by id (brand-guarded)
  *
  * Dashboard writes use the service-role client (RLS bypass) per the PROXe
  * safeguards. Every write is brand-filtered so cross-tenant edits are impossible.

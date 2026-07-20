@@ -60,7 +60,7 @@ export default function ConfigPage() {
         <div>
           <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Config</h1>
           <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
-            Every integration, channel, source and lead field in one place. Secret values are never shown — only whether they’re set.
+            Every integration, channel, source and lead field in one place. Secret values are never shown - only whether they’re set.
           </p>
         </div>
         <button type="button" onClick={load} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 38, padding: '0 14px', border: '1px solid var(--border-primary)', borderRadius: 10, background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
@@ -108,7 +108,7 @@ export default function ConfigPage() {
                           </span>
                           <span style={{ fontSize: 12, fontWeight: 600, flexShrink: 0, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right',
                             color: f.secret ? (f.set ? '#22c55e' : 'var(--text-muted)') : (f.value ? 'var(--text-primary)' : 'var(--text-muted)') }}>
-                            {f.secret ? (f.set ? '•••• set' : 'not set') : (f.value || '—')}
+                            {f.secret ? (f.set ? '•••• set' : 'not set') : (f.value || '-')}
                           </span>
                         </div>
                       ))}

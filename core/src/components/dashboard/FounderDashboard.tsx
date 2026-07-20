@@ -140,7 +140,7 @@ interface FounderMetrics {
     ladder?: { voters: number; supporters: number; volunteers: number; cadre: number; grievances: number }
   }
   // ALL brands: generic Activity Sources (touchpoints by conversation channel,
-  // last 30 days) — the metrics route ships this for every brand.
+  // last 30 days) - the metrics route ships this for every brand.
   sources?: {
     total30d: number
     mix: Array<{ magnet: string; count: number; share: number; delta7: number }>
@@ -423,7 +423,7 @@ export default function FounderDashboard() {
   // The four big cards (Engine / Events / Queue / Sources) live in SLOTS. Grab
   // the grip on a card and drop it on another to SWAP slots; the order persists
   // per browser. Reset (top bar, shows only when customized) restores default.
-  // Slots keep their grid spans — a card adopts the size of wherever it lands.
+  // Slots keep their grid spans - a card adopts the size of wherever it lands.
   const DEFAULT_CARD_ORDER = ['engine', 'events', 'queue', 'sources']
   const CARD_ORDER_KEY = 'proxe-home-cards'
   const [cardOrder, setCardOrder] = useState<string[]>(DEFAULT_CARD_ORDER)
@@ -718,7 +718,7 @@ export default function FounderDashboard() {
   // matrix (touchpoints by weekday & hour).
   const popHeat = isPop ? metrics.campaignHome?.dailyActivity : undefined
   const weekHour = isPop ? metrics.campaignHome?.weekHour : undefined
-  // "Activity Sources" panel — EVERY brand. POP keeps its richer magnet mix
+  // "Activity Sources" panel - EVERY brand. POP keeps its richer magnet mix
   // (d2d/qr/missed_call from pop_home_agg); other brands use the generic
   // conversations-by-channel mix the metrics route now ships for everyone.
   const popMix = isPop && metrics.campaignHome?.sources?.mix?.length
@@ -732,7 +732,7 @@ export default function FounderDashboard() {
   // ── Movable-card slot geometry (xl only) ─────────────────────────────────
   // slots 0+1 = top row, 2+3 = bottom row; spans follow the brand variants
   // that used to size the rows. A card adopts the span of the slot it's in.
-  // windchasers: even 50-50 rows — Engine Overview at span 8 left Upcoming
+  // windchasers: even 50-50 rows - Engine Overview at span 8 left Upcoming
   // Events squeezed (user-requested true 50-50 split).
   const engineNarrow = (isPop && !!metrics.campaignHome?.ladder) || showGigsTab || brandCfg.brand === 'windchasers'
   const SLOT_SPANS = engineNarrow ? [6, 6, 6, 6] : [8, 4, 6, 6]
@@ -750,7 +750,7 @@ export default function FounderDashboard() {
     onDragOver: (e: React.DragEvent) => { if (dragCardRef.current && dragCardRef.current !== id) e.preventDefault() },
     onDrop: (e: React.DragEvent) => { e.preventDefault(); if (dragCardRef.current) swapCards(dragCardRef.current, id); setDragArm(null); dragCardRef.current = null },
   })
-  // Grip that ARMS the drag — buttons/text inside cards never start one.
+  // Grip that ARMS the drag - buttons/text inside cards never start one.
   const cardGrip = (id: string) => (
     <button
       type="button"
@@ -854,7 +854,7 @@ export default function FounderDashboard() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Top bar keeps ONLY the bell (product updates + version). Snapshot and
-              Ask PROXe were dropped — the Brain dock covers asking by voice. */}
+              Ask PROXe were dropped - the Brain dock covers asking by voice. */}
           {isCustomLayout && (
             <button
               type="button"
@@ -1046,7 +1046,7 @@ export default function FounderDashboard() {
       </div>
 
       {/* ── ROWS 2+3 · the four MOVABLE cards (Engine / Events / Queue / Sources)
-          — ONE grid, two xl rows; each card is placed by its slot (drag the grip
+          - ONE grid, two xl rows; each card is placed by its slot (drag the grip
           to swap; Reset in the top bar restores default). ── */}
       <div className="wc-bento grid grid-cols-1 xl:grid-cols-12 xl:grid-rows-2 gap-4 sm:gap-5 xl:flex-[2] xl:min-h-0">
         {/* Engine Overview funnel. POP: the intensity LADDER (Voters → Supporters →
@@ -1069,7 +1069,7 @@ export default function FounderDashboard() {
             </div>
             )}
           </div>
-          {/* Program switcher (windchasers) — re-slices the funnel by program; the
+          {/* Program switcher (windchasers) - re-slices the funnel by program; the
               date toggle above still applies to whichever program is selected. */}
           {isWindchasers && wcFunnels && !isGigsView && (
             <div className="flex items-center gap-1 flex-wrap mt-2 shrink-0">
@@ -1153,7 +1153,7 @@ export default function FounderDashboard() {
           </div>
         </section>
 
-        {/* Upcoming Events — movable card (slot: events) */}
+        {/* Upcoming Events - movable card (slot: events) */}
         <section {...cardDrag('events')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ ...slotStyle('events'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           {cardGrip('events')}
           <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
@@ -1199,7 +1199,7 @@ export default function FounderDashboard() {
                             </span>
                           )}
                           <div className="flex-1 min-w-0">
-                            {/* Line 1 — title + kind, with Going / Interested INLINE on the right */}
+                            {/* Line 1 - title + kind, with Going / Interested INLINE on the right */}
                             <div className="flex items-center gap-2 min-w-0">
                               <p className="text-[13px] font-bold truncate" style={{ color: 'var(--text-primary)' }}>{ev.title}</p>
                               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: `${kind.c}1f`, color: kind.c, border: `1px solid ${kind.c}45` }}>{kind.label}</span>
@@ -1211,13 +1211,13 @@ export default function FounderDashboard() {
                                 <MdStarBorder size={12} /> {ev.interested}
                               </span>
                             </div>
-                            {/* Line 2 — location · time on one line */}
+                            {/* Line 2 - location · time on one line */}
                             <p className="text-[10.5px] truncate mt-1 flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
                               <MdPlace size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                               <span className="truncate">{[ev.constituency, ev.venue].filter(Boolean).join(' · ') || 'Punjab'}</span>
                               {timeIST && (<><span style={{ opacity: 0.4 }}>·</span><MdAccessTime size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} /><span className="whitespace-nowrap">{timeIST}</span></>)}
                             </p>
-                            {/* Line 3 — mobilizable base (compact, muted) */}
+                            {/* Line 3 - mobilizable base (compact, muted) */}
                             <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                               <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatVolunteers} volunteers</span>
                               <span className="inline-flex items-center gap-1"><MdPeople size={11} /> {ev.seatSupporters} supporters</span>
@@ -1310,7 +1310,7 @@ export default function FounderDashboard() {
           </div>
         </section>
 
-        {/* Priority Lead Queue — movable card (slot: queue) */}
+        {/* Priority Lead Queue - movable card (slot: queue) */}
         <section {...cardDrag('queue')} className="cq-card wc-slot relative group rounded-xl border overflow-hidden flex flex-col min-h-0" style={{ ...slotStyle('queue'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}>
           {cardGrip('queue')}
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
@@ -1440,7 +1440,7 @@ export default function FounderDashboard() {
           )}
         </section>
 
-        {/* Conversations Trend — fallback ONLY when a brand has no 30d source
+        {/* Conversations Trend - fallback ONLY when a brand has no 30d source
             data yet; every brand with data gets Activity Sources instead. */}
         {!popMix && (
         <section {...cardDrag('sources')} className="wc-slot relative group rounded-xl p-4 border flex flex-col min-h-0 overflow-hidden" style={{ ...slotStyle('sources'), backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)', boxShadow: '0 6px 18px rgba(0,0,0,0.22)' }}>
@@ -1569,13 +1569,13 @@ export default function FounderDashboard() {
               {/* the ring (LEFT) + ranked source rows. Every column shrinkable so
                   the card can NEVER clip its right edge at narrow xl widths. */}
               <div className="as-split flex-1 min-h-0 gap-3 overflow-hidden">
-                {/* the ring — source-mix donut with the total in the middle.
+                {/* the ring - source-mix donut with the total in the middle.
                     Shown/hidden by CARD width (@container), not viewport. */}
                 <div className="as-donut items-center justify-center min-h-0 min-w-0">
                   <div className="w-full" style={{ maxWidth: 148 }}><SourceDonut mix={popMix} total={mixTotal} /></div>
                 </div>
                 {/* overflow-y-auto + my-auto (not justify-center + hidden): with
-                    many sources justify-center clipped BOTH ends of the list —
+                    many sources justify-center clipped BOTH ends of the list -
                     my-auto centers when it fits, scrolls from the top when not. */}
                 <div className="flex flex-col min-h-0 min-w-0 overflow-y-auto">
                   <div className="my-auto flex flex-col gap-1">
@@ -1677,7 +1677,7 @@ function EngineNode({ icon, color, count, label, sub, last }: {
 }) {
   return (
     <>
-      {/* Desktop: the funnel circle. Phone: a compact stat ROW instead — five
+      {/* Desktop: the funnel circle. Phone: a compact stat ROW instead - five
           64px circles + big numbers never fit 375px, and larger counts (100/
           1000) made it worse. Rows grow with the number, funnel reads
           top→bottom. */}

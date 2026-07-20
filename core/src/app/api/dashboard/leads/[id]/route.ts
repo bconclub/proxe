@@ -46,7 +46,7 @@ export async function GET(
   }
 }
 
-// PATCH handler — update editable lead fields from the dashboard
+// PATCH handler - update editable lead fields from the dashboard
 //
 // Supported body fields:
 //   customer_name → renames the lead
@@ -171,7 +171,7 @@ export async function PATCH(
     updates.unified_context = newCtx
     // NOTE: do NOT touch last_interaction_at here. That column tracks the
     // CUSTOMER's last activity (the "Active" column / time-ago). A manual
-    // dashboard edit (name/email/city/etc.) is not customer activity — bumping
+    // dashboard edit (name/email/city/etc.) is not customer activity - bumping
     // it made every edited lead jump to "now". The edit is recorded in
     // unified_context.last_actor + the activities audit instead.
 
@@ -208,7 +208,7 @@ export async function DELETE(
   console.log('[DELETE] Handler invoked for lead:', params.id)
 
   try {
-    // Use the service-role client so the cascade actually executes — the
+    // Use the service-role client so the cascade actually executes - the
     // anon/cookie client is filtered by RLS (`auth.role() = 'authenticated'`)
     // and silently returns 0 rows even though the response looks like success.
     const supabase = getServiceClient() || (await createClient())

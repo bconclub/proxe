@@ -1,19 +1,19 @@
 /**
- * Slack notifier — one-way notifications to a Slack channel via an Incoming
+ * Slack notifier - one-way notifications to a Slack channel via an Incoming
  * Webhook. No bot token or scopes: create an Incoming Webhook for the target
  * channel (e.g. #lokazen-proxe) and put its URL in SLACK_WEBHOOK_URL.
  *
- * Messages use clean Block Kit formatting — a bold title line, bold field
- * labels, and italic meta — no emoji clutter, no walls of text. Everything
+ * Messages use clean Block Kit formatting - a bold title line, bold field
+ * labels, and italic meta - no emoji clutter, no walls of text. Everything
  * soft-fails: no SLACK_WEBHOOK_URL = no-op, and a Slack outage never breaks a
  * booking or a lead insert. The URL lives in each deployment's env, so only the
- * brand whose Vercel project has it set will post — no cross-brand leakage.
+ * brand whose Vercel project has it set will post - no cross-brand leakage.
  */
 
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 
 // Brand marks for the message body (the sender AVATAR/name is set on the Slack
-// app itself — app webhooks ignore per-message username/icon). The logo must be
+// app itself - app webhooks ignore per-message username/icon). The logo must be
 // a public PNG/JPG URL Slack can fetch (SVG is not rendered). Both overridable
 // per-deployment so another brand's channel can reuse this notifier.
 const SLACK_BRAND_COLOR = process.env.SLACK_BRAND_COLOR || '#E4002B'; // matches the logo (red)
@@ -23,7 +23,7 @@ const SLACK_LOGO_URL = process.env.SLACK_LOGO_URL || 'https://proxe.lokazen.in/l
 //   channel / here / everyone  → <!channel> / <!here> / <!everyone>
 //   U0ABC123 (member id)        → <@U0ABC123>
 //   !subteam^S0ABC123 (group)   → <!subteam^S0ABC123>
-// Empty = no ping (and no cross-brand bleed — only the brand whose env sets it).
+// Empty = no ping (and no cross-brand bleed - only the brand whose env sets it).
 const SLACK_MENTION = (process.env.SLACK_MENTION_USER_ID || '')
   .split(',')
   .map((s) => s.trim())
@@ -75,7 +75,7 @@ type Pair = [label: string, value?: string | number | null];
 
 const clean = (v: unknown): string =>
   v == null ? '' : String(Array.isArray(v) ? v.join(', ') : v)
-    .replace(/[—–]/g, '-') // never em/en dashes in alerts — use a hyphen
+    .replace(/[—–]/g, '-') // never em/en dashes in alerts - use a hyphen
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -99,7 +99,7 @@ function fieldsSection(pairs: Pair[]): { type: 'section'; fields: unknown[] } | 
   return { type: 'section', fields };
 }
 
-/** Big bold headline (header blocks are plain_text only — no markdown/emoji). */
+/** Big bold headline (header blocks are plain_text only - no markdown/emoji). */
 const header = (title: string) => ({
   type: 'header',
   text: { type: 'plain_text', text: title.slice(0, 150), emoji: false },
@@ -200,16 +200,16 @@ export interface LeadNotice {
   source?: string | null;
   detail?: string | null;         // free-text (rendered italic)
   detailFields?: Pair[];          // structured detail (2-col bold-label fields)
-  leadUrl?: string;               // dashboard URL — renders the lead name as a clickable "tag"
+  leadUrl?: string;               // dashboard URL - renders the lead name as a clickable "tag"
   title?: string;                 // headline text, e.g. "New lead" / "Needs human follow-up"
   footer?: string;                // small italic footer suffix
-  // URL buttons (work from an incoming webhook — no Slack app needed). Each
+  // URL buttons (work from an incoming webhook - no Slack app needed). Each
   // opens a link (e.g. the lead in the dashboard). TRUE in-Slack state buttons
   // (Resolved without leaving Slack) would need a Slack app + request URL.
   actions?: { text: string; url: string; style?: 'primary' | 'danger' }[];
 }
 
-/** Compact channel chip — an icon + the channel name (WhatsApp / Web / …). */
+/** Compact channel chip - an icon + the channel name (WhatsApp / Web / …). */
 function channelBadge(source?: string | null): string {
   const s = clean(source).toLowerCase();
   if (!s) return '';
@@ -222,7 +222,7 @@ function channelBadge(source?: string | null): string {
 }
 
 /**
- * A lead alert — new lead, hot lead, or a needs-human escalation. Compact by
+ * A lead alert - new lead, hot lead, or a needs-human escalation. Compact by
  * design: a short attachment (5 blocks max) so Slack never collapses it behind
  * "show more" and the action button stays on the first view. Phone + channel
  * render as icon chips, not a fields grid. If SLACK_MENTION_USER_ID is set, the
@@ -244,7 +244,7 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
     section(`${whoTag}${clean(l.leadType) ? `   ·   _${clean(l.leadType)}_` : ''}`),
   ];
 
-  // Captured brief — the Brand/Property fields (category, areas, size, budget…),
+  // Captured brief - the Brand/Property fields (category, areas, size, budget…),
   // one compact multiline block. Only non-empty fields render.
   const brief = (l.detailFields || [])
     .filter(([, v]) => clean(v == null ? '' : String(v)))
@@ -261,7 +261,7 @@ export async function notifySlackLead(l: LeadNotice): Promise<SlackResult> {
   if (cb) meta.push(cb);
   if (meta.length) blocks.push(section(meta.join('       ')));
 
-  // Action button — kept inside the short attachment so it shows on first view.
+  // Action button - kept inside the short attachment so it shows on first view.
   if (l.actions?.length) {
     blocks.push({
       type: 'actions',

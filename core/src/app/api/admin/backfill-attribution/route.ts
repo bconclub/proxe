@@ -8,11 +8,11 @@
  *   - web.utm.source, landing_page.utm_source (legacy paths)
  *   - first_touchpoint column (channel-level fallback)
  *
- * Idempotent — skips any lead that already has attribution.source set.
+ * Idempotent - skips any lead that already has attribution.source set.
  *
  * Body (optional):
- *   dryRun: true  — compute but don't write
- *   limit: 500    — cap how many to process (default unbounded)
+ *   dryRun: true  - compute but don't write
+ *   limit: 500    - cap how many to process (default unbounded)
  *   brand: "windchasers" (default from env)
  *
  * Auth: x-api-key header must match ADMIN_API_KEY env var (or WHATSAPP_API_KEY fallback).
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
       if (report.examples.length < 10) {
         report.examples.push({
           lead_id: lead.id,
-          name: lead.customer_name || '—',
+          name: lead.customer_name || '-',
           source: attribution.source_label,
           first_touch: attribution.first_touch_label,
         });

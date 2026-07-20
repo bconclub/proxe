@@ -1,9 +1,9 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BrainHero — orchestrates the living brain: pulls live vitals + the activity
+// BrainHero - orchestrates the living brain: pulls live vitals + the activity
 // feed, drives NeuralBrain (the 3D particle-cloud canvas) by flipping which
-// lobe is "firing" as real events land, and — on click — fetches and shows the
+// lobe is "firing" as real events land, and - on click - fetches and shows the
 // ACTUAL contents of that lobe (real leads / chats / sequences / KB items).
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export default function BrainHero() {
   }, [])
   useEffect(() => { load(); const t = setInterval(load, 25000); return () => clearInterval(t) }, [load])
 
-  // Fire ONLY on a real event from the live feed — no random idle flashing.
+  // Fire ONLY on a real event from the live feed - no random idle flashing.
   // When nothing's happening the brain stays calm (lobes hold a steady glow by
   // their live load); hovering a lobe is the other way to light one up.
   useEffect(() => {
@@ -107,13 +107,13 @@ export default function BrainHero() {
 
   const metricsFor = (id: RegionId): Array<[string, string | number]> => {
     switch (id) {
-      case 'intake': return [['Leads today', ti?.leads_today ?? '—'], ['All time', ti?.leads_total ?? '—'], ['Channels', ti ? Object.keys(ti.channels || {}).length : '—']]
-      case 'conversation': return [['Chats today', hn?.chats_today ?? '—'], ['Leads in flight', hn?.leads_in_flight ?? '—']]
-      case 'decisions': return [['Active sequences', hn?.active_sequences ?? '—'], ['Awaiting approval', hn?.queued_approvals ?? '—']]
-      case 'scoring': return [['Hot 70+', hn?.hot ?? '—'], ['Warm 40-69', hn?.warm ?? '—'], ['Cold', hn?.cold ?? '—']]
-      case 'memory': return [['Knowledge items', ti?.kb_items ?? '—'], ['Team notes', ti?.notes_total ?? '—'], ['Notes today', ti?.notes_today ?? '—']]
-      case 'timing': return [['Bookings upcoming', hn?.bookings_upcoming ?? '—'], ['Quiet hours', '9pm-9am']]
-      case 'output': return [['Sent today (feed)', sendsToday], ['Awaiting approval', hn?.queued_approvals ?? '—']]
+      case 'intake': return [['Leads today', ti?.leads_today ?? '-'], ['All time', ti?.leads_total ?? '-'], ['Channels', ti ? Object.keys(ti.channels || {}).length : '-']]
+      case 'conversation': return [['Chats today', hn?.chats_today ?? '-'], ['Leads in flight', hn?.leads_in_flight ?? '-']]
+      case 'decisions': return [['Active sequences', hn?.active_sequences ?? '-'], ['Awaiting approval', hn?.queued_approvals ?? '-']]
+      case 'scoring': return [['Hot 70+', hn?.hot ?? '-'], ['Warm 40-69', hn?.warm ?? '-'], ['Cold', hn?.cold ?? '-']]
+      case 'memory': return [['Knowledge items', ti?.kb_items ?? '-'], ['Team notes', ti?.notes_total ?? '-'], ['Notes today', ti?.notes_today ?? '-']]
+      case 'timing': return [['Bookings upcoming', hn?.bookings_upcoming ?? '-'], ['Quiet hours', '9pm-9am']]
+      case 'output': return [['Sent today (feed)', sendsToday], ['Awaiting approval', hn?.queued_approvals ?? '-']]
     }
   }
   const OPEN_LINK: Record<RegionId, { href: string; label: string }> = {
@@ -138,11 +138,11 @@ export default function BrainHero() {
         <NeuralBrain firing={firing} hovered={hovered} intensity={intensity} onPick={setSelected} onHover={setHovered} />
       </div>
 
-      {/* left vitals — hidden on phones: the two side panels would blanket the
+      {/* left vitals - hidden on phones: the two side panels would blanket the
           brain canvas at 375px. Stats stay reachable via the click panel. */}
       <div className="hidden md:flex" style={{ position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column', gap: 10, width: 168, pointerEvents: 'none' }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: 'var(--text-muted)' }}>TAKEN IN</div>
-        {([['Knowledge items', ti?.kb_items ?? '—'], ['Leads (all time)', ti?.leads_total ?? '—'], ['Leads today', ti?.leads_today ?? '—'], ['Team notes', ti?.notes_total ?? '—'], ['Channels', ti ? Object.keys(ti.channels || {}).length : '—']] as Array<[string, number | string]>).map(([label, v]) => (
+        {([['Knowledge items', ti?.kb_items ?? '-'], ['Leads (all time)', ti?.leads_total ?? '-'], ['Leads today', ti?.leads_today ?? '-'], ['Team notes', ti?.notes_total ?? '-'], ['Channels', ti ? Object.keys(ti.channels || {}).length : '-']] as Array<[string, number | string]>).map(([label, v]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-primary)', paddingBottom: 5 }}>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
             <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{v}</span>
@@ -151,10 +151,10 @@ export default function BrainHero() {
         <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>Drag to rotate. Click a glowing region to see inside it.</div>
       </div>
 
-      {/* right vitals + feed — hidden on phones (see left vitals note) */}
+      {/* right vitals + feed - hidden on phones (see left vitals note) */}
       <div className="hidden md:flex" style={{ position: 'absolute', right: 22, top: '50%', transform: 'translateY(-50%)', flexDirection: 'column', gap: 10, width: 220, pointerEvents: 'none' }}>
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, color: 'var(--text-muted)' }}>HANDLING NOW</div>
-        {([['Chats today', hn?.chats_today ?? '—'], ['Active sequences', hn?.active_sequences ?? '—'], ['Awaiting approval', hn?.queued_approvals ?? '—'], ['Leads in flight', hn?.leads_in_flight ?? '—'], ['Bookings upcoming', hn?.bookings_upcoming ?? '—']] as Array<[string, number | string]>).map(([label, v]) => (
+        {([['Chats today', hn?.chats_today ?? '-'], ['Active sequences', hn?.active_sequences ?? '-'], ['Awaiting approval', hn?.queued_approvals ?? '-'], ['Leads in flight', hn?.leads_in_flight ?? '-'], ['Bookings upcoming', hn?.bookings_upcoming ?? '-']] as Array<[string, number | string]>).map(([label, v]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-primary)', paddingBottom: 5 }}>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</span>
             <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{v}</span>

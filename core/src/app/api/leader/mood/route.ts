@@ -1,4 +1,4 @@
-// LEADER API — constituency mood: where support stands, seat by seat.
+// LEADER API - constituency mood: where support stands, seat by seat.
 // Auth: x-api-key = LEADER_API_KEY.
 
 import { NextRequest } from 'next/server';

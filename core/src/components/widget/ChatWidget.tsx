@@ -64,7 +64,7 @@ const InfinitySymbol = () => (
 );
 
 
-// Connecting ring — gold arc that fills 0→100% over 2.4s (Windchasers brand)
+// Connecting ring - gold arc that fills 0→100% over 2.4s (Windchasers brand)
 const ConnectingRingOrb = () => (
   <svg className={styles.voiceConnectingRing} viewBox="0 0 240 240" aria-hidden="true">
     <circle
@@ -176,7 +176,7 @@ const ICONS = {
   ),
 };
 
-// Opening AI bubbles — brand copy lives in the pack (config.widget.welcomeSequence).
+// Opening AI bubbles - brand copy lives in the pack (config.widget.welcomeSequence).
 const activeBrandConfig = getBrandConfig();
 const welcomeSequence = activeBrandConfig.widget?.welcomeSequence ?? [
   { text: `Hi! I'm ${activeBrandConfig.name}'s AI assistant. How can I help you today?`, delay: 0 },
@@ -1434,10 +1434,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
   // Docked positioning when open. CRITICAL for the open animation: this MUST
   // set the SAME anchor the CSS already uses (.chatboxBubbleMobile fullscreen /
-  // .chatboxBubbleDesktop bottom:104px) — writing a DIFFERENT position here
+  // .chatboxBubbleDesktop bottom:104px) - writing a DIFFERENT position here
   // (this used to center the panel with top:0;bottom:0;margin:auto) yanked the
   // freshly-painted panel to a new spot one frame later, which read as the
-  // "flicker" on open. And do NOT override `transform` here — slideUpBubble
+  // "flicker" on open. And do NOT override `transform` here - slideUpBubble
   // animates it; the panel settles to the CSS `transform:none` on its own.
   // useLayoutEffect: apply before paint so there is never a wrong first frame.
   useLayoutEffect(() => {
@@ -1461,7 +1461,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       el.style.setProperty('max-height', '100vh', 'important');
       el.style.setProperty('margin', '0', 'important');
     } else {
-      // Desktop: anchor ABOVE the launcher bubble — SAME as .chatboxBubbleDesktop
+      // Desktop: anchor ABOVE the launcher bubble - SAME as .chatboxBubbleDesktop
       // (no centering, no margin-auto), so JS and CSS agree and nothing jumps.
       el.style.setProperty('right', '24px', 'important');
       el.style.setProperty('left', 'auto', 'important');
@@ -1955,7 +1955,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
-    // Instant bubbles — CSS messageIn handles the fade-up animation
+    // Instant bubbles - CSS messageIn handles the fade-up animation
     for (let i = 0; i < welcomeSequence.length; i++) {
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 120));
@@ -2190,7 +2190,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   useEffect(() => {
     if (!isOpen || messages.length !== 0 || hasShownWelcomeRef.current) return;
 
-    // ── Show welcome immediately — never block on an async DB check ──────────
+    // ── Show welcome immediately - never block on an async DB check ──────────
     // This removes the ~500 ms round-trip delay that was visible on first open.
     playWelcomeSequence();
 
@@ -2235,7 +2235,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
           }, 80);
         } catch (err) {
-          // Non-fatal — welcome is already visible
+          // Non-fatal - welcome is already visible
           console.error('[ChatWidget] Background conversation restore failed:', err);
         }
       })();
@@ -2647,7 +2647,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // Some browsers/Daily.co silently mute the user track during assistant audio.
       setTimeout(ensureMicLive, 150);
     });
-    // Volume-level fires continuously with user mic amplitude (0–1).
+    // Volume-level fires continuously with user mic amplitude (0-1).
     // Drive the on-screen mic bar so we can visually confirm audio capture.
     vapi.on('volume-level', (level: number) => {
       setVapiVolume(level);
@@ -2672,10 +2672,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     });
   };
 
-  // Pre-warm: instantiate Vapi + attach listeners only — do NOT call .start() here.
+  // Pre-warm: instantiate Vapi + attach listeners only - do NOT call .start() here.
   // .start() is called in handleVoiceToggle (inside a user gesture) so browsers
   // grant mic permission correctly, especially on iOS Safari and Android Chrome.
-  // Do NOT pre-request getUserMedia here — claiming and releasing the mic before
+  // Do NOT pre-request getUserMedia here - claiming and releasing the mic before
   // Vapi grabs it causes the device to reject Vapi's subsequent capture on mobile.
   const startVapiPrewarm = () => {
     if (vapiPrewarmedRef.current) return;
@@ -2722,7 +2722,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         return;
       }
 
-      // Always create a fresh instance — reusing a pre-warmed or stale instance
+      // Always create a fresh instance - reusing a pre-warmed or stale instance
       // can cause silent failures on mobile browsers.
       if (vapiRef.current) {
         try { vapiRef.current.stop(); } catch {}
@@ -2730,7 +2730,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       }
       vapiPrewarmedRef.current = true;
 
-      // Preflight getUserMedia — must happen BEFORE Vapi's network handshake.
+      // Preflight getUserMedia - must happen BEFORE Vapi's network handshake.
       // In cross-origin iframes Chrome's transient user-activation window is
       // ~1 second. Vapi.start() fires a server request before calling
       // getUserMedia() internally; by then the activation expires and Chrome
@@ -2739,7 +2739,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       // within the activation window. Once the user taps Allow the permission
       // is stored for this origin and Vapi's own internal getUserMedia() works.
       // iOS Safari note: iOS 16.4+ also requires the call to stay in the
-      // synchronous part of the user-gesture stack — await here is fine because
+      // synchronous part of the user-gesture stack - await here is fine because
       // we're still inside the same event-loop task initiated by the click.
       if (navigator.mediaDevices?.getUserMedia) {
         try {
@@ -2760,7 +2760,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       attachVapiListeners(vapi);
 
       vapiLog('calling vapi.start…');
-      // No client-side overrides — all config lives in the Vapi dashboard.
+      // No client-side overrides - all config lives in the Vapi dashboard.
       // Passing overrides risks schema-validation rejection on the server side
       // which silently drops firstMessage and transcriber settings. Match the
       // VapiOrb pattern: just pass the assistant ID, nothing else.
@@ -2876,7 +2876,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
 
     const normalizedButton = message.toLowerCase();
 
-    // Rebook flow — intercept before AI
+    // Rebook flow - intercept before AI
     if (normalizedButton === 'yes, reschedule') {
       setBookingCompleted(false);
       bookingConfirmedRef.current = false;
@@ -2894,7 +2894,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       return;
     }
 
-    // Cost guide / roadmap — show inline WhatsApp contact form, skip AI
+    // Cost guide / roadmap - show inline WhatsApp contact form, skip AI
     if (normalizedButton === 'send me the cost guide' || normalizedButton === 'send me the roadmap') {
       addUserMessage(buttonText);
       const formId = `cost-guide-${Date.now()}`;
@@ -2908,7 +2908,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     // activity step (e.g. "Working", "Taking a break").
     const isParentPath = nextButtons.some((btn) => btn.toLowerCase() === 'i am a parent');
     const flowRule = (() : FlowOverrideRule | null => {
-      // Pilot Assessment entry — open the assessment in a new tab with chat
+      // Pilot Assessment entry - open the assessment in a new tab with chat
       // context attached. Accept the legacy "take the pat" label as well so
       // older chat states (mid-session) still route correctly.
       if (
@@ -2925,7 +2925,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             }
             window.open(assessmentUrl.toString(), '_blank', 'noopener,noreferrer');
           } catch {
-            /* noop — popup blocker or invalid URL */
+            /* noop - popup blocker or invalid URL */
           }
         }
         return {
@@ -2968,10 +2968,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         };
       }
       if (normalizedButton === 'yes, completed 12th science') {
-        // No buttons — user types their age freely, submitMessage detects it and routes
+        // No buttons - user types their age freely, submitMessage detects it and routes
         return { followUpButtons: [] };
       }
-      // Aspirant activity acknowledgement — only fires when not on the parent path.
+      // Aspirant activity acknowledgement - only fires when not on the parent path.
       if (
         !isParentPath && (
           normalizedButton === 'studying' ||
@@ -2994,7 +2994,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           ],
         };
       }
-      // First-level parent topic answers — every topic ends on the same
+      // First-level parent topic answers - every topic ends on the same
       // 3-button rail so the parent always has the same exits.
       if (
         isParentPath && (
@@ -3011,7 +3011,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           followUpButtons: ['Send me the roadmap', 'Ask a question', 'Maybe later'],
         };
       }
-      // Cost guide / roadmap — bot asks for contact; suppress buttons during
+      // Cost guide / roadmap - bot asks for contact; suppress buttons during
       // the contact-capture turn so the user can type their info.
       if (
         isParentPath && (
@@ -3021,12 +3021,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       ) {
         return { followUpButtons: [] };
       }
-      // Post-capture acknowledgement rail — the parent has shared contact
+      // Post-capture acknowledgement rail - the parent has shared contact
       // and the bot has acknowledged. Offer counsellor / another question / exit.
       // (Parent must explicitly click these; "ask another question" / "maybe
       // later" / "not right now" are handled below.)
 
-      // 'Ask another question' / 'Ask a question' — drop into free-form,
+      // 'Ask another question' / 'Ask a question' - drop into free-form,
       // no flow override. Bot responds from KB + prompt context.
       if (
         isParentPath && (
@@ -3036,7 +3036,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       ) {
         return null;
       }
-      // 'Maybe later' / 'Not right now' — graceful exit; bot says the closing
+      // 'Maybe later' / 'Not right now' - graceful exit; bot says the closing
       // line and we suppress further buttons.
       if (
         isParentPath && (
@@ -3060,7 +3060,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         return { followUpButtons: ['Airplane', 'Helicopter'] };
       }
       if (normalizedButton === 'helicopter pilot') {
-        // Skip the airplane/helicopter pick — they already chose helicopter.
+        // Skip the airplane/helicopter pick - they already chose helicopter.
         return {
           followUpButtons: ['Yes, Completed DGCA', 'No, Starting Fresh'],
         };
@@ -3069,7 +3069,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         normalizedButton === 'flight schools' ||
         normalizedButton === 'cabin crew'
       ) {
-        // Info-only programs — bot answers from KB, then offers a counsellor
+        // Info-only programs - bot answers from KB, then offers a counsellor
         // call or a follow-up question. Prevents the "stuck on Yes" bug.
         return {
           followUpButtons: ['Talk to a counsellor', 'Ask a question'],
@@ -3451,7 +3451,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     >
           {isVapiActive && (
         <div className={styles.voiceOverlay}>
-          {/* Glass orb — speaker state drives halo colour via data-speaker */}
+          {/* Glass orb - speaker state drives halo colour via data-speaker */}
           <div
             className={styles.voiceOrbWrap}
             data-speaker={vapiSpeaker}
@@ -3474,7 +3474,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 : 'Connected'}
             </p>
           </div>
-          {/* Mic volume bar — shows live amplitude from user's mic.
+          {/* Mic volume bar - shows live amplitude from user's mic.
               If this bar never moves when speaking, mic audio isn't reaching Vapi. */}
           {!vapiConnecting && !vapiEnding && (
             <div className={styles.voiceMicBar}>
@@ -3581,7 +3581,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           const accentClass = `accent-${accentIndex}`;
           
           // When the booking calendar is anchored to this message, the calendar
-          // widget renders its own AI bubble below — so suppress this empty
+          // widget renders its own AI bubble below - so suppress this empty
           // anchor bubble to avoid a chrome-only "broken bubble" above it.
           const calendarAnchoredHere = !!showCalendly && calendarAnchorId === message.id;
           return (

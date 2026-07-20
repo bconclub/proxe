@@ -215,18 +215,18 @@ export function isBookingIntent(message: string): boolean {
 }
 
 /**
- * Does this ASSISTANT message look like an in-progress booking STEP — asking
+ * Does this ASSISTANT message look like an in-progress booking STEP - asking
  * for a date/time/email, offering slots, or confirming-before-lock?
  *
  * Used to keep booking tools wired across a multi-turn flow. The original
  * "book a call" intent scrolls out of the recent-user-message window after a
  * few turns (the user then just sends an email, "yeah", "ok"), which used to
- * unwire the tools mid-flow — so the model typed the tool args as JSON text
+ * unwire the tools mid-flow - so the model typed the tool args as JSON text
  * and falsely claimed "Done" without ever booking. If the LAST assistant turn
  * was a booking step, this user reply is part of that flow → keep tools on.
  *
  * Deliberately does NOT match COMPLETED-booking confirmations ("is confirmed",
- * "you're booked", "see you") — matching those post-booking templates would
+ * "you're booked", "see you") - matching those post-booking templates would
  * force booking tools on for unrelated follow-up chatter.
  */
 export function isBookingFlowStep(message: string): boolean {

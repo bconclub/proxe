@@ -33,7 +33,7 @@ async function requireAdmin(userSupabase: any) {
 
   if (!dashboardUser) return { error: 'Not provisioned', status: 403 as const }
   if (dashboardUser.is_active === false) return { error: 'Account deactivated', status: 403 as const }
-  if (dashboardUser.role !== 'admin') return { error: 'Forbidden — admins only', status: 403 as const }
+  if (dashboardUser.role !== 'admin') return { error: 'Forbidden - admins only', status: 403 as const }
   return { user, role: dashboardUser.role, service, status: 200 as const }
 }
 
@@ -71,7 +71,7 @@ export async function PATCH(
     }
     if (body.is_active !== undefined) updates.is_active = !!body.is_active
     if (body.full_name !== undefined) updates.full_name = String(body.full_name).trim() || null
-    // features.leadAccess only — the column doesn't exist on other brands.
+    // features.leadAccess only - the column doesn't exist on other brands.
     if (getBrandConfig().features?.leadAccess && body.allowed_lead_types !== undefined) {
       const sanitized = sanitizeAllowedLeadTypes(body.allowed_lead_types)
       if (sanitized === undefined) {

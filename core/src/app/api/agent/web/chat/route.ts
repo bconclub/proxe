@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       await ensureSession(externalSessionId, 'web', supabase);
     }
 
-    // Server-authoritative history — mirror the WhatsApp pipeline. Web previously
+    // Server-authoritative history - mirror the WhatsApp pipeline. Web previously
     // trusted a browser-side ref capped at 6 turns (memory.recentHistory), which
     // gave the booking flow amnesia: it re-asked for name/email/date already
     // given and drifted on the agreed slot. Every web message is already logged
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
           // ── Post-streaming: business logic ─────────────────────────────
           // MUST be awaited. On Vercel serverless the lambda is terminated
           // as soon as the Response stream closes, so any unawaited
-          // postProcess promise is silently killed mid-flight — that's why
+          // postProcess promise is silently killed mid-flight - that's why
           // web_sessions / conversations were never being persisted.
           // The client has already received the 'done' SSE event and
           // rendered the AI response, so this extra await only delays the
@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
 /**
  * Rebuild the conversation window from the `conversations` table, keyed on the
  * web session id stored in metadata. This is the web counterpart to the
- * WhatsApp webhook's fetchRecentHistory — except web is keyed on
+ * WhatsApp webhook's fetchRecentHistory - except web is keyed on
  * metadata->>session_id (anonymous visitors have no lead_id) and ordered
  * DESCENDING + reversed so we get the genuinely most-recent turns (WhatsApp's
  * ascending+limit grabs the oldest N, a latent bug for long chats).
@@ -372,7 +372,7 @@ function buildLokazenContextPatch(
 
   // Scout PAGE-ORIGIN is authoritative. If the widget was loaded on /scout
   // (embed.js → page_context=lokazen_scout → pageAudience='scout'), the person
-  // IS a scout — even when their message mentions "shop"/"space"/"rent", which
+  // IS a scout - even when their message mentions "shop"/"space"/"rent", which
   // content-only detection would misread as brand/owner and drop them into the
   // Leads view. Origin wins; we never let content flip a scout to brand/owner.
   const forcedScout = originAudience === 'scout';
@@ -401,7 +401,7 @@ function buildLokazenContextPatch(
   const isOwnerFlow = audience === 'owner';
   const exact = (opts: string[]) => opts.some((o) => al === o);
   let capturedFlowField = false;
-  // Brand/owner flow-field capture is skipped entirely for scouts — those size/
+  // Brand/owner flow-field capture is skipped entirely for scouts - those size/
   // budget/format buttons never appear in the scout flow, and running it would
   // only pollute a scout with brand fields.
   if (!forcedScout) {
@@ -430,7 +430,7 @@ function buildLokazenContextPatch(
   } // end !forcedScout brand/owner capture
 
   // Fall back to previous-question matching ONLY when the answer wasn't a known
-  // quick-reply — i.e. free-text answers (brand name, a typed area/size, owner
+  // quick-reply - i.e. free-text answers (brand name, a typed area/size, owner
   // fields). Button answers are already handled deterministically above, so this
   // fragile chain must not re-run and clobber them.
   if (!capturedFlowField) {
@@ -613,7 +613,7 @@ async function updateLokazenLeadContext(
 
   // ── Slack "new lead" notification (chat) ────────────────────────────────
   // Web chat creates leads via updateLeadProfile (not ensureOrUpdateLead), so
-  // the leadManager Slack hook never fires for chat leads — that's why chat
+  // the leadManager Slack hook never fires for chat leads - that's why chat
   // leads weren't being announced. Fire ONCE here, as soon as the lead has an
   // identity (name/phone/email), and mark it so it never repeats. No-op unless
   // SLACK_WEBHOOK_URL is set.
@@ -665,7 +665,7 @@ async function updateLokazenLeadContext(
 // The web widget is POP's citizen surface (MyVoice). Deterministically derive
 // the campaign fields from the tapped quick-buttons + message keywords so a
 // grievance/volunteer/support on web climbs the intensity ladder (026) and
-// shows in the War Room — the same fields the D2D + leader-app paths write.
+// shows in the War Room - the same fields the D2D + leader-app paths write.
 // Keyword-based (no LLM, no latency); never clobbers an existing grievance.
 const POP_CATEGORY_KEYWORDS: [string, RegExp][] = [
   ['water', /\b(water|paani|ਪਾਣੀ|पानी)\b/i],
@@ -704,7 +704,7 @@ async function updatePopEngagement(
     cols.action_intent = 'share';
   }
 
-  // Grievance capture — only when it reads like one and none is stored yet.
+  // Grievance capture - only when it reads like one and none is stored yet.
   const cat = classifyPopCategory(msg);
   const looksGrievance = said(/grievance|complain\w*|problem|issue|shikayat|masla|not working|no water|no power|broken/) || (cat && msg.length > 12);
   if (cat || looksGrievance) {
@@ -770,7 +770,7 @@ async function postProcess(
       // These rows were logged before the visitor provided phone/email; they carry
       // session_id in their JSONB metadata column. Use .filter() for explicit JSON
       // path matching (more reliable than .eq() with arrow operators in Supabase JS).
-      // NOTE: Do NOT chain .select({ head: true }) after .update() — it converts
+      // NOTE: Do NOT chain .select({ head: true }) after .update() - it converts
       // the request to a HEAD which prevents the update from executing.
       if (leadId) {
         const { error: backfillError } = await supabase
@@ -841,7 +841,7 @@ async function postProcess(
 
     // 3.4 ADOPT orphaned anonymous rows: once the visitor identifies and a
     // lead exists, earlier turns logged with lead_id NULL (same session) must
-    // link to the lead — the inbox queries by lead_id and was showing
+    // link to the lead - the inbox queries by lead_id and was showing
     // conversations that started mid-thread.
     if (leadId) {
       try {
@@ -969,7 +969,7 @@ async function postProcess(
       }
     }
 
-    // 5. AI profile extraction — picks up user_type, course_interest, timeline,
+    // 5. AI profile extraction - picks up user_type, course_interest, timeline,
     //    education, city from the conversation (catches phrasing the keyword
     //    extractor misses). Runs every 2nd message, fire-and-forget.
     // Lokazen uses deterministic CRE capture above; this generic extractor is
@@ -1003,7 +1003,7 @@ async function postProcess(
           const storedName = ctxRow?.customer_name as string | null | undefined;
           // Promote a real name to customer_name when the stored one is junk/missing.
           // Prefer the name the visitor typed in chat (AI-extracted); fall back to the
-          // PRE-CHAT form name the website widget passes in session.user.name — which
+          // PRE-CHAT form name the website widget passes in session.user.name - which
           // we otherwise use only for the greeting and never persisted, so a website
           // lead that DID enter their name still showed "Hi there" and a nameless card.
           const preChatName = typeof agentInput.userProfile.name === 'string' ? agentInput.userProfile.name.trim() : '';
@@ -1031,7 +1031,7 @@ async function postProcess(
     } else if (!leadId && externalSessionId && (messageCount % 2 === 0 || messageCount <= 2)) {
       // ANONYMOUS web session (no phone/email yet → no all_leads row). The profile
       // block above is gated on leadId and never runs here, so a name the visitor
-      // typed in chat ("I'm Vivan") was never persisted — the inbox then shows
+      // typed in chat ("I'm Vivan") was never persisted - the inbox then shows
       // "Anonymous Web Visitor" even though we know their name. Capture just the
       // NAME onto web_sessions.customer_name so the inbox can show it. Fire-and-forget.
       (async () => {
@@ -1057,7 +1057,7 @@ async function postProcess(
       })();
     }
 
-    // 6. Trigger AI scoring for this lead (awaited — unawaited fetch gets killed
+    // 6. Trigger AI scoring for this lead (awaited - unawaited fetch gets killed
     // when the Vercel serverless function exits after the stream closes).
     if (leadId) {
       const appUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4002';

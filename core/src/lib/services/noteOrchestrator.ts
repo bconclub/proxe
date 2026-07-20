@@ -59,28 +59,28 @@ const CLASSIFY_SYSTEM_PROMPT = `You are a sales admin assistant. Given an admin 
 
 Respond in JSON only: {"category": "...", "booking_date": "...", "booking_time": "...", "session_type": "...", "name": "...", "send_message": "...", "summary": "..."}
 
-For session_type (only meaningful for BOOKING_MADE / DEMO_TAKEN): "offline" if they will come IN PERSON — "visit our HQ/office/campus", "come to the centre", "in-person", "facility visit". "online" if it's a video/Zoom/Google-Meet/online session. null if not stated. A visit to HQ is ALWAYS "offline".
+For session_type (only meaningful for BOOKING_MADE / DEMO_TAKEN): "offline" if they will come IN PERSON - "visit our HQ/office/campus", "come to the centre", "in-person", "facility visit". "online" if it's a video/Zoom/Google-Meet/online session. null if not stated. A visit to HQ is ALWAYS "offline".
 
 Category guide:
-- POST_CALL: "spoke to", "just called", "had a call", "after the call", OR any plan to CALL BACK / FOLLOW UP ("call back tomorrow", "callback", "call him/her tomorrow", "follow up tomorrow", "reach out later", "check back with them") — a call happened and/or a follow-up call is planned. A call-back/follow-up is POST_CALL, never a booking.
-- BOOKING_MADE: ONLY when an actual demo/session/meeting was BOOKED/CONFIRMED for the lead to ATTEND, at a specific slot — e.g. "demo booked", "session scheduled for Fri 4pm", "booked his demo for Monday 3pm", "meeting set". A real appointment, not a plan to phone them. NEVER classify a plan to CALL the lead ("call back tomorrow", "follow up", "callback") as BOOKING_MADE — that is POST_CALL. If there's no actual booked demo/session, it is NOT a booking.
-- NOT_POTENTIAL: "not potential", "not a fit", "wrong audience", "spam", "fake enquiry", "not eligible" — genuinely not worth pursuing. Do NOT use this just because they mention cost/affordability — that is AFFORDABILITY.
-- AFFORDABILITY: they want the course AND are open to a WAY TO PAY — "needs a loan", "need EMI/financing", "asked about a payment plan", "can you help with the fees", "worried about cost but exploring options". There must be a PATH to proceed (loan/EMI/financing). Keep them alive → loan/nurture help. ⚠️ Do NOT use AFFORDABILITY when the lead simply CANNOT or WON'T be able to afford it / is dropping out over cost — that is a LOST lead (see NOT_INTERESTED).
-- HOT_LEAD: "hot lead", "very interested", "wants to start", "ready to go", "priority", "close this week" — high intent
-- WARM_LATER: "maybe later", "check back later", "not now but maybe", "low potential", "follow up later" — warm but not now
-- RNR: "no show", "didn't show", "no answer", "didn't pick up", "rnr", "rang no response", "not responding", "not replying", "no response", "voicemail", "busy" — couldn't reach them
-- NOT_INTERESTED: explicit disinterest OR a cost-driven drop-out — "not interested", "dead lead", "won't be able to afford it", "can't afford it" (as a final no), "too expensive so not doing it", "cost too high, can't go ahead", "interested but won't be able to afford it". If the applicant is NOT going to do the course — whether plainly uninterested OR because they definitively can't/won't afford it with no financing path — it is a LOST lead → NOT_INTERESTED, NOT AFFORDABILITY.
-- CONVERTED: "converted", "signed", "closed won", "deal done" — deal closed
-- DEMO_TAKEN: "demo done", "demo taken", "showed the demo", "demo complete", "they saw the demo" — a demo was given
-- PROPOSAL_SENT: "proposal sent", "sent proposal", "shared proposal", "sent the deck", "sent pricing" — proposal or pricing was sent
-- MEETING_REQUEST: "asked for a meet", "wants a call", "send them time", "schedule a call", "asked for google meet" — they want to meet
-- SEND_MESSAGE: note starts with "send:", "message:", "tell them" — direct message to send (extract the message text after the prefix into send_message)
-- NAME_UPDATE: "it's [name]", "name is [name]", "his/her name is [name]" — name correction
+- POST_CALL: "spoke to", "just called", "had a call", "after the call", OR any plan to CALL BACK / FOLLOW UP ("call back tomorrow", "callback", "call him/her tomorrow", "follow up tomorrow", "reach out later", "check back with them") - a call happened and/or a follow-up call is planned. A call-back/follow-up is POST_CALL, never a booking.
+- BOOKING_MADE: ONLY when an actual demo/session/meeting was BOOKED/CONFIRMED for the lead to ATTEND, at a specific slot - e.g. "demo booked", "session scheduled for Fri 4pm", "booked his demo for Monday 3pm", "meeting set". A real appointment, not a plan to phone them. NEVER classify a plan to CALL the lead ("call back tomorrow", "follow up", "callback") as BOOKING_MADE - that is POST_CALL. If there's no actual booked demo/session, it is NOT a booking.
+- NOT_POTENTIAL: "not potential", "not a fit", "wrong audience", "spam", "fake enquiry", "not eligible" - genuinely not worth pursuing. Do NOT use this just because they mention cost/affordability - that is AFFORDABILITY.
+- AFFORDABILITY: they want the course AND are open to a WAY TO PAY - "needs a loan", "need EMI/financing", "asked about a payment plan", "can you help with the fees", "worried about cost but exploring options". There must be a PATH to proceed (loan/EMI/financing). Keep them alive → loan/nurture help. ⚠️ Do NOT use AFFORDABILITY when the lead simply CANNOT or WON'T be able to afford it / is dropping out over cost - that is a LOST lead (see NOT_INTERESTED).
+- HOT_LEAD: "hot lead", "very interested", "wants to start", "ready to go", "priority", "close this week" - high intent
+- WARM_LATER: "maybe later", "check back later", "not now but maybe", "low potential", "follow up later" - warm but not now
+- RNR: "no show", "didn't show", "no answer", "didn't pick up", "rnr", "rang no response", "not responding", "not replying", "no response", "voicemail", "busy" - couldn't reach them
+- NOT_INTERESTED: explicit disinterest OR a cost-driven drop-out - "not interested", "dead lead", "won't be able to afford it", "can't afford it" (as a final no), "too expensive so not doing it", "cost too high, can't go ahead", "interested but won't be able to afford it". If the applicant is NOT going to do the course - whether plainly uninterested OR because they definitively can't/won't afford it with no financing path - it is a LOST lead → NOT_INTERESTED, NOT AFFORDABILITY.
+- CONVERTED: "converted", "signed", "closed won", "deal done" - deal closed
+- DEMO_TAKEN: "demo done", "demo taken", "showed the demo", "demo complete", "they saw the demo" - a demo was given
+- PROPOSAL_SENT: "proposal sent", "sent proposal", "shared proposal", "sent the deck", "sent pricing" - proposal or pricing was sent
+- MEETING_REQUEST: "asked for a meet", "wants a call", "send them time", "schedule a call", "asked for google meet" - they want to meet
+- SEND_MESSAGE: note starts with "send:", "message:", "tell them" - direct message to send (extract the message text after the prefix into send_message)
+- NAME_UPDATE: "it's [name]", "name is [name]", "his/her name is [name]" - name correction
 - INFO_ONLY: general notes, observations, no action needed
 
 DO NOT OVER-REACT TO THIN INPUT: if the note is very short or vague with no clear signal, use INFO_ONLY. Only assign a destructive category (NOT_POTENTIAL, NOT_INTERESTED) when the note CLEARLY states disinterest/unfitness. A two-word note must NEVER trigger Closed Lost on its own.
 
-When a call outcome is prefixed in square brackets (e.g. "[No Answer]", "[Voicemail]", "[Busy]"), treat it as a strong signal — if outcome is No Answer/Voicemail/Busy with no contrary info in the text, classify as RNR.
+When a call outcome is prefixed in square brackets (e.g. "[No Answer]", "[Voicemail]", "[Busy]"), treat it as a strong signal - if outcome is No Answer/Voicemail/Busy with no contrary info in the text, classify as RNR.
 
 For booking_date: use relative terms as-is ("tomorrow", "next Monday", "March 28"). For booking_time: extract the time ("4 pm", "10:30 am"). If not mentioned, use null.
 For name: extract the actual name mentioned, or null if none.
@@ -88,14 +88,14 @@ For send_message: extract the exact message text to send (everything after "send
 
 Example: note "spoke to him have a demo booked for tomorrow 4 pm" → {"category": "BOOKING_MADE", "booking_date": "tomorrow", "booking_time": "4 pm", "session_type": "online", "name": null, "send_message": null, "summary": "Demo booked for tomorrow 4pm after call"}
 Example: note "wants to visit our hq on 19-06-2026 around 2:30 pm" → {"category": "BOOKING_MADE", "booking_date": "19-06-2026", "booking_time": "2:30 pm", "session_type": "offline", "name": null, "send_message": null, "summary": "Booked an in-person HQ visit on 19 Jun, 2:30pm"}
-Example: note "He is interested to take this up, call back tomorrow" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — call back tomorrow"}
-Example: note "interested, asked me to follow up next week" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested — follow up next week"}
+Example: note "He is interested to take this up, call back tomorrow" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested - call back tomorrow"}
+Example: note "interested, asked me to follow up next week" → {"category": "POST_CALL", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Interested - follow up next week"}
 Example: note "[No Answer] tried calling twice" → {"category": "RNR", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Called twice, no answer"}
 Example: note "send: Hey, just checking in!" → {"category": "SEND_MESSAGE", "booking_date": null, "booking_time": null, "name": null, "send_message": "Hey, just checking in!", "summary": "Direct message to send to lead"}
-Example: note "Not interested, won't be able to afford it" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Dropping out — can't afford it"}
-Example: note "Interested but won't be able to afford it, CPL cost is too high" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants it but can't afford CPL — lost over cost"}
+Example: note "Not interested, won't be able to afford it" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Dropping out - can't afford it"}
+Example: note "Interested but won't be able to afford it, CPL cost is too high" → {"category": "NOT_INTERESTED", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants it but can't afford CPL - lost over cost"}
 Example: note "interested but needs a bank loan for the fees" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Wants the course, needs loan support"}
-Example: note "fees are high, do you have EMI options?" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Exploring financing — route to loan help"}`;
+Example: note "fees are high, do you have EMI options?" → {"category": "AFFORDABILITY", "booking_date": null, "booking_time": null, "name": null, "send_message": null, "summary": "Exploring financing - route to loan help"}`;
 
 // ─── Classifier ─────────────────────────────────────────────────────────────
 
@@ -115,7 +115,7 @@ const EMPTY_CLASSIFICATION: NoteClassification = {
  * we shortcut to RNR without burning a Haiku call.
  */
 export async function classifyNote(text: string, outcome?: CallOutcome): Promise<NoteClassification> {
-  // Shortcut for empty no-contact outcomes — no need to call Haiku
+  // Shortcut for empty no-contact outcomes - no need to call Haiku
   const trimmed = (text || '').trim();
   const noLiveContact = outcome === 'No Answer' || outcome === 'Busy' || outcome === 'Voicemail';
   if (noLiveContact && trimmed.length < 8) {
@@ -132,7 +132,7 @@ export async function classifyNote(text: string, outcome?: CallOutcome): Promise
   const classifierInput = outcome ? `[${outcome}] ${trimmed}` : trimmed;
 
   try {
-    // A hung LLM call must never freeze the log-call modal — 12s hard cap,
+    // A hung LLM call must never freeze the log-call modal - 12s hard cap,
     // then the safe EMPTY_CLASSIFICATION fallback takes over.
     const abort = new AbortController();
     const abortTimer = setTimeout(() => abort.abort(), 12_000);
@@ -201,7 +201,7 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
   } else if (lower === 'day after tomorrow' || lower === 'day after') {
     targetIST.setUTCDate(targetIST.getUTCDate() + 2);
   } else if (['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].includes(lower.replace(/^(this|coming|on)\s+/, ''))) {
-    // BARE weekday — how people actually talk: "Friday", "this Friday",
+    // BARE weekday - how people actually talk: "Friday", "this Friday",
     // "coming Monday". Used to fall through to new Date('friday') = Invalid
     // and silently book TOMORROW (a Friday meeting landed on Tuesday).
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -224,7 +224,7 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
     const m = lower.match(/in\s*(\d+)\s*days?/);
     if (m) targetIST.setUTCDate(targetIST.getUTCDate() + parseInt(m[1]));
   } else {
-    // Robust parse of free-text dates the classifier emits — "25 june",
+    // Robust parse of free-text dates the classifier emits - "25 june",
     // "25th june", "june 25", "19-06-2026" (DD-MM-YYYY, Indian), "2026-06-25",
     // "25/06". Native new Date("25th june") is Invalid → it was silently
     // falling back to tomorrow (so "25 june" booked as Jun 16). Parse it here.
@@ -296,7 +296,7 @@ export interface PlanProposal {
  * Mirror of the category branches in `classifyAndAct`, but writes NOTHING.
  * Given a classification, return the plan the worker would run, in words a
  * human can confirm or override at the log-call hub. Keep this in sync with the
- * branches below — it is the single source for "what the brain would do".
+ * branches below - it is the single source for "what the brain would do".
  */
 export function proposePlan(c: NoteClassification): PlanProposal {
   const when = c.booking_date ? `${c.booking_date}${c.booking_time ? ' ' + c.booking_time : ''}` : 'the booked slot';
@@ -427,13 +427,13 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   console.log(`[noteOrchestrator] Step 2: Classification:`, JSON.stringify(classification));
   actions.push(`ai_category:${classification.category}`);
 
-  // #4 — don't duplicate what the human already did. If the note says the team
+  // #4 - don't duplicate what the human already did. If the note says the team
   // already messaged / shared the contact, suppress PROXe's own auto-sends and
   // follow-up sequences (we still log + update stage/touchpoint).
   const alreadyActioned = /\b(chaser|already\s+(sent|messaged|texted|followed\s*up|reached\s*out)|message\s+(already\s+)?sent|sent\s+(over|on|via)\s+whatsapp|contact\s+shared|shared\s+(with|to)\s+(the\s+)?team|handed\s+(over\s+)?to\s+(the\s+)?team|informed\s+the\s+team)\b/i.test(trimmedNote);
   if (alreadyActioned) {
     actions.push('already_actioned_detected');
-    actionsTaken.push('Note says the team already reached out — skipping PROXe auto-send/sequence');
+    actionsTaken.push('Note says the team already reached out - skipping PROXe auto-send/sequence');
   }
 
   // ── BOOKING_MADE ─────────────────────────────────────────────────────────
@@ -502,7 +502,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     actionsTaken.push(`Score updated to 80`);
 
     // Persist the booking into unified_context so it shows as a real booking in
-    // Upcoming + the lead pane (not just a stage flip), with the right format —
+    // Upcoming + the lead pane (not just a stage flip), with the right format -
     // an HQ / in-person visit is stored as session_type 'offline'.
     try {
       const { data: ctxRow } = await supabase
@@ -519,7 +519,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
         booking_created_at: now.toISOString(),
         ...(sessionType ? { session_type: sessionType } : {}),
       };
-      // ALSO refresh the top-level booking columns — the Key Event card (and
+      // ALSO refresh the top-level booking columns - the Key Event card (and
       // anything else) reads lead.booking_date FIRST, so a stale column here
       // shadows the fresh context booking (seen live: a rebooked Fri 17th
       // still displayed the old Wed 15th).
@@ -561,7 +561,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   if (classification.category === 'NOT_POTENTIAL') {
     const { data: cancelledTasks } = await supabase
       .from('agent_tasks')
-      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: not potential — "${trimmedNote.substring(0, 50)}"` })
+      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: not potential - "${trimmedNote.substring(0, 50)}"` })
       .eq('lead_id', leadId)
       .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
       .select('id');
@@ -579,12 +579,12 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
     // NO re-engagement here: the human explicitly said this is not a lead
     // (spam / wrong audience / not a fit). Re-messaging disqualified contacts
-    // in 90 days wastes sends and pollutes the pipeline — closed means closed.
+    // in 90 days wastes sends and pollutes the pipeline - closed means closed.
     actions.push(`not_potential:cancelled_${cancelCount}_tasks,stage_Closed_Lost,score_0`);
   }
 
   // ── AFFORDABILITY ────────────────────────────────────────────────────────
-  // #8 — cost concern is a FINANCING conversation, NOT a dead lead. Keep the
+  // #8 - cost concern is a FINANCING conversation, NOT a dead lead. Keep the
   // lead alive, never zero the score, and queue loan/nurture help for the team.
   if (classification.category === 'AFFORDABILITY') {
     newStage = 'Nurture';
@@ -592,7 +592,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .from('all_leads')
       .update({ lead_stage: newStage, stage_override: true })
       .eq('id', leadId);
-    actionsTaken.push(`Stage changed to Nurture (financing — not lost)`);
+    actionsTaken.push(`Stage changed to Nurture (financing - not lost)`);
 
     await supabase.from('agent_tasks').insert({
       task_type: 'loan_assistance',
@@ -655,7 +655,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
         created_at: now.toISOString(),
       });
       actions.push('high_potential:temp_hot,stage_High_Intent,score_85,prep_task_created');
-      actionsTaken.push(`Created prep task — review before existing booking`);
+      actionsTaken.push(`Created prep task - review before existing booking`);
     } else {
       await supabase.from('agent_tasks').insert({
         task_type: 'push_to_book',
@@ -677,7 +677,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   if (classification.category === 'WARM_LATER') {
     const { data: cancelledTasks } = await supabase
       .from('agent_tasks')
-      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: warm later — "${trimmedNote.substring(0, 50)}"` })
+      .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: warm later - "${trimmedNote.substring(0, 50)}"` })
       .eq('lead_id', leadId)
       .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
       .select('id');
@@ -721,13 +721,13 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
       .in('status', ['pending', 'queued']);
 
-    // #4 — if the team already sent the chaser/WhatsApp, don't stack PROXe's
+    // #4 - if the team already sent the chaser/WhatsApp, don't stack PROXe's
     // own missed-call follow-up + 4-step sequence on top. Just log the call.
     if (alreadyActioned) {
       actions.push('rnr_sequence_skipped:already_actioned');
-      actionsTaken.push(`Skipped auto follow-up — chaser already sent by the team`);
+      actionsTaken.push(`Skipped auto follow-up - chaser already sent by the team`);
     } else {
-      // Supersede whatever plan was running before — a stale pending day-1
+      // Supersede whatever plan was running before - a stale pending day-1
       // from an old sequence would otherwise sit ABOVE the new re-try plan
       // as the lead's "next action" (seen live: a 6-day-overdue dynamic-seq
       // task shadowing a fresh RNR plan).
@@ -751,7 +751,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
         lead_name: leadName,
         status: 'pending',
         scheduled_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
-        metadata: { source: 'note_orchestrator', sequence: 'no_show', step: 0, timing_reason: 'RNR — follow-up in 30 min', outcome: outcome || null },
+        metadata: { source: 'note_orchestrator', sequence: 'no_show', step: 0, timing_reason: 'RNR - follow-up in 30 min', outcome: outcome || null },
         created_at: now.toISOString(),
       });
       actions.push('missed_call_followup_created');
@@ -829,7 +829,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
       .from('all_leads')
       .update({ lead_stage: newStage, stage_override: true })
       .eq('id', leadId);
-    // Record WHEN it converted — from the note's date if given, else now.
+    // Record WHEN it converted - from the note's date if given, else now.
     // Separate, soft-failing update so a brand whose DB lacks converted_at
     // (migration 037 not yet run) still gets the stage change without erroring.
     const convertedAt = classification.booking_date
@@ -947,7 +947,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
     if (leadPhone) {
       // Only send free-form text if the customer has previously initiated a
       // WhatsApp conversation with us. WhatsApp Meta policy prohibits sending
-      // free-form messages outside a 24h customer-initiated window — and for
+      // free-form messages outside a 24h customer-initiated window - and for
       // leads who have never messaged us, we have no window at all.
       const { data: customerMsg } = await supabase
         .from('conversations')
@@ -978,16 +978,16 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
       if (!hasInitiated) {
         actions.push('whatsapp_skipped:customer_never_initiated');
-        actionsTaken.push(`WhatsApp skipped — customer hasn't messaged us yet (use a template for cold outreach)`);
+        actionsTaken.push(`WhatsApp skipped - customer hasn't messaged us yet (use a template for cold outreach)`);
       } else if (!within24h) {
         actions.push('whatsapp_skipped:outside_24h_window');
-        actionsTaken.push(`WhatsApp skipped — last customer message was >24h ago (use a template to re-open)`);
+        actionsTaken.push(`WhatsApp skipped - last customer message was >24h ago (use a template to re-open)`);
       } else if (recentSend) {
         actions.push('whatsapp_skipped:duplicate_within_5min');
-        actionsTaken.push(`WhatsApp skipped — same message already sent in the last 5 minutes`);
+        actionsTaken.push(`WhatsApp skipped - same message already sent in the last 5 minutes`);
       } else if (alreadyActioned) {
         actions.push('whatsapp_skipped:already_actioned');
-        actionsTaken.push(`WhatsApp skipped — the team already reached out per the note`);
+        actionsTaken.push(`WhatsApp skipped - the team already reached out per the note`);
       } else {
         const msg = `${leadName}, we'd love to set up a call. What time works best for you this week?`;
         const sendResult = await sendWhatsAppText(leadPhone, msg);
@@ -1029,7 +1029,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
   if (classification.category === 'SEND_MESSAGE') {
     const directMessage = classification.send_message?.trim();
     if (directMessage && leadPhone) {
-      // Same gate as MEETING_REQUEST — only send free-form within the 24h window
+      // Same gate as MEETING_REQUEST - only send free-form within the 24h window
       const { data: lastCustomerMsg } = await supabase
         .from('conversations')
         .select('created_at')
@@ -1045,7 +1045,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
       if (!sendOk) {
         actions.push('whatsapp_skipped:no_active_window');
-        actionsTaken.push(`WhatsApp skipped — customer hasn't messaged within 24h (use a template)`);
+        actionsTaken.push(`WhatsApp skipped - customer hasn't messaged within 24h (use a template)`);
       } else {
         const sendResult = await sendWhatsAppText(leadPhone, directMessage);
         if (sendResult.success) {
@@ -1082,7 +1082,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── INFO_ONLY ────────────────────────────────────────────────────────────
   if (classification.category === 'INFO_ONLY') {
-    actionsTaken.push(`Note saved — no automated actions needed`);
+    actionsTaken.push(`Note saved - no automated actions needed`);
   }
 
   // ── Activity feed: log the automation summary ────────────────────────────
@@ -1099,7 +1099,7 @@ export async function classifyAndAct(input: ClassifyAndActInput): Promise<Orches
 
   // ── Record actor (who did this) + invalidate cached summary ──────────────
   // last_actor surfaces in the LAST TOUCH column so the team can see who
-  // handled this lead most recently — a specific user or PROXe AI.
+  // handled this lead most recently - a specific user or PROXe AI.
   const actorEmail = (input.createdBy || 'system').trim();
   const actorIsSystem = actorEmail === 'system' || actorEmail === 'PROXe AI' || actorEmail.toLowerCase() === 'proxe';
   const actorName = actorIsSystem

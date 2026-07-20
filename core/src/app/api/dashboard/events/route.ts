@@ -1,4 +1,4 @@
-// CAMPAIGN EVENTS — first consumer of campaign_events/event_rsvps (023).
+// CAMPAIGN EVENTS - first consumer of campaign_events/event_rsvps (023).
 //
 //   GET  ?upcoming=1 → { events: [...+rsvp counts] }   (cookie auth)
 //   POST { title, ... } → { ok, id }                    (cookie auth)

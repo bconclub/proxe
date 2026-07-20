@@ -53,7 +53,7 @@ interface CallRow {
 // Dialed language shown as its own column (pa/hi/en → readable label).
 const CALL_LANG_LABEL: Record<string, string> = { pa: 'Punjabi', hi: 'Hindi', en: 'English' }
 
-// Which engine placed the call — a small V1/V2/V3 badge on each row so it's
+// Which engine placed the call - a small V1/V2/V3 badge on each row so it's
 // obvious at a glance what stack was used (Vapi vs ElevenLabs vs our Sarvam
 // pipeline). Colours match the eval bench.
 const ENGINE_BADGE: Record<'vapi' | 'elevenlabs' | 'sarvam', { label: string; tone: string; title: string }> = {
@@ -85,7 +85,7 @@ type DirectionFilter = 'all' | 'inbound' | 'outbound'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDuration(secs: number): string {
-  const total = Math.round(secs || 0) // round — duration can arrive as a float (e.g. 95.362)
+  const total = Math.round(secs || 0) // round - duration can arrive as a float (e.g. 95.362)
   if (total <= 0) return '0s'
   const m = Math.floor(total / 60)
   const s = total % 60
@@ -110,7 +110,7 @@ function initials(name?: string | null): string {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('') || '#'
 }
 
-// Friendly status pill colours — mirrors the dashboard's intent/status chips.
+// Friendly status pill colours - mirrors the dashboard's intent/status chips.
 function statusTint(status?: string | null): { bg: string; color: string; label: string } {
   const s = (status || '').toLowerCase()
   if (s === 'completed') return { bg: 'rgba(34,197,94,0.12)', color: '#22c55e', label: 'Completed' }
@@ -177,7 +177,7 @@ export default function CallsTable() {
 
   // Pull final status/transcript/recording for any calls whose end-of-call
   // webhook never landed (always the case on localhost; a rare miss in prod),
-  // then reload. Best-effort — never blocks showing what we already have.
+  // then reload. Best-effort - never blocks showing what we already have.
   const [syncing, setSyncing] = useState(false)
   const syncThenLoad = useCallback(async () => {
     setSyncing(true)
@@ -185,7 +185,7 @@ export default function CallsTable() {
       await fetch('/api/agent/voice/vapi-sync', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
       })
-    } catch { /* ignore — show existing rows regardless */ }
+    } catch { /* ignore - show existing rows regardless */ }
     finally { setSyncing(false) }
     await load()
   }, [load])
@@ -193,7 +193,7 @@ export default function CallsTable() {
   // Reconcile once on mount so freshly-placed calls fill in without a click.
   useEffect(() => { syncThenLoad() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // No auto-refresh — the page loads on mount and when filters/search change.
+  // No auto-refresh - the page loads on mount and when filters/search change.
   // (Founder feedback: the constant 15s reload was distracting and unnecessary.)
   // Use the manual refresh control to pull new calls.
 
@@ -274,7 +274,7 @@ export default function CallsTable() {
           {brain && (
             <Link
               href="/dashboard/settings/brain?tab=eval"
-              title="Open the Brain — Eval bench"
+              title="Open the Brain - Eval bench"
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold border whitespace-nowrap transition-colors"
               style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--accent-subtle)' }}
             >
@@ -341,7 +341,7 @@ export default function CallsTable() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '—'}</p>
+                            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{c.phone || '-'}</p>
                           </div>
                         </div>
                       </td>
@@ -357,7 +357,7 @@ export default function CallsTable() {
                             {CALL_LANG_LABEL[c.language] || c.language}
                           </span>
                         ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                       <td className="px-3 py-3 hidden sm:table-cell">
@@ -372,7 +372,7 @@ export default function CallsTable() {
                         <span className="inline-flex items-center rounded px-2 py-1 text-[11px] font-medium whitespace-nowrap" style={{ backgroundColor: tint.bg, color: tint.color }}>{tint.label}</span>
                       </td>
                       <td className="px-3 py-3 hidden lg:table-cell">
-                        <span className="text-xs" style={{ color: c.turnCount > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{c.turnCount > 0 ? `${c.turnCount} turns` : '—'}</span>
+                        <span className="text-xs" style={{ color: c.turnCount > 0 ? 'var(--text-secondary)' : 'var(--text-muted)' }}>{c.turnCount > 0 ? `${c.turnCount} turns` : '-'}</span>
                       </td>
                       <td className="px-3 py-3">
                         {c.recordingUrl ? (
@@ -380,7 +380,7 @@ export default function CallsTable() {
                             <MdPlayArrow size={16} /> Play
                           </span>
                         ) : (
-                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -452,7 +452,7 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
                   </span>
                 )}
               </div>
-              <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{call.phone || '—'} · {out ? 'Outbound' : 'Inbound'}</p>
+              <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{call.phone || '-'} · {out ? 'Outbound' : 'Inbound'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-md transition-colors" style={{ color: 'var(--text-secondary)' }} aria-label="Close">
@@ -472,7 +472,7 @@ function CallDetailDrawer({ call, loading, onClose }: { call: CallDetail; loadin
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Status</div>
             </div>
             <div>
-              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmtWhen(call.createdAt).split('·')[0]?.trim() || '—'}</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{fmtWhen(call.createdAt).split('·')[0]?.trim() || '-'}</div>
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Date</div>
             </div>
           </div>

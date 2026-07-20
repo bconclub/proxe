@@ -68,19 +68,19 @@ const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Chats', href: '/dashboard/inbox', icon: MdInbox },
-  // Calls — voice-gated; kept wherever Voice is on.
+  // Calls - voice-gated; kept wherever Voice is on.
   { name: 'Calls', href: '/dashboard/calls', icon: MdCall },
   { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
-  // Scouts (lokazen = "Gigs") — feature-gated per brand.
+  // Scouts (lokazen = "Gigs") - feature-gated per brand.
   { name: 'Scouts', href: '/dashboard/scouts', icon: MdHandshake },
-  // War Room (pop) — the constituency map. Feature-gated.
+  // War Room (pop) - the constituency map. Feature-gated.
   { name: 'War Room', href: '/war-room', icon: MdMap },
-  // OPERATIONS — Events renamed "Key Events" (route unchanged).
+  // OPERATIONS - Events renamed "Key Events" (route unchanged).
   { name: 'Key Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Flow', href: '/dashboard/flows', icon: MdTimeline },
-  // Campaigns — chat-driven campaign builder; feature-gated per brand.
+  // Campaigns - chat-driven campaign builder; feature-gated per brand.
   { name: 'Campaigns', href: '/dashboard/campaigns', icon: MdCampaign },
-  // SYSTEM — Humans (the team) sits before Agents; POP folds Agent Tasks into
+  // SYSTEM - Humans (the team) sits before Agents; POP folds Agent Tasks into
   // the Agents page, so it's not a separate row there.
   { name: 'Humans', href: '/dashboard/humans', icon: MdPeople },
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
@@ -105,7 +105,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
-  // byte-identical across brands — only the resolved values differ per brand.
+  // byte-identical across brands - only the resolved values differ per brand.
   const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors, artifacts: brandArtifacts } = getBrandConfig()
   // Brands with `artifacts` in config (pop) get the artifact switcher dropdown
   // on the brand header instead of a plain title / hardcoded war-room link.
@@ -133,10 +133,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Transparent mark for the full-screen auth loader (jpg avatars render as a
   // square box). Falls back to the avatar when a brand has no dedicated mark.
   const brandMark = markPath || brandLogo
-  // Per-brand feature toggles — hides nav entries for features this brand has
+  // Per-brand feature toggles - hides nav entries for features this brand has
   // switched off (e.g. a brand keeps Voice/Calls off).
   const brandFeatures = useFeatureFlags()
-  // Per-brand nav label overrides — same base nav array across brands, only the
+  // Per-brand nav label overrides - same base nav array across brands, only the
   // rendered label differs (pop: Leads→People, lokazen: Scouts→Gigs).
   const navLabel = (name: string): string => {
     if (name === 'Leads' && brandId === 'pop') return 'People'
@@ -150,7 +150,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null)
-  // Hover state on the sidebar itself — used to expand the collapsed rail on hover
+  // Hover state on the sidebar itself - used to expand the collapsed rail on hover
   const [isHovered, setIsHovered] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -210,7 +210,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (cancelled) return
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
       fetch('/api/auth/touch', { method: 'POST' }).catch(() => {
-        // Soft-fail — heartbeat is best-effort.
+        // Soft-fail - heartbeat is best-effort.
       })
     }
     ping() // fire once on mount
@@ -229,7 +229,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [])
 
   // Global preferences hydration. Sounds + theme are stored server-side so one
-  // founder's setting applies to every user (founder request — "whatever setting
+  // founder's setting applies to every user (founder request - "whatever setting
   // I make should be for all users"). On load we paint the locally-cached accent
   // instantly (no bare flash), then fetch the global config and reconcile:
   // sounds → localStorage, dashboard mode → ThemeProvider, accent → CSS vars.
@@ -391,7 +391,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   const handleSidebarItemClick = () => {
-    // No-op — sidebar stays open/closed via manual toggle only
+    // No-op - sidebar stays open/closed via manual toggle only
   }
 
   const toggleTheme = () => {
@@ -418,14 +418,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       await supabase.auth.signOut()
     } catch (err) {
       console.error('[layout] signOut failed:', err)
-      // Continue with redirect anyway — better to land on /auth/login than
+      // Continue with redirect anyway - better to land on /auth/login than
       // stay stuck in a broken authed state.
     }
     window.location.href = '/auth/login'
   }
 
   // showExpanded: sidebar labels show when pinned open OR when hovered (hover-to-expand).
-  // The mobile drawer is ALWAYS expanded — a collapsed 56px icon rail persisted
+  // The mobile drawer is ALWAYS expanded - a collapsed 56px icon rail persisted
   // from desktop (localStorage) would otherwise open as an unusable sliver.
   const showExpanded = !isCollapsed || isHovered || (isMobile && mobileSidebarOpen)
   const sidebarWidth = showExpanded ? '184px' : '56px'
@@ -484,7 +484,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
       >
-        {/* Logo and Toggle — the logo sits in the SAME 40px leading column as
+        {/* Logo and Toggle - the logo sits in the SAME 40px leading column as
             the nav icons below, so it never shifts between collapsed/expanded.
             Only the brand name reveals beside it. Slimmer, lighter header. */}
         <div
@@ -602,7 +602,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: '8px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list flex-1">
-            {/* Pinned artifacts — pinning one in the switcher surfaces it here, in
+            {/* Pinned artifacts - pinning one in the switcher surfaces it here, in
                 the main sidebar, in canonical config order. */}
             {pinnedArtifacts.length > 0 && (
               <div className="dashboard-layout-nav-pinned">
@@ -644,22 +644,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               if (item.href === '/dashboard/calls' && !brandFeatures.voice) return null
               // Feature toggle: Scouts segment only for brands with scouts on.
               // Lokazen folds it into the Leads page (Leads | Gigs toggle), so drop
-              // the standalone nav row there — the /dashboard/scouts route, widget
+              // the standalone nav row there - the /dashboard/scouts route, widget
               // scout mode, and KB scope all stay live via features.scouts.
               if (item.href === '/dashboard/scouts' && (!brandFeatures.scouts || brandId === 'lokazen')) return null
               // Feature toggle: War Room only for brands with it on (pop).
               if (item.href === '/war-room' && !brandFeatures.warRoom) return null
               // Feature toggle: Campaigns only for brands running the builder.
               if (item.href === '/dashboard/campaigns' && !brandFeatures.campaigns) return null
-              // POP is a campaign, not a sales org — keep the nav clear and
+              // POP is a campaign, not a sales org - keep the nav clear and
               // direct: no sales Pipeline, no Flow builder. War Room is reachable
               // from the brand logo/artifact switcher. Overview lives IN the
               // artifact switcher (first artifact), and Agent Tasks folds into
-              // the Agents page — so neither is a separate nav row for POP.
+              // the Agents page - so neither is a separate nav row for POP.
               if (brandId === 'pop' && item.href && ['/dashboard', '/dashboard/pipeline', '/dashboard/flows', '/war-room', '/dashboard/tasks'].includes(item.href)) return null
               // Divider placement. POP is two groups: the day-to-day (People ·
               // Chats · Calls · Events) and the system (Humans · Agents ·
-              // Knowledge · Configure) — one rule splits them, before Humans.
+              // Knowledge · Configure) - one rule splits them, before Humans.
               // Other brands use the multi-section index list.
               const needsDivider = brandId === 'pop'
                 ? item.href === '/dashboard/humans'
@@ -667,7 +667,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               // Match the nav item active when:
               //   • pathname exactly matches its href, OR
               //   • pathname starts with `${href}/` (i.e. user is on a
-              //     sub-page like /dashboard/settings/users — highlight the
+              //     sub-page like /dashboard/settings/users - highlight the
               //     parent "Configure" item)
               // We exclude bare '/dashboard' from the prefix match, otherwise
               // Overview would light up on every page.
@@ -684,7 +684,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
                 const isItemHovered = !showExpanded && hoveredNavItem === navItem.name
 
-                // Modern sidebar item styling — no hard borders, no filled
+                // Modern sidebar item styling - no hard borders, no filled
                 // bg-hover for active. Active is an accent-tinted pill with
                 // accent-coloured text+icon (picks up the brand colour).
                 // Hover on inactive items gets a soft neutral tint via the
@@ -696,7 +696,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
                   // Pin the icon: constant vertical margin + a left padding of 0
                   // in both states (the icon sits in a fixed 40px leading box,
-                  // below). Only the label reveals on expand — the icon's X never
+                  // below). Only the label reveals on expand - the icon's X never
                   // moves. Child items indent via left padding (expanded only).
                   margin: '2px 0',
                   borderRadius: '8px',
@@ -721,7 +721,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         // Fixed-width AND fixed-height leading box, icon centered.
                         // The fixed 20px height matches the label's line-height so
                         // the row is the SAME height whether collapsed (icon only)
-                        // or expanded (icon + label) — otherwise the taller label
+                        // or expanded (icon + label) - otherwise the taller label
                         // line grows every row and the icons drift downward.
                         width: '40px',
                         minWidth: '40px',
@@ -791,7 +791,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
-                          // Soft neutral tint on hover — sits below the active
+                          // Soft neutral tint on hover - sits below the active
                           // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                           e.currentTarget.style.color = 'var(--text-primary)'
@@ -863,7 +863,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           setHoveredNavItem(navItem.name)
                         }
                         if (!itemIsActive) {
-                          // Soft neutral tint on hover — sits below the active
+                          // Soft neutral tint on hover - sits below the active
                           // accent tint visually so the active item still pops.
                           e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                           e.currentTarget.style.color = 'var(--text-primary)'
@@ -904,7 +904,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             })}
           </div>
 
-          {/* Report Issue — pinned under the nav on every brand. Anyone on the
+          {/* Report Issue - pinned under the nav on every brand. Anyone on the
               team screenshots what's broken and sends it straight to HQ
               (brand's issue-reports bucket → issues vault). */}
           <button
@@ -1001,7 +1001,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   {/* "Endpoint Health" used to live here as a popover modal,
                      but System Status (/dashboard/status) already renders
-                     HealthStrip + EndpointHealthDetail on a single page —
+                     HealthStrip + EndpointHealthDetail on a single page -
                      one source of truth, no menu duplication. */}
                   <Link
                     href="/status"
@@ -1088,10 +1088,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Page Transition Loader */}
         <PageTransitionLoader />
 
-        {/* Endpoint health — controlled by the sidebar three-dot menu's "Endpoint Health" item. */}
+        {/* Endpoint health - controlled by the sidebar three-dot menu's "Endpoint Health" item. */}
         <HealthBarButton open={healthOpen} onClose={() => setHealthOpen(false)} />
 
-        {/* Mobile top bar — only visible on mobile */}
+        {/* Mobile top bar - only visible on mobile */}
         <div
           className="md:hidden flex items-center gap-3 flex-shrink-0 border-b px-4"
           style={{
@@ -1113,7 +1113,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <MdMenu size={20} />
           </button>
           <h1 className="text-xl font-black flex-1 truncate" style={{ color: 'var(--accent-primary)' }}>{brandName}</h1>
-          {/* Report Issue — mobile gets it in the top bar (no sidebar visible). */}
+          {/* Report Issue - mobile gets it in the top bar (no sidebar visible). */}
           <button
             onClick={() => setReportIssueOpen(true)}
             className="touch-44 flex items-center justify-center p-2 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
@@ -1143,12 +1143,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
       </div>
 
-      {/* Persistent Brain (PiP) — mounted at the LAYOUT level so it survives page
+      {/* Persistent Brain (PiP) - mounted at the LAYOUT level so it survives page
           changes: open it, navigate anywhere, and it stays docked bottom-right
           with your conversation intact. Gated on the brand's brain feature. */}
       {brandFeatures.brain && <DashboardBrain dock />}
 
-      {/* Report Issue modal — layout-level so it opens over any page. */}
+      {/* Report Issue modal - layout-level so it opens over any page. */}
       <ReportIssueModal open={reportIssueOpen} onClose={() => setReportIssueOpen(false)} />
     </div>
   )

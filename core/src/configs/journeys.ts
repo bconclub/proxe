@@ -26,7 +26,7 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   bcon_lowtouch_d7_v1: ['Yes, Book a Call', 'Not a Priority now', 'STOP'],
 }
 
-// Bodies the agent configs don't carry (worker/Meta-side) — shown honestly.
+// Bodies the agent configs don't carry (worker/Meta-side) - shown honestly.
 const EXTRA_BODIES: Record<string, string> = {
   bcon_welcome_web_v1: `Hey {{customer_name}}, got your enquiry about {{service_interest}} for {{brand_name}}.\n\n{{probe_question}}, Lets get on call to discuss this.`,
   bcon_service_rnr_1_v1: `Hi {{customer_name}},\n\nWe just tried calling you from *BCON* about your enquiry on {{service_name}} for {{brand_name}}. Couldn't reach you.\n\nHow would you like to continue?`,
@@ -59,13 +59,13 @@ export type Journey = {
 
 /**
  * Every path through the system. Step timings and template routing mirror the
- * worker + noteOrchestrator. This is DISPLAY truth for Eval — the send-time
+ * worker + noteOrchestrator. This is DISPLAY truth for Eval - the send-time
  * truth lives in task-worker.js.
  */
 export const JOURNEYS: Journey[] = [
   {
     id: 'entry',
-    title: 'Entry — the first message per source',
+    title: 'Entry - the first message per source',
     trigger: 'A brand-new lead arrives',
     who: 'Everyone, exactly once. The source decides the welcome.',
     stop: 'One send. Their reply routes them to a journey below.',
@@ -73,14 +73,14 @@ export const JOURNEYS: Journey[] = [
     steps: [
       { label: 'Website form', delay: 'instant', template: 'bcon_welcome_web_v1', note: 'Filled with their selected interest + typed message + company.' },
       { label: 'Web chat', delay: 'after they state a goal', template: 'bcon_welcome_web_v1', note: 'Deferred until the first real message/button so the goal is real (never "General Inquiry").' },
-      { label: 'Meta — AI Lead Machine', delay: 'instant (first_outreach task)', template: 'bcon_lead_machine_meta_welcome_v1_' },
+      { label: 'Meta - AI Lead Machine', delay: 'instant (first_outreach task)', template: 'bcon_lead_machine_meta_welcome_v1_' },
       { label: 'WhatsApp direct', delay: 'instant', template: null, freeform: `Hi, welcome to BCON Club. I'm PROXe, BCON's marketing AI.\n\nWe help businesses get more customers using AI. What brings you here?`, note: 'Prompt v4 quick-reply greeting with buttons: Explore Services · More about BCON · Book a call.' },
       { label: 'Voice call in', delay: 'no message', template: null, note: 'Voice sessions log to the timeline; no WhatsApp welcome fires.' },
     ],
   },
   {
     id: 'ghost',
-    title: 'Ghost — never replied (ONE_TOUCH)',
+    title: 'Ghost - never replied (ONE_TOUCH)',
     trigger: 'Welcome sent, zero replies',
     who: 'Leads that went silent from the start.',
     stop: 'Any reply exits the ladder. STOP unsubscribes.',
@@ -95,7 +95,7 @@ export const JOURNEYS: Journey[] = [
   },
   {
     id: 'rnr',
-    title: 'RNR — call rang, no response',
+    title: 'RNR - call rang, no response',
     trigger: 'A logged call note classifies RNR / no answer / busy / voicemail',
     who: 'Leads the team tried to call and could not reach.',
     stop: 'Stops the moment they reply. Cancels any prior ladder first (no double-enrolment).',
@@ -135,7 +135,7 @@ export const JOURNEYS: Journey[] = [
   },
   {
     id: 'booked',
-    title: 'Booked — the call path',
+    title: 'Booked - the call path',
     trigger: 'A call gets scheduled',
     who: 'Every booked lead.',
     stop: 'Runs to the call; missed call reroutes to RNR.',
@@ -150,15 +150,15 @@ export const JOURNEYS: Journey[] = [
   },
   {
     id: 'nudge',
-    title: 'Live-chat nudge — tiered by what we know',
+    title: 'Live-chat nudge - tiered by what we know',
     trigger: 'PROXe asked a question, the lead went quiet (hot 1h · warm 2h · cool 3h)',
     who: 'Mid-conversation ghosts. Read receipt gates it: read → nudge 30 min after; not read → reschedule to their active hour.',
     stop: 'Reply kills the nudge.',
     tone: '#a855f7',
     steps: [
-      { label: 'Tier 1 — know nothing', delay: 'they only said hi', template: null, freeform: `Hey {{customer_name}}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?` },
-      { label: 'Tier 2 — know a detail', delay: 'goal / brand / pain known', template: null, freeform: `Hey {{customer_name}}, you mentioned {{service_interest}} earlier. Want me to show you how we'd fix that with AI? Takes 2 mins.` },
-      { label: 'Tier 3 — form lead', delay: 'goal + brand known', template: null, freeform: `Hey {{customer_name}}, saw you reached out about {{service_interest}} for {{brand_name}}. Want me to map out how we'd get you there? I can set up a quick call.` },
+      { label: 'Tier 1 - know nothing', delay: 'they only said hi', template: null, freeform: `Hey {{customer_name}}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?` },
+      { label: 'Tier 2 - know a detail', delay: 'goal / brand / pain known', template: null, freeform: `Hey {{customer_name}}, you mentioned {{service_interest}} earlier. Want me to show you how we'd fix that with AI? Takes 2 mins.` },
+      { label: 'Tier 3 - form lead', delay: 'goal + brand known', template: null, freeform: `Hey {{customer_name}}, saw you reached out about {{service_interest}} for {{brand_name}}. Want me to map out how we'd get you there? I can set up a quick call.` },
     ],
   },
   {

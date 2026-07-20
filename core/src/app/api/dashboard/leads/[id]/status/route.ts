@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 
-// DEPRECATED — the `status` column is a dead legacy taxonomy (null on every
+// DEPRECATED - the `status` column is a dead legacy taxonomy (null on every
 // lead; no UI writes it since 2026-07-13). Lead pipeline state lives in
 // `lead_stage` via the /stage route. Kept only so old clients don't 404.
 // Allowed status values
@@ -23,7 +23,7 @@ export async function PATCH(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

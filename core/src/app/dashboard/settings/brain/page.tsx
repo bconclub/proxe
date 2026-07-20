@@ -1,11 +1,11 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The Brain — four tabs, each a full surface:
-//   Brain    — the voice orb: tap it and it SPEAKS today's briefing (VoiceOrb)
-//   Map      — how PROXe actually thinks: sources → spine → ladders, live counts
-//   Eval     — every message a lead can receive, by permutation + test bench
-//   Learning — the recursive loop: sources ingested, tokens burned, reflection
+// The Brain - four tabs, each a full surface:
+//   Brain    - the voice orb: tap it and it SPEAKS today's briefing (VoiceOrb)
+//   Map      - how PROXe actually thinks: sources → spine → ladders, live counts
+//   Eval     - every message a lead can receive, by permutation + test bench
+//   Learning - the recursive loop: sources ingested, tokens burned, reflection
 // Views live beside this file: VoiceOrb / MapView / EvalTabs / LearningView.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -22,7 +22,7 @@ import LearningView from './LearningView'
 type Tab = 'brain' | 'map' | 'eval' | 'learning'
 // Per-brand tabs: Map draws the campaign engine topology (warRoom brands only);
 // Eval shows when the brand has journeys (brain.evalJourneys) OR a CORE
-// COMMUNICATIONS checklist (brain.communications) — either gives it content.
+// COMMUNICATIONS checklist (brain.communications) - either gives it content.
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'brain', label: 'Brain' },
   ...(getBrandConfig().features?.warRoom ? ([{ id: 'map', label: 'Map' }] as Array<{ id: Tab; label: string }>) : []),
@@ -49,7 +49,7 @@ export default function BrainPage() {
 
   return (
     <>
-      {/* Phone: 100dvh (not vh — mobile URL bar) minus the 56px hamburger bar;
+      {/* Phone: 100dvh (not vh - mobile URL bar) minus the 56px hamburger bar;
           desktop keeps the original 100vh - 3rem. */}
       <style>{`@media (max-width: 767px) { .brain-page-shell { height: calc(100dvh - var(--mobile-topbar-h, 56px) - 3rem) !important; } }`}</style>
       <div className="brain-page-shell" style={{ height: 'calc(100vh - 3rem)', display: 'flex', flexDirection: 'column', color: 'var(--text-primary)' }}>

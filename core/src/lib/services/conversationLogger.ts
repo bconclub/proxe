@@ -275,7 +275,7 @@ export async function logMessage(
   metadata: any = {},
   supabase?: SupabaseClient | null,
 ): Promise<any | null> {
-  // leadId is optional — anonymous web-chat sessions log conversations
+  // leadId is optional - anonymous web-chat sessions log conversations
   // without a lead until the visitor identifies themselves. The
   // conversations.lead_id column is nullable; the session_id stored in
   // metadata is the linking key for those rows.
@@ -308,7 +308,7 @@ export async function logMessage(
 
   try {
     // Verify lead exists when leadId is provided. Anonymous chats (leadId=null)
-    // skip the check — the conversations.lead_id column is nullable and the FK
+    // skip the check - the conversations.lead_id column is nullable and the FK
     // only fires for non-null values.
     if (leadId) {
       const { data: leadCheck } = await client

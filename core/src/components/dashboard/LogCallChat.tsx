@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * LogCallChat — the post-call decision, as a chat with PROXe (replaces the
+ * LogCallChat - the post-call decision, as a chat with PROXe (replaces the
  * static LogCallDecisionHub when features.logCallChat is on).
  *
  * Predictable by design: PROXe opens with one clean line and a RECOMMENDED next

@@ -9,12 +9,12 @@ type Flags = Partial<Record<FlagKey, boolean>>
 
 // Only CORE features that ship to every brand belong here. Brand-specific
 // features (Scouts/Gigs, War Room, Lead Access) need per-brand DB setup and
-// are switched in the brand config — they are NOT surfaced in this panel.
+// are switched in the brand config - they are NOT surfaced in this panel.
 const FEATURES: Array<{ key: FlagKey; name: string; desc: string; icon: React.ComponentType<{ size?: number }>; live: boolean }> = [
-  { key: 'campaigns', name: 'Campaigns', desc: 'The AI campaign workspace — chat an audience together, match templates, schedule.', icon: MdCampaign, live: true },
+  { key: 'campaigns', name: 'Campaigns', desc: 'The AI campaign workspace - chat an audience together, match templates, schedule.', icon: MdCampaign, live: true },
   { key: 'voice', name: 'Voice / Calls', desc: 'Vapi inbound + outbound calls and the Calls dashboard tab.', icon: MdCall, live: true },
-  { key: 'brain', name: 'Dashboard Brain', desc: 'The "Ask PROXe" panel — Q&A over your live dashboard data.', icon: MdPsychology, live: true },
-  { key: 'brainActions', name: 'Brain Actions', desc: 'The Brain can drive the dashboard — open a lead, open a page, suggest a dial.', icon: MdTouchApp, live: true },
+  { key: 'brain', name: 'Dashboard Brain', desc: 'The "Ask PROXe" panel - Q&A over your live dashboard data.', icon: MdPsychology, live: true },
+  { key: 'brainActions', name: 'Brain Actions', desc: 'The Brain can drive the dashboard - open a lead, open a page, suggest a dial.', icon: MdTouchApp, live: true },
   { key: 'logCallChat', name: 'Log-call Chat', desc: 'After logging a call, chat with PROXe to decide next steps instead of a fixed button grid.', icon: MdForum, live: true },
   { key: 'pipelineFunnel', name: 'Pipeline Funnel', desc: 'The funnel-stage breakdown on the Pipeline page.', icon: MdViewKanban, live: true },
   { key: 'followUpSequence', name: 'Follow-up Sequence', desc: 'Automated re-engagement cron (needs an approved template).', icon: MdAutorenew, live: false },
@@ -84,7 +84,7 @@ export default function FeaturesSettingsPage() {
 
       <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Features</h1>
       <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-        Switch dashboard features on or off. Changes apply to everyone on this brand and take effect on the next page load — no redeploy needed.
+        Switch dashboard features on or off. Changes apply to everyone on this brand and take effect on the next page load - no redeploy needed.
       </p>
 
       {error && <p className="text-sm mb-4" style={{ color: '#ef4444' }}>{error}</p>}

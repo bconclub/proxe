@@ -6,7 +6,7 @@ import pkg from '../../../../package.json'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  // Version: package.json is the source of truth — the prebuild script
+  // Version: package.json is the source of truth - the prebuild script
   // auto-bumps the patch, so each Vercel build reflects the bumped value.
   // (Env-var approach was unreliable: NEXT_PUBLIC_APP_VERSION had to be
   // manually maintained on Vercel and got stuck at 0.0.17.)
@@ -15,7 +15,7 @@ export async function GET() {
 
   try {
     // Build timestamp: .build-info file (written by prebuild script). If it
-    // exists, prefer it — the prebuild's exact timestamp is more accurate
+    // exists, prefer it - the prebuild's exact timestamp is more accurate
     // than the request time. version is still package.json (the .build-info
     // version can be stale if rebuilt without prebuild running).
     const buildInfoPath = path.join(process.cwd(), '.build-info')

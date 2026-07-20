@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic'
 // Lists voice calls (inbound + outbound) for the Calls dashboard view.
 //
 // Data lives in two places and is merged here:
-//   • voice_sessions  — one row per call (direction, status, duration, phone).
-//   • conversations   — channel='voice' rows hold the transcript turns AND a
+//   • voice_sessions  - one row per call (direction, status, duration, phone).
+//   • conversations   - channel='voice' rows hold the transcript turns AND a
 //                       "summary" row whose metadata carries recording_url,
 //                       ended_reason and the call summary. The Vapi webhook
 //                       writes recording/summary THERE (not onto voice_sessions),
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     // Voice conversation rows for these calls → recording/summary/turn-count.
     // Join on the call_id (conversations.metadata.call_id === external_session_id),
-    // NOT lead_id — recordings/transcripts must surface even when the call has no
+    // NOT lead_id - recordings/transcripts must surface even when the call has no
     // lead linkage. The Vapi webhook writes them with metadata.call_id regardless.
     type CallExtra = { recordingUrl: string | null; summary: string | null; endedReason: string | null; turnCount: number; leadId: string | null; durationSeconds: number | null }
     const extras = new Map<string, CallExtra>()
@@ -90,11 +90,11 @@ export async function GET(request: NextRequest) {
         if (!cid) return
         const e = extras.get(cid) || { recordingUrl: null, summary: null, endedReason: null, turnCount: 0, leadId: null, durationSeconds: null }
         // The transcript/summary rows often carry the resolved lead even when the
-        // voice_sessions row never got enriched — capture it so the contact name
+        // voice_sessions row never got enriched - capture it so the contact name
         // resolves from here as a fallback.
         if (c.lead_id) e.leadId = e.leadId || c.lead_id
         if (c?.metadata?.summary) {
-          // The summary row — carries the recording + ended reason + summary +
+          // The summary row - carries the recording + ended reason + summary +
           // duration. Used as a fallback when the session row is stale.
           e.recordingUrl = c.metadata.recording_url || e.recordingUrl
           e.endedReason = c.metadata.ended_reason || e.endedReason
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Backfill leadMap with any lead found on the conversations but not on the
-    // session row — so "Unknown caller" calls (session.lead_id NULL) still resolve
+    // session row - so "Unknown caller" calls (session.lead_id NULL) still resolve
     // their name/phone from the lead the transcript is linked to.
     const convLeadIds = Array.from(new Set(
       Array.from(extras.values()).map((e) => e.leadId).filter((id): id is string => !!id && !leadMap.has(id)),
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     let calls = rows.map((r: any) => {
       const extra = r.external_session_id ? extras.get(r.external_session_id) : undefined
       // Resolve the lead from the session, else from the lead the transcript is
-      // linked to — so calls whose voice_sessions row never got enriched still
+      // linked to - so calls whose voice_sessions row never got enriched still
       // show the real contact instead of "Unknown caller".
       const resolvedLeadId = r.lead_id || extra?.leadId || null
       const lead = resolvedLeadId ? leadMap.get(resolvedLeadId) : null
@@ -167,9 +167,9 @@ export async function GET(request: NextRequest) {
     // V2 (ElevenLabs) has no post-call webhook, so its rows sit at "queued·0s"
     // forever. Lazily sync the still-pending ones from the conversation API on
     // list load (capped, parallel) and persist so they land completed with the
-    // real duration — the V2 equivalent of the Vapi webhook / V3 telemetry.
+    // real duration - the V2 equivalent of the Vapi webhook / V3 telemetry.
     const elKey = process.env.ELEVENLABS_API_KEY
-    // Enrich V2 rows that are pending OR missing their transcript — status,
+    // Enrich V2 rows that are pending OR missing their transcript - status,
     // duration, transcript (→ conversations rows so the list count + detail view
     // work like V1), and a recording proxy URL.
     const pendingEl = calls.filter(
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
               updated_at: new Date().toISOString(),
             })
             .eq('external_session_id', c.callId)
-        } catch { /* soft-fail — leave the row as-is */ }
+        } catch { /* soft-fail - leave the row as-is */ }
       }))
     }
 
@@ -228,7 +228,7 @@ export async function GET(request: NextRequest) {
     // sync so a call that actually completed isn't mistaken for dead.
     calls = calls.filter((c) => !((c.status === 'queued' || !c.status) && (c.durationSeconds ?? 0) === 0 && (c.turnCount ?? 0) === 0))
 
-    // Name search (post-join) — phone search already applied at the DB layer.
+    // Name search (post-join) - phone search already applied at the DB layer.
     if (search && search.length >= 2 && !/^\d+$/.test(search.replace(/\D/g, ''))) {
       const needle = search.toLowerCase()
       calls = calls.filter((c) => (c.leadName || '').toLowerCase().includes(needle))

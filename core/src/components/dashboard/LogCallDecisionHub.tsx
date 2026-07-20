@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * LogCallDecisionHub — the human decision point after a call, as a centered modal.
+ * LogCallDecisionHub - the human decision point after a call, as a centered modal.
  *
  * 1. On open it asks the API what it WOULD do (read-only `propose`), showing
  *    the lead context + the AI's proposed plan.
@@ -35,9 +35,9 @@ type HubAction = 'book' | 'move' | 'sequence' | 'task' | 'close' | 'none'
 const MOVE_STAGES = ['Engaged', 'High Intent', 'Demo Taken', 'Proposal Sent', 'Nurture']
 const CLOSE_STAGES = ['Closed Won', 'Closed Lost']
 const SEQUENCES: Array<{ key: 'ghost' | 'engaged' | 'reengage'; label: string }> = [
-  { key: 'ghost', label: 'Ghost — gentle nudges (day 1, 3, 7)' },
-  { key: 'engaged', label: 'Engaged — follow-ups (day 1, 3, 5)' },
-  { key: 'reengage', label: 'Re-engage — light touch in 2 days' },
+  { key: 'ghost', label: 'Ghost - gentle nudges (day 1, 3, 7)' },
+  { key: 'engaged', label: 'Engaged - follow-ups (day 1, 3, 5)' },
+  { key: 'reengage', label: 'Re-engage - light touch in 2 days' },
 ]
 
 const ACTIONS: Array<{ key: HubAction; label: string; desc: string; icon: React.ReactNode }> = [
@@ -124,7 +124,7 @@ export default function LogCallDecisionHub({ leadId, leadName, outcome, notes, o
         style={{ width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', borderRadius: 14, padding: 18 }}
       >
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Call logged for {leadName} — what next?</span>
+          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Call logged for {leadName} - what next?</span>
           <button onClick={onCancel} className="p-1 rounded" style={{ color: 'var(--text-secondary)' }} aria-label="Cancel"><MdClose size={18} /></button>
         </div>
 
@@ -139,7 +139,7 @@ export default function LogCallDecisionHub({ leadId, leadName, outcome, notes, o
           </div>
         )}
 
-        {/* The AI's proposed plan — always shown (loading / plan / error) */}
+        {/* The AI's proposed plan - always shown (loading / plan / error) */}
         <div className="mb-3">
           <div className="text-[11px] uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>the brain suggests</div>
           {loading ? (

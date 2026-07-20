@@ -38,7 +38,7 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 /**
  * Send a text message via Meta WhatsApp Cloud API.
  * Returns Meta's wamid on success so the caller can persist it as
- * metadata.wa_message_id — the key delivered/read receipts match on. A human
+ * metadata.wa_message_id - the key delivered/read receipts match on. A human
  * reply with no wamid never gets a receipt.
  */
 async function sendWhatsAppMessage(to: string, message: string): Promise<{ ok: boolean; messageId?: string }> {
@@ -81,7 +81,7 @@ async function sendWhatsAppMessage(to: string, message: string): Promise<{ ok: b
 
 /**
  * Send an approved WhatsApp template via Meta Cloud API.
- * Templates bypass the 24-hour conversation window — this is the legitimate
+ * Templates bypass the 24-hour conversation window - this is the legitimate
  * way to re-engage a lead whose last message is older than 24h.
  */
 async function sendWhatsAppTemplate(params: {
@@ -154,7 +154,7 @@ async function sendWhatsAppTemplate(params: {
 
 /**
  * Reassign lead ownership to the acting user. Sending a reply or template =
- * "I'm handling this lead now", so the sender becomes the owner — even if
+ * "I'm handling this lead now", so the sender becomes the owner - even if
  * someone else owned it before (owner follows whoever is actively working it).
  * Resolves the logged-in user from the cookie session; no-ops for system
  * paths. Non-fatal.
@@ -420,7 +420,7 @@ export async function POST(request: NextRequest) {
         templateName,
         // windchasers templates are approved as `en` (not `en_US`). Meta
         // returns a misleading 132001 "template does not exist in en_US"
-        // otherwise — the auto-send for PAT/demo silently fails because of it.
+        // otherwise - the auto-send for PAT/demo silently fails because of it.
         languageCode: languageCode || 'en',
         bodyParams: !Array.isArray(bodyParamsNamed) && Array.isArray(bodyParams)
           ? bodyParams.map(String)
@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
       // so the dashboard renders a yellow "TEST" pill on the row, making it
       // obvious this didn't go to the lead.
       // No client-supplied preview? Render the real body ourselves from the
-      // brand's template map + the params we just sent — the operator must see
+      // brand's template map + the params we just sent - the operator must see
       // the actual message in the thread, never "[Template: name]".
       let selfRendered: string | null = null
       if (TEMPLATE_BODIES[templateName]) {
@@ -483,7 +483,7 @@ export async function POST(request: NextRequest) {
             ? bodyParamsNamed
             : (Array.isArray(bodyParams) ? bodyParams : []),
           meta_message_id: result.messageId || null,
-          // read receipts (sent → delivered → read ticks) match on this key —
+          // read receipts (sent → delivered → read ticks) match on this key -
           // without it template bubbles never tick past sent.
           wa_message_id: result.messageId || undefined,
           whatsapp_message_id: result.messageId || undefined,

@@ -16,7 +16,7 @@ export async function GET(
   try {
     const authClient = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await authClient.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -75,7 +75,7 @@ export async function GET(
     // 2. Team actions: logged activities (from activities table).
     // Select only the columns we know exist on every brand's activities table.
     // Older WC schemas lack duration_minutes / next_followup_date, and the
-    // previous select-then-throw made the WHOLE activity feed 500 — which made
+    // previous select-then-throw made the WHOLE activity feed 500 - which made
     // the modal fall back to conversations only, hiding logged calls/notes.
     // Degrade gracefully instead: a team-query failure just omits team rows.
     const { data: teamActivities, error: teamError } = await supabase
@@ -111,7 +111,7 @@ export async function GET(
           content: activity.note,
           timestamp: activity.created_at,
           icon: activity.activity_type,
-          color: '#F59E0B', // Amber — distinct from PROXe (purple) + Customer (green)
+          color: '#F59E0B', // Amber - distinct from PROXe (purple) + Customer (green)
           user_id: activity.created_by,
         })
       }

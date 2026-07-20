@@ -4,11 +4,11 @@
  *
  * When a visitor clicks the website WhatsApp pop-up, /api/agent/wa-prelaunch
  * records the lead with unified_context.pending_wa_message = true + pending_wa_at
- * + the page_url they came from — but clicking the button is NOT the same as
+ * + the page_url they came from - but clicking the button is NOT the same as
  * actually messaging. Many drop off before sending anything.
  *
  * This cron, ~7 minutes after the click, pushes the welcome template IF they
- * still haven't messaged on WhatsApp — routed by the page they came from
+ * still haven't messaged on WhatsApp - routed by the page they came from
  * (pilot page → pilot welcome, anything else → generic). If they DID message,
  * the agent is already handling them, so we skip + clear the flag (never
  * double-greet).
@@ -65,14 +65,14 @@ export async function GET(req: NextRequest) {
 
       const ageMin = (now - pendingAt) / 60_000
       if (ageMin < WAIT_MINUTES) { results.skipped++; continue }       // not waited long enough yet
-      if (ageMin > MAX_AGE_HOURS * 60) {                                // too old — clear, don't send
+      if (ageMin > MAX_AGE_HOURS * 60) {                                // too old - clear, don't send
         await clearFlag(supabase, lead.id, ctx)
         results.skipped++
         continue
       }
 
       // Did they actually message on WhatsApp since the click? If so, the agent
-      // is handling them — skip + clear so we never double-greet.
+      // is handling them - skip + clear so we never double-greet.
       const { data: inbound } = await supabase
         .from('conversations')
         .select('id')

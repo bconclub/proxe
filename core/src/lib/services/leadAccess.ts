@@ -1,10 +1,10 @@
 /**
- * Per-user lead-type access control (features.leadAccess — windchasers).
+ * Per-user lead-type access control (features.leadAccess - windchasers).
  *
  * A dashboard user can be restricted to a set of lead types (canonical course
  * names from configs/courses.ts) via dashboard_users.allowed_lead_types.
  * NULL = unrestricted. Admins are always unrestricted. When the brand flag is
- * off this whole module is a no-op — every check returns "visible".
+ * off this whole module is a no-op - every check returns "visible".
  *
  * Filtering is JS post-fetch (same pattern as the NULL-safe newsletter filter
  * in the leads route): course_interest values in unified_context are raw/messy
@@ -44,7 +44,7 @@ export async function getLeadAccess(supabase: any, userId: string): Promise<Lead
       .eq('id', userId)
       .maybeSingle()
     if (meErr) {
-      // Migration 036 not run yet (column missing) — keep admin detection
+      // Migration 036 not run yet (column missing) - keep admin detection
       // alive with a role-only read; access stays unrestricted.
       ;({ data: me } = await supabase
         .from('dashboard_users')
@@ -59,7 +59,7 @@ export async function getLeadAccess(supabase: any, userId: string): Promise<Lead
     if (isAdmin || !types) return UNRESTRICTED(userId, isAdmin)
     return { restricted: true, isAdmin, allowedTypes: types, userId }
   } catch (e: any) {
-    // Never lock a user out because the access lookup failed — fail open.
+    // Never lock a user out because the access lookup failed - fail open.
     console.warn('[leadAccess] getLeadAccess failed (fail-open):', e?.message || e)
     return UNRESTRICTED(userId)
   }
@@ -102,7 +102,7 @@ export function sanitizeAllowedLeadTypes(raw: any): string[] | null | undefined 
 /**
  * Write-site guard: may this user act on this lead? Fetches the lead's
  * unified_context only when the user is actually restricted. A missing lead
- * returns true — the route's own 404 handles that case.
+ * returns true - the route's own 404 handles that case.
  */
 export async function canAccessLeadId(supabase: any, userId: string, leadId: string): Promise<boolean> {
   const access = await getLeadAccess(supabase, userId)

@@ -147,10 +147,10 @@ export async function POST(request: NextRequest) {
         console.error('[reconcile] persist failed', lead.id, e?.message || e)
       }
     } else {
-      // Past-time agreement — the call slot already passed. Flag the team to call.
+      // Past-time agreement - the call slot already passed. Flag the team to call.
       try {
         await notifySlackLead({
-          brandLabel: getBrandConfig()?.name || 'Lokazen', title: 'Missed booking — please call',
+          brandLabel: getBrandConfig()?.name || 'Lokazen', title: 'Missed booking - please call',
           name, phone, leadType: String(uc?.lokazen?.user_type || '') || null,
           detail: `Agreed a callback for ${timeDisplay} on ${dateISO} but it was never registered and the time has passed. Please call to reschedule.`,
           footer: 'reconciled · missed',

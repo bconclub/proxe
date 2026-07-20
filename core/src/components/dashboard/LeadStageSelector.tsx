@@ -26,7 +26,7 @@ const STAGE_OPTIONS: { value: LeadStage; label: string; description: string; sco
   { value: 'Cold', label: 'Cold', description: 'No engagement', scoreRange: 'Manual' },
   { value: 'R&R', label: 'R&R', description: 'Rang, No Reply', scoreRange: 'Manual' },
   { value: 'In Sequence', label: 'In Sequence', description: 'Automated follow-up', scoreRange: 'Manual' },
-  { value: 'Nurture', label: 'Nurture', description: 'Long-game — check in later', scoreRange: 'Manual' },
+  { value: 'Nurture', label: 'Nurture', description: 'Long-game - check in later', scoreRange: 'Manual' },
 ]
 
 const SUB_STAGE_OPTIONS: { value: HighIntentSubStage; label: string }[] = [

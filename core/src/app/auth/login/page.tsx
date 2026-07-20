@@ -213,7 +213,7 @@ export default function LoginPage() {
 
         if (data?.user && data?.session) {
           console.log('✅ Login successful, user:', data.user.email)
-          // createBrowserClient automatically wrote the session to cookies —
+          // createBrowserClient automatically wrote the session to cookies -
           // the server-side createServerClient will see it on the next request.
           // A full page navigation flushes the in-flight React state cleanly.
           window.location.href = '/dashboard'
@@ -261,7 +261,7 @@ export default function LoginPage() {
 
   // Don't render the form until we've confirmed there's no active session
   // (prevents a flash before the redirect fires). Show a themed loader rather
-  // than a blank page — returning null here rendered a black screen while the
+  // than a blank page - returning null here rendered a black screen while the
   // session check / redirect was in flight.
   if (checking) {
     return (

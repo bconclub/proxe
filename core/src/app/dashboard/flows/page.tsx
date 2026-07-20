@@ -943,7 +943,7 @@ export default function FlowsPage() {
     await reloadFlows()
   }
 
-  // ── Sequences view (default landing) + Triggers view — toggle to either, or Stages ──
+  // ── Sequences view (default landing) + Triggers view - toggle to either, or Stages ──
   if (view === 'sequences' || view === 'triggers') {
     return (
       <div style={{ minHeight: 'calc(100vh - 48px)', color: 'var(--text-primary)' }}>
@@ -952,8 +952,8 @@ export default function FlowsPage() {
             <h1 style={{ margin: 0, fontSize: 24, lineHeight: 1.1, fontWeight: 700 }}>Flows</h1>
             <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: 13 }}>
               {view === 'sequences'
-                ? 'Sequences — the multi-step chains a lead runs through, and the template each step fires.'
-                : 'Triggers — the one-off automations that fire on an event, and the template each uses.'}
+                ? 'Sequences - the multi-step chains a lead runs through, and the template each step fires.'
+                : 'Triggers - the one-off automations that fire on an event, and the template each uses.'}
             </p>
           </div>
           <FlowsViewToggle view={view} setView={setView} />
@@ -1017,7 +1017,7 @@ export default function FlowsPage() {
           </div>
         </header>
 
-        {/* Go-Live readiness — kept at top so you always see what's going on */}
+        {/* Go-Live readiness - kept at top so you always see what's going on */}
         <GoLiveChecklist
           totalLeads={totalLeads}
           stagesActive={stagesActive}
@@ -1027,7 +1027,7 @@ export default function FlowsPage() {
           coveredStages={stageStats.filter(s => s.id !== 'converted' && s.coverage > 0).length}
         />
 
-        {/* Funnel selector — quick "where am I" */}
+        {/* Funnel selector - quick "where am I" */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, flexShrink: 0 }}>
           {funnelGroups.map(group => {
             const count = group.stageIds.reduce((sum, id) => sum + (stageMap.get(id)?.leadCount || 0), 0)
@@ -1070,7 +1070,7 @@ export default function FlowsPage() {
           })}
         </section>
 
-        {/* Drill-in — active funnel's stages (left) + selected stage detail (right) */}
+        {/* Drill-in - active funnel's stages (left) + selected stage detail (right) */}
         <section style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 12 }}>
           <div style={{ border: '1px solid var(--border-primary)', borderRadius: 12, background: 'var(--bg-secondary)', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-primary)', fontSize: 12, fontWeight: 700, color: activeGroup.color, letterSpacing: '0.4px', flexShrink: 0 }}>
@@ -1611,7 +1611,7 @@ function GoLiveChecklist({
       short: 'Approved',
       detail: templatesLive > 0
         ? `${templatesLive} template${templatesLive !== 1 ? 's' : ''} approved on Meta and live.`
-        : 'No templates approved yet — coverage stays at 0% until at least one is approved.',
+        : 'No templates approved yet - coverage stays at 0% until at least one is approved.',
       status: templatesLive > 0 ? 'done' : 'todo',
     },
     {
@@ -1619,7 +1619,7 @@ function GoLiveChecklist({
       short: 'Coverage',
       detail: coveredStages > 0
         ? `${coveredStages} stage${coveredStages !== 1 ? 's' : ''} have a live template (avg ${avgCoverage}%).`
-        : 'Every stage shows 0% coverage — approve templates to raise it.',
+        : 'Every stage shows 0% coverage - approve templates to raise it.',
       status: coveredStages > 0 ? 'done' : 'todo',
     },
     {
@@ -1683,7 +1683,7 @@ function GoLiveChecklist({
         return (
           <span
             key={item.label}
-            title={`${item.label} — ${item.detail}`}
+            title={`${item.label} - ${item.detail}`}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
               fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',

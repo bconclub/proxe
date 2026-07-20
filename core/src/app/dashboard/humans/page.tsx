@@ -1,8 +1,8 @@
 'use client'
 
 // Humans = the managing team. Under features.leadAccess this is the
-// team-ACTIVITY view: what humans we have and what each is doing — allowed
-// lead types, leads owned, pipeline stage breakdown, last active — with an
+// team-ACTIVITY view: what humans we have and what each is doing - allowed
+// lead types, leads owned, pipeline stage breakdown, last active - with an
 // admin click-through to any member's pipeline. User MANAGEMENT (invite,
 // roles, deactivate) lives in Settings → Users.
 //
@@ -55,7 +55,7 @@ function groupBreakdown(stages: Record<string, number>): Array<{ label: string; 
 function formatLastActive(iso: string | null): { label: string; live: boolean } {
   if (!iso) return { label: 'Never logged in', live: false }
   const then = new Date(iso).getTime()
-  if (isNaN(then)) return { label: '—', live: false }
+  if (isNaN(then)) return { label: '-', live: false }
   const diffSec = Math.floor((Date.now() - then) / 1000)
   if (diffSec < 120) return { label: 'Live now', live: true }
   if (diffSec < 3600) return { label: `${Math.floor(diffSec / 60)} min ago`, live: false }
@@ -147,7 +147,7 @@ function HumansOverview() {
             {loading ? '…' : `${openPool} in the open pool`}
           </div>
           <div className="text-xs text-[var(--text-secondary)]">
-            {loading ? '' : `of ${totalLeads} total leads — unclaimed, first touch takes responsibility`}
+            {loading ? '' : `of ${totalLeads} total leads - unclaimed, first touch takes responsibility`}
           </div>
         </div>
       </button>
@@ -225,7 +225,7 @@ function HumansOverview() {
                   )}
                 </div>
 
-                {/* Last active (admin only — API redacts for viewers) */}
+                {/* Last active (admin only - API redacts for viewers) */}
                 {isAdmin && (
                   <div className="text-[11px] mt-auto">
                     {active.live ? (

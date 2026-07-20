@@ -7,7 +7,7 @@ import ConnectWhatsAppCard from './ConnectWhatsAppCard';
 export default function WhatsAppAgentTab() {
   const brandName = getBrandConfig().name;
   // Sender identity comes from the live connection (ConnectWhatsAppCard's
-  // status fetch) — no hardcoded numbers or brand names.
+  // status fetch) - no hardcoded numbers or brand names.
   const [connection, setConnection] = useState<{ verifiedName?: string | null } | null>(null);
   const chatAgentName = connection?.verifiedName || brandName;
   const avatarLetter = chatAgentName.charAt(0).toUpperCase() || 'P';
@@ -33,7 +33,7 @@ export default function WhatsAppAgentTab() {
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
-      {/* LEFT — Config Panel */}
+      {/* LEFT - Config Panel */}
       <div style={{
         flex: '0 0 40%',
         maxWidth: '40%',
@@ -45,7 +45,7 @@ export default function WhatsAppAgentTab() {
         gap: '20px',
         overflowY: 'auto',
       }}>
-        {/* Connection — live status + Meta embedded-signup connect */}
+        {/* Connection - live status + Meta embedded-signup connect */}
         <ConnectWhatsAppCard onStatus={setConnection} />
 
         {/* Divider */}
@@ -105,7 +105,7 @@ export default function WhatsAppAgentTab() {
         </div>
       </div>
 
-      {/* RIGHT — Phone Mockup */}
+      {/* RIGHT - Phone Mockup */}
       <div style={{
         flex: '1 1 60%',
         minWidth: 0,

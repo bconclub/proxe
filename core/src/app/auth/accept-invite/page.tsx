@@ -91,7 +91,7 @@ function AcceptInviteForm() {
     // We POST to /api/auth/redeem-invite which:
     //   1. Validates the token (exists, not accepted, not expired)
     //   2. Uses the service-role admin API to create the user with
-    //      email_confirm:true — so they can sign in immediately. Previously
+    //      email_confirm:true - so they can sign in immediately. Previously
     //      we did supabase.auth.signUp() in the browser which left users
     //      stranded on the login screen with "Please verify your email."
     //   3. Sets the dashboard_users role + marks invitation accepted
@@ -112,7 +112,7 @@ function AcceptInviteForm() {
         return
       }
 
-      // Establish a session — the redeem endpoint just created the user
+      // Establish a session - the redeem endpoint just created the user
       // server-side; the browser still has no auth cookie. signInWithPassword
       // sets it via the supabase-ssr cookie handlers in middleware.
       const supabase = createClient()
@@ -122,7 +122,7 @@ function AcceptInviteForm() {
       })
       if (signInError) {
         // Highly unlikely (we just created/confirmed the user) but if it
-        // happens, the account is fine — send them to login with the email
+        // happens, the account is fine - send them to login with the email
         // pre-filled.
         console.error('[accept-invite] signIn after redeem failed:', signInError)
         router.push('/auth/login')

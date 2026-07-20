@@ -1,9 +1,9 @@
 /**
- * Lead-detail modal config — choose which tabs a brand shows, from the dashboard.
+ * Lead-detail modal config - choose which tabs a brand shows, from the dashboard.
  *
  * Brand divergence as DATA: which tabs appear in the lead-detail modal (and a few
  * label overrides) is editable at Configure → Lead Modal and stored per-brand in
- * dashboard_settings (key/value jsonb — no migration). The modal reads this and
+ * dashboard_settings (key/value jsonb - no migration). The modal reads this and
  * defaults every tab ON, so behaviour is unchanged until a brand turns one off.
  */
 

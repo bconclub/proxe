@@ -15,7 +15,7 @@
  *   platform                    → Meta placement surface: 'ig' | 'fb' (drives source badge)
  *   campaign_name / adset_name / ad_name / form_name / form_id / lead_id → ad metadata
  *   class_12_pcm / start_timeline / age → lead-form qualifying answers
- *   utm_source/medium/campaign/content → ONLY real UTMs — never hardcode a label here
+ *   utm_source/medium/campaign/content → ONLY real UTMs - never hardcode a label here
  *
  * Auth: x-api-key header must match INBOUND_API_KEY env var.
  */
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // ── Field parsing ─────────────────────────────────────────────────────────
     // `rawName` is used for the required-field gate (we never drop a lead because
-    // somebody typed junk into the name field — phone is the real identifier).
+    // somebody typed junk into the name field - phone is the real identifier).
     // `cleanName` is the real-person-validated name for storage and template use.
     const rawName: string =
       body.name || body.full_name || body.customer_name || body.Name || '';
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     const age: string | null = body.age != null ? String(body.age) : null;
     // Explicit course/interest the Pabbly workflow can set (e.g. "cabin_crew",
     // "pilot", "cpl"). Drives welcome routing deterministically instead of
-    // relying on the ad/form name — set a static value per dedicated workflow.
+    // relying on the ad/form name - set a static value per dedicated workflow.
     const course: string | null =
       body.course || body.course_interest || body.interest || body.program || null;
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Facebook campaign metadata
     // `platform` is Meta's per-lead placement surface: 'ig' (Instagram) or
-    // 'fb' (Facebook) — the true marketing source for lead-form leads.
+    // 'fb' (Facebook) - the true marketing source for lead-form leads.
     const platform: string =
       String(body.platform || '').toLowerCase().trim();
     const facebookMeta = {
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
     // real UTM (rare on lead forms) → placement platform (ig → Instagram,
-    // fb → Facebook) → meta_ads. Pabbly must NOT hardcode utm_source — that's
+    // fb → Facebook) → meta_ads. Pabbly must NOT hardcode utm_source - that's
     // how every lead ended up badged "Res1 Platform".
     const platformSource =
       platform === 'ig' ? 'ig' : platform === 'fb' ? 'facebook' : null;
@@ -186,13 +186,13 @@ export async function POST(request: NextRequest) {
               ...(existingCtx.windchasers || {}),
               ...windchasersProfile,
             },
-            // Attribution is immutable — keep existing if already set
+            // Attribution is immutable - keep existing if already set
             attribution: existingCtx.attribution ?? attribution,
           },
         })
         .eq('id', leadId);
     } else {
-      // Brand-new lead — set first_touchpoint: meta_forms (Meta lead form)
+      // Brand-new lead - set first_touchpoint: meta_forms (Meta lead form)
       const { data: created, error: insertError } = await supabase
         .from('all_leads')
         .insert({
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
       leadId = created.id;
     }
 
-    // ── 2. Cooldown check — don't re-message an active lead ──────────────────
+    // ── 2. Cooldown check - don't re-message an active lead ──────────────────
     const cooldownUntil = existing?.follow_up_cooldown_until;
     const inCooldown = cooldownUntil && new Date(cooldownUntil) > new Date();
 
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
     if (inCooldown) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
     } else {
-      // ── 3. Fire the welcome template — parent enquiry gets its own template
+      // ── 3. Fire the welcome template - parent enquiry gets its own template
       // (named param `parent_name`); otherwise pilot vs generic by the
       // ad/form/campaign the lead came from (a pilot ad/form/campaign → pilot welcome).
       // `course` first: a dedicated Pabbly workflow sets a static

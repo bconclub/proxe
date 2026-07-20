@@ -1,5 +1,5 @@
 /**
- * WhatsApp Connection — Embedded Signup backend (admin only).
+ * WhatsApp Connection - Embedded Signup backend (admin only).
  *
  * GET    /api/dashboard/whatsapp/connection → current connection status
  *        (DB connection, or legacy env wiring, or nothing) + whether the
@@ -13,11 +13,11 @@
  *        sends fall back to env creds if present).
  *
  * Env:
- *   NEXT_PUBLIC_META_APP_ID      — Meta app id (public)
- *   META_APP_SECRET              — Meta app secret (server only)
- *   NEXT_PUBLIC_META_ES_CONFIG_ID— Embedded Signup configuration id (public)
- *   META_WHATSAPP_VERIFY_TOKEN   — webhook verify token (reused for override)
- *   NEXT_PUBLIC_APP_URL          — optional; webhook callback origin override
+ *   NEXT_PUBLIC_META_APP_ID      - Meta app id (public)
+ *   META_APP_SECRET              - Meta app secret (server only)
+ *   NEXT_PUBLIC_META_ES_CONFIG_ID- Embedded Signup configuration id (public)
+ *   META_WHATSAPP_VERIFY_TOKEN   - webhook verify token (reused for override)
+ *   NEXT_PUBLIC_APP_URL          - optional; webhook callback origin override
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -83,7 +83,7 @@ export async function GET() {
     return NextResponse.json({ connected: false, source: null, embeddedSignupReady });
   }
 
-  // Enrich with live number info (name/quality) — best-effort.
+  // Enrich with live number info (name/quality) - best-effort.
   let info: any = null;
   try {
     info = await graphGet(
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
     const accessToken: string = tokenBody.access_token;
     steps.tokenExchange = 'ok';
 
-    // 2. Subscribe our app to the WABA — webhooks for this WABA route to THIS
+    // 2. Subscribe our app to the WABA - webhooks for this WABA route to THIS
     //    deployment (override), so multiple brands can share one Meta app.
     const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN;
     const origin =
@@ -153,14 +153,14 @@ export async function POST(request: NextRequest) {
       } : {});
       steps.subscribe = verifyToken ? `ok (override → ${callbackUri})` : 'ok (app-level webhook)';
     } catch (err: any) {
-      // Override needs a publicly reachable URL (fails on localhost) — fall
+      // Override needs a publicly reachable URL (fails on localhost) - fall
       // back to a plain subscription so the connection still completes.
       await graphPost(`${wabaId}/subscribed_apps`, accessToken, {});
-      steps.subscribe = `ok (plain — override failed: ${err?.message})`;
+      steps.subscribe = `ok (plain - override failed: ${err?.message})`;
     }
 
     // 3. Register the number on Cloud API (sets the two-step PIN). A number
-    //    already registered elsewhere returns an error — treat as non-fatal.
+    //    already registered elsewhere returns an error - treat as non-fatal.
     const pin = String(Math.floor(100000 + Math.random() * 900000));
     let registeredPin: string | null = pin;
     try {

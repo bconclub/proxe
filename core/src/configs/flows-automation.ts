@@ -13,10 +13,10 @@ export type Sequence = { id: string; segment: string; who: string; stop: string;
 // ── BCON ─────────────────────────────────────────────────────────────────────
 const BCON_TRIGGERS: Trigger[] = [
   { id: 'welcome', icon: MdWavingHand, event: 'New lead arrives', when: 'Immediately', template: 'bcon_proxe_first_outreach', desc: 'The welcome / first outreach a fresh lead receives.' },
-  { id: 'r24', icon: MdNotificationsActive, event: 'Booking — 1 day before', when: '24h before the call', template: 'bcon_proxe_booking_reminder_24h', desc: '“Your call is tomorrow at …”' },
-  { id: 'r1', icon: MdNotificationsActive, event: 'Booking — 1 hour before', when: '1h before', template: 'bcon_proxe_booking_reminder_1h', desc: '“Your call starts in 1 hour.”' },
-  { id: 'r30', icon: MdNotificationsActive, event: 'Booking — 30 min before', when: '30m before', template: 'bcon_proxe_booking_reminder_30m', desc: '“Your call starts in 30 minutes.”' },
-  { id: 'missed', icon: MdPhoneMissed, event: 'Voice call — no answer', when: '30 min after', template: null, desc: 'Kicks off the “No response” sequence below (missed_call_followup).' },
+  { id: 'r24', icon: MdNotificationsActive, event: 'Booking - 1 day before', when: '24h before the call', template: 'bcon_proxe_booking_reminder_24h', desc: '“Your call is tomorrow at …”' },
+  { id: 'r1', icon: MdNotificationsActive, event: 'Booking - 1 hour before', when: '1h before', template: 'bcon_proxe_booking_reminder_1h', desc: '“Your call starts in 1 hour.”' },
+  { id: 'r30', icon: MdNotificationsActive, event: 'Booking - 30 min before', when: '30m before', template: 'bcon_proxe_booking_reminder_30m', desc: '“Your call starts in 30 minutes.”' },
+  { id: 'missed', icon: MdPhoneMissed, event: 'Voice call - no answer', when: '30 min after', template: null, desc: 'Kicks off the “No response” sequence below (missed_call_followup).' },
   { id: 'callback', icon: MdCallReceived, event: 'Callback requested', when: 'On request', template: null, desc: 'Acknowledge and schedule the callback.' },
 ]
 
@@ -44,7 +44,7 @@ const BCON_SEQUENCES: Sequence[] = [
   },
   {
     id: 'longtail', segment: 'Long-tail nurture',
-    who: 'No booking after the first touches — a slow drip so they don’t go cold.',
+    who: 'No booking after the first touches - a slow drip so they don’t go cold.',
     stop: 'Stops on any reply or booking',
     steps: [
       { label: 'Day 3', delay: '+3 days', template: 'bcon_proxe_followup_noengage' },
@@ -59,7 +59,7 @@ const BCON_SEQUENCES: Sequence[] = [
 const WINDCHASERS_TRIGGERS: Trigger[] = [
   {
     id: 'welcome', icon: MdWavingHand, event: 'New lead arrives', when: 'Immediately', template: null,
-    desc: 'The first WhatsApp a fresh lead gets — the copy is chosen by where they came from.',
+    desc: 'The first WhatsApp a fresh lead gets - the copy is chosen by where they came from.',
     sources: [
       { label: 'Student / general', template: 'windchasers_generic_welcome_v3', desc: 'Website forms, general ads, non-pilot enquiries.' },
       { label: 'Pilot track', template: 'windchasers_pilot_welcome_v3', desc: 'CPL / PPL / DGCA / flying interest.' },
@@ -70,7 +70,7 @@ const WINDCHASERS_TRIGGERS: Trigger[] = [
   { id: 'pat', icon: MdAssignment, event: 'Pilot Aptitude Test completed', when: 'Immediately', template: 'windchasers_pat_result_v2', desc: 'Sends the PAT score + tier and next step.' },
   {
     id: 'demo', icon: MdEventAvailable, event: 'Demo booked', when: 'On booking', template: null,
-    desc: 'Confirms the demo — online or in-facility.',
+    desc: 'Confirms the demo - online or in-facility.',
     sources: [
       { label: 'Online demo', template: 'windchasers_demo_online_v2', desc: 'Confirmation + Add-to-Calendar; Meet link follows before the session.' },
       { label: 'Offline demo', template: 'windchasers_demo_offline_v2', desc: 'In-facility confirmation with date/time.' },
@@ -84,7 +84,7 @@ const WINDCHASERS_TRIGGERS: Trigger[] = [
       { label: 'Parent', template: 'windchasers_webinar_confirm_parents_v1', desc: 'Parent-voiced webinar confirmation.' },
     ],
   },
-  { id: 'missed', icon: MdPhoneMissed, event: 'Voice call — no answer', when: '30 min after', template: null, desc: 'Kicks off the “No response / cold” sequence below.' },
+  { id: 'missed', icon: MdPhoneMissed, event: 'Voice call - no answer', when: '30 min after', template: null, desc: 'Kicks off the “No response / cold” sequence below.' },
 ]
 
 const WINDCHASERS_SEQUENCES: Sequence[] = [

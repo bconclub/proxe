@@ -1,11 +1,11 @@
 'use client'
 
 /**
- * NotificationCenter — "what's new" only.
+ * NotificationCenter - "what's new" only.
  *
  * The bell now carries EXACTLY one thing: product updates (curated in
  * @/lib/product-updates) with their version numbers. No lead activity, no
- * toasts, no sounds — founder call 2026-07-10: "notification should be all the
+ * toasts, no sounds - founder call 2026-07-10: "notification should be all the
  * new updates with version numbering. That's the only thing it has to do."
  * (The old lead-stage feed lives on in git history if we ever want it back.)
  *
@@ -77,7 +77,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
 
   return (
     <>
-      {/* Bell — inline in the top bar (or fixed for legacy floating layouts). */}
+      {/* Bell - inline in the top bar (or fixed for legacy floating layouts). */}
       <button
         onClick={openDrawer}
         className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
@@ -111,7 +111,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
             style={{ backgroundColor: 'rgba(0,0,0,0.45)', animation: 'wc-fade-in 160ms ease' }}
             onClick={() => setOpen(false)}
           />
-          {/* Panel — full-height, right side */}
+          {/* Panel - full-height, right side */}
           <div
             className="absolute top-0 right-0 h-full flex flex-col shadow-2xl"
             style={{

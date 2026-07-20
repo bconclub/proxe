@@ -12,7 +12,7 @@ export async function POST(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -22,7 +22,7 @@ export async function POST(
 
     // The lead modal computes the user-visible score client-side (message-aware
     // calculateLeadScore) and sends it here. We persist THAT value so the stored
-    // lead_score — and therefore the dashboard's Avg Lead Score — matches exactly
+    // lead_score - and therefore the dashboard's Avg Lead Score - matches exactly
     // what the user sees per lead, instead of the divergent SQL RPC value.
     const body = await request.json().catch(() => ({} as any))
     const clientScore =

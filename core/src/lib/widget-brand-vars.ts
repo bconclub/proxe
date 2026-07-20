@@ -7,7 +7,7 @@ import type { BrandConfig } from '@/configs/types';
  * fallbacks). Opt-in via styles.colorVarsFromConfig so brands that already
  * have hand-tuned theme.css blocks keep their exact rendering.
  *
- * Only call on widget-only pages (/widget, /widget/bubble) — the vars are set
+ * Only call on widget-only pages (/widget, /widget/bubble) - the vars are set
  * inline on <html>, which would override dashboard theme switching elsewhere.
  */
 const VAR_MAP: [cssVar: string, key: keyof BrandConfig['colors']][] = [
@@ -31,7 +31,7 @@ const VAR_MAP: [cssVar: string, key: keyof BrandConfig['colors']][] = [
   ['--bubble-ai-shadow', 'bubbleAiShadow'],
   ['--button-bg', 'buttonBg'],
   ['--button-hover', 'buttonHover'],
-  // Closed-bubble chrome (ring + glow + backdrop) — otherwise hardcoded gold.
+  // Closed-bubble chrome (ring + glow + backdrop) - otherwise hardcoded gold.
   ['--bubble-ring', 'primaryVibrant'],
   ['--bubble-ring-glow', 'borderGlow'],
   ['--bubble-bg', 'darkBg'],

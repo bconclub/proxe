@@ -1,4 +1,4 @@
-// LEADER API — emerging issues: which grievances are trending, where.
+// LEADER API - emerging issues: which grievances are trending, where.
 // Auth: x-api-key = LEADER_API_KEY.
 
 import { NextRequest } from 'next/server';

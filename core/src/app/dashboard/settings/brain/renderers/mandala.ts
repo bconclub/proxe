@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Mandala — a HUD of concentric orbital rings around a dense particle core.
+// Mandala - a HUD of concentric orbital rings around a dense particle core.
 //
 // Four slow counter-rotating rings carry node dots, dashes and tick marks; a
 // full-width horizontal energy beam runs through the center and renders the
 // live waveform while the brain speaks. The outermost ring doubles as the
-// thinking progress arc. Rigid chrome — no ripples; taps still engage().
+// thinking progress arc. Rigid chrome - no ripples; taps still engage().
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CreateRenderer } from './types'
@@ -82,7 +82,7 @@ export const createMandala: CreateRenderer = (canvas, env) => {
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
       }
     } else {
-      // idle shimmer: a barely-breathing flat line (90 fixed segments — a
+      // idle shimmer: a barely-breathing flat line (90 fixed segments - a
       // computed step of w/90 would spin forever on a 0-width canvas)
       for (let i = 0; i <= 90; i++) {
         const x = (i / 90) * w
@@ -134,7 +134,7 @@ export const createMandala: CreateRenderer = (canvas, env) => {
       ctx.restore()
     }
 
-    // crosshair spokes — vertical axis line, quieter than the beam
+    // crosshair spokes - vertical axis line, quieter than the beam
     const vg = ctx.createLinearGradient(cx, cy - R * 2.2, cx, cy + R * 2.2)
     vg.addColorStop(0, `rgba(${ar},${ag},${ab},0)`)
     vg.addColorStop(0.5, `rgba(${ar},${ag},${ab},${0.06 + think * 0.05})`)

@@ -1,4 +1,4 @@
-// WAR ROOM AI SUMMARY — one-paragraph command-center readout, on demand.
+// WAR ROOM AI SUMMARY - one-paragraph command-center readout, on demand.
 //
 //   GET  → cached { summary, generatedAt } from dashboard_settings
 //   POST → regenerate: aggregate the war-room numbers → generateResponse
@@ -84,7 +84,7 @@ export async function POST(_req: NextRequest) {
       openDirectives: (recos || []).map((r) => r.title),
     };
 
-    const system = `You are the Pulse of Punjab WAR ROOM analyst. Write a crisp daily command-center summary for campaign directors from the JSON snapshot. 4-6 sentences, plain language, numbers included. Cover: capture volume + momentum, the dominant issues, where support stands (lean + intensity ladder: voter→supporter→volunteer→cadre), anything that needs attention (crisis signals, open directives, weak loop health). No preamble, no markdown headers — just the paragraph.`;
+    const system = `You are the Pulse of Punjab WAR ROOM analyst. Write a crisp daily command-center summary for campaign directors from the JSON snapshot. 4-6 sentences, plain language, numbers included. Cover: capture volume + momentum, the dominant issues, where support stands (lean + intensity ladder: voter→supporter→volunteer→cadre), anything that needs attention (crisis signals, open directives, weak loop health). No preamble, no markdown headers - just the paragraph.`;
 
     const summary = await generateResponse(system, JSON.stringify(snapshot), 1200, MODEL, 'brain');
     const value = { summary, generatedAt: new Date().toISOString() };

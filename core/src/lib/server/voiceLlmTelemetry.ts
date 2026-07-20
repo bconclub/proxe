@@ -1,7 +1,7 @@
 import { getJson, setJsonWithTtl } from './redis';
 
 // Per-turn latency for the V1/V2 custom-LLM bridge (Vapi/ElevenLabs -> Groq).
-// Separate, small store from voice_sessions telemetry — keyed by call id, one
+// Separate, small store from voice_sessions telemetry - keyed by call id, one
 // list of turn timings, short TTL since it's only for the dashboard bench.
 const TTL_SECONDS = 60 * 60 * 24; // 1 day
 

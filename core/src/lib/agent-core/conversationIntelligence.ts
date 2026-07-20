@@ -3,7 +3,7 @@
  *
  * AI-based intent / profile extraction from conversation history.
  * Used by the WhatsApp Meta webhook + web chat postProcess + an admin
- * backfill route — keyword matching alone misses too many casual messages
+ * backfill route - keyword matching alone misses too many casual messages
  * ("I wanna fly planes" doesn't trip "pilot").
  *
  * Cheap to run: Claude Haiku, ~$0.0001 per extraction.
@@ -100,7 +100,7 @@ export async function extractProfileFromConversation(
 
   // Format conversation for the classifier
   const transcript = history
-    .slice(-30) // Last 30 messages — plenty of context, caps token cost
+    .slice(-30) // Last 30 messages - plenty of context, caps token cost
     .map((m) => `${m.role === 'user' ? 'Customer' : 'Counsellor'}: ${m.content}`)
     .join('\n');
 
@@ -190,7 +190,7 @@ export function mergeProfile(
   for (const [key, value] of Object.entries(next)) {
     // full_name is handled separately at the call site (promoted to
     // customer_name when the stored name is garbled). Don't store it inside
-    // the brand context — that would create a confusing duplicate.
+    // the brand context - that would create a confusing duplicate.
     if (key === 'full_name') continue;
     if (value !== null && value !== undefined && value !== '') {
       merged[key] = value;

@@ -1,6 +1,6 @@
 'use client';
 
-// Notifications & Sounds — master mute + per-event toggles. Extracted from the
+// Notifications & Sounds - master mute + per-event toggles. Extracted from the
 // old single-scroll settings page when Configure became a card grid.
 
 import { useState, useEffect } from 'react';
@@ -69,7 +69,7 @@ export default function NotificationsPage() {
             <div>
               <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>All notification sounds</h3>
               <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                {soundMuted ? 'Muted — no sounds will play' : 'On — events below play their sound'}
+                {soundMuted ? 'Muted - no sounds will play' : 'On - events below play their sound'}
               </p>
             </div>
             <button

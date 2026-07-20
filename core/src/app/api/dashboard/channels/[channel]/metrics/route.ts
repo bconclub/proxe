@@ -10,7 +10,7 @@ export async function GET(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

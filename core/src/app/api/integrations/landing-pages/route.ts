@@ -155,7 +155,7 @@ export async function POST(request: NextRequest) {
       lead_id: leadId,
       channel: 'landing_page',
       sender: 'customer',
-      content: `Landing page enquiry${course_interest ? ` — ${course_interest}` : ''}${form_name ? ` (${form_name})` : ''}`,
+      content: `Landing page enquiry${course_interest ? ` - ${course_interest}` : ''}${form_name ? ` (${form_name})` : ''}`,
       message_type: 'text',
       metadata: { page_url, form_name, utm_source, utm_medium, utm_campaign },
     })

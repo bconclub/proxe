@@ -1,5 +1,5 @@
 /**
- * Log-call CHAT — one turn of the post-call conversation with PROXe.
+ * Log-call CHAT - one turn of the post-call conversation with PROXe.
  *
  * The human logged a call; instead of a static suggestion + button grid, they
  * talk to PROXe. Each turn: rebuild the lead's context server-side, one LLM

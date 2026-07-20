@@ -1,7 +1,7 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TeamMessagesView — the Eval bench for messages that go to the TEAM (Slack),
+// TeamMessagesView - the Eval bench for messages that go to the TEAM (Slack),
 // not the lead. Every Slack alert PROXe can raise, by type, with the trigger
 // that fires it and a preview of the card the team sees in #<brand>-proxe.
 // Mirrors core/src/lib/services/slackNotifier.ts (notifySlackLead / Booking).
@@ -35,7 +35,7 @@ const ALL_MESSAGES: TeamMsg[] = [
   {
     id: 'needs_human',
     title: 'Needs human follow-up',
-    when: 'A lead asks to reach the team / a human ("talk to the team", "connect with the team"), or the AI has nothing to say (empty response) — the lead is flagged and a task is created.',
+    when: 'A lead asks to reach the team / a human ("talk to the team", "connect with the team"), or the AI has nothing to say (empty response) - the lead is flagged and a task is created.',
     who: 'Priya Nair', type: null,
     detail: 'Asked to speak with the team to move things forward.',
     fields: [['Phone', '+91 98xxxxxx12'], ['Channel', 'whatsapp']],
@@ -44,16 +44,16 @@ const ALL_MESSAGES: TeamMsg[] = [
   {
     id: 'scout_support',
     title: 'Scout support request',
-    when: 'A scout reports a problem — payout not received, KYC stuck, can’t upload, login issue. Scouts never book calls, so this is the only escalation path.',
+    when: 'A scout reports a problem - payout not received, KYC stuck, can’t upload, login issue. Scouts never book calls, so this is the only escalation path.',
     who: 'Mr. Kannadiga', type: 'Scout',
-    detail: 'Payout not received — asked 3+ times ("not received yet", "I need my payment").',
+    detail: 'Payout not received - asked 3+ times ("not received yet", "I need my payment").',
     fields: [['Phone', '+91 90xxxxxx60'], ['Channel', 'whatsapp']],
     footer: 'scout support · reach out on the number above', action: 'View lead in dashboard',
   },
   {
     id: 'payment',
     title: 'Payment / transaction issue',
-    when: 'A lead reports a money problem — "amount debited but failed", "refund not received", "not credited". Never becomes a booking.',
+    when: 'A lead reports a money problem - "amount debited but failed", "refund not received", "not credited". Never becomes a booking.',
     who: 'Arjun Rao', type: null,
     detail: 'Paid but the amount was debited and it did not go through.',
     fields: [['Phone', '+91 99xxxxxx07'], ['Channel', 'web']],
@@ -69,7 +69,7 @@ const ALL_MESSAGES: TeamMsg[] = [
     footer: null, action: null,
   },
 ]
-// Scout support is a Lokazen-only alert type — drop it for non-scout brands.
+// Scout support is a Lokazen-only alert type - drop it for non-scout brands.
 const MESSAGES: TeamMsg[] = ALL_MESSAGES.filter((m) => m.id !== 'scout_support' || SCOUTS_ON)
 
 function SlackCard({ m }: { m: TeamMsg }) {
@@ -109,7 +109,7 @@ export default function TeamMessagesView() {
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 18px 24px' }}>
       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', maxWidth: 620, marginBottom: 16 }}>
-        Every alert PROXe raises to the <b style={{ color: 'var(--text-primary)' }}>team</b> (posted to your Slack channel) — the
+        Every alert PROXe raises to the <b style={{ color: 'var(--text-primary)' }}>team</b> (posted to your Slack channel) - the
         trigger that fires it and the card the team sees. These fire inline on the
         message; a matching <b style={{ color: 'var(--text-primary)' }}>task</b> is created for each so nothing is missed.
       </p>

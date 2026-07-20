@@ -5,12 +5,12 @@
  * Webinar registrants (unified_context.windchasers.lead_type = 'webinar',
  * tagged by /api/agent/leads/inbound from the Zoom → Pabbly registration
  * feed) get two WhatsApp reminders before their webinar_date:
- *   • ~24h before (window 20–28h)  → "tomorrow at <time>"
- *   • ~2h before  (window 1–4h)   → "in about 2 hours"
+ *   • ~24h before (window 20-28h)  → "tomorrow at <time>"
+ *   • ~2h before  (window 1-4h)   → "in about 2 hours"
  *
  * Idempotent via per-step markers on the lead's context
  * (webinar_reminder_24h_sent / webinar_reminder_2h_sent), so the schedule
- * cadence is forgiving — run hourly.
+ * cadence is forgiving - run hourly.
  *
  * Schedule this URL in the same external scheduler that hits
  * /api/cron/booking-reminders (Bearer CRON_SECRET), hourly.
@@ -34,7 +34,7 @@ const LIVE_TEMPLATE = 'windchasers_webinar_live_now_v3'
 /**
  * Parse the stored webinar_date into epoch ms. Pabbly/registration sends it as
  * a human label ("18 July 2026 at 11:30 AM IST"), which `new Date()` cannot
- * parse — so the cron was skipping every registrant. Fall back to a manual
+ * parse - so the cron was skipping every registrant. Fall back to a manual
  * parse (treated as IST, UTC+5:30). Returns NaN if genuinely unparseable.
  */
 function parseWebinarDateMs(raw: string): number {
@@ -109,13 +109,13 @@ export async function GET(req: NextRequest) {
       const startsAt = parseWebinarDateMs(rawDate)
       if (isNaN(startsAt)) { results.skipped++; continue }   // genuinely unparseable
       const hoursUntil = (startsAt - now) / 3_600_000
-      // Skip only once well past the start — the "live now" step still fires for a
+      // Skip only once well past the start - the "live now" step still fires for a
       // short window AFTER the webinar begins (hoursUntil goes slightly negative).
       if (hoursUntil <= -0.6) { results.skipped++; continue }
 
       // Zoom-registered leads hold a personal join link → they get the pre-webinar
       // reminders below. Leads who only gave name+phone (no join link) never
-      // finished registration, so a "webinar tomorrow" reminder would be wrong —
+      // finished registration, so a "webinar tomorrow" reminder would be wrong -
       // they instead get a one-time "complete your registration" nudge while
       // there's still time to sign up.
       const registered = !!(wc.zoom_registered || wc.zoom_join_url)
@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
           }
           const dfn = (lead.customer_name || 'there').split(' ')[0]
           const tpl = dayStep === 'live' ? LIVE_TEMPLATE : STARTING_SOON_TEMPLATE
-          // Log the EXACT approved template (clean body + button), not a stub — so
+          // Log the EXACT approved template (clean body + button), not a stub - so
           // the inbox shows what the lead actually received (join link is in the
           // button, never inline). joinUrl stays out of the body by design.
           const rendered = renderWaTemplate(tpl, { customer_name: dfn, webinar_name: webinarName || 'our webinar' })
@@ -221,7 +221,7 @@ export async function GET(req: NextRequest) {
       if (!result.success) {
         results.errors++
         log.push(`lead=${lead.id} step=${step} send failed: ${result.error}`)
-        // No marker on failure — retried next run (e.g. once Meta approves the template).
+        // No marker on failure - retried next run (e.g. once Meta approves the template).
         continue
       }
 

@@ -69,18 +69,18 @@ export function resolveModel(configured?: string | null): string {
   const raw = (configured || '').trim();
   if (!raw) return DEFAULT_MODEL;
   if (RETIRED_MODEL_MAP[raw]) {
-    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is retired — using "${RETIRED_MODEL_MAP[raw]}". Update the env var.`);
+    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is retired - using "${RETIRED_MODEL_MAP[raw]}". Update the env var.`);
     return RETIRED_MODEL_MAP[raw];
   }
-  // Already a canonical id — trust it as-is.
+  // Already a canonical id - trust it as-is.
   if (/^claude-/i.test(raw)) return raw;
   const norm = raw.toLowerCase().replace(/[\s_]+/g, '-');
   if (MODEL_ALIAS_MAP[norm]) {
-    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a valid model ID — using "${MODEL_ALIAS_MAP[norm]}". Set CLAUDE_MODEL to a canonical claude-* id.`);
+    console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a valid model ID - using "${MODEL_ALIAS_MAP[norm]}". Set CLAUDE_MODEL to a canonical claude-* id.`);
     return MODEL_ALIAS_MAP[norm];
   }
   // Unknown alias: best-effort prefix so it at least reaches the API as a claude-* id.
-  console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a recognized alias — trying "claude-${norm}".`);
+  console.warn(`[ClaudeClient] CLAUDE_MODEL="${raw}" is not a recognized alias - trying "claude-${norm}".`);
   return `claude-${norm}`;
 }
 
@@ -90,8 +90,8 @@ function getModel(): string {
 
 // Model for the actual CONVERSATION (the part that needs reasoning). Sonnet 5
 // by default so chat replies reason well; override with CLAUDE_MODEL_REASONING.
-// The cheap helpers — quick-reply buttons (generateShort), summaries, profile
-// extraction — deliberately stay on getModel() (Haiku) to keep token spend down.
+// The cheap helpers - quick-reply buttons (generateShort), summaries, profile
+// extraction - deliberately stay on getModel() (Haiku) to keep token spend down.
 // Currently used only by the Lokazen-gated non-streaming web path in engine.ts.
 export function getReasoningModel(): string {
   return resolveModel(process.env.CLAUDE_MODEL_REASONING || 'claude-sonnet-5');
@@ -175,7 +175,7 @@ export async function* streamResponse(
       }
     }
   } finally {
-    // Fires even if the consumer stops early — best-effort metering.
+    // Fires even if the consumer stops early - best-effort metering.
     await recordTokenUsage('chat', model, tuInput, tuOutput, tuCacheRead, tuCacheWrite);
   }
 }
@@ -226,7 +226,7 @@ export async function generateResponseDetailed(
       const usage: CallUsage = { model, input, output, cacheRead, cacheWrite };
 
       // Find the first TEXT block. Newer models can lead with a NON-text block
-      // (e.g. a thinking block), so content[0] isn't reliably the text — reading
+      // (e.g. a thinking block), so content[0] isn't reliably the text - reading
       // only content[0] made EVERY reply come back empty whenever the model led
       // with one, which the engine then papered over with a canned "flagged to
       // the team" fallback (the "same message 4 times" bug). Scan for text.

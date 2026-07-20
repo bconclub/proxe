@@ -1,9 +1,9 @@
-// LEADER API — MLA/constituency performance, derived from OUR OWN data
+// LEADER API - MLA/constituency performance, derived from OUR OWN data
 // (user decision: no external MLA dataset). Composite per seat:
-//   resolution — grievance loop health (resolved / raised)
-//   mood       — 7d lean shift vs previous 7d
-//   growth     — volunteer (tier-3+) additions in the last 14d
-// Score = weighted blend, 0-100. Directional tool, not a judgement — the
+//   resolution - grievance loop health (resolved / raised)
+//   mood       - 7d lean shift vs previous 7d
+//   growth     - volunteer (tier-3+) additions in the last 14d
+// Score = weighted blend, 0-100. Directional tool, not a judgement - the
 // inputs are only what flows through PROXe.
 // Auth: x-api-key = LEADER_API_KEY.
 
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     return corsJson({
       seats,
-      method: 'score = 0.5*resolution% + 0.25*(50+moodShiftPp) + 0.25*min(100, volGrowth14d*10) — derived from PROXe data only',
+      method: 'score = 0.5*resolution% + 0.25*(50+moodShiftPp) + 0.25*min(100, volGrowth14d*10) - derived from PROXe data only',
     });
   } catch (e) {
     console.error('[leader/performance]', (e as Error).message);

@@ -434,7 +434,7 @@ export default function ListenPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
               {sources.map((s) => (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-primary)', border: '1px solid var(--border-primary)', borderRadius: 8, padding: '8px 10px', opacity: s.active ? 1 : 0.55 }}>
-                  <span onClick={() => toggleSource(s)} title={s.active ? 'Active — click to pause' : 'Paused — click to activate'} style={{ width: 9, height: 9, borderRadius: 9, background: s.active ? '#22c55e' : 'var(--text-muted)', flexShrink: 0, cursor: 'pointer' }} />
+                  <span onClick={() => toggleSource(s)} title={s.active ? 'Active - click to pause' : 'Paused - click to activate'} style={{ width: 9, height: 9, borderRadius: 9, background: s.active ? '#22c55e' : 'var(--text-muted)', flexShrink: 0, cursor: 'pointer' }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</div>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>

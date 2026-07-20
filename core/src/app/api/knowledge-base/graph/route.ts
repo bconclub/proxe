@@ -10,8 +10,8 @@ import { getBrainConfig } from '@/lib/brain/brainConfig'
 /**
  * GET /api/knowledge-base/graph
  *
- * Read-only inventory of EVERYTHING the agent "knows" — the uploaded knowledge
- * base PLUS every prompt across the system — assembled into a { nodes, links }
+ * Read-only inventory of EVERYTHING the agent "knows" - the uploaded knowledge
+ * base PLUS every prompt across the system - assembled into a { nodes, links }
  * graph for the Knowledge Base highlight view. Brand-neutral: all content comes
  * from the active brand's files / config / DB, nothing hardcoded per brand.
  *

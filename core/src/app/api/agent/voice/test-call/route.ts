@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/services';
 import { ensureOrUpdateLead } from '@/lib/services/leadManager';
 // POP grievance voice prompts per starting language (pa/hi/en). Resolved from the
-// ONE core place — the dashboard-editable override in dashboard_settings, falling
+// ONE core place - the dashboard-editable override in dashboard_settings, falling
 // back to the brand file defaults. Overriding the Vapi prompt + opening per call
 // (below) carries the edited prompt onto the LIVE assistant without touching the
 // API-managed golden config, and lets us dial the same number in any language.
@@ -12,7 +12,7 @@ import { resolveVoicePrompt } from '@/lib/server/voicePromptConfig';
 
 // Two outbound flavors, picked per brand:
 //
-// VAPI (bcon, pop — the voice-enabled brands): calls are ORIGINATED by Vapi
+// VAPI (bcon, pop - the voice-enabled brands): calls are ORIGINATED by Vapi
 // (Vapi -> VoBiz BYO trunk -> PSTN), NOT by the VoBiz Call API. This is the only
 // path that carries lead context: the old VoBiz->Vapi bridge drops all custom SIP
 // headers, so the agent never saw the name. Originating from Vapi lets us pass
@@ -23,7 +23,7 @@ import { resolveVoicePrompt } from '@/lib/server/voicePromptConfig';
 // default to the live BCON outbound number (on the VoBiz "Vapi Outbound" trunk
 // credential, outboundLeadingPlusEnabled MUST be false) and the PROXe assistant.
 //
-// VOBIZ (lokazen, windchasers — voice currently off): legacy direct VoBiz Call API
+// VOBIZ (lokazen, windchasers - voice currently off): legacy direct VoBiz Call API
 // with the /answer webhook. Kept as-is for fork parity until those brands move.
 
 const VAPI_BRANDS = ['bcon', 'pop'];
@@ -35,7 +35,7 @@ const VAPI_ASSISTANT_ID =
 
 // ElevenLabs end-to-end telephony (POP A/B). The agent "Grievance PUNJAB" dials
 // out over the SAME Vobiz trunk as Vapi (a dedicated `elevenlabs-pop` SIP
-// credential), so it's the same number/caller — only the brain differs. Lets us
+// credential), so it's the same number/caller - only the brain differs. Lets us
 // compare 11labs' own STT+LLM+TTS+turn-taking against the Vapi pipeline.
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
 const ELEVENLABS_PHONE_NUMBER_ID = process.env.ELEVENLABS_PHONE_NUMBER_ID;
@@ -49,7 +49,7 @@ async function vapiTestCall(body: any) {
   // so (a) the no-repeat guardrail is always on and (b) the same number can be
   // dialed in any language. Other brands keep their own assistant prompt.
   const name = (contactName || leadName || '').trim();
-  // POP grievance calls have NO business concept — ignore any businessName the
+  // POP grievance calls have NO business concept - ignore any businessName the
   // client sends (a stale form defaulted it to the brand name, which then leaked
   // into the greeting and named leads "Pulse of Punjab"). Other brands keep it.
   const business = BRAND_ID === 'pop' ? '' : (businessName || '').trim();
@@ -57,7 +57,7 @@ async function vapiTestCall(body: any) {
   // ("Hi, is this Thanzeel?" vs "Hi, is this AB Developers?"). When there's no
   // person, vh-contactname stays empty so the agent asks to be put through.
   //
-  // POP grievance calls dial constituents whose name is often UNKNOWN — a bare
+  // POP grievance calls dial constituents whose name is often UNKNOWN - a bare
   // number must still call. Empty vh-greetingname/vh-contactname tell the
   // grievance agent to introduce itself and ask who it's speaking with. The
   // name requirement stays for bcon's B2B flow, where a nameless cold call is
@@ -86,7 +86,7 @@ async function vapiTestCall(body: any) {
   const last10 = digits.slice(-10);
   const e164 = digits.length === 12 && digits.startsWith('91') ? `+${digits}` : `+91${last10}`;
 
-  // Current India/IST time so the agent books realistic slots (11 AM–5 PM, not now,
+  // Current India/IST time so the agent books realistic slots (11 AM-5 PM, not now,
   // after-hours -> next day). Passed as the {{vh-now}} prompt variable.
   const istNow = new Intl.DateTimeFormat('en-IN', {
     timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'short',
@@ -94,14 +94,14 @@ async function vapiTestCall(body: any) {
   }).format(new Date());
 
   // POP's grievance agent GREETS in Punjabi, but its base transcriber on Vapi is
-  // English-only (deepgram flux-general-en) — so constituent replies come back as
+  // English-only (deepgram flux-general-en) - so constituent replies come back as
   // garbage and the agent loops its opening. Override the transcriber per-call
   // (never touching the shared Vapi assistant) to a Punjabi-capable model. All
   // three knobs are env-tunable so the provider/language can be swapped without a
   // code change if accuracy needs work. POP only; other brands keep their config.
   // Transcriber override is OPT-IN: only when VAPI_POP_TRANSCRIBER_PROVIDER is
   // explicitly set. Default = no override, so the POP Grievance assistant's OWN
-  // transcriber (set in the Vapi dashboard) wins — that assistant is POP-dedicated,
+  // transcriber (set in the Vapi dashboard) wins - that assistant is POP-dedicated,
   // so tuning it in Vapi is the clean home for this, and an unconditional code
   // override would otherwise silently mask whatever's picked in the dashboard.
   // Transcriber language follows the selected call language (pa-IN/hi-IN/en-IN)
@@ -119,7 +119,7 @@ async function vapiTestCall(body: any) {
         }
       : null;
 
-  // A `model` override in Vapi is NOT deep-merged — it's validated standalone and
+  // A `model` override in Vapi is NOT deep-merged - it's validated standalone and
   // REQUIRES provider (else: "model.provider must be one of …"). So to swap only
   // the system prompt per language we must carry the assistant's real model
   // config (provider/model/temperature/tools) and replace just its messages.
@@ -185,7 +185,7 @@ async function vapiTestCall(body: any) {
               }
             : {}),
           // Per-language prompt + opening. Deep-merged by Vapi, so only the
-          // system message + first line change — provider/model/voice stay as
+          // system message + first line change - provider/model/voice stay as
           // configured on the assistant. This is where the no-repeat guardrail
           // lands on every live call.
           ...(voicePrompt
@@ -193,7 +193,7 @@ async function vapiTestCall(body: any) {
                 firstMessage: voicePrompt.firstMessage,
                 ...(modelOverride ? { model: modelOverride } : {}),
                 // Voice: keep the assistant's NATIVE voice (Monika + eleven_v3)
-                // — that's the V1 sound that worked. Only override if the env
+                // - that's the V1 sound that worked. Only override if the env
                 // explicitly asks for a different model (opt-in, not default), so
                 // the earlier flash_v2_5 experiment can't quietly change V1.
                 ...(process.env.VAPI_POP_TTS_MODEL
@@ -217,7 +217,7 @@ async function vapiTestCall(body: any) {
         },
         customer: { number: e164 },
         // Record the DIALED language so the eval can compare pa/hi/en latency
-        // (authoritative — beats post-call extraction which is often empty).
+        // (authoritative - beats post-call extraction which is often empty).
         ...(voiceLang ? { metadata: { language: voiceLang } } : {}),
       }),
     });
@@ -229,7 +229,7 @@ async function vapiTestCall(body: any) {
 
     const callId: string | null = data?.id || null;
 
-    // Persist the call NOW, at initiation — so it shows up in the Calls list with
+    // Persist the call NOW, at initiation - so it shows up in the Calls list with
     // the real contact (name + number) instead of "Unknown caller", and carries a
     // lead_id for the transcript/recording join. The Vapi webhook later ENRICHES
     // this same row (keyed on external_session_id) without clobbering these fields.
@@ -252,7 +252,7 @@ async function vapiTestCall(body: any) {
             call_status: 'queued',
             brand: BRAND_ID,
             // Store the dialed language so the Calls list can show it (no
-            // dedicated column — channel_data is jsonb and otherwise unused).
+            // dedicated column - channel_data is jsonb and otherwise unused).
             ...(voiceLang ? { channel_data: { language: voiceLang } } : {}),
             updated_at: new Date().toISOString(),
           };
@@ -263,7 +263,7 @@ async function vapiTestCall(body: any) {
             .eq('external_session_id', callId)
             .maybeSingle();
 
-          // Supabase does NOT throw on write errors — it returns { error }. These
+          // Supabase does NOT throw on write errors - it returns { error }. These
           // were previously unchecked, so a failing insert vanished silently (no
           // row, no log) and the call never appeared in the dashboard.
           if (existing?.id) {
@@ -276,7 +276,7 @@ async function vapiTestCall(body: any) {
             if (insErr) console.error('[test-call] voice_sessions insert failed:', insErr.message, insErr.details || '');
           }
         } else {
-          console.error('[test-call] getServiceClient() returned null — no service key at runtime');
+          console.error('[test-call] getServiceClient() returned null - no service key at runtime');
         }
       } catch (e: any) {
         console.error('[test-call] failed to persist lead/session (non-fatal):', e?.message);
@@ -343,7 +343,7 @@ async function elevenLabsTestCall(body: any) {
   const name = (contactName || leadName || '').trim();
 
   // POP: drive the ElevenLabs agent in the SELECTED language with the SAME
-  // one-core-place prompt (the agent otherwise runs its hardcoded pa default —
+  // one-core-place prompt (the agent otherwise runs its hardcoded pa default -
   // why V2 Hindi didn't work). Per-call overrides were enabled on the agent.
   // Name-aware: greet by name + skip asking if we know who we're calling.
   const vpBase = BRAND_ID === 'pop' ? await resolveVoicePrompt(body.language) : null;
@@ -380,7 +380,7 @@ async function elevenLabsTestCall(body: any) {
       data?.conversation_id || data?.callSid || data?.call_sid || data?.sip_call_id || null;
 
     // Best-effort persist so the call surfaces in the Calls list, tagged as the
-    // 11labs engine (call_summary marker — no schema change needed for the A/B).
+    // 11labs engine (call_summary marker - no schema change needed for the A/B).
     if (callId) {
       try {
         const supabase = getServiceClient();
@@ -411,7 +411,7 @@ async function elevenLabsTestCall(body: any) {
   }
 }
 
-// V3 (POP A/B): dial through the Sarvam pipeline — Vobiz's own <Stream> forwards
+// V3 (POP A/B): dial through the Sarvam pipeline - Vobiz's own <Stream> forwards
 // the call audio to our Pipecat+Sarvam server (STT+LLM+TTS), same trunk/number.
 // This route just proxies to the pipeline's /start (server-side → no browser CORS).
 // V3_PIPELINE_URL points at the running pipeline (localhost:8080 in local dev; the
@@ -445,7 +445,7 @@ async function sarvamPipelineCall(body: any) {
     try { const vb = JSON.parse(data.body); callId = vb.request_uuid || vb.api_id || callId; } catch { /* keep synth id */ }
 
     // Best-effort persist so the call surfaces in the Calls list + the eval's
-    // caller-name join works — mirrors the 11labs path, tagged engine:sarvam.
+    // caller-name join works - mirrors the 11labs path, tagged engine:sarvam.
     try {
       const supabase = getServiceClient();
       if (supabase) {
@@ -471,7 +471,7 @@ async function sarvamPipelineCall(body: any) {
     }
     return NextResponse.json({ success: true, callId, engine: 'sarvam' });
   } catch {
-    return NextResponse.json({ success: false, error: `V3 pipeline unreachable at ${url} — is the pipeline server running?` }, { status: 502 });
+    return NextResponse.json({ success: false, error: `V3 pipeline unreachable at ${url} - is the pipeline server running?` }, { status: 502 });
   }
 }
 

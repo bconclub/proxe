@@ -1,12 +1,12 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EvalTabs — the Eval surface, split into benches:
-//   Communications — the CORE COMMUNICATIONS checklist: every message the agent
+// EvalTabs - the Eval surface, split into benches:
+//   Communications - the CORE COMMUNICATIONS checklist: every message the agent
 //                    must handle autonomously, filled or missing (CommunicationsView)
-//   Messaging — every WhatsApp message a lead can receive, by permutation (EvalView)
-//   Team      — every Slack alert PROXe raises to the team, by trigger (TeamMessagesView)
-//   Calls     — every voice call measured: latency, turns, wait, cost (CallsView)
+//   Messaging - every WhatsApp message a lead can receive, by permutation (EvalView)
+//   Team      - every Slack alert PROXe raises to the team, by trigger (TeamMessagesView)
+//   Calls     - every voice call measured: latency, turns, wait, cost (CallsView)
 // Communications shows only for brands with brain.communications; Messaging only
 // when evalJourneys !== 'none' (the journeys benches carry BCON/POP content and
 // must never render on other brands). A light segmented switcher sits above.

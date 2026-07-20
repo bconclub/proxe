@@ -1,4 +1,4 @@
-// PROXE LISTEN — digest for the dashboard / comms team (GI/PI, ads, agency).
+// PROXE LISTEN - digest for the dashboard / comms team (GI/PI, ads, agency).
 // Heat score, trending issues, crisis alerts, signal inbox, sentiment-over-time,
 // trending keywords, mood-by-region, and a derived "What PROXe thinks" read.
 // Cookie auth.
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // ── Trending phrases — what is actually being said across the pulled
+    // ── Trending phrases - what is actually being said across the pulled
     // signals right now: 2-3 word n-grams (doc frequency, stopword boundaries),
     // not generic category words. Each carries sentiment, trend vs the prior
     // window, and the dominant issue category underneath it.
@@ -181,7 +181,7 @@ export async function GET(req: NextRequest) {
       .map(([category, count]) => ({ category, count: count as number, prev: p[category] || 0, trend: (count as number) - (p[category] || 0) }))
       .sort((a, b) => b.count - a.count);
 
-    // ── "What PROXe thinks" — deterministic read of the window ──
+    // ── "What PROXe thinks" - deterministic read of the window ──
     const topIssue = trendingIssues[0];
     const hottestSeat = moodBySeat[0];
     const tilt = pos > neg ? 'net positive' : neg > pos * 1.3 ? 'clearly negative' : 'mixed';

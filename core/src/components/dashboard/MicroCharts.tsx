@@ -16,7 +16,7 @@ function heatColor(f: number): string {
   return i >= HEAT_STOPS.length - 1 ? HEAT_STOPS[HEAT_STOPS.length - 1] : hexLerp(HEAT_STOPS[i], HEAT_STOPS[i + 1], x - i)
 }
 
-// Activity heatmap — weekday-aligned (Mon→Sun rows, columns = weeks). Cells map
+// Activity heatmap - weekday-aligned (Mon→Sun rows, columns = weeks). Cells map
 // intensity onto a smooth indigo→pink→orange ramp, glowing at the top end.
 // Cells stretch to fill the card width (clean, even rectangles).
 export function ActivityHeatmap({ data }: { data: Array<{ date: string; count: number }>; color?: string }) {
@@ -85,7 +85,7 @@ export function activityPeaks(data: Array<{ date: string; count: number }>, hour
       const h = parseInt(String(top.time), 10)
       if (Number.isFinite(h)) {
         const to12 = (x: number) => `${((x + 11) % 12) + 1}${x < 12 ? 'AM' : 'PM'}`
-        peakHour = `${to12(h)}–${to12((h + 2) % 24)}`
+        peakHour = `${to12(h)}-${to12((h + 2) % 24)}`
       }
     }
   }
@@ -96,7 +96,7 @@ export function activityPeaks(data: Array<{ date: string; count: number }>, hour
 // The reference layout: 7 weekday rows (Mon→Sun) × 12 two-hour columns. Each
 // cell is the touchpoint count for that weekday+slot over the window, coloured
 // by intensity on the same indigo→pink→orange ramp. This concentrates activity
-// into a real hotspot (evenings) so colour genuinely tracks volume — unlike the
+// into a real hotspot (evenings) so colour genuinely tracks volume - unlike the
 // old weekday×week view where 30 days collapsed into ~5 near-identical columns.
 const to12h = (x: number) => `${((x + 11) % 12) + 1} ${x < 12 ? 'AM' : 'PM'}`
 export function WeekHourHeatmap({ weekHour }: { weekHour: number[][] }) {
@@ -111,7 +111,7 @@ export function WeekHourHeatmap({ weekHour }: { weekHour: number[][] }) {
     return b
   })
   const max = Math.max(1, ...grid.flat())
-  const bucketRange = (b: number) => `${to12h(b * 2)}–${to12h((b * 2 + 2) % 24)}`
+  const bucketRange = (b: number) => `${to12h(b * 2)}-${to12h((b * 2 + 2) % 24)}`
   // Column labels at a few anchor buckets so the axis reads without clutter.
   const axis: Record<number, string> = { 0: '12a', 3: '6a', 6: '12p', 9: '6p' }
 
@@ -164,7 +164,7 @@ export function peaksFromWeekHour(weekHour?: number[][]): { peakDay: string | nu
   weekHour.forEach((h) => h.forEach((v, i) => { byHour[i] += v }))
   let bestB = 0, bestV = -1
   for (let b = 0; b < 12; b++) { const v = (byHour[b * 2] || 0) + (byHour[b * 2 + 1] || 0); if (v > bestV) { bestV = v; bestB = b } }
-  const peakHour = bestV > 0 ? `${to12h(bestB * 2)}–${to12h((bestB * 2 + 2) % 24)}` : null
+  const peakHour = bestV > 0 ? `${to12h(bestB * 2)}-${to12h((bestB * 2 + 2) % 24)}` : null
   return { peakDay, peakHour }
 }
 
@@ -182,7 +182,7 @@ export function Sparkline({ data, color, height = 40, showGradient = false, ampl
   showGradient?: boolean,
   /**
    * How much of the chart height the series' own min→max range should fill
-   * (0–1). At 1 the line spans edge-to-edge; lower values leave headroom.
+   * (0-1). At 1 the line spans edge-to-edge; lower values leave headroom.
    * We default below 1 so peaks read as tall *spikes* with a little breathing
    * room rather than slamming the top edge. Lower this once real volume makes
    * the series naturally full.

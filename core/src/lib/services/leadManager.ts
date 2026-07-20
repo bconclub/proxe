@@ -27,7 +27,7 @@ import { ensureSession, getChannelTable, type Channel } from './sessionManager';
 export function normalizePhone(phone: string | number | null | undefined): string | null {
   if (phone === null || phone === undefined || phone === '') return null;
 
-  // Coerce to string first — inbound payloads (Zoom, Pabbly, some forms) often
+  // Coerce to string first - inbound payloads (Zoom, Pabbly, some forms) often
   // send the phone as a NUMBER, and calling .replace on a number throws
   // "e.replace is not a function".
   const digits = String(phone).replace(/\D/g, '');

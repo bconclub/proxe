@@ -1,7 +1,7 @@
 /**
- * Calls eval — per-call telemetry for the voice agent, straight from Vapi.
+ * Calls eval - per-call telemetry for the voice agent, straight from Vapi.
  *
- * Latency is NOT reconstructed — Vapi hands us the real per-turn split in
+ * Latency is NOT reconstructed - Vapi hands us the real per-turn split in
  * artifact.performanceMetrics: transcriber (STT) · model (LLM) · voice (TTS) ·
  * endpointing (OUR turn-taking config) · transport (network/telephony). That
  * lets the UI answer "who is doing the latency": the providers (outside) vs our
@@ -10,7 +10,7 @@
  * The Vapi list endpoint already carries performanceMetrics for most calls; for
  * the few phone calls where it's trimmed, we fetch the full call (parallel,
  * capped). Web-call rows (dashboard "Talk to Assistant" browser tests) have no
- * number and no latency — tagged source:'web' so the UI can label/hide them.
+ * number and no latency - tagged source:'web' so the UI can label/hide them.
  *
  * Scoped to the brand's own assistant (VAPI_ASSISTANT_ID). Degrades to an empty
  * list (200) when Vapi isn't configured.
@@ -59,7 +59,7 @@ function connectorOf(c: any) {
 // The real latency breakdown, from Vapi's own metrics. Everything in ms.
 // A real conversational turn tops out a few seconds. When the caller goes quiet
 // (or trailing silence after the close), Vapi still logs a "turn" with a 10-20s
-// latency — that's not a response time, it's a person not talking. Exclude those
+// latency - that's not a response time, it's a person not talking. Exclude those
 // so avg/worst reflect real turns, and recompute from the kept turns (Vapi's own
 // averages include the outliers).
 const REAL_TURN_MAX = 8000
@@ -132,10 +132,10 @@ function computeCall(c: any) {
   }
 }
 
-// ── ElevenLabs A/B engine — pulled straight from ElevenLabs' own API so its
+// ── ElevenLabs A/B engine - pulled straight from ElevenLabs' own API so its
 // calls show up no matter where they were placed (app OR the 11labs dashboard).
 // Its conversation transcript carries per-turn latency (ASR / LLM ttfb / TTS
-// ttfb) — the same STT/LLM/Voice split as Vapi, in seconds → we convert to ms.
+// ttfb) - the same STT/LLM/Voice split as Vapi, in seconds → we convert to ms.
 const ELEVEN_BASE = 'https://api.elevenlabs.io/v1/convai'
 const ELEVEN_DETAIL_CAP = 15
 
@@ -152,7 +152,7 @@ function perfFromEleven(detail: any) {
     // comparable-to-Vapi number; the service ttfbs above are just sub-components.
     const s = m.convai_ttf_audio_since_silence ? Math.round(m.convai_ttf_audio_since_silence.elapsed_time * 1000) : 0
     // Component latencies are per-service and live on different turns (ASR on the
-    // caller's turn, LLM/TTS on the agent's) — capture each whenever present, else
+    // caller's turn, LLM/TTS on the agent's) - capture each whenever present, else
     // STT reads 0. Only the turn TOTAL (silence→audio) gets the trailing-silence cap.
     if (a) asr.push(a)
     if (l) llm.push(l)
@@ -166,8 +166,8 @@ function perfFromEleven(detail: any) {
     }
   }
   const avg = (arr: number[]) => (arr.length ? Math.round(arr.reduce((x, y) => x + y, 0) / arr.length) : 0)
-  // transport (network) is NOT exposed by ElevenLabs — it's folded into the
-  // silence→audio measurement, so we report it as null (shown as "—"), not zero.
+  // transport (network) is NOT exposed by ElevenLabs - it's folded into the
+  // silence→audio measurement, so we report it as null (shown as "-"), not zero.
   const stages = { transcriber: avg(asr), model: avg(llm), voice: avg(tts), endpointing: avg(ep), transport: null as number | null }
   const totals = detailRows.map((r) => r.total)
   const turnAvg = avg(sil)
@@ -181,11 +181,11 @@ function perfFromEleven(detail: any) {
   }
 }
 
-// Real per-call connector values, from ElevenLabs' own billing breakdown —
+// Real per-call connector values, from ElevenLabs' own billing breakdown -
 // asr_usage.asr_model and tts_usage.primary_tts_model are always present;
 // the LLM name only appears as a key in charging.llm_usage's model_usage
 // once actual generation happened (a call that disconnects before the model
-// is invoked — e.g. right after the static first message — has an empty
+// is invoked - e.g. right after the static first message - has an empty
 // model_usage, so this can genuinely be null for very short calls).
 function elevenConnector(meta: any): { stt: string | null; model: string | null; tts: string | null } {
   const charging = meta?.charging || {}
@@ -253,9 +253,9 @@ async function fetchElevenCalls(): Promise<any[]> {
   }
 }
 
-// ── V3 — our own pipeline (Vobiz <Stream> → Pipecat: Sarvam STT → Groq LLM →
+// ── V3 - our own pipeline (Vobiz <Stream> → Pipecat: Sarvam STT → Groq LLM →
 // ElevenLabs TTS on the VPS). The pipeline POSTs one telemetry record per call
-// to api/agent/voice/v3-telemetry (Redis) — this reads them back and maps to
+// to api/agent/voice/v3-telemetry (Redis) - this reads them back and maps to
 // the same Call row shape as V1/V2. Costs are pipeline-side estimates from
 // env-configured rates (no provider billing API for a self-hosted stack).
 async function fetchSarvamCalls(): Promise<any[]> {
@@ -362,19 +362,19 @@ export async function GET() {
 
     const calls: any[] = list.map(computeCall)
 
-    // ElevenLabs A/B calls — pulled from ElevenLabs' own API (they never touch the
+    // ElevenLabs A/B calls - pulled from ElevenLabs' own API (they never touch the
     // Vapi API), so they show up wherever they were placed. Merged in with their
     // own per-turn latency.
     const eleven = await fetchElevenCalls()
     calls.push(...eleven)
 
-    // V3 pipeline calls — read back from the Redis telemetry the pipeline ships
+    // V3 pipeline calls - read back from the Redis telemetry the pipeline ships
     // at hangup. Empty when Redis/telemetry isn't configured (soft-degrade).
     const sarvam = await fetchSarvamCalls()
     calls.push(...sarvam)
 
     // Custom-LLM bridge (core/api/agent/voice/custom-llm) routes V1/V2 through
-    // Groq instead of each platform's own model — but the platforms still
+    // Groq instead of each platform's own model - but the platforms still
     // report their OWN name for "model" (Vapi shows whatever the custom-llm
     // config says; ElevenLabs' connector above is hardcoded to '11labs' since
     // its API doesn't expose a distinct custom-LLM identity). Overlay OUR
@@ -392,7 +392,7 @@ export async function GET() {
     } catch { /* soft-fail: falls back to provider-reported model/latency */ }
 
     // Enrich Vapi calls with the caller NAME captured at dial time (voice_sessions
-    // → all_leads). Brand-scoped, soft-fail — names just won't show if it errors.
+    // → all_leads). Brand-scoped, soft-fail - names just won't show if it errors.
     try {
       const supabase = getServiceClient()
       if (supabase) {
@@ -426,8 +426,8 @@ export async function GET() {
     // Aggregate. Totals span both engines; the latency SPLIT is computed PER ENGINE
     // (endpointing/transport are Vapi-only concepts) so Vapi vs 11Labs is comparable.
     // No-answer / zeroed calls are excluded via the turnAvg guard.
-    // null-safe mean — ignores nulls (e.g. ElevenLabs transport) so a not-exposed
-    // stage stays null ("—") instead of poisoning the average with NaN/0.
+    // null-safe mean - ignores nulls (e.g. ElevenLabs transport) so a not-exposed
+    // stage stays null ("-") instead of poisoning the average with NaN/0.
     const mean = (arr: Array<number | null | undefined>) => {
       const xs = arr.filter((x): x is number => typeof x === 'number')
       return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null

@@ -1,6 +1,6 @@
 'use client'
 
-// Configure → Support — every issue the team has reported via the Report
+// Configure → Support - every issue the team has reported via the Report
 // Issue button, with its live status (the HQ vault sync writes status + fix
 // notes back into each report.json, so what shows here is the working truth).
 
@@ -138,7 +138,7 @@ export default function SupportPage() {
             {tab === 'fixed' ? 'Nothing fixed yet' : tab === 'open' ? 'No open reports' : 'No reports yet'}
           </div>
           <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            Use the Report Issue button in the sidebar to flag anything broken — it lands here.
+            Use the Report Issue button in the sidebar to flag anything broken - it lands here.
           </div>
         </div>
       ) : (

@@ -332,7 +332,7 @@ export default function D2DCampaignsTab() {
                         <span style={{ display: 'block', fontSize: 10, color: MUT, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.boothName}</span>
                       </td>
                       <td style={{ ...TD, color: SEC }}>{r.constituency}</td>
-                      <td style={{ ...TD, color: SEC, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.campaign || '—'}</td>
+                      <td style={{ ...TD, color: SEC, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.campaign || '-'}</td>
                       <td style={TD}>{prioPill(r.priority)}</td>
                       <td style={TD}>
                         <b style={{ fontSize: 13 }}>{r.doorsLeft}</b> <span style={{ fontSize: 10, color: MUT }}>({r.doorsDone} / {r.doorsTarget})</span>

@@ -1,9 +1,9 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LearningView — the recursive-learning readout, with real accounting:
+// LearningView - the recursive-learning readout, with real accounting:
 //   · the loop itself: INGEST → REFLECT → ADJUST → VERIFY (live numbers on each)
-//   · what it ingests (leads scanned, chats, notes, decisions — today + total)
+//   · what it ingests (leads scanned, chats, notes, decisions - today + total)
 //   · what its thinking costs (token_usage 'brain' bucket: today / 7d / all-time)
 //   · the Sonnet-5 reflection (manual) + the measured token cost of THAT call
 //   · honesty panel: which loop stages are live vs still manual
@@ -34,7 +34,7 @@ type Reflection = {
 }
 
 // Turn every "Chat N" reference the reflection cites into a clickable link that
-// opens that exact conversation in the inbox — so the reviewer can jump straight
+// opens that exact conversation in the inbox - so the reviewer can jump straight
 // to the chat the learning came from instead of guessing which one "Chat 7" is.
 function linkifyChats(text: string, chatMap?: ChatRef[]): ReactNode {
   if (!text) return text
@@ -97,10 +97,10 @@ export default function LearningView() {
 
   // The four loop stages with their live numbers.
   const LOOP_STAGES = [
-    { id: 'ingest', label: 'INGEST', color: '#22c55e', lines: [`${s?.chats_today ?? '—'} chats today`, `${s?.notes_today ?? '—'} notes · ${s?.decisions_today ?? '—'} decisions`, `${s?.leads_scanned ?? '—'} leads scanned`] },
+    { id: 'ingest', label: 'INGEST', color: '#22c55e', lines: [`${s?.chats_today ?? '-'} chats today`, `${s?.notes_today ?? '-'} notes · ${s?.decisions_today ?? '-'} decisions`, `${s?.leads_scanned ?? '-'} leads scanned`] },
     { id: 'reflect', label: 'REFLECT', color: '#8B5CF6', lines: ['Sonnet 5, on demand', reflection?.generated_at ? `last: ${new Date(reflection.generated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : 'not run today', u ? `${u.brain_today.calls} brain calls today` : ''] },
     { id: 'adjust', label: 'ADJUST', color: '#f59e0b', lines: ['interest labels cached', 'cadence by temperature', 'nudge timing by read receipts'] },
-    { id: 'verify', label: 'VERIFY', color: '#3b82f6', lines: [matchRate != null ? `${matchRate}% AI matched human` : '— match rate', `${decisions?.total ?? '—'} decisions logged`] },
+    { id: 'verify', label: 'VERIFY', color: '#3b82f6', lines: [matchRate != null ? `${matchRate}% AI matched human` : '- match rate', `${decisions?.total ?? '-'} decisions logged`] },
   ]
 
   return (
@@ -115,7 +115,7 @@ export default function LearningView() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <MdLoop size={17} style={{ color: 'var(--accent-primary)' }} />
           <span style={{ fontSize: 14, fontWeight: 800 }}>The recursive loop</span>
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>every pass feeds the next — live numbers on each stage</span>
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>every pass feeds the next - live numbers on each stage</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, position: 'relative' }}>
           {LOOP_STAGES.map((st, i) => (
@@ -131,7 +131,7 @@ export default function LearningView() {
           ))}
         </div>
         <div style={{ marginTop: 10, fontSize: 10.5, color: 'var(--text-muted)' }}>
-          Live today: interest caching, temperature cadences, read-receipt nudge timing, decision logging. Still manual: the reflection below does not yet rewrite prompts or sequences by itself — its "what to do differently" needs your sign-off.
+          Live today: interest caching, temperature cadences, read-receipt nudge timing, decision logging. Still manual: the reflection below does not yet rewrite prompts or sequences by itself - its "what to do differently" needs your sign-off.
         </div>
       </div>
 
@@ -159,7 +159,7 @@ export default function LearningView() {
                 </div>
               ))}
               <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>
-                Yes — every lead's chats, admin notes and decision log are in scope on each reflection.
+                Yes - every lead's chats, admin notes and decision log are in scope on each reflection.
               </div>
             </div>
           )}
@@ -213,18 +213,18 @@ export default function LearningView() {
           </button>
         </div>
         <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
-          Sonnet 5 reads today's chats, team notes and human decisions, then reports what changed in its understanding — and what this exact reflection cost.
+          Sonnet 5 reads today's chats, team notes and human decisions, then reports what changed in its understanding - and what this exact reflection cost.
         </p>
         {reflectErr && <div style={{ fontSize: 12, color: '#ef4444' }}>{reflectErr}</div>}
         {!reflection && !reflectErr && !reflecting && (
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>Tap "Reflect on today" — costs one Sonnet 5 call, measured below.</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontStyle: 'italic' }}>Tap "Reflect on today" - costs one Sonnet 5 call, measured below.</div>
         )}
         {reflection && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
               read {reflection.chats_analyzed} chat{reflection.chats_analyzed === 1 ? '' : 's'}
               {reflection.sources ? ` · ${reflection.sources.notes_today} notes · ${reflection.sources.decisions_today} decisions` : ''}
-              {reflection.reflection_usage ? ` — this reflection: ${fmt(reflection.reflection_usage.input_tokens)} in / ${fmt(reflection.reflection_usage.output_tokens)} out · ${usd(reflection.reflection_usage.cost_usd)}` : ''}
+              {reflection.reflection_usage ? ` - this reflection: ${fmt(reflection.reflection_usage.input_tokens)} in / ${fmt(reflection.reflection_usage.output_tokens)} out · ${usd(reflection.reflection_usage.cost_usd)}` : ''}
             </div>
             {reflection.note && <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{reflection.note}</div>}
             {reflection.biggest_learning && (
@@ -250,7 +250,7 @@ export default function LearningView() {
       <div style={{ padding: 16, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <MdPsychology size={17} style={{ color: '#3b82f6' }} />
-          <span style={{ fontSize: 14, fontWeight: 800 }}>Verify — decisions vs the human</span>
+          <span style={{ fontSize: 14, fontWeight: 800 }}>Verify - decisions vs the human</span>
         </div>
         <p style={{ fontSize: 11.5, color: 'var(--text-secondary)', margin: '0 0 12px' }}>
           Every logged call teaches it. When the match rate climbs, the brain is ready to act on its own.
@@ -287,7 +287,7 @@ export default function LearningView() {
                     </div>
                     <div style={{ color: 'var(--text-secondary)' }}>
                       ai proposed <span style={{ color: 'var(--text-primary)' }}>{e.ai_action}</span>, human chose <span style={{ color: e.matched ? '#22c55e' : '#f59e0b' }}>{e.human_action}</span>
-                      {e.reason ? ` — "${e.reason}"` : ''}
+                      {e.reason ? ` - "${e.reason}"` : ''}
                     </div>
                   </div>
                 </div>

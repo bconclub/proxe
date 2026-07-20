@@ -1,5 +1,5 @@
 /**
- * DELETE /api/dashboard/users/invitations/[id] — revoke pending invitation
+ * DELETE /api/dashboard/users/invitations/[id] - revoke pending invitation
  * Admin-only. Uses service-role client for the write.
  */
 
@@ -32,7 +32,7 @@ export async function DELETE(
       .maybeSingle()
 
     if (!dashboardUser || dashboardUser.role !== 'admin' || dashboardUser.is_active === false) {
-      return NextResponse.json({ error: 'Forbidden — admins only' }, { status: 403 })
+      return NextResponse.json({ error: 'Forbidden - admins only' }, { status: 403 })
     }
 
     const { error } = await service

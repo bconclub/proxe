@@ -1,10 +1,10 @@
-// D2D CADRE REGISTRY — the tier-4 people. Dashboard-side management.
+// D2D CADRE REGISTRY - the tier-4 people. Dashboard-side management.
 //
 //   GET  → { workers: [...+knock counts] }                      (cookie auth)
 //   POST { name, phone, ... } → { ok, id, verification_code }   (cookie auth)
 //
 // Registering a worker: person-merges them into all_leads (phone = merge key)
-// and links lead_id — the DB trigger (026) promotes that person to intensity 4.
+// and links lead_id - the DB trigger (026) promotes that person to intensity 4.
 // verification_code goes on the worker's QR badge; the field app verifies it
 // via POST /api/agent/d2d/verify.
 
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     const normPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
     if (normPhone.length !== 10) return NextResponse.json({ error: 'a valid 10-digit phone is required' }, { status: 400 });
 
-    // A cadre IS a person — merge into all_leads first (trigger promotes to
+    // A cadre IS a person - merge into all_leads first (trigger promotes to
     // tier 4 once the worker row lands with this lead_id).
     const leadId = await ensureOrUpdateLead(name, null, normPhone, 'web', undefined, sb);
     if (leadId && (constituency || district)) {

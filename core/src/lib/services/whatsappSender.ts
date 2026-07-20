@@ -16,7 +16,7 @@ import { getWhatsAppCreds } from './whatsappCreds';
 import { getBrandConfig } from '@/configs';
 
 // Brand display name, resolved per-build. Booking/reminder/missed-call bodies
-// were hardcoded "BCON" — this sends them under the actual brand instead.
+// were hardcoded "BCON" - this sends them under the actual brand instead.
 const BRAND_NAME = getBrandConfig().name;
 
 const GRAPH_API_VERSION = 'v21.0';
@@ -33,7 +33,7 @@ async function getCredentials() {
 }
 
 /** Normalize phone: strip everything except digits.
- *  Coerce first — Pabbly (and other inbound integrations) sometimes send the
+ *  Coerce first - Pabbly (and other inbound integrations) sometimes send the
  *  phone as a JSON number, which would throw "e.replace is not a function" and
  *  500 the whole facebook-lead / inbound send. String() keeps every caller safe. */
 function normalizePhone(phone: string | number | null | undefined): string {
@@ -94,7 +94,7 @@ async function resolveLeadIdByPhone(phone: string): Promise<string | null> {
 
 /**
  * Log a SYSTEM-sent WhatsApp message to `conversations` so it shows up in the
- * dashboard Chats — the single place every automated outbound (booking
+ * dashboard Chats - the single place every automated outbound (booking
  * confirmation, reminder, missed-call, re-engagement) funnels through.
  *
  * Live conversational agent replies are already logged by their own routes
@@ -156,7 +156,7 @@ export async function sendWhatsAppText(
       return { success: false, error: errBody };
     }
 
-    // Return Meta's wamid so callers can persist it as metadata.wa_message_id —
+    // Return Meta's wamid so callers can persist it as metadata.wa_message_id -
     // that's the key handleStatusUpdates() matches on to attach delivered/read
     // receipts. Without it, human/Slack replies never show a receipt.
     const body = await res.json().catch(() => null);
@@ -187,7 +187,7 @@ export async function sendWhatsAppTemplate(
 ): Promise<{
   success: boolean;
   error?: string;
-  messageId?: string;  // Meta's wamid… — needed for delivery status tracking
+  messageId?: string;  // Meta's wamid… - needed for delivery status tracking
   statusCode?: number; // HTTP status from Graph API (200, 400, 401, etc.)
 }> {
   const creds = await getCredentials();
@@ -232,7 +232,7 @@ export async function sendWhatsAppTemplate(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Template-body renderers — match the Meta-approved template strings exactly so
+// Template-body renderers - match the Meta-approved template strings exactly so
 // what we log to `conversations` is what the customer actually sees on WhatsApp.
 // Update these whenever the corresponding Meta template body changes.
 // ──────────────────────────────────────────────────────────────────────────────
@@ -243,7 +243,7 @@ export function renderPATResultBody(
   tierLabel: string,
   tierMessage: string,
 ): string {
-  return `Hi ${firstName}, your Pilot Assessment result is in: *${score100}/100* — Tier: *${tierLabel}*. ${tierMessage}`;
+  return `Hi ${firstName}, your Pilot Assessment result is in: *${score100}/100* - Tier: *${tierLabel}*. ${tierMessage}`;
 }
 
 export function renderDemoOnlineBody(
@@ -287,7 +287,7 @@ export function renderDemoOfflineBody(
 /**
  * Send a free-form INTERACTIVE message with up to 3 quick-reply buttons.
  * Works inside the 24h conversation window only (no template approval
- * needed — these are freeform). When the customer taps a button, Meta
+ * needed - these are freeform). When the customer taps a button, Meta
  * sends us an `interactive.button_reply` event with the title as text,
  * which our webhook handler already converts to a normal text message.
  *
@@ -370,7 +370,7 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
   windchasers_pat_result_v2:    ['Book a Demo Class', 'Plan My Pilot Career'],
   windchasers_demo_online_v2:      ['Join Pilot Community', 'Take Pilot Assessment Test'],
   windchasers_demo_offline_v2:  ['Get Directions', 'Join Pilot Community'],
-  // All 6 lokazen scout lifecycle templates carry the same single button —
+  // All 6 lokazen scout lifecycle templates carry the same single button -
   // this is a STATIC URL button baked into the approved template, not a
   // quick-reply, so it renders in the inbox with a distinct external-link
   // icon rather than the quick-reply icon (see TEMPLATE_BUTTON_TYPES below).
@@ -383,7 +383,7 @@ export const TEMPLATE_BUTTONS: Record<string, string[]> = {
 };
 
 /**
- * Button TYPE per template — 'url' (opens a link, no reply sent) vs the
+ * Button TYPE per template - 'url' (opens a link, no reply sent) vs the
  * default 'quick_reply' (taps send a message back). The inbox renders these
  * differently so a URL button never looks tappable-as-a-reply. We don't know
  * the exact destination URL Meta has baked into these templates (it's
@@ -562,8 +562,8 @@ export async function sendFacebookLeadWelcome(
 
 /**
  * Pick the welcome template by where the lead came from. Anything pilot-related
- * — a pilot landing page, a pilot ad/form/campaign, or a pilot course interest
- * (CPL / PPL / CHPL / DGCA / flying) — gets the pilot welcome; everything else
+ * - a pilot landing page, a pilot ad/form/campaign, or a pilot course interest
+ * (CPL / PPL / CHPL / DGCA / flying) - gets the pilot welcome; everything else
  * (home/main pages, generic forms, cabin crew, etc.) gets the generic welcome.
  *
  * Pass any page/source/interest strings you have; nulls are ignored.
@@ -574,7 +574,7 @@ export function isPilotSource(...signals: Array<string | null | undefined>): boo
 }
 
 // Latest welcome copy is v3 (generic + pilot). Those are still clearing Meta
-// review, so each maps to its last APPROVED version — sendWelcomeTemplate tries
+// review, so each maps to its last APPROVED version - sendWelcomeTemplate tries
 // the preferred one and auto-falls-back until the newer one is approved. Once v3
 // is live the fallback simply never fires; drop the entry then.
 const WELCOME_FALLBACK: Record<string, string> = {
@@ -601,7 +601,7 @@ export function isCabinCrewSource(...signals: Array<string | null | undefined>):
  * Welcome for cabin-crew leads. Tries the cabin-crew-specific template; if it's
  * not approved in Meta yet, falls back to the generic welcome so a live
  * cabin-crew ad lead is NEVER left unwelcomed. Auto-upgrades to the dedicated
- * copy the moment Meta approves — no redeploy needed. `templateUsed` reports
+ * copy the moment Meta approves - no redeploy needed. `templateUsed` reports
  * which one actually went out so the caller can log it accurately.
  * Template: windchasers_cabin_crew_welcome_v1 (NAMED param customer_name).
  */
@@ -638,7 +638,7 @@ export function isParentSource(...signals: Array<string | null | undefined>): bo
 /**
  * Welcome message for parent-enquiry leads. Uses a NAMED body param
  * (`parent_name`), unlike the student welcome templates which use
- * `customer_name` — the two are not interchangeable at the Graph API level.
+ * `customer_name` - the two are not interchangeable at the Graph API level.
  *
  * Template: windchasers_pilot_parents_welcome_v1
  */
@@ -661,9 +661,9 @@ export const WEBINAR_CONFIRM_TEMPLATE = 'windchasers_webinar_confirmation_v1'
 
 /**
  * Webinar registration confirmation (Zoom → Pabbly / landing → leads/inbound).
- * Template: windchasers_webinar_confirmation_v1 — NAMED params:
+ * Template: windchasers_webinar_confirmation_v1 - NAMED params:
  *   customer_name · topic · date · time  (+ a Join-WhatsApp-Group quick reply).
- * `dateTime` is the combined "18 July 2026 at 11:30 AM IST" label — split into
+ * `dateTime` is the combined "18 July 2026 at 11:30 AM IST" label - split into
  * the separate date + time the template expects.
  */
 export async function sendWebinarConfirm(
@@ -689,7 +689,7 @@ export async function sendWebinarConfirm(
 }
 
 /**
- * No parent-specific confirmation template exists — parents get the same
+ * No parent-specific confirmation template exists - parents get the same
  * windchasers_webinar_confirmation_v1. Kept as a named alias so callers that
  * branch on audience stay unchanged.
  */
@@ -707,7 +707,7 @@ export async function sendWebinarConfirmParents(
  *   customer_name · webinar_name · when (e.g. "tomorrow at 5:00 PM" / "in 2 hours")
  *
  * Prefers windchasers_webinar_reminder_v2, which adds a "Join WhatsApp Group"
- * quick-reply — tapping it hits the Meta webhook, which replies the webinar
+ * quick-reply - tapping it hits the Meta webhook, which replies the webinar
  * group link (see api/agent/whatsapp/meta), so anyone who missed the group can
  * still get in. Falls back to the button-less (already approved) v1 if v2 isn't
  * approved yet. Both share the same body params; a static quick-reply needs no
@@ -751,7 +751,7 @@ export async function sendWebinarStartingSoon(
   // v3 = clean copy (no em dash) with a "Join webinar" URL button pointing at the
   // working registration link. The per-person zoom_join_url tokens are broken
   // (they land on Zoom's generic Join page), so joinUrl is intentionally NOT used.
-  // No fallback to v1/v2 — those embed the broken join token in the body, so a
+  // No fallback to v1/v2 - those embed the broken join token in the body, so a
   // miss here sends nothing rather than a dead link.
   void joinUrl
   return sendWhatsAppTemplate(to, 'windchasers_webinar_starting_soon_v3', [
@@ -830,7 +830,7 @@ export async function sendWebinarRegisterNudge(
 
 /**
  * Pick the RNR (no-reply / missed-call) re-engagement template.
- * Two steps per segment — step 1 = first re-attempt, step 2 = "tried again".
+ * Two steps per segment - step 1 = first re-attempt, step 2 = "tried again".
  * Routed pilot vs generic by the lead's source. Names are Meta-approved with a
  * _v1 suffix: rnr_pilot_1_v1 / rnr_pilot_2_v1 / rnr_generic_1_v1 / rnr_generic_2_v1.
  */
@@ -886,7 +886,7 @@ export async function sendWelcomeTemplate(
 }
 
 // NOTE: sendFirstOutreach() was removed because the 'windchasers_followup'
-// template was never approved in Meta — every call was failing silently.
+// template was never approved in Meta - every call was failing silently.
 // To re-enable a first-outreach flow:
 //   1. Submit a new template in Meta Business Manager and wait for approval
 //   2. Add a new sender here referencing the approved name
@@ -898,11 +898,11 @@ export async function sendWelcomeTemplate(
  *
  * Two templates depending on format:
  *
- * OFFLINE — windchasers_demo_offline_v2
+ * OFFLINE - windchasers_demo_offline_v2
  *   {{1}} = first name · {{2}} = date · {{3}} = time
- *   No buttons (no Meet link, no Add to Calendar — user comes to the facility).
+ *   No buttons (no Meet link, no Add to Calendar - user comes to the facility).
  *
- * ONLINE — windchasers_demo_online_v2 (note: no _v1 suffix; Meta-approved name)
+ * ONLINE - windchasers_demo_online_v2 (note: no _v1 suffix; Meta-approved name)
  *   {{1}} = first name · {{2}} = date · {{3}} = time
  *   Button 0 (URL, dynamic): base64 Google Calendar eventId.
  *   URL pattern registered in Meta: https://calendar.google.com/calendar/event?eid={{1}}
@@ -943,7 +943,7 @@ export async function sendDemoConfirmation(
 /**
  * @deprecated Use sendDemoConfirmation(... format, calendarEventId) directly.
  * Kept for backward compatibility with existing callers that haven't been
- * migrated yet. Defaults to offline format (safe — no Meet link assumed).
+ * migrated yet. Defaults to offline format (safe - no Meet link assumed).
  *
  * The legacy parameter `meetLink` is intentionally unused: the new templates
  * don't take a Meet code in the body and the offline template has no button.
@@ -963,7 +963,7 @@ export async function sendDemoBookedConfirmation(
  *
  * Template: windchasers_pat_result_v2
  *   {{1}} = first name
- *   {{2}} = score displayed as /100 (e.g. "58") — converted from raw /150
+ *   {{2}} = score displayed as /100 (e.g. "58") - converted from raw /150
  *   {{3}} = tier UX label (e.g. "Premium", "Strong", "Moderate", "Early Stage")
  *   {{4}} = tier-specific next-step message
  */
@@ -1000,7 +1000,7 @@ export async function sendPATResult(
   const tierMessage = TIER_MESSAGES[tierKey] || 'A counsellor can walk you through the next steps.';
 
   // Meta template uses NAMED params (customer_name / score / tier / tier_message).
-  // Quick-reply buttons are static — no button component needed in the send call.
+  // Quick-reply buttons are static - no button component needed in the send call.
   const components: Array<any> = [
     {
       type: 'body',

@@ -40,7 +40,7 @@ const fmtK = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 
 
 // Build a "focus mask": a world-covering polygon with the whole Punjab AC set
 // punched out as holes. Filled with the page background it hides every
-// neighbouring state (Haryana, HP, Rajasthan, …) so only Punjab shows — the way
+// neighbouring state (Haryana, HP, Rajasthan, …) so only Punjab shows - the way
 // the old map did. GeoJSON is [lng,lat]; Leaflet wants [lat,lng], so flip.
 function buildPunjabMask(fc: any): [number, number][][] {
   const world: [number, number][] = [[-85, -180], [-85, 180], [85, 180], [85, -180]];
@@ -115,7 +115,7 @@ export default function PunjabLeafletMap({
     const isPulse = pulseRef.current && normName(pulseRef.current) === normName(name);
     return {
       fillColor: fillColor(name),
-      fillOpacity: isSel ? 0.7 : 0.45, // lighter wash — bubbles carry the numbers
+      fillOpacity: isSel ? 0.7 : 0.45, // lighter wash - bubbles carry the numbers
       color: isSel ? P.sel : isPulse ? SAFFRON : P.stroke,
       weight: isSel ? 2.6 : isPulse ? 2.2 : 0.6,
     };
@@ -167,7 +167,7 @@ export default function PunjabLeafletMap({
         const icon = L.divIcon({ html, className: 'wr-count-marker', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
         const m = L.marker(center, { icon, riseOnHover: true, keyboard: false });
         // click a cluster → zoom INTO the district; the zoomend re-render swaps to
-        // seat bubbles. fitBounds (instant) not flyTo — animated flights get
+        // seat bubbles. fitBounds (instant) not flyTo - animated flights get
         // cancelled by follow-on events in some environments. Deferred a tick so
         // the same click reaching the map container can't interrupt it.
         m.on('click', (e) => {
@@ -175,7 +175,7 @@ export default function PunjabLeafletMap({
           const b = a.bounds;
           setTimeout(() => { if (b) map.fitBounds(b.pad(0.35), { maxZoom: 10.5, animate: false }); }, 0);
         });
-        m.bindTooltip(`${dist} — ${fmtK(a.total)} voices · ${a.seats} seats · click to open`, { direction: 'top', offset: [0, -size / 2], opacity: 0.92, className: 'wr-leaflet-tip' });
+        m.bindTooltip(`${dist} - ${fmtK(a.total)} voices · ${a.seats} seats · click to open`, { direction: 'top', offset: [0, -size / 2], opacity: 0.92, className: 'wr-leaflet-tip' });
         grp.addLayer(m);
       });
       return;
@@ -193,7 +193,7 @@ export default function PunjabLeafletMap({
       const icon = L.divIcon({ html, className: 'wr-count-marker', iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
       const m = L.marker(center, { icon, riseOnHover: true, keyboard: false });
       m.on('click', (e) => { L.DomEvent.stop(e); onSelectRef.current(s.constituency); });
-      m.bindTooltip(`${s.constituency} — ${s.count} voices`, { direction: 'top', offset: [0, -size / 2], opacity: 0.92, className: 'wr-leaflet-tip' });
+      m.bindTooltip(`${s.constituency} - ${s.count} voices`, { direction: 'top', offset: [0, -size / 2], opacity: 0.92, className: 'wr-leaflet-tip' });
       grp.addLayer(m);
     });
   };
@@ -218,7 +218,7 @@ export default function PunjabLeafletMap({
       subdomains: 'abcd', maxZoom: 19, attribution: '&copy; OpenStreetMap &copy; CARTO',
     }).addTo(map);
 
-    // Focus mask — hide everything outside Punjab with the page background so the
+    // Focus mask - hide everything outside Punjab with the page background so the
     // neighbouring states never show. Sits above the tiles, below the choropleth.
     const maskBg = (getComputedStyle(document.documentElement).getPropertyValue('--bg-primary').trim()) || (dark ? '#0b0f14' : '#f4f1ea');
     L.polygon(buildPunjabMask(raw as any) as any, { stroke: false, fillColor: maskBg, fillOpacity: 1, fillRule: 'evenodd', interactive: false, className: 'wr-focus-mask' }).addTo(map);

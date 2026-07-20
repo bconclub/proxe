@@ -3,7 +3,7 @@ import { recordV3Call, V3CallRecord } from '@/lib/server/voiceV3Telemetry';
 import { getServiceClient } from '@/lib/services';
 
 // Ingest endpoint for the V3 pipeline (VPS): one POST per completed call with
-// per-turn latency, usage, and cost estimate. Auth is a shared secret header —
+// per-turn latency, usage, and cost estimate. Auth is a shared secret header -
 // the pipeline is the only caller.
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     if (!body?.callId) {
       return NextResponse.json({ error: 'callId required' }, { status: 400 });
     }
-    // MUST be awaited — Vercel freezes the function right after the response
+    // MUST be awaited - Vercel freezes the function right after the response
     // is sent, so a detached write gets silently dropped (same bug class as
     // the custom-llm telemetry fix).
     await recordV3Call(body);

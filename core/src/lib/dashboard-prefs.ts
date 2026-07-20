@@ -3,7 +3,7 @@
  *
  * The server (/api/dashboard/settings/preferences) is the source of truth; this
  * just fetches it, pushes changes, and mirrors the sound prefs into the same
- * localStorage keys the existing sound-prefs helper reads — so one founder's
+ * localStorage keys the existing sound-prefs helper reads - so one founder's
  * setting reaches every user on their next load.
  */
 
@@ -35,7 +35,7 @@ export async function saveGlobalPrefs(partial: GlobalPrefs): Promise<void> {
       body: JSON.stringify(partial),
     })
   } catch {
-    /* non-fatal — local change already applied */
+    /* non-fatal - local change already applied */
   }
 }
 

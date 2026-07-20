@@ -18,7 +18,7 @@ const INSTAGRAM_SCOPES = [
   'instagram_business_manage_comments',
 ].join(',');
 
-// Brand-specific — never hardcode another brand's account here. Env wins;
+// Brand-specific - never hardcode another brand's account here. Env wins;
 // known brand handles keep their fork-exact default.
 const TARGET_ACCOUNT =
   process.env.NEXT_PUBLIC_IG_ACCOUNT ||

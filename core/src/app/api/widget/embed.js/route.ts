@@ -56,7 +56,7 @@ export async function GET() {
 
   // Widget shows immediately on page load. Collapsed WIDTH is sized to the
   // bubble button itself (48-56px) plus offset + shadow bleed, not a fixed
-  // 125px — a bigger box than the button left a dead margin that read as a
+  // 125px - a bigger box than the button left a dead margin that read as a
   // stray dark box behind the circle on brands without a solid page bg.
   // Collapsed HEIGHT has to stay generous: lokazen's button sits at
   // bottom:96px (clears the site's own mobile footer nav) + 56px tall, so a
@@ -68,7 +68,7 @@ export async function GET() {
   var collapsedWidth = isMobileInit ? 88 : 100;
   var collapsedHeight = 165;
   // color-scheme:normal on the iframe ELEMENT: Chromium/WebKit force an OPAQUE
-  // canvas when the embedded doc's color-scheme mismatches the embedder's —
+  // canvas when the embedded doc's color-scheme mismatches the embedder's -
   // the "dark box around the bubble" in Instagram's in-app browser. The widget
   // doc declares color-scheme:normal too (widget/bubble layout), so they match.
   iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:' + collapsedWidth + 'px;height:' + collapsedHeight + 'px;border:none;background:transparent;color-scheme:normal;z-index:2147483647;';

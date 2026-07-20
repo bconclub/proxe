@@ -66,7 +66,7 @@ export default function WebAgentSettingsClient() {
 
     setIsResettingChat(true)
     try {
-      // ChatWidget stores the session id at `${brand}.chat.sessionId` — clear
+      // ChatWidget stores the session id at `${brand}.chat.sessionId` - clear
       // THIS brand's key, not a hardcoded windchasers one (else Reset Chat did
       // nothing for pop/lokazen/bcon).
       window.localStorage.removeItem(`${getCurrentBrandId()}.chat.sessionId`)
@@ -443,7 +443,7 @@ export default function WebAgentSettingsClient() {
                 >
                   {(() => {
                     // Brand-aware preview address bar. Env wins; else the brand's
-                    // own website (pop=goproxe.com, lokazen=lokazen.in, …) — never
+                    // own website (pop=goproxe.com, lokazen=lokazen.in, …) - never
                     // a hardcoded windchasers.in leaking into every brand.
                     const raw =
                       process.env.NEXT_PUBLIC_SITE_URL ||

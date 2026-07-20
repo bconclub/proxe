@@ -1,13 +1,13 @@
 /**
- * Log Call — records the call activity, then either:
+ * Log Call - records the call activity, then either:
  *
- *  1. HUMAN-DECISION mode (body has `decision` — sent only by bcon's
+ *  1. HUMAN-DECISION mode (body has `decision` - sent only by bcon's
  *     LogCallDecisionHub): the human reviewed the AI's proposed plan at the hub
  *     and picked an action. We log the call, save a rich decision_log record
  *     (context + ai plan + human choice + agreement) for the brain to learn
  *     from, execute the chosen action, and mark the lead human-owned so the
  *     worker stops its generic auto-cadence.
- *  2. LEGACY auto mode (no `decision` — every other brand, and bcon's plain
+ *  2. LEGACY auto mode (no `decision` - every other brand, and bcon's plain
  *     quick-log): routes through the shared noteOrchestrator with the outcome
  *     as a strong classification signal.
  *       "Connected"  + notes → classifier sees full text, e.g. POST_CALL / BOOKING_MADE / CONVERTED
@@ -89,7 +89,7 @@ export async function POST(
     } = await authClient.auth.getUser()
     const createdBy = user?.email || 'system'
     // activities.created_by is a UUID column on the older Windchasers-era
-    // schemas — only ever a real user id, else null (email throws 22P02 and
+    // schemas - only ever a real user id, else null (email throws 22P02 and
     // 500s the whole log). BCON's schema stores text, and its fork logs the
     // email + 'manual_call' type; keep each brand on its live shape.
     const activityCreatedBy = BRAND_ID === 'bcon' ? createdBy : (user?.id || null)
@@ -135,7 +135,7 @@ export async function POST(
 
     const trimmedNotes = (notes || '').trim()
     // "Connected" left selected while the note clearly says nobody answered
-    // (RNR etc.) is a mis-tap — normalize so the badge, note text, and the
+    // (RNR etc.) is a mis-tap - normalize so the badge, note text, and the
     // classifier all agree with what actually happened.
     const RNR_TEXT = /\b(rnr|no answer|didn'?t pick|did ?not pick|no response|not responding|not replying|rang no|ring no|voicemail|busy|switched off|unreachable|not reachable|no show)\b/i
     const outcome: CallOutcome = rawOutcome === 'Connected' && RNR_TEXT.test(trimmedNotes) ? 'No Answer' : rawOutcome
@@ -148,7 +148,7 @@ export async function POST(
       note: activityNote,
       created_by: activityCreatedBy,
     })
-    if (activityError) console.error('[log-call] activity insert failed (continuing — note is primary):', activityError.message)
+    if (activityError) console.error('[log-call] activity insert failed (continuing - note is primary):', activityError.message)
 
     const { data: leadRow, error: leadErr } = await supabase
       .from('all_leads')
@@ -184,9 +184,9 @@ export async function POST(
       })
       .eq('id', leadId)
 
-    if (noteUpdateError && activityError) throw noteUpdateError // nothing persisted — honest failure
+    if (noteUpdateError && activityError) throw noteUpdateError // nothing persisted - honest failure
     if (noteUpdateError) console.error('[log-call] visible-note update failed (activity saved):', noteUpdateError.message)
-    // From here on the call IS logged — nothing below may surface as an error.
+    // From here on the call IS logged - nothing below may surface as an error.
     noteSaved = true
 
     // Logging a call = "I'm working this lead now" → become the owner.
@@ -394,13 +394,13 @@ export async function POST(
     return NextResponse.json({ success: true, outcome, mode: 'human', actions_taken: actionsTaken, new_stage: newStage, owned_by_human: !handBackToAi, agreement })
   } catch (error) {
     console.error('[log-call] Error:', error)
-    // The call note is already saved — surface a calm degraded result instead
+    // The call note is already saved - surface a calm degraded result instead
     // of an error. The founder's log must NEVER appear to fail after the fact.
     if (noteSaved) {
       return NextResponse.json({
         success: true,
         mode: 'logged_only',
-        actions_taken: ['Call note saved — follow-up automation hit a snag and was skipped'],
+        actions_taken: ['Call note saved - follow-up automation hit a snag and was skipped'],
         orchestration_error: error instanceof Error ? error.message : 'unknown',
       })
     }

@@ -6,12 +6,12 @@
  * winner.
  *
  * Winner picking: higher lead_score wins. On tie, earlier created_at wins.
- * (Per user decision 2026-05-21 — operator clicks merge on either side,
+ * (Per user decision 2026-05-21 - operator clicks merge on either side,
  * the system picks the richer record as keeper.)
  *
  * Request body:  { other_lead_id: UUID }
- *   [id]         — one of the two leads (from the route param)
- *   other_lead_id — the other one
+ *   [id]         - one of the two leads (from the route param)
+ *   other_lead_id - the other one
  *
  * Response: {
  *   winner_lead_id: UUID,
@@ -91,7 +91,7 @@ export async function POST(
       winner = scoreA > scoreB ? leadA : leadB
       loser = scoreA > scoreB ? leadB : leadA
     } else {
-      // Same score — pick the older lead as winner
+      // Same score - pick the older lead as winner
       const tA = new Date(leadA.created_at).getTime()
       const tB = new Date(leadB.created_at).getTime()
       winner = tA <= tB ? leadA : leadB
@@ -100,7 +100,7 @@ export async function POST(
 
     // Build merged unified_context. Winner's fields win on conflicts; loser's
     // unique fields (e.g. alternate attribution.utm) are NOT auto-merged
-    // beyond a top-level shallow merge — those would need bespoke logic per
+    // beyond a top-level shallow merge - those would need bespoke logic per
     // namespace. We DO preserve the loser's identity on the winner under
     // merged_from[] so a future operator can see this happened + the
     // alternate phone/name is still on the lead.
@@ -123,7 +123,7 @@ export async function POST(
       merged_from: mergedFrom,      // always preserved + grown
     }
 
-    // Collect merged_phones for the response — handy for the toast UI
+    // Collect merged_phones for the response - handy for the toast UI
     const mergedPhones: string[] = []
     if (loser.phone && loser.phone !== winner.phone) mergedPhones.push(loser.phone)
 
@@ -171,7 +171,7 @@ export async function POST(
       console.error('[merge] Failed deleting loser:', deleteErr.message)
       return NextResponse.json(
         {
-          error: 'FKs moved but loser delete failed — data is in inconsistent state, contact engineering',
+          error: 'FKs moved but loser delete failed - data is in inconsistent state, contact engineering',
           detail: deleteErr.message,
           winner_lead_id: winner.id,
           merged_lead_id: loser.id,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentBrandId } from '@/configs';
 
 // End a live outbound test call from the dashboard (End Call button). Best-effort
-// hangup per engine — the UI clears itself immediately and does NOT depend on
+// hangup per engine - the UI clears itself immediately and does NOT depend on
 // this succeeding, so we always return 200 with a per-engine note.
 //   V3 (sarvam) → the pipeline's own /hangup (cancels the Pipecat task).
 //   V1 (vapi)   → the call's live control channel with {type:'end-call'}.
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // V1 Vapi — end via the call's control channel.
+  // V1 Vapi - end via the call's control channel.
   if (engine === 'vapi') {
     const key = process.env.VAPI_PRIVATE_API_KEY;
     if (!key) return NextResponse.json({ ok: false, note: 'VAPI key not set' });
@@ -47,6 +47,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // V2 ElevenLabs — no wired live-hangup; UI clears on its own.
+  // V2 ElevenLabs - no wired live-hangup; UI clears on its own.
   return NextResponse.json({ ok: true, engine, note: 'ui cleared' });
 }

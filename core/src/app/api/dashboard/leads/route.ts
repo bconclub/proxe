@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const includeNewsletter = searchParams.get('include_newsletter') === 'true'
-    // Free-text search across customer_name, phone, email — used by the
+    // Free-text search across customer_name, phone, email - used by the
     // merge-leads picker in the lead modal.
     const search = searchParams.get('search')?.trim() || null
     // Owner scope (features.leadAccess only): me | unassigned | <user uuid> |
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
 
     // Newsletter exclusion is applied AFTER fetch (see below), NOT as a PostgREST
     // .not(...eq 'newsletter') filter. That filter generates `form_type <> 'newsletter'`,
-    // which is NULL (→ excluded) for every lead whose nested form_type is NULL — i.e.
-    // essentially ALL leads — silently returning 0 rows. JS `!== 'newsletter'` is NULL-safe.
+    // which is NULL (→ excluded) for every lead whose nested form_type is NULL - i.e.
+    // essentially ALL leads - silently returning 0 rows. JS `!== 'newsletter'` is NULL-safe.
 
     if (source) {
       // Filter by first_touchpoint or last_touchpoint
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Lead-type access: restricted users only see leads of their allowed
-    // courses (JS post-filter — same NULL-safety rationale as newsletter).
+    // courses (JS post-filter - same NULL-safety rationale as newsletter).
     leads = filterLeads(access, leads)
 
     return NextResponse.json({

@@ -1,5 +1,5 @@
-// LEADER API — ground-team (d2d_workers) lookup, for the grievance assignment
-// picker in the leader app. Read-only, minimal fields (no phone by default —
+// LEADER API - ground-team (d2d_workers) lookup, for the grievance assignment
+// picker in the leader app. Read-only, minimal fields (no phone by default -
 // the leader assigns by name; phone stays internal to the D2D surfaces).
 // Auth: x-api-key = LEADER_API_KEY.
 

@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       leadId = session?.lead_id || null;
     }
 
-    // Events are telemetry — they must NOT create a lead. The conversation route
+    // Events are telemetry - they must NOT create a lead. The conversation route
     // (/api/agent/web/chat) is the single, attribution-aware lead creator. If a
     // lead already exists for this phone+brand, link to it; otherwise leave the
     // events anonymous and let the next chat message mint the lead. (Both routes

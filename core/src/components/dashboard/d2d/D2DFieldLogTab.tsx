@@ -1,6 +1,6 @@
 'use client'
 
-// Field Log tab: full-width KPI strip, then a two-column body — left is the
+// Field Log tab: full-width KPI strip, then a two-column body - left is the
 // filter row + segregated leads table + drawer; right is the analytics rail.
 
 import { useMemo, useState } from 'react'

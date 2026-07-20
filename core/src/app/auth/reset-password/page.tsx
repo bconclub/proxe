@@ -6,7 +6,7 @@ import { createClient } from '../../../lib/supabase/client'
 import { getBrandConfig } from '@/configs'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Password reset — landing page for the Supabase recovery link.
+// Password reset - landing page for the Supabase recovery link.
 //
 // Flow: login "Forgot password?" → resetPasswordForEmail(redirectTo:
 // /auth/callback?next=/auth/reset-password) → Supabase emails a recovery link →

@@ -1,13 +1,13 @@
 'use client'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NeuralBrain — a real 3D neural particle-cloud brain on a raw <canvas>.
+// NeuralBrain - a real 3D neural particle-cloud brain on a raw <canvas>.
 // No three.js, no deps: hand-rolled 3D → perspective projection, depth sorting,
 // drag-to-rotate + auto-spin, a precomputed connectome edge set, and signal
 // packets that race the edges when real events land. Each particle belongs to
 // a functional lobe (Intake / Conversation / Decisions / Scoring / Memory /
 // Timing / Output); clicking a lobe is hit-tested against its projected core.
-// The component is presentational — data + the info panel live in BrainHero.
+// The component is presentational - data + the info panel live in BrainHero.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useRef, useEffect, useMemo, useCallback } from 'react'

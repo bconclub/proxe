@@ -1,4 +1,4 @@
-// LEADER API — volunteer energy: how alive is the cadre machine.
+// LEADER API - volunteer energy: how alive is the cadre machine.
 // Auth: x-api-key = LEADER_API_KEY.
 
 import { NextRequest } from 'next/server';
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     const { count: cadreCount } = await sb.from('d2d_workers')
       .select('id', { count: 'exact', head: true }).eq('status', 'active');
 
-    // Knock energy — d2d visits over the window.
+    // Knock energy - d2d visits over the window.
     const { data: knocks } = await sb.from('d2d_visits')
       .select('constituency, created_at').gte('created_at', since).limit(10000);
 

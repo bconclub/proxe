@@ -12,12 +12,12 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /**
- * POST /api/dashboard/brain/briefing — the Brain's voice, staged for speed.
+ * POST /api/dashboard/brain/briefing - the Brain's voice, staged for speed.
  *
  * The client orchestrates three modes so the first words play almost
  * instantly instead of waiting for the whole clip:
  *   mode "text"  { question?, language? }  → gather context + write the words
- *                                            (Groq if configured — fast — else
+ *                                            (Groq if configured - fast - else
  *                                            Claude). Returns { text, llmMs }.
  *   mode "tts"   { text }                  → ElevenLabs (brand voice) on
  *                                            eleven_v3 (multilingual_v2
@@ -26,7 +26,7 @@ export const maxDuration = 60
  *                                            first sentence + the rest in
  *                                            parallel. Returns { audio, ttsMs }.
  *   mode "log"   { meta }                  → append a latency/run record to a
- *                                            rolling Redis list — the "brain
+ *                                            rolling Redis list - the "brain
  *                                            voice" eval data (kept for the
  *                                            Eval → Calls surface later).
  * GET → the recent run records.
@@ -38,7 +38,7 @@ export const maxDuration = 60
 const RUNS_KEY = `brain:voice:runs:${BRAND_ID}`
 const RUNS_TTL = 60 * 60 * 24 * 14 // keep two weeks
 const CTX_KEY = `brain:voice:ctx:${BRAND_ID}`
-const CTX_TTL = 90 // seconds — quick-question clicks reuse the gathered context
+const CTX_TTL = 90 // seconds - quick-question clicks reuse the gathered context
 
 async function internalJson(origin: string, path: string, cookie: string): Promise<any> {
   try {
@@ -79,7 +79,7 @@ async function writeWords(system: string, userPrompt: string): Promise<{ text: s
       console.error('[brain/briefing] groq error:', e?.message)
     }
   }
-  // Claude fallback — bucket under the Brain TEXT category (was defaulting to 'chat')
+  // Claude fallback - bucket under the Brain TEXT category (was defaulting to 'chat')
   return { text: (await generateResponse(system, userPrompt, 400, undefined, 'brain')).trim(), engine: 'claude' }
 }
 
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const mode: string = body?.mode || 'text'
 
-    // ── mode: log — keep the run's latency metadata (brain-voice eval) ───────
+    // ── mode: log - keep the run's latency metadata (brain-voice eval) ───────
     if (mode === 'log') {
       const meta = body?.meta && typeof body.meta === 'object' ? body.meta : {}
       const runs = (await getJson<any[]>(RUNS_KEY)) || []
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // ── mode: voice-health — can the brain actually SPEAK? Reports exactly
+    // ── mode: voice-health - can the brain actually SPEAK? Reports exactly
     // what's missing/broken so a silent orb is never a mystery. ──────────────
     if (mode === 'voice-health') {
       const key = process.env.ELEVENLABS_API_KEY
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       checks.push({ name: 'ElevenLabs API key', ok: !!key, detail: key ? 'present' : 'ELEVENLABS_API_KEY missing from this brand\'s env' })
       checks.push({ name: 'Voice ID', ok: !!voiceId, detail: voiceId ? 'configured' : 'no ELEVENLABS_VOICE_ID and no brain.voiceId in brand config' })
       if (key && voiceId) {
-        // Test the ACTUAL capability (a micro TTS) — restricted keys can speak
+        // Test the ACTUAL capability (a micro TTS) - restricted keys can speak
         // while still 401-ing on /v1/user, so pinging that gave false alarms.
         try {
           const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_22050_32`, {
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
             headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: 'ok', model_id: 'eleven_flash_v2_5' }),
           })
-          checks.push({ name: 'ElevenLabs speech', ok: r.ok, detail: r.ok ? 'speaking works' : `TTS rejected (${r.status}) — check the key\'s TTS permission / quota at elevenlabs.io` })
+          checks.push({ name: 'ElevenLabs speech', ok: r.ok, detail: r.ok ? 'speaking works' : `TTS rejected (${r.status}) - check the key\'s TTS permission / quota at elevenlabs.io` })
         } catch {
           checks.push({ name: 'ElevenLabs speech', ok: false, detail: 'could not reach api.elevenlabs.io' })
         }
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok, checks })
     }
 
-    // ── mode: greet — an INSTANT personalized opener (no LLM) so the orb speaks
+    // ── mode: greet - an INSTANT personalized opener (no LLM) so the orb speaks
     // within ~1.5s (just a TTS round-trip) instead of waiting the full
     // text-gen + TTS (~5s) in silence. Client fires this in parallel with
     // mode:text, plays the greeting first, then the real briefing. ───────────
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       const fullName = (profile?.full_name || user.email?.split('@')[0] || '').trim()
       const firstName = fullName.split(/\s+/)[0] || 'there'
       const q = typeof body?.question === 'string' ? body.question.trim() : ''
-      // Input-aware acknowledgment — echo WHAT they asked about, by name, and
+      // Input-aware acknowledgment - echo WHAT they asked about, by name, and
       // vary the phrasing so it never reads as the same canned line every time.
       const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
       const ql = q.toLowerCase()
@@ -153,10 +153,10 @@ export async function POST(req: NextRequest) {
         ? pick([
             `Hi ${firstName}, let me pull together everything from today.`,
             `Okay ${firstName}, catching you up on today now.`,
-            `${firstName}, give me a moment — gathering today's picture.`,
+            `${firstName}, give me a moment - gathering today's picture.`,
           ])
         : /catch (me )?up|what happened|what's new|brief me|today so far/.test(ql)
-          ? pick([`Okay ${firstName}, catching you up now.`, `${firstName}, pulling together everything from today.`, `On it ${firstName} — here's today coming up.`])
+          ? pick([`Okay ${firstName}, catching you up now.`, `${firstName}, pulling together everything from today.`, `On it ${firstName} - here's today coming up.`])
         : /\blead|pipeline|prospect|hot\b/.test(ql)
           ? pick([`Okay ${firstName}, let me check on those leads for you.`, `Pulling up the leads now, ${firstName}.`, `Let me see how the leads are doing, ${firstName}.`])
         : /\bbook|demo|meeting|calendar|schedul/.test(ql)
@@ -167,9 +167,9 @@ export async function POST(req: NextRequest) {
           ? pick([`Let me scan the conversations, ${firstName}.`, `Checking the inbox now, ${firstName}.`])
         : /\bfollow|task|pending|due|remind/.test(ql)
           ? pick([`Let me check what's pending, ${firstName}.`, `Pulling up the follow-ups, ${firstName}.`])
-          : pick([`Okay ${firstName}, let me look into that for you.`, `On it, ${firstName} — one moment.`, `Let me dig that up, ${firstName}.`])
+          : pick([`Okay ${firstName}, let me look into that for you.`, `On it, ${firstName} - one moment.`, `Let me dig that up, ${firstName}.`])
       const text = ack
-      // Voice the greeting with the FASTEST model (flash) — it's a fixed canned
+      // Voice the greeting with the FASTEST model (flash) - it's a fixed canned
       // line, so speed matters far more than expressiveness, and it must land in
       // well under a second to feel instant. The real briefing still uses v3.
       const key = process.env.ELEVENLABS_API_KEY
@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ text, firstName, audio, mime: 'audio/mpeg' })
     }
 
-    // ── mode: tts — voice a chunk of text (brand voice, ONE voice per brand) ──
+    // ── mode: tts - voice a chunk of text (brand voice, ONE voice per brand) ──
     if (mode === 'tts') {
       const text = String(body?.text || '').slice(0, 2000)
       if (!text) return NextResponse.json({ error: 'no text' }, { status: 400 })
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
           headers: { 'xi-api-key': key, 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, model_id: model }),
         })
-      // Which model actually produced the audio — returned + logged so we can
+      // Which model actually produced the audio - returned + logged so we can
       // confirm V3 is really playing (and see when it silently falls back to
       // multilingual_v2), instead of guessing from how it sounds.
       let usedModel = 'eleven_v3'
@@ -222,11 +222,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ audio, mime: 'audio/mpeg', ttsMs: Date.now() - t0, model: usedModel })
     }
 
-    // ── mode: text — gather today's context and write the words ──────────────
+    // ── mode: text - gather today's context and write the words ──────────────
     const brain = getBrainConfig()
     const question: string | null = typeof body?.question === 'string' && body.question.trim() ? body.question.trim().slice(0, 300) : null
     const lang = brain.languages.find((l) => l.id === body?.language) || brain.languages[0]
-    // Conversation so far (voice loop) — lets the model resolve "yes" / "show
+    // Conversation so far (voice loop) - lets the model resolve "yes" / "show
     // me that one" against what it just said. Sent by the orb client.
     const history: Array<{ role: string; content: string }> = Array.isArray(body?.history)
       ? body.history.slice(-6).filter((h: any) => h && typeof h.content === 'string')
@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
     const t0 = Date.now()
 
     // People the voice brain can point at: recently active + top scored, with
-    // ids. Phones stay in this server-side slice (Redis) — never sent to the
+    // ids. Phones stay in this server-side slice (Redis) - never sent to the
     // model; validateActions attaches them if a dial ever ships for voice.
     const fetchPeople = async (): Promise<any[]> => {
       if (!actionsOn || !svc) return []
@@ -278,7 +278,7 @@ export async function POST(req: NextRequest) {
               .limit(12)
               .then((r: any) => (r.data || []).map((x: any) => ({ ...x, body: String(x.body || '').slice(0, 160) })))
           : Promise.resolve([]),
-        // news / social buzz — what people are seeing and reacting to
+        // news / social buzz - what people are seeing and reacting to
         svc && hasWarRoom
           ? svc.from('listen_signals')
               .select('source, content, sentiment, issue_category, constituency, is_crisis, is_opposition, created_at')
@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
       await setJsonWithTtl(CTX_KEY, ctx, CTX_TTL).catch(() => {})
     }
     // A ctx cached before actions shipped (or while the flag was off) has no
-    // people slice — backfill without invalidating the rest of the cache.
+    // people slice - backfill without invalidating the rest of the cache.
     if (actionsOn && !Array.isArray(ctx.people)) ctx.people = await fetchPeople()
 
     const profile = await profileP
@@ -328,31 +328,31 @@ export async function POST(req: NextRequest) {
       `You are the living Brain of ${brand.name}${brain.persona}. You are about to SPEAK out loud to ${firstName}, the person running this.`,
       lang.promptRule,
       question
-        ? `${firstName} asked: "${question}". Answer THAT question directly from the live data — no daily-briefing preamble. Open with the answer, not a greeting.`
+        ? `${firstName} asked: "${question}". Answer THAT question directly from the live data - no daily-briefing preamble. Open with the answer, not a greeting.`
         // A short spoken greeting ("Hi <name>, let me pull together today…") is
         // ALWAYS played first, so the briefing must NOT greet or repeat the name.
-        : `A greeting to ${firstName} was ALREADY spoken aloud just before this, so DO NOT greet and DO NOT say their name again. Open DIRECTLY with today's state — e.g. "Here's how today looks." — in the speaking language.`,
-      `Style: spoken word, warm, confident, first person. No markdown, no bullets, no emojis — natural sentences read aloud. The FIRST sentence must be short (under 12 words) — it plays first.`,
+        : `A greeting to ${firstName} was ALREADY spoken aloud just before this, so DO NOT greet and DO NOT say their name again. Open DIRECTLY with today's state - e.g. "Here's how today looks." - in the speaking language.`,
+      `Style: spoken word, warm, confident, first person. No markdown, no bullets, no emojis - natural sentences read aloud. The FIRST sentence must be short (under 12 words) - it plays first.`,
       question ? `Length: 3 to 6 sentences, under 100 words total.` : `Length: 5 to 8 sentences, under 130 words total.`,
-      `You ARE PROXe — the system itself. NEVER say "AI", "the AI", "artificial intelligence" or "AI suggests". When a suggestion came from the system, say "PROXe suggests" or simply "I suggest" (you are PROXe speaking).`,
+      `You ARE PROXe - the system itself. NEVER say "AI", "the AI", "artificial intelligence" or "AI suggests". When a suggestion came from the system, say "PROXe suggests" or simply "I suggest" (you are PROXe speaking).`,
       brain.vocabularyRule,
       question
         ? `If the data genuinely doesn't cover the question, say so in one sentence and give the nearest useful signal instead.`
-        : `Cover: what came in today and from where, what people are raising and responding to, what you're handling right now, and end with the single thing that most needs ${firstName}'s attention — or a calm all-quiet close. Skip zeros and missing data gracefully; never apologize for quiet days.`,
-      `If highlights.most_active_lead is present, name them and mention how engaged they've been (e.g. "X has been messaging a lot today"). If highlights.top_area is present, mention it as where most activity is concentrated right now. Only mention a highlight if it's actually present in the data — never invent one.`,
+        : `Cover: what came in today and from where, what people are raising and responding to, what you're handling right now, and end with the single thing that most needs ${firstName}'s attention - or a calm all-quiet close. Skip zeros and missing data gracefully; never apologize for quiet days.`,
+      `If highlights.most_active_lead is present, name them and mention how engaged they've been (e.g. "X has been messaging a lot today"). If highlights.top_area is present, mention it as where most activity is concentrated right now. Only mention a highlight if it's actually present in the data - never invent one.`,
       // Scouts/gigs exist ONLY for scout-enabled brands (Lokazen). Teaching the
       // model this taxonomy on other brands made bcon's brain talk about "scouts"
-      // and "gigs" — vocabulary its founder has never heard of.
+      // and "gigs" - vocabulary its founder has never heard of.
       ...(getBrandConfig().features?.scouts ? [
-        `LEADS vs GIGS: taken_in.leads_total counts real leads only — property owners and brands (the people who lease or list space). taken_in.gigs_total counts GIGS: scouts (gig workers who spot vacant shops and get paid) and connectors. These are NOT leads and must NEVER be lumped into a lead count. If gigs_total is present and non-zero, mention scouts as their own thing (e.g. "on the gig side, X scouts came in"), separate from leads. Never say "we got N leads" using a number that includes scouts.`,
+        `LEADS vs GIGS: taken_in.leads_total counts real leads only - property owners and brands (the people who lease or list space). taken_in.gigs_total counts GIGS: scouts (gig workers who spot vacant shops and get paid) and connectors. These are NOT leads and must NEVER be lumped into a lead count. If gigs_total is present and non-zero, mention scouts as their own thing (e.g. "on the gig side, X scouts came in"), separate from leads. Never say "we got N leads" using a number that includes scouts.`,
       ] : []),
       ...(actionsOn ? [actionsPromptSpec(true)] : []),
     ].join('\n')
 
-    // Trim what goes to the model — Groq's on-demand tier caps tokens/minute,
+    // Trim what goes to the model - Groq's on-demand tier caps tokens/minute,
     // and the raw overview carries far more than a spoken briefing can use.
     const ov = ctx.overview || {}
-    // The id index the model's actions are validated against — built from the
+    // The id index the model's actions are validated against - built from the
     // same people slice the model sees, so ids can't point outside it.
     const peopleIdx = actionsOn ? buildLeadIndex(ctx.people || []) : null
     const slim = {
@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
       pulse: ctx.pulse || null,
       leader_pushes: (ctx.leader_pushes || []).slice(0, 8),
       news_buzz: ctx.news_buzz || null,
-      // ids only (no phones) — what the ACTIONS trailer may point at
+      // ids only (no phones) - what the ACTIONS trailer may point at
       ...(actionsOn && (ctx.people || []).length ? {
         people: (ctx.people as any[]).slice(0, 30).map((p: any) => ({
           id: id8(p.id),
@@ -389,7 +389,7 @@ export async function POST(req: NextRequest) {
     if (actionsOn && peopleIdx) {
       const parsed = parseActionsTrailer(rawText)
       text = parsed.text
-      // voice v1: navigation only — dial never ships from the voice path; nav
+      // voice v1: navigation only - dial never ships from the voice path; nav
       // is always auto (the voice says what it's doing, there's no button).
       actions = validateActions(parsed.actions, peopleIdx)
         .flatMap((a) => (a.type === 'dial' ? [] : [{ ...a, auto: true }]))

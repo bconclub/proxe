@@ -13,7 +13,7 @@ import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
 import { getBrandConfig } from '@/configs'
 
-// The BRAND's real accent colour (Lokazen orange, etc.) — NOT --accent-primary,
+// The BRAND's real accent colour (Lokazen orange, etc.) - NOT --accent-primary,
 // which is monochrome white/black in the default dark/light themes. Used for the
 // property card's accent bits (View all, map link, Push-to-Lokazen) so they show
 // the brand colour instead of grey.
@@ -28,7 +28,7 @@ import { getCurrentBrandId, brandLabel } from '@/configs'
 import { LeadStage } from '@/types'
 import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil, type CalculatedScore } from '@/lib/leadScoreCalculator'
-// Direct path to the source file — NOT the @/lib/services barrel — so this
+// Direct path to the source file - NOT the @/lib/services barrel - so this
 // client component doesn't drag bookingManager (googleapis → fs/net/child_process)
 // into the client bundle. Webpack tree-shaking became less generous after the
 // resend import was added to the barrel.
@@ -37,7 +37,7 @@ import { LokazenPropertyGallery } from './LokazenPropertyGallery'
 
 // Property-owner leads get a synthetic placeholder email
 // (owner_<phone>_<ts>@noemail.lokazen.in) when they have no real email. It's an
-// internal id, not a contact — never show it as the lead's email.
+// internal id, not a contact - never show it as the lead's email.
 function displayEmail(email: string | null | undefined): string | null {
   if (!email) return null
   return /@noemail\.|noreply|no-reply|placeholder/i.test(email) ? null : email
@@ -45,7 +45,7 @@ function displayEmail(email: string | null | undefined): string | null {
 
 // The same synthetic ids can land in the NAME field (e.g. a lead created with only
 // "owner_<phone>_<ts>@noemail.lokazen.in" or the account default "Property Owner").
-// Never show an internal id / placeholder as a person's name — fall back to blank
+// Never show an internal id / placeholder as a person's name - fall back to blank
 // so callers render "Unknown Lead" instead of the id.
 const NAME_PLACEHOLDER_TOKENS = new Set([
   'property', 'owner', 'brand', 'scout', 'connector', 'lead', 'customer',
@@ -93,7 +93,7 @@ function formatBookingTime(timeString: string | null | undefined): string {
   const s = timeString.toString().trim();
   if (!s) return '';
   // Bookings are stored in two formats: 24h "HH:MM" (web) and 12h "H:MM AM/PM"
-  // (WhatsApp). If a period is already present, keep it — otherwise the hour
+  // (WhatsApp). If a period is already present, keep it - otherwise the hour
   // would be misread as 24h and a PM time would flip to AM.
   const ampm = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i);
   if (ampm) {
@@ -120,7 +120,7 @@ function formatBookingDateShort(dateString: string | null | undefined): string {
   }
 }
 
-// Shared classifier for call-log outcomes in the Notes tab — true when the
+// Shared classifier for call-log outcomes in the Notes tab - true when the
 // call did NOT connect (no answer / busy / voicemail / RNR / unreachable).
 function isNoAnswerOutcome(outcome: string): boolean {
   return /no answer|busy|voicemail|rnr|not reachable|unreachable|switched off|missed|no response|declin|disconnect/.test(outcome.toLowerCase())
@@ -174,7 +174,7 @@ function formatCountdown(scheduledAt: string): string {
 }
 
 // Task types encode their day offset in the name (follow_up_day3, follow_up_24h,
-// booking_reminder_30m, ...) — surface that instead of a generic "Follow-up"
+// booking_reminder_30m, ...) - surface that instead of a generic "Follow-up"
 // label so the timeline reads like an actual cadence, not repeated placeholders.
 // (bcon Next Actions timeline.)
 function getDayLabel(taskType: string): string | null {
@@ -239,12 +239,12 @@ function renderMarkdown(text: string) {
 }
 
 /**
- * Render WhatsApp-style markdown — what Meta's templates use natively:
+ * Render WhatsApp-style markdown - what Meta's templates use natively:
  *   *text*  → bold
  *   _text_  → italic
  *   ~text~  → strikethrough
  * Newlines preserved as <br/>. Used for the Activity tab bubbles when the
- * activity came from the WhatsApp channel — otherwise free-form AI replies
+ * activity came from the WhatsApp channel - otherwise free-form AI replies
  * showed literal asterisks (e.g. "Date: *Fri, 22 May* Time: *1:00 PM*").
  */
 function renderWhatsAppMarkdown(text: string): React.ReactNode {
@@ -401,7 +401,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const brandId = getCurrentBrandId()
   const featureFlags = useFeatureFlags()
   const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
-  // Lead-modal tab visibility — configured per brand at Configure → Lead Modal.
+  // Lead-modal tab visibility - configured per brand at Configure → Lead Modal.
   // Defaults every tab ON; only an explicit `false` hides one.
   const [leadTabCfg, setLeadTabCfg] = useState<Record<string, boolean>>({})
   const tabOn = (k: string) => leadTabCfg[k] !== false
@@ -452,7 +452,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [activities, setActivities] = useState<any[]>([])
   const [conversationActivities, setConversationActivities] = useState<any[]>([])
-  // Manual refresh for the Notes tab — re-pulls the lead row (fresh admin_notes)
+  // Manual refresh for the Notes tab - re-pulls the lead row (fresh admin_notes)
   // and the activity timeline so a just-logged note/call shows without reopening.
   const [isRefreshingNotes, setIsRefreshingNotes] = useState(false)
   const refreshNotes = async () => {
@@ -534,7 +534,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [logCallNotes, setLogCallNotes] = useState('')
   const [savingLogCall, setSavingLogCall] = useState(false)
 
-  // Convert lead state — explicit conversion with details (date/program/amount/notes)
+  // Convert lead state - explicit conversion with details (date/program/amount/notes)
   const [showConvertModal, setShowConvertModal] = useState(false)
   const [convertDate, setConvertDate] = useState<string>('')
   const [convertProgram, setConvertProgram] = useState('')
@@ -566,12 +566,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   } | null>(null)
   const [merging, setMerging] = useState(false)
 
-  // Next Actions — hidden until redesigned. Founder: "Next Actions is completely
+  // Next Actions - hidden until redesigned. Founder: "Next Actions is completely
   // messed up. Rather than showing random things, just stop showing anything,
   // figure out what needs to be done, then set up Next Actions." Flip to true
   // once the auto-task logic is reworked.
   // bcon redesigned it (horizontal step timeline with inline previews) and pop
-  // ships the classic vertical list — both live with Next Actions on.
+  // ships the classic vertical list - both live with Next Actions on.
   const SHOW_NEXT_ACTIONS = ['bcon', 'pop'].includes(brandId)
 
   // Next Actions state
@@ -679,7 +679,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         // If neither all_leads nor unified_context carries a booking but the
         // lead actually booked, the booking is sitting in web_sessions or
         // whatsapp_sessions (storeBooking writes there first, then syncs to
-        // all_leads — when that sync fails the channel session is the only
+        // all_leads - when that sync fails the channel session is the only
         // surviving source). Pull it from there so Key Event renders.
         let resolvedBookingDate: string | null = bookingDate
         let resolvedBookingTime: string | null = bookingTime
@@ -1299,7 +1299,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     null
   const daysInactive = lastInteraction ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
-  // Get health score — use DB lead_score when admin has explicitly overridden, otherwise use calculated
+  // Get health score - use DB lead_score when admin has explicitly overridden, otherwise use calculated
   const score = (currentLead.stage_override && currentLead.lead_score != null && currentLead.lead_score > 0)
     ? Math.max(currentLead.lead_score, calculatedScore?.score ?? 0)
     : (calculatedScore?.score ?? 0)
@@ -1415,7 +1415,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       // Show classification
       const categoryLabels: Record<string, string> = {
         BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
-        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
+        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm - Later', RNR: 'Rang No Response',
         NOT_INTERESTED: 'Not Interested', CONVERTED: 'Closed Won', MEETING_REQUEST: 'Meeting Request',
         SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', INFO_ONLY: 'Info Only',
       }
@@ -1441,7 +1441,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setShowAdminNoteInput(false)
       setActiveTab('notes')
 
-      // Overlay STAYS until the operator clicks Done — so they can read every
+      // Overlay STAYS until the operator clicks Done - so they can read every
       // step (and fix anything the AI did) instead of it auto-vanishing.
       loadActivities()
       loadLeadTasks()
@@ -1508,7 +1508,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     const lines = [
       `*Lead Details*`,
       `Name: ${currentLead.name || 'Unknown'}`,
-      `Phone: ${currentLead.phone || '—'}`,
+      `Phone: ${currentLead.phone || '-'}`,
       currentLead.email ? `Email: ${currentLead.email}` : null,
       city ? `City: ${city}` : null,
       wc.user_type ? `Type: ${String(wc.user_type).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}` : null,
@@ -1516,7 +1516,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       wc.class_12_pcm ? `Education: ${eduMap[wc.class_12_pcm] || wc.class_12_pcm}` : (wc.education ? `Education: ${wc.education}` : null),
       wc.timeline ? `Timeline: ${wc.timeline}` : null,
       patScore100 != null ? `PAT Score: ${patScore100}/100${wc.pat_tier ? ` (${wc.pat_tier})` : ''}` : null,
-      `Lead Score: ${(currentLead as any).lead_score ?? '—'}/100`,
+      `Lead Score: ${(currentLead as any).lead_score ?? '-'}/100`,
       `Stage: ${currentLead.lead_stage || 'New'}`,
       wc.application_status ? `Application Status: ${appStatusMap[wc.application_status] || wc.application_status}` : null,
       attr.source_label ? `Source: ${attr.source_label}${attr.first_touch_label ? ' · ' + attr.first_touch_label : ''}` : null,
@@ -1577,7 +1577,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       ]
       const categoryLabels: Record<string, string> = {
         BOOKING_MADE: 'Booking Made', POST_CALL: 'Post Call', NOT_POTENTIAL: 'Not Potential',
-        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm — Later', RNR: 'Rang No Response',
+        HOT_LEAD: 'Hot Lead', WARM_LATER: 'Warm - Later', RNR: 'Rang No Response',
         NOT_INTERESTED: 'Not Interested', CONVERTED: 'Closed Won', MEETING_REQUEST: 'Meeting Request',
         SEND_MESSAGE: 'Send Message', NAME_UPDATE: 'Name Update', DEMO_TAKEN: 'Demo Taken',
         PROPOSAL_SENT: 'Proposal Sent', INFO_ONLY: 'Info Only',
@@ -1602,7 +1602,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setActiveTab('notes')
 
       // Overlay STAYS until the operator clicks Done (see the Done button in the
-      // orchestrator overlay) — no auto-vanish, so they can read what happened.
+      // orchestrator overlay) - no auto-vanish, so they can read what happened.
       loadActivities()
       loadLeadTasks()
       loadFreshLeadData()
@@ -1880,7 +1880,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           aria-labelledby="lead-modal-title"
           aria-modal="true"
         >
-          {/* Centered PROXe AI orchestrator overlay — appears while an admin
+          {/* Centered PROXe AI orchestrator overlay - appears while an admin
               note or call log is being processed, so the operator sees every
               step the AI takes plus the note they wrote, in real time. */}
           {noteProgress.steps.length > 0 && (
@@ -1974,7 +1974,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   ))}
                 </div>
 
-                {/* Done button — appears once the run completes so the operator
+                {/* Done button - appears once the run completes so the operator
                     can READ every step (and fix anything) instead of the overlay
                     auto-vanishing. Simple single-step toasts (e.g. "copied") have
                     no Done/Error terminal step, so they still auto-dismiss. */}
@@ -2016,7 +2016,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <div className="group flex items-center gap-1.5 flex-1 min-w-0">
                     {editingName ? (() => {
-                      // Shared save handler — wired to both ✓ button and Enter key.
+                      // Shared save handler - wired to both ✓ button and Enter key.
                       // (Enter was relied on alone before; the user didn't realize
                       // it would save and there was no visible commit affordance.)
                       const commitName = async () => {
@@ -2218,7 +2218,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
               {/* Contact Info Section - Bottom */}
               <address className="lead-contact-info space-y-1 mt-auto not-italic">
-                {/* Email with icon — hidden for synthetic @noemail placeholders */}
+                {/* Email with icon - hidden for synthetic @noemail placeholders */}
                 {currentLead.email && displayEmail(currentLead.email) && (
                   <div className="lead-contact-email group flex items-center gap-1.5">
                     <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
@@ -2357,7 +2357,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   </div>
 
-                                  {/* Requirement headline — the brand is a SEEKER, so lead with
+                                  {/* Requirement headline - the brand is a SEEKER, so lead with
                                       what they need (size · budget · areas) at a glance. */}
                                   {(() => {
                                     const budgetStr = lkz.budget_monthly_rent
@@ -2453,7 +2453,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   // Inline card stays MINIMAL: just the "Property details → View all"
                   // click-out plus the MAJOR identifiers only (brand name, location).
                   // Every intricate field (property/size/floor/rent/deposit/…) lives
-                  // behind the modal, not on the card — so it never grows wide.
+                  // behind the modal, not on the card - so it never grows wide.
                   const previewRows = ([
                     ['Brand', lkz.brand_name],
                     ['Location', lkz.property_zone || lkz.city],
@@ -2463,7 +2463,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   const hasMore = hasDetails;
                   return (
                     <div className="lead-property-details flex flex-col gap-y-1 pt-1.5 mt-1.5 border-t" style={{ borderColor: 'var(--border-primary)' }}>
-                      {/* Clickable header — opens the full property modal. */}
+                      {/* Clickable header - opens the full property modal. */}
                       <button
                         type="button"
                         onClick={() => setShowPropertyModal(true)}
@@ -2554,7 +2554,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                             </div>
 
-                            {/* Stat tiles — 4 across one row (keeps the modal short) */}
+                            {/* Stat tiles - 4 across one row (keeps the modal short) */}
                             {tiles.length > 0 && (
                               <div className="grid gap-2 pt-3 border-t" style={{ borderColor: 'var(--border-primary)', gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
                                 {tiles.map(({ icon: Icon, label, value }) => (
@@ -2569,7 +2569,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </div>
                             )}
 
-                            {/* View on Google Maps — full width */}
+                            {/* View on Google Maps - full width */}
                             {maps && (
                               <a href={String(maps)} target="_blank" rel="noopener noreferrer"
                                 className="flex items-center justify-center gap-1.5 rounded-xl p-3 mt-2 transition-all hover:opacity-90"
@@ -2672,7 +2672,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* TYPE / COURSE / EDUCATION / TIMELINE — extracted profile fields */}
+                {/* TYPE / COURSE / EDUCATION / TIMELINE - extracted profile fields */}
                 {(() => {
                   const brandProfileData = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {};
                   const hasType = !!brandProfileData.user_type;
@@ -2741,7 +2741,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* WEBINAR registration (windchasers) — which webinar they
+                {/* WEBINAR registration (windchasers) - which webinar they
                     registered for + one-click promotion into the main Leads
                     list (clears lead_type via set-type). */}
                 {brandId === 'windchasers' && (() => {
@@ -2832,10 +2832,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* ATTRIBUTION moved to the Interaction tab (with expanded
                     UTM / ad set / ad name / fbclid details). Used to live here
-                    as a collapsible block on the contact card — too noisy on
+                    as a collapsible block on the contact card - too noisy on
                     a card meant for at-a-glance info. */}
 
-                {/* TOP-LEVEL BUSINESS (bcon) — only the brand and the industry. The full
+                {/* TOP-LEVEL BUSINESS (bcon) - only the brand and the industry. The full
                     form submission belongs in the chat, not crammed into the contact card. */}
                 {brandId === 'bcon' && (() => {
                   const ctx: any = currentLead.unified_context || {};
@@ -2859,7 +2859,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   );
                 })()}
 
-                {/* PAT (Pilot Aptitude Test) breakdown — Windchasers only */}
+                {/* PAT (Pilot Aptitude Test) breakdown - Windchasers only */}
                 {(() => {
                   const wc = currentLead.unified_context?.windchasers || currentLead.unified_context?.bcon || {};
                   const rff = currentLead.unified_context?.raw_form_fields || {};
@@ -2991,7 +2991,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           <div
                             className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
                             style={{ backgroundColor: channel.color }}
-                            title={`Open ${channel.name} conversation — ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                            title={`Open ${channel.name} conversation - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
                             aria-label={`Open ${channel.name} conversation`}
                             onClick={() => {
                               // Jump straight to this contact's inbox thread, pre-selecting the
@@ -3054,7 +3054,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 )}
 
                 {/* Log a Call form */}
-                {/* Log a Call form — draft row (hidden once the bcon hub opens) */}
+                {/* Log a Call form - draft row (hidden once the bcon hub opens) */}
                 {showLogCallForm && !showLogCallHub && (
                   <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
                     <select
@@ -3103,7 +3103,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* Decision hub (bcon) — opens after the draft is saved */}
+                {/* Decision hub (bcon) - opens after the draft is saved */}
                 {showLogCallForm && showLogCallHub && lead && (
                   featureFlags.logCallChat ? (
                     <LogCallChat
@@ -3582,7 +3582,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                - proxe     → blue (agent)
                                - team      → amber (call logs, manual notes)
                                              previously a tiny grey paragraph
-                                             buried under the icon — easy to
+                                             buried under the icon - easy to
                                              miss. Now styled like every other
                                              bubble so the actual call note
                                              pops on the timeline. */}
@@ -3729,7 +3729,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         ...activities
                           .filter(activity => {
                             // Notes tab is HUMAN-ONLY. Automation / agent (proxe)
-                            // entries belong in the Activity tab, never here — the
+                            // entries belong in the Activity tab, never here - the
                             // founder only wants what a person actually wrote, with
                             // their name + note type.
                             if (activity.type !== 'team') return false
@@ -3867,7 +3867,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )}
                     </article>
 
-                    {/* Brands only: "Know online results" — quick launcher to look
+                    {/* Brands only: "Know online results" - quick launcher to look
                         the brand up online (no per-lead search backend needed). */}
                     {(() => {
                       const lkz: any = currentLead.unified_context?.lokazen || {}
@@ -3966,9 +3966,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )
                     })()}
 
-                    {/* Latest note card removed (13 Jul) — notes live in the Notes tab; the founder didn't want it on the summary. */}
+                    {/* Latest note card removed (13 Jul) - notes live in the Notes tab; the founder didn't want it on the summary. */}
 
-                    {/* Next Actions — hidden until redesigned (see SHOW_NEXT_ACTIONS) */}
+                    {/* Next Actions - hidden until redesigned (see SHOW_NEXT_ACTIONS) */}
                     {SHOW_NEXT_ACTIONS && (
                     <section className="lead-next-actions mt-4">
                       <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-[var(--text-primary)]">
@@ -3993,7 +3993,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         }
                         if (brandId === 'bcon') return (
                           <div>
-                            {/* Horizontal timeline — click a step to reveal the exact outgoing message.
+                            {/* Horizontal timeline - click a step to reveal the exact outgoing message.
                                 Wheel scroll is translated to horizontal so a normal scroll moves the
                                 strip sideways; native trackpad/scrollbar drag still works too. */}
                             <div
@@ -4086,7 +4086,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       &ldquo;{renderPreviewWithVars(preview)}&rdquo;
                                     </p>
                                   ) : (
-                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">No fixed template — the AI writes this live at send time using the angle below.</p>
+                                    <p className="text-[11px] text-[var(--text-muted)] mt-1.5 italic">No fixed template - the AI writes this live at send time using the angle below.</p>
                                   )}
                                   {reason && (
                                     <p className="text-[10px] text-[var(--text-muted)] mt-1">{reason}</p>
@@ -4207,7 +4207,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       return (
                         <p className="text-xs text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border-primary)] flex items-center gap-1.5">
                           <MdFlashOn size={13} className="text-orange-500 flex-shrink-0" />
-                          <span><strong className="text-[var(--text-primary)]">Next:</strong> {actionLabel} {countdown ? countdown.toLowerCase() : ''}{firstPending.metadata?.next_action_reason ? ` — ${firstPending.metadata.next_action_reason}` : ''}</span>
+                          <span><strong className="text-[var(--text-primary)]">Next:</strong> {actionLabel} {countdown ? countdown.toLowerCase() : ''}{firstPending.metadata?.next_action_reason ? ` - ${firstPending.metadata.next_action_reason}` : ''}</span>
                         </p>
                       )
                     })()}
@@ -4224,7 +4224,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   >
                     {calculatedScore ? (
                       <div className="space-y-4">
-                        {/* Score headline — single tier label from the calculated score.
+                        {/* Score headline - single tier label from the calculated score.
                             The legacy unified_context.lead_temperature pill was removed because it
                             was painted from a stale/independent classifier and contradicted the
                             score-derived label (e.g. "53/100 Cold + WARM"). One source of truth. */}
@@ -4287,7 +4287,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </section>
                 )}
 
-                {/* Attribution Tab — marketing source + first/last touch +
+                {/* Attribution Tab - marketing source + first/last touch +
                     full UTM/ad-id breakdown + landing page. Split out of the
                     Interaction tab on 2026-05-21 so the 30-day calendar
                     has its own dedicated view. */}
@@ -4314,7 +4314,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           const u = new URL(fullUrl);
                           u.searchParams.forEach((v, k) => { urlParams[k] = v; });
                         }
-                      } catch { /* malformed URL — skip */ }
+                      } catch { /* malformed URL - skip */ }
 
                       const sourceLabel = attribution.source_label
                         || (attribution.source ? String(attribution.source).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : null);
@@ -4329,7 +4329,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
                         : null;
 
-                      // Rich UTM / ad fields — pull from utm{}, fall back to URL params
+                      // Rich UTM / ad fields - pull from utm{}, fall back to URL params
                       const utmSource   = utm.source   || urlParams.utm_source   || null;
                       const utmMedium   = utm.medium   || urlParams.utm_medium   || null;
                       const utmCampaign = utm.campaign || urlParams.utm_campaign || null;
@@ -4616,7 +4616,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 if (!confirm('Are you sure you want to delete this lead? This action cannot be undone.')) return;
                 
                 try {
-                  // Use the per-lead path-param route — it cascades through
+                  // Use the per-lead path-param route - it cascades through
                   // conversations, activities, agent_tasks, and
                   // lead_stage_changes before deleting the lead itself.
                   // The collection-route DELETE doesn't cascade and trips
@@ -4643,7 +4643,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               Delete Lead
             </button>
             <div className="flex items-center gap-3">
-              {/* Quick actions moved out of the + menu — icon + hover tooltip. */}
+              {/* Quick actions moved out of the + menu - icon + hover tooltip. */}
               <div className="flex items-center gap-1">
                 <button
                   onClick={copyLeadDetails}
@@ -4931,7 +4931,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               alert(`Merge failed: ${data?.error || r.statusText}`)
               return
             }
-            // After merge: close the modal and reload — the loser is gone,
+            // After merge: close the modal and reload - the loser is gone,
             // so the dashboard needs to refetch the leads list.
             setShowMergeDialog(false)
             onClose()
@@ -5027,7 +5027,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               {c.customer_name || c.phone || c.email || c.id.slice(0, 8)}
                             </div>
                             <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                              {c.phone || '—'}{c.email ? ` · ${c.email}` : ''} · score {c.lead_score ?? '—'}
+                              {c.phone || '-'}{c.email ? ` · ${c.email}` : ''} · score {c.lead_score ?? '-'}
                             </div>
                           </div>
                         </button>
@@ -5045,16 +5045,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <div className="grid grid-cols-2 gap-2">
                       <article className="p-3 rounded-lg border" style={{ background: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.45)' }}>
                         <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 mb-1">Keep</div>
-                        <div className="text-[12px] font-semibold truncate">{willKeep.customer_name || willKeep.phone || '—'}</div>
+                        <div className="text-[12px] font-semibold truncate">{willKeep.customer_name || willKeep.phone || '-'}</div>
                         <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {willKeep.phone || '—'} · score {willKeep.lead_score ?? '—'}
+                          {willKeep.phone || '-'} · score {willKeep.lead_score ?? '-'}
                         </div>
                       </article>
                       <article className="p-3 rounded-lg border" style={{ background: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.45)' }}>
                         <div className="text-[9px] font-bold uppercase tracking-wider text-red-400 mb-1">Delete</div>
-                        <div className="text-[12px] font-semibold truncate">{willDelete.customer_name || willDelete.phone || '—'}</div>
+                        <div className="text-[12px] font-semibold truncate">{willDelete.customer_name || willDelete.phone || '-'}</div>
                         <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                          {willDelete.phone || '—'} · score {willDelete.lead_score ?? '—'}
+                          {willDelete.phone || '-'} · score {willDelete.lead_score ?? '-'}
                         </div>
                       </article>
                     </div>

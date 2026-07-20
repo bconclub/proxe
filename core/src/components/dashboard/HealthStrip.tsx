@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react'
 
 /**
- * HealthStrip — compact horizontal strip of per-service status dots.
+ * HealthStrip - compact horizontal strip of per-service status dots.
  * Reads /api/dashboard/health and refreshes every 60s while mounted.
  *
  * Usage:
- *   <HealthStrip />              — full layout (dot + label per service)
- *   <HealthStrip compact />      — dots only (no label), for tight headers
+ *   <HealthStrip />              - full layout (dot + label per service)
+ *   <HealthStrip compact />      - dots only (no label), for tight headers
  */
 
 type Status = 'ok' | 'degraded' | 'down' | 'unknown'
@@ -60,7 +60,7 @@ export default function HealthStrip({ compact = false }: { compact?: boolean }) 
       const res = await fetch('/api/dashboard/health', { credentials: 'include' })
       if (res.ok) setData(await res.json())
     } catch {
-      /* swallow — strip just stays in last-known state */
+      /* swallow - strip just stays in last-known state */
     } finally {
       setLoading(false)
     }

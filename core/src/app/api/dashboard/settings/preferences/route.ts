@@ -1,5 +1,5 @@
 /**
- * Global dashboard preferences — ONE config shared by every user.
+ * Global dashboard preferences - ONE config shared by every user.
  *
  * Founder request: "Whatever setting changes I'm making on the dashboard should
  * be for all users until we make a differentiation of users." So sound + theme

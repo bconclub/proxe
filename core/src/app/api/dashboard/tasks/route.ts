@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 /** Render a short outgoing-message preview for a task.
  * bcon: variables stay VISIBLE as [[label]] chips (the UI styles them) and the
- * template the worker WILL send is resolved per task_type + bucket — so the
+ * template the worker WILL send is resolved per task_type + bucket - so the
  * timeline shows the actual outgoing message per planned step. Other brands
  * keep the value-substituted preview their forks shipped. */
 function renderPreview(t: any, facts?: { goal: string | null; brandName: string | null; painPoint: string | null }): string {
@@ -21,7 +21,7 @@ function renderPreview(t: any, facts?: { goal: string | null; brandName: string 
     const tmpl = md.template_name || md.template || resolveTaskTemplate(t.task_type, md.bucket, md.sequence)
     if (tmpl && TEMPLATE_BODIES[tmpl]) {
       // Fill from what the lead actually SAID (facts resolved from their form
-      // answers / campaign / chat) — chips only for genuinely-unknown values.
+      // answers / campaign / chat) - chips only for genuinely-unknown values.
       const goal = md.service_interest || facts?.goal
       const brand = facts?.brandName
       const pain = facts?.painPoint
@@ -45,7 +45,7 @@ function renderPreview(t: any, facts?: { goal: string | null; brandName: string 
         .replace(/\{\{\s*pain_point\s*\}\}/g, md.pain_point || 'that')
     }
   }
-  // AI-dynamic tasks: message is generated at send time — use the stored
+  // AI-dynamic tasks: message is generated at send time - use the stored
   // preview / description / angle as the best available hint.
   return md.preview || md.message_preview || t.task_description || md.completed_action ||
     `${String(t.task_type || 'task').replace(/_/g, ' ')} to ${t.lead_name || 'lead'}`
@@ -63,8 +63,8 @@ function deriveActor(t: any): { label: string; kind: 'human' | 'proxe' } {
 function deriveStatusReason(t: any): string {
   const err = String(t.error_message || '')
   if (t.status === 'queued') return 'Awaiting your approval to send'
-  if (/template/i.test(err)) return 'Template not found — needs setup'
-  if (/24h|window/i.test(err)) return 'Outside 24h window — needs template'
+  if (/template/i.test(err)) return 'Template not found - needs setup'
+  if (/24h|window/i.test(err)) return 'Outside 24h window - needs template'
   if (/phone|number|not synced|recipient/i.test(err)) return 'Phone number missing'
   if (/deliver|unreachable|failed to send/i.test(err)) return 'Delivery failed'
   return err || 'Needs attention'
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get('to')
     const leadId = searchParams.get('lead_id')
 
-    // Deprecated task types — no longer created, filter out any remaining
+    // Deprecated task types - no longer created, filter out any remaining
     const DEPRECATED_TYPES = ['post_booking_followup', 'booking_reminder_1h']
 
     const now = new Date()
@@ -315,7 +315,7 @@ export async function GET(request: NextRequest) {
       .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
     const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000)
     const upcoming = {
-      nextHour: [] as any[], // (none — those are in nextToFire); kept for shape parity
+      nextHour: [] as any[], // (none - those are in nextToFire); kept for shape parity
       soon: upcomingPend.filter((t: any) => new Date(t.scheduled_at) <= fourHoursFromNow).map(slim),
       today: upcomingPend.filter((t: any) => { const d = new Date(t.scheduled_at); return d > fourHoursFromNow && d < todayEnd }).map(slim),
       tomorrow: upcomingPend.filter((t: any) => { const d = new Date(t.scheduled_at); return d >= todayEnd && d < tomorrowEnd }).map(slim),

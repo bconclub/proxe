@@ -1,8 +1,8 @@
-// PROXe Listen — pull items from RSS sources into listen_signals.
+// PROXe Listen - pull items from RSS sources into listen_signals.
 // POST (cookie auth, dashboard "Fetch now"): fetch all active rss sources (or
 // ?id= for one), regex-parse each feed, lightly classify (issue / sentiment /
 // crisis / seat), and insert as source='news' signals. Dedup by url via the
-// unique index (on conflict do nothing). No XML dep — regex is enough for the
+// unique index (on conflict do nothing). No XML dep - regex is enough for the
 // standard RSS/Atom the feeds emit.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -58,7 +58,7 @@ const findSeat = (t: string) => SEATS.find((s) => s.re.test(t)) || null;
 // description html. Feeds vary wildly; try them in that order.
 const itemImage = (block: string): string | null => {
   // feeds embed the image raw, inside CDATA, or html-ENCODED (&lt;img … TOI does
-  // this) — so also try after entity-decoding.
+  // this) - so also try after entity-decoding.
   const decoded = decode(unCdata(block));
   const m =
     block.match(/<media:content[^>]*url="([^"]+)"[^>]*>/i) ||
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
             brand: BRAND_ID,
           };
         });
-        // on conflict (url, brand) MERGE — dedups already-ingested articles while
+        // on conflict (url, brand) MERGE - dedups already-ingested articles while
         // backfilling newly-parsed fields (image_url). created_at isn't in the
         // row payload so the original ingest time is preserved.
         const { data: ins, error: insErr } = await sb.from('listen_signals')

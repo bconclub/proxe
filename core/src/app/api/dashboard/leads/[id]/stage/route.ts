@@ -5,7 +5,7 @@ import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 
 // Allowed lead stages
-// The canonical list lives in @/configs/lead-stages — the API accepts exactly
+// The canonical list lives in @/configs/lead-stages - the API accepts exactly
 // what the UI offers (incl. Demo Taken / Proposal Sent / Nurture, which the
 // orchestrator was already writing but this route used to reject).
 const ALLOWED_STAGES = LEAD_STAGE_VALUES
@@ -24,7 +24,7 @@ export async function PATCH(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -104,7 +104,7 @@ export async function PATCH(
       )
     }
 
-    // Stage change is a work action — it claims the lead (sticky first-touch
+    // Stage change is a work action - it claims the lead (sticky first-touch
     // under features.leadAccess, last-touch-wins otherwise). Non-fatal.
     await assignOwnerOnTouch(supabase, leadId, user)
 
@@ -191,7 +191,7 @@ export async function DELETE(
   try {
     const supabase = await createClient()
     // Auth gate: every dashboard API requires a logged-in Supabase session.
-    // No role check here — viewer vs admin enforcement is done at write sites.
+    // No role check here - viewer vs admin enforcement is done at write sites.
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

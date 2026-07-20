@@ -1,4 +1,4 @@
-// LEADER API — per-seat pulse. The Pulse Punjab app's real numbers (replaces
+// LEADER API - per-seat pulse. The Pulse Punjab app's real numbers (replaces
 // its seeded mock via src/lib/api.ts GET /pulse).
 // Auth: x-api-key = LEADER_API_KEY. Read-only over the privacy-projected view.
 
@@ -65,11 +65,11 @@ export async function GET(req: NextRequest) {
         topCategory: Object.entries(catCount).sort((a, b) => b[1] - a[1])[0]?.[0] || null,
         voteShare,
         knocks7d: knocksBySeat.get(seat) || 0,
-        // Pulse-shaped block — the leader app maps this straight into its
+        // Pulse-shaped block - the leader app maps this straight into its
         // Record<no, Pulse> (it keeps its own bundled age model).
         pulse: {
           // The intensity ladder is CUMULATIVE (nested): every cadre is a
-          // volunteer is a supporter is a voter. Count tier ≥ N, not exactly N —
+          // volunteer is a supporter is a voter. Count tier ≥ N, not exactly N -
           // otherwise a seat with volunteers can show 0 supporters.
           voters: tiers.t1 + tiers.t2 + tiers.t3 + tiers.t4,
           supporters: tiers.t2 + tiers.t3 + tiers.t4,
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
       };
     }).sort((a, b) => b.total - a.total);
 
-    // State-wide intensity totals — the leader's headline "how many volunteers,
+    // State-wide intensity totals - the leader's headline "how many volunteers,
     // how many supporters" numbers.
     const totals = { voters: 0, supporters: 0, volunteers: 0, cadre: 0, grievances: 0, resolved: 0, activeSeats: seats.length };
     seats.forEach((s) => {

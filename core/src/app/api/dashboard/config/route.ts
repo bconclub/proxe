@@ -1,5 +1,5 @@
 /**
- * Config / Connections — admin only.
+ * Config / Connections - admin only.
  *
  * GET /api/dashboard/config → one place to SEE the whole app configuration:
  *   per-integration connection status, the non-secret identifiers (URLs, IDs,
@@ -7,7 +7,7 @@
  *   secret value itself), plus the lead sources, connected channels and lead
  *   fields the agent uses.
  *
- * Phase 1 is read-only visibility. Secret VALUES are never returned — only a
+ * Phase 1 is read-only visibility. Secret VALUES are never returned - only a
  * boolean `set`. (Phase 2 adds write-only secret updates.)
  */
 
@@ -29,7 +29,7 @@ async function requireAdmin(userSupabase: any) {
     .maybeSingle()
   if (!dashboardUser) return { error: 'Your account is not provisioned in dashboard_users. Ask another admin to add you.', status: 403 as const }
   if (dashboardUser.is_active === false) return { error: 'Your account is deactivated', status: 403 as const }
-  if (dashboardUser.role !== 'admin') return { error: 'Forbidden — admins only', status: 403 as const }
+  if (dashboardUser.role !== 'admin') return { error: 'Forbidden - admins only', status: 403 as const }
   return { user, role: dashboardUser.role, status: 200 as const, service }
 }
 

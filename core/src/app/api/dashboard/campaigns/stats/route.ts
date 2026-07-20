@@ -1,8 +1,8 @@
 /**
- * Campaign stats — GET live delivery metrics for campaigns that were actually
+ * Campaign stats - GET live delivery metrics for campaigns that were actually
  * SENT (as opposed to the planned campaigns in the builder store).
  *
- * Derived entirely from the `conversations` log — no separate table. A send is
+ * Derived entirely from the `conversations` log - no separate table. A send is
  * an agent template row tagged with `metadata.campaign`; delivered/read come
  * from `metadata.delivery_status` (stamped by the Meta status webhook, matched
  * on wa_message_id); clicked counts recipients who tapped a quick-reply button
@@ -23,7 +23,7 @@ const SEND_LABELS: Record<string, string> = {
   webinar_thankyou: 'Thank you',
 }
 
-// Who each send targets — surfaced as the card's subtext.
+// Who each send targets - surfaced as the card's subtext.
 const SEND_AUDIENCE: Record<string, string> = {
   webinar_reminder: 'registered leads',
   webinar_starting_soon: 'registered leads',
@@ -65,7 +65,7 @@ export async function GET() {
   // the lead LAST received before the tap. So a "Join WhatsApp Group" tap counts
   // for the reminder that carried the button, not for every template the lead
   // ever got. Two signals: (a) inbound customer button/interactive taps; (b) the
-  // bot's deterministic quick-reply replies (`quick_reply_trigger`) — the group
+  // bot's deterministic quick-reply replies (`quick_reply_trigger`) - the group
   // tap is answered before it lands as an inbound row, so (b) is its only record.
   const clickedByTpl: Record<string, Set<string>> = {}
   const { data: engagement } = await sb
@@ -99,7 +99,7 @@ export async function GET() {
     return parts.join('_') || 'webinar'
   }
 
-  // Group by TEMPLATE — each template we send is its own campaign (one template,
+  // Group by TEMPLATE - each template we send is its own campaign (one template,
   // one audience). Never merged. Alongside, tally per-event votes for the webinar
   // title and date at the ROW level so the group header uses the name/date that
   // most sends actually carried (the Zoom name wins over a stray ad name).
@@ -167,7 +167,7 @@ export async function GET() {
         name: label,
         // The webinar this send belongs to (used to group cards on the page).
         // ALWAYS the event's canonical "Zoom name · date" so every template of one
-        // webinar groups together — the per-send webinar_name is deliberately
+        // webinar groups together - the per-send webinar_name is deliberately
         // ignored because the nudge audience carries a different (ad) name.
         webinar: isWebinar ? (titleByEvent[eventKey(c.campaign)] || c.webinarName || 'Webinar') : null,
         description: `${audience ? audience + ' · ' : ''}${c.template}`,
@@ -182,7 +182,7 @@ export async function GET() {
     .sort((a: any, b: any) => (a.lastSent < b.lastSent ? 1 : -1))
 
   // Upcoming (scheduled, not-yet-sent) day-of webinar sends. Registered leads get
-  // "starting soon" ~30 min before + "live now" at start — surface what's queued.
+  // "starting soon" ~30 min before + "live now" at start - surface what's queued.
   const upcoming: any[] = []
   const { data: wleads } = await sb
     .from('all_leads')

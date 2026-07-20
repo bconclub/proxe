@@ -29,7 +29,7 @@ import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifie
 import { slackBotConfigured, slackPostMessage, leadAlertBlocks } from '@/lib/services/slackApi';
 
 // `process` is SHADOWED in this module by the exported `async function process`
-// below — so a bare `process.env.X` reads `.env` off the FUNCTION (undefined)
+// below - so a bare `process.env.X` reads `.env` off the FUNCTION (undefined)
 // and THROWS "Cannot read properties of undefined (reading 'X')". That silently
 // killed flagForHumanFollowup at the NEXT_PUBLIC_APP_URL read → the Slack "needs
 // a human" ping NEVER fired (and the Telegram alert too). Read env off
@@ -38,7 +38,7 @@ const ENV: Record<string, string | undefined> = ((globalThis as any).process?.en
 
 /**
  * Lokazen has three separate audiences (brand/owner/scout) that must never
- * cross-contaminate — a brand's pricing question should never surface Scout
+ * cross-contaminate - a brand's pricing question should never surface Scout
  * payout content, and vice versa. Only Scout currently has KB content, so
  * for any other (or undetermined) audience we skip the KB search entirely
  * rather than risk a leak; extend the 'scout' branch pattern here if
@@ -67,7 +67,7 @@ export async function process(
   // 1. Extract intent from message
   const intent = extractIntent(input.message, input.usedButtons);
 
-  // 2. Search knowledge base (audience-scoped for Lokazen — see resolveKbScope)
+  // 2. Search knowledge base (audience-scoped for Lokazen - see resolveKbScope)
   const kbScope = resolveKbScope(brandId, input.lokazenAudience);
   const relevantDocs = kbScope.skip ? [] : await searchKnowledgeBase(supabase, input.message, 3, kbScope.category);
   const knowledgeContext = formatKnowledgeContext(relevantDocs);
@@ -78,14 +78,14 @@ export async function process(
   // 4. Build prompt (brand-aware)
   // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
-    ? `[EXISTING BOOKING INFO (internal — do not echo verbatim to the customer): ${existingBookingMessage}
+    ? `[EXISTING BOOKING INFO (internal - do not echo verbatim to the customer): ${existingBookingMessage}
 
 RULES for this turn:
-- Trust the "Current IST" time in your system prompt. NEVER tell the customer the team "will call you at {time}" if that time has ALREADY PASSED — repeating a past slot as if it's still coming is the #1 mistake to avoid here.
-- If the booking time has ALREADY PASSED (the info above says PASSED): take ownership warmly. Apologise that the team hasn't connected yet, do NOT repeat the old time as if it's still upcoming. Then give a concrete next step — offer the next available slot, OR tell them you'll have the team call them back shortly. If they want a call now, say you're getting the team to reach out and that you've flagged it as priority. Do not keep sending the same "booked for {time}" line.
-- If the booking is UPCOMING: acknowledge briefly and reassure ("All set — the team will reach out at {time}."). Don't over-repeat it.
-- If they give a different date/time, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".
-- Read the customer's tone. If they're frustrated or repeating themselves, respond to THAT directly — never send the same booking line twice in a row.]
+- Trust the "Current IST" time in your system prompt. NEVER tell the customer the team "will call you at {time}" if that time has ALREADY PASSED - repeating a past slot as if it's still coming is the #1 mistake to avoid here.
+- If the booking time has ALREADY PASSED (the info above says PASSED): take ownership warmly. Apologise that the team hasn't connected yet, do NOT repeat the old time as if it's still upcoming. Then give a concrete next step - offer the next available slot, OR tell them you'll have the team call them back shortly. If they want a call now, say you're getting the team to reach out and that you've flagged it as priority. Do not keep sending the same "booked for {time}" line.
+- If the booking is UPCOMING: acknowledge briefly and reassure ("All set - the team will reach out at {time}."). Don't over-repeat it.
+- If they give a different date/time, that's a reschedule - cancel old + book new immediately, without asking "should I cancel?".
+- Read the customer's tone. If they're frustrated or repeating themselves, respond to THAT directly - never send the same booking line twice in a row.]
 
 User's message: ${input.message}`
     : input.message;
@@ -137,7 +137,7 @@ User's message: ${input.message}`
   // 5. Detect human handoff requests before AI generation
   const wantsHuman = detectHumanHandoffRequest(input.message);
 
-  // 5b. Scout support issues — a scout reporting an app/upload/KYC/payout problem
+  // 5b. Scout support issues - a scout reporting an app/upload/KYC/payout problem
   // must become a SUPPORT REQUEST (Slack ping to the team), deterministically,
   // not left to the model. Scoped to scout audience so a brand/owner mentioning
   // "photo" or "location" is never caught. These leads can't book a call, so the
@@ -146,35 +146,35 @@ User's message: ${input.message}`
     input.lokazenAudience === 'scout' &&
     (/\b(can'?t|cannot|can not|unable|not able|couldn'?t|won'?t|isn'?t|doesn'?t|didn'?t|no|not)\b[^.?!]*\b(upload|uploaded|uploading|photo|picture|image|pic|location|gps|submit|submitted|kyc|verif|verified|login|log ?in|sign ?in|app|payout|paid|payment|money|reward)\b|\b(kyc|payout|payment|verification)\b[^.?!]*\b(stuck|pending|fail|failed|error|not|missing|issue|problem|delay)\b|\b(problem|issue|trouble|error|not working|doesn'?t work|stuck|help me)\b/i
       .test(input.message || '') ||
-    // Money / payment complaints — scouts get PAID, so any "debited / deducted /
+    // Money / payment complaints - scouts get PAID, so any "debited / deducted /
     // charged / refund / not credited / amount cut / kindly check my payment"
     // line is a support issue even without a negation word. Scout-scoped, so a
     // brand/owner asking about fees is never caught here.
     /\b(debited|deducted|charged|refunded?|not credited|credited|chargeback)\b|\b(money|amount|paisa|rupees?|rs\.?|₹|payment|payout|balance)\b[^.?!]*\b(debited|deducted|cut|gone|missing|stuck|check|not received|didn'?t (get|receive)|haven'?t (got|received)|pending|deducted)\b|\b(didn'?t|not|haven'?t|never)\b[^.?!]*\b(get|got|receive|received|credited|paid)\b[^.?!]*\b(money|amount|payment|payout|refund)\b/i
       .test(input.message || ''));
 
-  // 5c. Payment / transaction failures apply to ANY Lokazen audience — owners and
+  // 5c. Payment / transaction failures apply to ANY Lokazen audience - owners and
   // brands PAY Lokazen, scouts get PAID BY Lokazen, so "money debited but payment
   // failed", "amount deducted", "refund not received" is a SUPPORT issue for all
   // three, never a reason to book a call. Complaint-shaped only (see isPaymentComplaint),
   // so "what's the fee?" / "how do I pay?" never fires.
   const paymentSupportIssue = brandId === 'lokazen' && isPaymentComplaint(input.message || '');
   const supportEscalation = scoutSupportIssue || paymentSupportIssue;
-  // A payment problem must never become a booking — tell the model plainly and
+  // A payment problem must never become a booking - tell the model plainly and
   // forbid the "your transaction was successful" hallucination.
   if (paymentSupportIssue) systemPrompt += paymentSupportDirective();
 
-  // When the person asks for the team / a human, hand off CLEANLY — the team has
+  // When the person asks for the team / a human, hand off CLEANLY - the team has
   // been pinged (flagForHumanFollowup below). Do NOT negotiate a call time back
   // and forth (it loops and never books). Confirm the handoff and stop.
   if (wantsHuman) {
-    systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): Our team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself — the team confirms the time directly. Never loop on times.`;
+    systemPrompt += `\n\nTEAM HANDOFF (the person asked to reach the team/a human): Our team has ALREADY been notified with this conversation. Reply in ONE short line that you've passed their details to the team and someone will reach out shortly to confirm a time. Do NOT ask "what day/time works", do NOT propose slots, do NOT try to book the call yourself - the team confirms the time directly. Never loop on times.`;
   }
 
-  // 5d. Bare greeting — a plain "Hey" is a fresh hello, not the customer
+  // 5d. Bare greeting - a plain "Hey" is a fresh hello, not the customer
   // re-opening yesterday's payout/support thread. Append LAST so it wins over
   // any prior-topic pull. Handoff/payment directives above are gated on the
-  // CURRENT message, so they don't fire on "Hey" — this just stops the model
+  // CURRENT message, so they don't fire on "Hey" - this just stops the model
   // from re-litigating history it shouldn't assume.
   if (isBareGreeting(input.message)) systemPrompt += greetingDirective(input.userProfile.name);
 
@@ -189,14 +189,14 @@ User's message: ${input.message}`
   // Wire booking tools when:
   //   - Current message has booking intent, OR
   //   - User already has a booking (could be rescheduling), OR
-  //   - Any of the last 6 CUSTOMER messages had booking intent — this keeps
+  //   - Any of the last 6 CUSTOMER messages had booking intent - this keeps
   //     tools available across multi-turn booking flows (user said "yes book me"
   //     3 turns ago, now sharing email; tools must still be wired so the LLM
   //     can call check_availability + book_consultation).
   //
   // IMPORTANT: only check role==='user' messages. Agent templates ("Demo
   // Session Booked", "your online demo session is confirmed") contain
-  // booking keywords by definition — if we counted those, every customer
+  // booking keywords by definition - if we counted those, every customer
   // reply right after a demo confirmation would force-wire booking tools,
   // which confused Claude when the customer was actually asking about
   // something unrelated (e.g. "Join Pilot Community" tap → no reply).
@@ -211,16 +211,16 @@ User's message: ${input.message}`
     .reverse()
     .find((m) => m.role === 'assistant');
   const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-  // Scouts can NEVER book a call — so we never even WIRE the booking tools for
+  // Scouts can NEVER book a call - so we never even WIRE the booking tools for
   // them. Previously the tools were offered and the handler hard-refused with
   // scoutBookingBlock(), which the model surfaced as a dumb "Sorry, I cannot
   // book a call" AFTER walking the user down the booking path. Cutting the
   // tools off here means the flow never starts.
   const isScout = input.lokazenAudience === 'scout';
-  // A payment/transaction complaint (any audience) is support, not sales — never
+  // A payment/transaction complaint (any audience) is support, not sales - never
   // wire booking tools for it, so the model can't pivot the person into a call.
   const lokazenBookingAction = !isScout && !supportEscalation && brandId === 'lokazen' && isLokazenBookingAction(input);
-  // POP is citizen grievance outreach — there is nothing to book. Same cutoff
+  // POP is citizen grievance outreach - there is nothing to book. Same cutoff
   // pattern as scouts: never wire the tools, so a booking flow can't even start
   // if a citizen's message happens to trip isBookingIntent().
   const isVoterBrand = brandId === 'pop';
@@ -283,17 +283,17 @@ User's message: ${input.message}`
   // If the response claims a booking was made but book_consultation never
   // fired (Claude sometimes types through a flow without invoking the tool),
   // overwrite the response with a "let me try again" line and flag the lead.
-  // We deliberately do NOT silently keep the false claim — the customer would
+  // We deliberately do NOT silently keep the false claim - the customer would
   // expect a calendar invite that never arrives.
   // Fire whenever NO booking actually completed this turn and there is no
   // pre-existing booking to legitimately confirm. This now also covers the
   // case where booking tools were never wired (Claude free-typed a "Done."
-  // confirmation, or printed the tool args as JSON) — previously the guard was
+  // confirmation, or printed the tool args as JSON) - previously the guard was
   // gated on needsBookingTools and silently let those false claims through.
   const noBookingThisTurn = !bookingsCompletedThisSession || bookingsCompletedThisSession.size === 0;
   if (input.channel === 'whatsapp' && noBookingThisTurn && !existingBookingMessage) {
     // Match the CURRENT confirmation wording too. The booking copy changed to
-    // "Your booking is recorded …" / "You're all set …" — the old regex only
+    // "Your booking is recorded …" / "You're all set …" - the old regex only
     // caught "is locked" / "booking confirmed", so failed bookings were sailing
     // through with a false "recorded" claim and nothing saved.
     const claimsBooked = /(\b(done\.|is locked|booking confirmed|booking is recorded|recorded for|you'?re all set|all set,? |looking forward to (chatting|seeing|meeting)|see you (tomorrow|today|on)|calendar invite on its way|booked,?\b|your (call|visit|callback) is (set|booked|scheduled|confirmed)|(call|callback|visit) is set for|team will (confirm|call|connect)|will confirm and call you|will call you then|call you at|flag (this|it|these|that|your details) to (the|our) team|noted[,.]? .*call you)\b|\bat \d{1,2}(:\d{2})?\s*(am|pm)\s+works\b)/i
@@ -301,7 +301,7 @@ User's message: ${input.message}`
     // DETERMINISTIC SAFETY NET (never silent): if the customer's message THIS turn
     // is a bare time-slot pick ("3 PM" / "3:00 PM" / "15:00") in reply to a booking
     // prompt, a booking was expected. If none registered, we MUST act regardless of
-    // what the model typed — even an honest "I couldn't book" would otherwise leave
+    // what the model typed - even an honest "I couldn't book" would otherwise leave
     // the team unaware. Gated on a booking context so a stray "5 pm" never fires.
     const msgTrim = String(input.message || '').trim();
     const isBareSlot = /^(1[0-2]|[1-9])(:[0-5]\d)?\s*(a\.?m\.?|p\.?m\.?)$/i.test(msgTrim)
@@ -309,21 +309,21 @@ User's message: ${input.message}`
     const lastAsst = (input.conversationHistory || []).slice(-3).reverse().find((m) => m.role === 'assistant');
     const inBookingCtx = !!lastAsst && /\b(\d\s*(am|pm)|what time|which .*work|\bslot\b|book|call ?back|schedule|\bcall you\b)\b/i.test(String(lastAsst.content || ''));
     // If the model is still COLLECTING info (asking for email/name/number) the
-    // flow isn't done — that's not a failed booking, so don't force the net.
+    // flow isn't done - that's not a failed booking, so don't force the net.
     const responseAsksForInfo = /\?\s*$/.test(rawResponse.trim())
       || /\b(e-?mail|your name|best (number|time)|reach you (on|at)|what('?s| is) your|share your)\b/i.test(rawResponse);
     const userPickedSlot = isBareSlot && inBookingCtx && !responseAsksForInfo;
     if (claimsBooked || userPickedSlot) {
       // Before giving up: go back through the conversation, pull the date + time
       // the user actually agreed, and register it. A failed/never-called booking
-      // should not lose the call — recover it instead of only apologising.
+      // should not lose the call - recover it instead of only apologising.
       const recovered = await recoverLostBooking(input, rawResponse, supabase);
       if (recovered) {
         console.log(`[Engine] FALSE BOOKING CLAIM RECOVERED from conversation: ${recovered.dateISO} ${recovered.timeDisplay}`);
         rawResponse = `You're booked for ${recovered.timeDisplay} ${recovered.dateLabel}. The team will call you then.`;
       } else {
-        console.error('[Engine] FALSE BOOKING CLAIM — could not recover a slot from the conversation. Overwriting + flagging lead.');
-        await flagForHumanFollowup(supabase, input, 'BOOKING FAILED — the customer tried to book a call but it did not save. Please call them to confirm a time.');
+        console.error('[Engine] FALSE BOOKING CLAIM - could not recover a slot from the conversation. Overwriting + flagging lead.');
+        await flagForHumanFollowup(supabase, input, 'BOOKING FAILED - the customer tried to book a call but it did not save. Please call them to confirm a time.');
         rawResponse = "I could not lock that slot just now, but I have passed your details to our team. They will reach out to confirm your time shortly.";
       }
     }
@@ -332,7 +332,7 @@ User's message: ${input.message}`
   // ── DUPLICATE CONFIRMATION GUARD ───────────────────────────────────────
   // A booking confirmation already exists for this lead (existingBookingMessage)
   // and the model is repeating "booking is recorded" WITHOUT making a new
-  // booking this turn — e.g. the customer just said "okay". Re-announcing the
+  // booking this turn - e.g. the customer just said "okay". Re-announcing the
   // booking a second time reads as broken ("recorded… recorded again"). Replace
   // the repeat with a brief acknowledgement so it's only ever confirmed once.
   if (input.channel === 'whatsapp' && noBookingThisTurn && existingBookingMessage) {
@@ -340,7 +340,7 @@ User's message: ${input.message}`
       .test(rawResponse);
     if (repeatsBooking) {
       console.log('[Engine] Suppressing duplicate booking confirmation (already confirmed earlier, no new booking this turn).');
-      rawResponse = "You're all set — our team will reach out to confirm. Anything else I can help with?";
+      rawResponse = "You're all set - our team will reach out to confirm. Anything else I can help with?";
     }
   }
 
@@ -348,11 +348,11 @@ User's message: ${input.message}`
   if (wantsHuman) {
     await flagForHumanFollowup(supabase, input, 'Customer requested human agent');
   } else if (paymentSupportIssue) {
-    // Payment/transaction problem (any audience) — raise a support request so the
+    // Payment/transaction problem (any audience) - raise a support request so the
     // team gets the number + the exact complaint and can check the transaction.
     await flagForHumanFollowup(supabase, input, `Payment/transaction issue: "${(input.message || '').slice(0, 160)}"`);
   } else if (scoutSupportIssue) {
-    // Scout hit a problem — raise a support request so the team gets pinged with
+    // Scout hit a problem - raise a support request so the team gets pinged with
     // the number + the issue. (No call for scouts; support goes this way.)
     await flagForHumanFollowup(supabase, input, `Scout reported an issue: "${(input.message || '').slice(0, 160)}"`);
   }
@@ -373,10 +373,10 @@ User's message: ${input.message}`
   let lowValueEscalation = false;
 
   // ANTI-REPEAT GUARD (deterministic): the model sometimes re-sends a
-  // near-identical line turn after turn — e.g. the same "the team handles
+  // near-identical line turn after turn - e.g. the same "the team handles
   // payouts... your submission is in the queue for verification" to both "Hey"
   // and "Yes". That reads as broken and re-asserts status we don't know. If this
-  // reply is ~the same as any of the last few things we sent, don't parrot it —
+  // reply is ~the same as any of the last few things we sent, don't parrot it -
   // hand to a human once and stop. Compares against the last 3 assistant turns.
   if (input.channel === 'whatsapp' && cleanedResponse && !needsBookingTools) {
     const recentAssistant = (input.conversationHistory || [])
@@ -384,21 +384,21 @@ User's message: ${input.message}`
       .slice(-3)
       .map((m) => m.content);
     if (recentAssistant.some((prev) => isNearDuplicate(cleanedResponse, prev))) {
-      console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" — suppressing the parrot, escalating to a human.`);
+      console.warn(`[Engine] ANTI-REPEAT: near-duplicate of a recent reply for "${(input.message || '').slice(0, 60)}" - suppressing the parrot, escalating to a human.`);
       await flagForHumanFollowup(supabase, input, `Repeat-reply guard: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
       cleanedResponse = await composeTeamHandoffLine(supabase, input, brandId);
       lowValueEscalation = true;
     }
   }
 
-  // EMPTY-RESPONSE GUARD: never hand the WhatsApp route an empty reply — it would
+  // EMPTY-RESPONSE GUARD: never hand the WhatsApp route an empty reply - it would
   // send the generic "Give me a moment, I'll have someone from the team get in
   // touch" holding line, which repeats turn after turn and reads as broken (the
   // scout kept asking "when will they connect" and got the same robotic line).
   // If the model produced nothing usable, ESCALATE to a human (Slack ping + task
   // via flagForHumanFollowup) and give ONE warm, specific line instead.
   if (!cleanedResponse || !cleanedResponse.trim()) {
-    console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" — escalating to a human instead of the generic holding line.`);
+    console.warn(`[Engine] Empty response for "${(input.message || '').slice(0, 80)}" - escalating to a human instead of the generic holding line.`);
     await flagForHumanFollowup(supabase, input, `Empty AI response to: "${(input.message || '').slice(0, 120)}"`).catch(() => {});
     cleanedResponse = await composeTeamHandoffLine(supabase, input, brandId);
     lowValueEscalation = true;
@@ -450,10 +450,10 @@ export async function* processStream(
     const brandId = input.brand || getCurrentBrandId();
     const brandConfig = getBrandConfig(brandId);
 
-    // 1. Extract intent — determines which DB calls to make
+    // 1. Extract intent - determines which DB calls to make
     const intent = extractIntent(input.message, input.usedButtons);
     // Booking intent: current message OR a CUSTOMER message in the last 6 turns
-    // had booking intent. Same scope-down as process() — agent templates
+    // had booking intent. Same scope-down as process() - agent templates
     // contain booking keywords ("demo session confirmed") and would otherwise
     // false-trigger booking-tool mode for follow-up customer messages.
     const recentBookingDiscussion = (input.conversationHistory || [])
@@ -464,12 +464,12 @@ export async function* processStream(
       .reverse()
       .find((m) => m.role === 'assistant');
     const midBookingFlow = !!lastAssistantTurn && isBookingFlowStep(lastAssistantTurn.content);
-    // Scouts never book — keep booking intent (and thus the booking tools) off
+    // Scouts never book - keep booking intent (and thus the booking tools) off
     // entirely for them, same as the WhatsApp path above.
     const isScout = input.lokazenAudience === 'scout';
-    // Payment/transaction complaint (any audience) is support, not sales — keep
+    // Payment/transaction complaint (any audience) is support, not sales - keep
     // booking off, same as the WhatsApp path. The web path has no escalation block
-    // of its own, so raise the support request here too — otherwise the directive
+    // of its own, so raise the support request here too - otherwise the directive
     // makes the reply CLAIM "I've raised a request" while nothing actually fires.
     const paymentSupportIssue = brandId === 'lokazen' && isPaymentComplaint(input.message || '');
     if (paymentSupportIssue) {
@@ -480,7 +480,7 @@ export async function* processStream(
       (isBookingIntent(input.message) || recentBookingDiscussion || midBookingFlow || lokazenBookingAction);
 
     // 2. Parallelize DB calls: KB search always runs (audience-scoped for
-    //    Lokazen — see resolveKbScope); booking check only when needed
+    //    Lokazen - see resolveKbScope); booking check only when needed
     const kbScope = resolveKbScope(brandId, input.lokazenAudience);
     const [relevantDocs, existingBookingMessage] = await Promise.all([
       kbScope.skip ? Promise.resolve([]) : searchKnowledgeBase(supabase, input.message, 3, kbScope.category),
@@ -490,12 +490,12 @@ export async function* processStream(
 
     // 3. Build prompt (brand-aware)
     const finalMessage = existingBookingMessage
-      ? `[EXISTING BOOKING INFO (internal — do not echo verbatim to the customer): ${existingBookingMessage}
+      ? `[EXISTING BOOKING INFO (internal - do not echo verbatim to the customer): ${existingBookingMessage}
 
 RULES for this turn:
 - The customer JUST booked. They know when. Do NOT restate the specific date or time back to them unless they explicitly ask "when is my session?" or similar.
 - Acknowledge the booking briefly ("Great, your demo is confirmed." or "All set."), then ask what they need help with.
-- If they give a different date/time in this message, that's a reschedule — cancel old + book new immediately, without asking "should I cancel?".]
+- If they give a different date/time in this message, that's a reschedule - cancel old + book new immediately, without asking "should I cancel?".]
 
 User's message: ${input.message}`
       : input.message;
@@ -550,7 +550,7 @@ User's message: ${input.message}`
     if (brandId === 'lokazen') systemPrompt += statusHonestyDirective();
   if (brandId === 'lokazen') systemPrompt += callbackDirective();
 
-    // 4. Generate response — true streaming for conversational messages,
+    // 4. Generate response - true streaming for conversational messages,
     //    tool-loop for booking messages (tools need a complete back-and-forth)
     let finalResponse = '';
 
@@ -598,7 +598,7 @@ User's message: ${input.message}`
 
       // EMPTY-RESPONSE GUARD: in the tool loop the model sometimes spends its
       // turn on tool calls (update_lead_profile etc.) and returns no visible
-      // text, or text that is ONLY [BTN:] markers — the widget then shows an
+      // text, or text that is ONLY [BTN:] markers - the widget then shows an
       // empty bubble and the flow dies (seen live on "Start this plan").
       // Substitute the deterministic next booking question so the flow
       // always moves forward.
@@ -633,7 +633,7 @@ User's message: ${input.message}`
 
     yield { type: 'followUps', followUps };
 
-    // Schedule flow tasks (non-blocking — fires after response is sent)
+    // Schedule flow tasks (non-blocking - fires after response is sent)
     scheduleFlowTasks(supabase, input, finalResponse).catch(err => {
       console.error('[Engine] Flow task scheduling failed:', err?.message);
     });
@@ -691,10 +691,10 @@ function suppressKnownContactReask(response: string, input: AgentInput, brandId:
 /**
  * A hard, per-turn audience lock appended to the Lokazen system prompt. The
  * base prompt carries brand/owner/scout GUIDANCE, but nothing tells the model
- * which flow THIS conversation is in — so it would infer (and drift), e.g.
+ * which flow THIS conversation is in - so it would infer (and drift), e.g.
  * answering a scout's "money debited" with brand/CRE copy, or offering a scout
  * a call. This states the resolved audience outright. No-op for non-lokazen
- * brands or when the audience is unknown (null) — then the base guidance +
+ * brands or when the audience is unknown (null) - then the base guidance +
  * "ask one question if unsure" rule still applies.
  */
 function lokazenAudienceDirective(input: AgentInput, brandId: string): string {
@@ -702,12 +702,12 @@ function lokazenAudienceDirective(input: AgentInput, brandId: string): string {
 
   if (input.lokazenAudience === 'scout') {
     return `\n\n=================================================================================
-CURRENT CONVERSATION AUDIENCE: SCOUT (LOCKED — overrides any inferred flow)
+CURRENT CONVERSATION AUDIENCE: SCOUT (LOCKED - overrides any inferred flow)
 =================================================================================
-This person is a Lokazen SCOUT (a gig worker who spots empty "To Let" shops and gets PAID after verification). Apply the SCOUT rules ONLY — never the Brand or Owner flow.
+This person is a Lokazen SCOUT (a gig worker who spots empty "To Let" shops and gets PAID after verification). Apply the SCOUT rules ONLY - never the Brand or Owner flow.
 - NEVER offer, suggest, or attempt a call, consultation, demo, or site visit. There is nothing to book for a scout. Never ask "what day/time works for a call" or say "I'll connect you with the team for a call".
 - NEVER answer with brand / commercial-real-estate / space-finding / pricing content. That is a different audience.
-- If they report ANY problem — money debited / deducted / charged, payment or payout not received, refund, amount cut, "kindly check", KYC stuck, verification, app not working, login, upload / photo / location — treat it as SCOUT SUPPORT: acknowledge briefly, confirm their phone number, and say plainly: "I've raised a support request with the Lokazen team with your number and details, and they'll help you shortly." Do NOT invent troubleshooting steps and do NOT claim the issue is fixed.`;
+- If they report ANY problem - money debited / deducted / charged, payment or payout not received, refund, amount cut, "kindly check", KYC stuck, verification, app not working, login, upload / photo / location - treat it as SCOUT SUPPORT: acknowledge briefly, confirm their phone number, and say plainly: "I've raised a support request with the Lokazen team with your number and details, and they'll help you shortly." Do NOT invent troubleshooting steps and do NOT claim the issue is fixed.`;
   }
 
   const label = input.lokazenAudience === 'brand'
@@ -720,11 +720,11 @@ Apply the ${input.lokazenAudience.toUpperCase()} flow for this conversation. Do 
 }
 
 /**
- * Complaint-shaped detector for a payment/transaction problem — money debited but
+ * Complaint-shaped detector for a payment/transaction problem - money debited but
  * payment failed, amount deducted, double charged, refund not received, etc. Kept
  * deliberately complaint-shaped (needs a fail/debited/deducted/reversed signal, not
  * just the word "payment") so a pricing QUESTION ("what's the fee?", "how do I
- * pay?") never trips it. Applies to every Lokazen audience — owners/brands pay
+ * pay?") never trips it. Applies to every Lokazen audience - owners/brands pay
  * Lokazen, scouts are paid by Lokazen, so all three can hit a payment problem.
  */
 function isPaymentComplaint(message: string): boolean {
@@ -739,19 +739,19 @@ function isPaymentComplaint(message: string): boolean {
  */
 function paymentSupportDirective(): string {
   return `\n\n=================================================================================
-PAYMENT / TRANSACTION PROBLEM (LOCKED — this turn is SUPPORT, not sales)
+PAYMENT / TRANSACTION PROBLEM (LOCKED - this turn is SUPPORT, not sales)
 =================================================================================
 This person reported a payment or transaction problem (money debited but payment failed, amount deducted, double charged, refund not received, etc.). Handle it as SUPPORT:
 - Do NOT offer, suggest, or start a call/consultation/site-visit booking. Never ask "what day/time works for a call". There is nothing to book here.
-- Acknowledge the specific issue in one line, confirm the phone number we should use, then say plainly: "I've raised a support request with the Lokazen team with your number and details — they'll check this and get back to you shortly."
+- Acknowledge the specific issue in one line, confirm the phone number we should use, then say plainly: "I've raised a support request with the Lokazen team with your number and details - they'll check this and get back to you shortly."
 - Do NOT claim the payment succeeded, was reversed, or is fixed. Do NOT invent a resolution, a reference number, or a timeline. You are only raising the request.`;
 }
 
 /**
- * A message that is ONLY a greeting/opener with no real content — "hey", "hi",
+ * A message that is ONLY a greeting/opener with no real content - "hey", "hi",
  * "hello", "good morning", "namaste", maybe with a name, "there", or an emoji.
  * After a heavy prior thread (a payment/support issue, a booking), a bare "Hey"
- * is NOT the customer re-raising that topic — it's a fresh hello. We must greet
+ * is NOT the customer re-raising that topic - it's a fresh hello. We must greet
  * back and let them lead, never re-litigate yesterday's issue or assume urgency.
  */
 function isBareGreeting(message: string): boolean {
@@ -773,11 +773,11 @@ function isBareGreeting(message: string): boolean {
 function greetingDirective(name?: string): string {
   const first = name?.trim() ? name.trim().split(/\s+/)[0] : '';
   return `\n\n=================================================================================
-BARE GREETING (LOCKED — the customer only said hello)
+BARE GREETING (LOCKED - the customer only said hello)
 =================================================================================
-The customer's latest message is JUST a greeting — nothing else. Treat it as a fresh hello, NOT a continuation of any earlier topic.
+The customer's latest message is JUST a greeting - nothing else. Treat it as a fresh hello, NOT a continuation of any earlier topic.
 - Reply with ONE short, warm greeting and an open question like "how can I help?" / "what can I do for you today?"${first ? ` Open with their first name (${first}).` : ''}
-- Do NOT bring up payments, payouts, submissions, verification, bookings, site visits, or "the team is looking into it" — unless THEY raise it in THIS message. They didn't.
+- Do NOT bring up payments, payouts, submissions, verification, bookings, site visits, or "the team is looking into it" - unless THEY raise it in THIS message. They didn't.
 - Do NOT assume anything is important, urgent, or unresolved. Let them tell you what they need. Keep it light and let them lead.`;
 }
 
@@ -791,17 +791,17 @@ function statusHonestyDirective(): string {
   return `\n\n=================================================================================
 DO NOT INVENT STATUS (LOCKED)
 =================================================================================
-You have NO access to any payout, payment, submission, verification, application, KYC, or order system. You do NOT know the live status, queue position, or timeline of any of these — ever.
-- NEVER assert or imply a status you cannot see: e.g. "your submission is in the queue for verification", "the team usually gets back the same day", "they have your number", "it's being processed", "you'll hear back by <time>". These are fabrications — do not say them.
+You have NO access to any payout, payment, submission, verification, application, KYC, or order system. You do NOT know the live status, queue position, or timeline of any of these - ever.
+- NEVER assert or imply a status you cannot see: e.g. "your submission is in the queue for verification", "the team usually gets back the same day", "they have your number", "it's being processed", "you'll hear back by <time>". These are fabrications - do not say them.
 - If they ask about status and the team is already handling it: say honestly you don't have the live status in front of you, confirm it's been passed to the Lokazen team, and ask if there's anything specific to add. ONE short line.
-- Do NOT re-send a reassurance you already gave. If you've said it once, either add something real or hand it to the team — never repeat the same line.`;
+- Do NOT re-send a reassurance you already gave. If you've said it once, either add something real or hand it to the team - never repeat the same line.`;
 }
 
 /**
  * Appended for Lokazen. Fixes the earlier chaos where the agent invented random
  * slots ("3/4/5 PM") and self-claimed "Booked" (nothing persisted → loop). The
- * real rule: booking window is 11 AM–6 PM IST and every offered time must be at
- * least 90 minutes out. The agent offers valid times but does NOT self-lock —
+ * real rule: booking window is 11 AM-6 PM IST and every offered time must be at
+ * least 90 minutes out. The agent offers valid times but does NOT self-lock -
  * the team confirms and attends. Current time is injected so slots are valid.
  */
 function callbackDirective(): string {
@@ -811,16 +811,16 @@ function callbackDirective(): string {
   const earliest = new Date(now.getTime() + 90 * 60_000).toLocaleTimeString('en-IN', opts);
   const istHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: false }).format(now));
   const todayNote = istHour >= 16
-    ? `It's late — the earliest valid time (${earliest}) may be past 6 PM. If so, offer times TOMORROW, 11 AM–6 PM.`
-    : `Offer 2–3 concrete times today between ${earliest} and 6:00 PM.`;
+    ? `It's late - the earliest valid time (${earliest}) may be past 6 PM. If so, offer times TOMORROW, 11 AM-6 PM.`
+    : `Offer 2-3 concrete times today between ${earliest} and 6:00 PM.`;
   return `\n\n=================================================================================
 LOKAZEN CALL / SITE-VISIT TIMING (LOCKED)
 =================================================================================
 The booking window is FIXED: 11:00 AM to 6:00 PM IST, and every time you offer must be at least 90 minutes from now. It is currently ${istNow} IST, so the earliest time you may offer is ${earliest} IST.
 - ${todayNote}
-- NEVER offer a time outside 11:00 AM–6:00 PM IST, and never sooner than 90 minutes from now.
-- You do NOT self-lock bookings. Once they pick a time, confirm it in ONE line and say the Lokazen team will confirm and be there — do NOT say "Booked/locked/set" as if the system confirmed it, and do NOT re-open scheduling afterwards.
-- If they only want a phone callback, no slot is needed — say the team will call them, once, and stop.`;
+- NEVER offer a time outside 11:00 AM-6:00 PM IST, and never sooner than 90 minutes from now.
+- You do NOT self-lock bookings. Once they pick a time, confirm it in ONE line and say the Lokazen team will confirm and be there - do NOT say "Booked/locked/set" as if the system confirmed it, and do NOT re-open scheduling afterwards.
+- If they only want a phone callback, no slot is needed - say the team will call them, once, and stop.`;
 }
 
 /** Normalize for near-duplicate detection: lowercase, collapse to word tokens. */
@@ -829,7 +829,7 @@ function normalizeForCompare(s: string): string {
 }
 
 /**
- * True when `a` is essentially the same message as `b` — identical after
+ * True when `a` is essentially the same message as `b` - identical after
  * normalization, or ≥80% token overlap (Jaccard). Catches the "same payout line
  * sent to both 'Hey' and 'Yes'" parrot loop.
  */
@@ -850,11 +850,11 @@ function isNearDuplicate(a: string, b: string): boolean {
 /**
  * A warm, CONTEXTUAL "the team is on it" line for the escalation fallbacks
  * (empty AI reply / anti-repeat). Replaces the fixed canned strings that fired
- * verbatim turn after turn ("Thanks for bearing with me — I've flagged this to
+ * verbatim turn after turn ("Thanks for bearing with me - I've flagged this to
  * our team…" sent to both "Any updates??" and "call me back"). It:
  *   - greets by first name,
  *   - names what they're actually about (their property area/type, pulled from
- *     the lead's stored context — e.g. "your Jainagar property"),
+ *     the lead's stored context - e.g. "your Jainagar property"),
  *   - offers a callback,
  *   - and picks a phrasing that ISN'T a near-duplicate of what we just said, so
  *     a second/third escalation never parrots the first.
@@ -880,7 +880,7 @@ async function composeTeamHandoffLine(
       const type = String(lkz.property_type || '').trim();
       about = area ? `your ${area} property` : type ? `your ${type.toLowerCase()} requirement` : '';
     }
-  } catch { /* non-critical — fall back to a generic reference */ }
+  } catch { /* non-critical - fall back to a generic reference */ }
   const on = about ? ` on ${about}` : '';
   const ref = about || 'this';
 
@@ -888,7 +888,7 @@ async function composeTeamHandoffLine(
   // isn't a near-duplicate of a recent assistant turn.
   const lines = [
     `${hi}our team is already working on ${ref}. Want someone from the team to call you back?`,
-    `${hi}the team has your number and details${on} — I'll make sure they call you back. What time works best for you?`,
+    `${hi}the team has your number and details${on} - I'll make sure they call you back. What time works best for you?`,
     `${hi}I've passed this to the team${on} and they have your number; they'll reach out directly. Anything you'd like me to add for them?`,
   ];
   const recent = (input.conversationHistory || [])
@@ -913,7 +913,7 @@ function isLokazenBookingAction(input: AgentInput): boolean {
 
 function advanceLokazenBookingAfterEmail(response: string, input: AgentInput, brandId: string): string {
   if (brandId !== 'lokazen') return response;
-  // Scouts never book — never rewrite a scout's reply into "what day/time works
+  // Scouts never book - never rewrite a scout's reply into "what day/time works
   // for a call". Their "team will reach out" line is the support-request
   // confirmation, not a booking punt.
   if (input.lokazenAudience === 'scout') return response;
@@ -948,7 +948,7 @@ function stripCapturedDetailWrapper(raw: string): string {
   const separatorIndex = lines.findIndex((line, index) => {
     if (index === 0) return false;
     const trimmed = line.trim();
-    return /^-{2,}$/.test(trimmed) || /^—{2,}$/.test(trimmed) || /^–{2,}$/.test(trimmed);
+    return /^-{2,}$/.test(trimmed) || /^-{2,}$/.test(trimmed) || /^-{2,}$/.test(trimmed);
   });
 
   if (separatorIndex < 0 || separatorIndex > 5) {
@@ -977,7 +977,7 @@ function cleanResponse(raw: string, channel?: string): string {
     // and instead types the call signature as text (e.g. "Let me check
     // today's slots for you. check_availability(2026-05-21)"), the
     // customer sees raw function syntax on WhatsApp. Strip every known
-    // tool name followed by an arg list — and any "Let me check ..."
+    // tool name followed by an arg list - and any "Let me check ..."
     // preamble that's left dangling without a tool result. Add new tool
     // names here whenever buildBookingTools / future engines gain one.
     .replace(/\b(check_availability|book_consultation)\s*\([^)]*\)\.?/gi, '')
@@ -1010,16 +1010,16 @@ function cleanResponse(raw: string, channel?: string): string {
   cleaned = stripCapturedDetailWrapper(cleaned).trim();
 
   // Hard guard: never emit em/en dashes in user-facing responses.
-  // Replace with a sentence break ('. ') rather than a hyphen — using '-'
+  // Replace with a sentence break ('. ') rather than a hyphen - using '-'
   // produced glued-together output like "Happy to help-what aspect..." when
-  // the model wrote "Happy to help — what aspect...". The post-processor
+  // the model wrote "Happy to help - what aspect...". The post-processor
   // also normalises any accidental " - " spacing left over from old training
   // habits into a proper sentence break, then collapses any double spaces /
   // ". ." artefacts the regexes might leave behind.
   cleaned = cleaned
     .replace(/\s*[—–]\s*/g, '. ')
     .replace(/\.[ \t]*\./g, '.')
-    // Collapse runs of spaces/tabs only — do NOT touch newlines, or multi-
+    // Collapse runs of spaces/tabs only - do NOT touch newlines, or multi-
     // paragraph replies (\n\n between paragraphs) get flattened into one block.
     .replace(/[ \t]{2,}/g, ' ')
     // Tidy spaces left hanging at line ends after the strips above.
@@ -1062,7 +1062,7 @@ function bookingTo12(hhmm: string): string {
 async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promise<string | null> {
   // NOT gated on booking-intent: a customer with a booking who is frustrated
   // ("call now", "it's 6:30") rarely uses booking keywords, yet the agent must
-  // still know their slot — and crucially whether it has already passed.
+  // still know their slot - and crucially whether it has already passed.
   const phone = input.userProfile.phone;
   if (!phone) return null;
 
@@ -1099,7 +1099,7 @@ async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promis
     const nowDisplay = bookingTo12(nowHM);
 
     if (isPast) {
-      return `The customer's booking was for ${whenLabel} at ${display}, but that time has ALREADY PASSED — it is now ${nowDisplay} IST. The scheduled call has not happened. Do NOT promise a call at ${display}; apologise and offer the next slot or a team callback.`;
+      return `The customer's booking was for ${whenLabel} at ${display}, but that time has ALREADY PASSED - it is now ${nowDisplay} IST. The scheduled call has not happened. Do NOT promise a call at ${display}; apologise and offer the next slot or a team callback.`;
     }
     return `The customer has an UPCOMING booking for ${whenLabel} at ${display} (it is now ${nowDisplay} IST).`;
   } catch (error) {
@@ -1115,7 +1115,7 @@ const HUMAN_HANDOFF_PATTERNS = [
   /\btalk\s+to\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
   /\bspeak\s+(?:to|with)\s+(?:a\s+)?(?:human|person|real\s+person|someone|agent|representative|rep)\b/i,
   /\bconnect\s+(?:me\s+)?(?:to|with)\s+(?:a\s+)?(?:human|person|someone|agent|representative|rep)\b/i,
-  // "talk to the team" / "connect with the team" / "talk to Lokazen team" — a
+  // "talk to the team" / "connect with the team" / "talk to Lokazen team" - a
   // team handoff. Route it to a real human handoff (Slack ping) instead of the
   // AI trying to negotiate a booking time (which loops). The team confirms.
   /\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:(?:the|lokazen|your)\s+){0,2}team\b/i,
@@ -1145,7 +1145,7 @@ function escapeHtmlTg(text: string | null | undefined): string {
 
 /**
  * Ping the team's Telegram group (TELEGRAM_ADMIN_CHAT_ID) via the brand's bot.
- * No-op — returns {sent:false} — for any brand that hasn't set both env vars, so
+ * No-op - returns {sent:false} - for any brand that hasn't set both env vars, so
  * this never throws or bleeds a message to the wrong brand's group.
  */
 async function sendTelegramAlert(text: string): Promise<{ sent: boolean; error?: string }> {
@@ -1177,7 +1177,7 @@ async function flagForHumanFollowup(
     const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
 
     // Fetch the lead (customer_name + unified_context so the Slack alert can
-    // name the BUSINESS, e.g. "NG Ventures", not just the person — the team
+    // name the BUSINESS, e.g. "NG Ventures", not just the person - the team
     // identifies a lead by its business/brand, not the contact's first name).
     const { data: lead } = await supabase
       .from('all_leads')
@@ -1210,14 +1210,14 @@ async function flagForHumanFollowup(
       : input.lokazenAudience === 'owner' ? 'Property Owner'
       : input.lokazenAudience === 'scout' ? 'Scout'
       : null;
-    // Scouts can't book a call — their escalations are SUPPORT requests, so the
+    // Scouts can't book a call - their escalations are SUPPORT requests, so the
     // channel reads "Scout support request" (with the number + issue) rather than
     // a generic lead follow-up.
     const isScout = input.lokazenAudience === 'scout';
     const appUrl = ENV.NEXT_PUBLIC_APP_URL || 'https://proxe.lokazen.in';
     const title = isScout ? 'Scout support request' : 'Needs human follow-up';
 
-    // Show just the lead's own name (e.g. "Arbaaz Khan") — nothing else. An
+    // Show just the lead's own name (e.g. "Arbaaz Khan") - nothing else. An
     // earlier version prepended a guessed "business name" which mis-attached an
     // unrelated value to the contact and duplicated the @mention handle. The
     // @mention (SLACK_MENTION_USER_ID) is the ping; the name is just the lead.
@@ -1258,21 +1258,21 @@ async function flagForHumanFollowup(
       });
     }
     // notifySlackLead soft-fails SILENTLY (no log at all) when SLACK_WEBHOOK_URL
-    // isn't set — the AI tells the person "I've raised a support request" and
+    // isn't set - the AI tells the person "I've raised a support request" and
     // the DB flag is real, but the team never actually gets pinged, with zero
     // trace of that gap anywhere. Log the real outcome so a missing/broken
     // webhook is visible instead of assumed from the conversational claim.
     if (slackResult.skipped) {
-      console.warn(`[Engine] Slack alert SKIPPED for lead ${lead.id} (SLACK_WEBHOOK_URL not set) — "${reason}" was NOT sent to the team.`);
+      console.warn(`[Engine] Slack alert SKIPPED for lead ${lead.id} (SLACK_WEBHOOK_URL not set) - "${reason}" was NOT sent to the team.`);
     } else if (!slackResult.success) {
-      console.error(`[Engine] Slack alert FAILED for lead ${lead.id}: ${slackResult.error || 'unknown error'} — "${reason}" was NOT sent to the team.`);
+      console.error(`[Engine] Slack alert FAILED for lead ${lead.id}: ${slackResult.error || 'unknown error'} - "${reason}" was NOT sent to the team.`);
     } else {
       console.log(`[Engine] Slack alert sent for lead ${lead.id}: "${reason}"`);
     }
 
     // Telegram team-group alert (no-op unless TELEGRAM_BOT_TOKEN + _ADMIN_CHAT_ID
     // are set for this brand). Mirrors the Slack ping so the team gets pinged on
-    // their Telegram group and a human can jump in — e.g. a booking the agent
+    // their Telegram group and a human can jump in - e.g. a booking the agent
     // couldn't lock ("passed to our team"). Fire-and-soft-fail.
     const tgText =
       `🔔 <b>${escapeHtmlTg(title)}</b> · ${escapeHtmlTg(brandLabel)}\n` +
@@ -1286,7 +1286,7 @@ async function flagForHumanFollowup(
     // Create a real TASK so the handoff/support request is visible + actionable
     // on the Tasks page, not just a Slack ping + a flag. De-duped: skip if this
     // lead already has an open human-followup task. (No-op / soft-fail if the
-    // brand's Supabase lacks the agent_tasks table — see migration 002.)
+    // brand's Supabase lacks the agent_tasks table - see migration 002.)
     try {
       let brandId2 = 'lokazen';
       try { brandId2 = getCurrentBrandId() || 'lokazen'; } catch { /* keep default */ }
@@ -1389,7 +1389,7 @@ function buildBookingTools(
           },
           phone: {
             type: 'string',
-            description: 'Phone number of the person booking. Optional: web users usually book with an email instead — provide whichever contact you have (phone OR email), not necessarily both.',
+            description: 'Phone number of the person booking. Optional: web users usually book with an email instead - provide whichever contact you have (phone OR email), not necessarily both.',
           },
           title: {
             type: 'string',
@@ -1411,7 +1411,7 @@ function buildBookingTools(
     },
     {
       name: 'cancel_booking',
-      description: "Cancel / remove this lead's EXISTING booked session. Call when the customer asks to cancel, says they can't make it, wants to undo a booking, or clearly declines a session that was already booked. Deletes the calendar event and stops the reminder messages. Do NOT use this to book — only to cancel.",
+      description: "Cancel / remove this lead's EXISTING booked session. Call when the customer asks to cancel, says they can't make it, wants to undo a booking, or clearly declines a session that was already booked. Deletes the calendar event and stops the reminder messages. Do NOT use this to book - only to cancel.",
       input_schema: {
         type: 'object',
         properties: {
@@ -1422,7 +1422,7 @@ function buildBookingTools(
     },
     {
       name: 'update_lead_profile',
-      description: 'Save lead profile details whenever the user shares personal, business, OR commercial-property information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, website URL — and (Lokazen) whenever a property OWNER shares any listing detail (property type, size in sqft, rent, floor, deposit/advance/lock-in terms, availability, area/locality, or a Google Maps link) or a BRAND shares their space requirement. Capture these even mid-conversation and across several messages — call it each time a new detail appears. Only include fields explicitly shared - never guess.',
+      description: 'Save lead profile details whenever the user shares personal, business, OR commercial-property information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, business type, website URL - and (Lokazen) whenever a property OWNER shares any listing detail (property type, size in sqft, rent, floor, deposit/advance/lock-in terms, availability, area/locality, or a Google Maps link) or a BRAND shares their space requirement. Capture these even mid-conversation and across several messages - call it each time a new detail appears. Only include fields explicitly shared - never guess.',
       input_schema: {
         type: 'object',
         properties: {
@@ -1492,12 +1492,12 @@ function buildBookingTools(
     },
   ];
 
-  // Scouts can NEVER book a call — there is nothing to schedule for a scout, and
+  // Scouts can NEVER book a call - there is nothing to schedule for a scout, and
   // their issues go through a support request, not a call. Hard-refuse both
   // booking tools regardless of what the model attempts.
   const scoutBookingBlock = () =>
     JSON.stringify({
-      error: 'This is a Scout conversation. Scouts cannot book a call — do NOT offer or book one. If the scout has a problem, raise a support request for the team instead.',
+      error: 'This is a Scout conversation. Scouts cannot book a call - do NOT offer or book one. If the scout has a problem, raise a support request for the team instead.',
     });
 
   const toolHandlers: Record<string, ToolHandler> = {
@@ -1551,7 +1551,7 @@ function buildBookingTools(
         return JSON.stringify({
           available_slots: [],
           message: isToday
-            ? 'No more slots available today. Ask the user if they would like tomorrow or another upcoming date — do NOT silently switch the date for them.'
+            ? 'No more slots available today. Ask the user if they would like tomorrow or another upcoming date - do NOT silently switch the date for them.'
             : `No slots available on ${date}. Suggest the user try a different date.`,
         });
       }
@@ -1613,7 +1613,7 @@ function buildBookingTools(
       // Only block a GENUINE conflict: the slot was found AND is already taken.
       // A slot we could not match (e.g. the model sent "3 PM" while the list has
       // "3:00 PM") already passed isAllowedBookingTime above, so it is a legit
-      // slot — let it through and register the booking instead of failing, which
+      // slot - let it through and register the booking instead of failing, which
       // is what left leads unbooked and looping on the same slot forever.
       if (requestedSlot && !requestedSlot.available) {
         return JSON.stringify({
@@ -1694,7 +1694,7 @@ function buildBookingTools(
       bookingsCompletedThisSession.add(bookingKey);
 
       // Slack notification (no-op unless SLACK_WEBHOOK_URL is set for this
-      // deployment). Awaited on purpose — we're still inside the tool handler,
+      // deployment). Awaited on purpose - we're still inside the tool handler,
       // so Vercel won't drop it, and it soft-fails so Slack never blocks a
       // booking. Lead type comes from the resolved Lokazen audience.
       try {
@@ -1818,7 +1818,7 @@ function buildBookingTools(
       // NOTE: No separate WhatsApp confirmation - Claude's response IS the only message
 
       // Canonical human date label (IST) so the confirmation matches the booked
-      // date exactly — the model must echo THIS, never restate a day from memory.
+      // date exactly - the model must echo THIS, never restate a day from memory.
       const dateLabel = (() => {
         try {
           const d = new Date(`${date}T12:00:00+05:30`);
@@ -1840,7 +1840,7 @@ function buildBookingTools(
         session_type: sessionType,
         google_event_created: !!calendarResult,
         meet_link: calendarResult?.meetLink || null,
-        message: `Booking confirmed for ${bookingName} on ${dateLabel} at ${time}. Send EXACTLY ONE confirmation to the user using this exact date ("${dateLabel}") and time — do NOT restate a different day. STOP: do not call any more tools, and do not repeat this confirmation in any later message.`,
+        message: `Booking confirmed for ${bookingName} on ${dateLabel} at ${time}. Send EXACTLY ONE confirmation to the user using this exact date ("${dateLabel}") and time - do NOT restate a different day. STOP: do not call any more tools, and do not repeat this confirmation in any later message.`,
       });
     },
 
@@ -1863,7 +1863,7 @@ function buildBookingTools(
         if (!res.ok) return JSON.stringify({ success: false, error: res.error || 'Cancel failed' });
         return JSON.stringify({
           success: true,
-          message: 'Booking cancelled — calendar event removed and reminders stopped. Tell the user their session is cancelled and offer to rebook whenever they like. Do NOT claim a new booking.',
+          message: 'Booking cancelled - calendar event removed and reminders stopped. Tell the user their session is cancelled and offer to rebook whenever they like. Do NOT claim a new booking.',
         });
       } catch (e: any) {
         return JSON.stringify({ success: false, error: e?.message || 'Cancel failed' });
@@ -1955,7 +1955,7 @@ function buildBookingTools(
         // Lokazen: store commercial-property details in the brand namespace using
         // the SAME field names the inbound-form path writes, so an owner who TYPES
         // their details in chat gets the same structured capture (and the same
-        // modal display) a form submission gets. Free-text was previously lost —
+        // modal display) a form submission gets. Free-text was previously lost -
         // the agent replied but nothing landed in the structured fields.
         if (hasPropertyDetail) {
           const brandKey = getCurrentBrandId();
@@ -1972,7 +1972,7 @@ function buildBookingTools(
           // untyped) the moment property details are captured. A listing detail
           // (floor / asking rent / deposit / property_type) with no explicit
           // brand-requirement audience = OWNER. This is what surfaces the
-          // "Property Owner" badge and files them correctly — previously the
+          // "Property Owner" badge and files them correctly - previously the
           // details landed but user_type stayed blank, so the lead read as
           // "unknown" and the agent kept treating it as a fresh conversation.
           if (!brandCtx.user_type) {
@@ -2063,7 +2063,7 @@ function buildBookingTools(
  * design: only acts when BOTH an allowed online time AND a concrete date can be
  * read with confidence (the model's own confirmation line first, then recent
  * history); otherwise returns null and the caller escalates to a human. Online
- * slots only (3/4/5 PM) — the offline window is never auto-recovered.
+ * slots only (3/4/5 PM) - the offline window is never auto-recovered.
  */
 async function recoverLostBooking(
   input: AgentInput,
@@ -2081,7 +2081,7 @@ async function recoverLostBooking(
     ...(input.conversationHistory || []).slice(-10).reverse().map((m) => m.content || ''),
   ];
 
-  // TIME — online slots are 3/4/5 PM only (15:00 / 16:00 / 17:00).
+  // TIME - online slots are 3/4/5 PM only (15:00 / 16:00 / 17:00).
   const readTime = (s: string): string | null => {
     const m = s.match(/\b([3-5])\s*(?::\s*0?0)?\s*p\.?\s*m\.?/i) || s.match(/\b(15|16|17)\s*:\s*00\b/);
     if (!m) return null;
@@ -2092,7 +2092,7 @@ async function recoverLostBooking(
   for (const s of corpus) { const t = readTime(s); if (t) { time24 = t; break; } }
   if (!time24 || !isAllowedBookingTime(time24, 'online')) return null;
 
-  // DATE — resolve today / tomorrow / weekday / explicit ISO in IST.
+  // DATE - resolve today / tomorrow / weekday / explicit ISO in IST.
   const now = new Date();
   const istToday = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
   const [ty, tm, tdd] = istToday.split('-').map(Number);
@@ -2575,7 +2575,7 @@ async function scheduleFlowTasks(
       ? `${temperature} lead: nudge in ${Math.round(nudgeDelayMs / (60 * 60 * 1000))}h (adjusted from 2h)`
       : 'Initial 2h nudge timer, will adjust based on read receipts';
 
-    // A web visitor who closed the tab can't be nudged "on web" — when we have
+    // A web visitor who closed the tab can't be nudged "on web" - when we have
     // their phone, the nudge goes out on WhatsApp instead.
     const nudgeChannel = input.channel === 'web' && leadPhone ? 'whatsapp' : input.channel;
 

@@ -2,7 +2,7 @@
  * GET /api/dashboard/leads/[id]/online-results  (Lokazen, brand leads)
  *
  * Fetches REAL online info about the brand using Claude's web search tool (uses
- * the existing CLAUDE_API_KEY — no new key). Returns a short summary of what the
+ * the existing CLAUDE_API_KEY - no new key). Returns a short summary of what the
  * brand is + the actual source URLs found, so the lead modal can SHOW results
  * instead of just linking out. Degrades gracefully (200 with an error reason)
  * when the key or web search is unavailable, so the UI can fall back to links.
@@ -65,7 +65,7 @@ export async function GET(
         }
       }
     } catch (e: any) {
-      // Web search not enabled on the account, model issue, etc. — let the UI
+      // Web search not enabled on the account, model issue, etc. - let the UI
       // fall back to the launcher links.
       return NextResponse.json({ ok: false, reason: e?.message || 'search_failed' })
     }

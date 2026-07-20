@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
-    // Gigs tab (lokazen only — see brandConfig.features.scouts check below):
+    // Gigs tab (lokazen only - see brandConfig.features.scouts check below):
     // same dashboard, wired to scout/connector leads instead of business leads.
     // Any other brand/value falls back to the normal 'leads' scope untouched.
     const scope = searchParams.get('scope') === 'gigs' ? 'gigs' : 'leads'
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })),
       // 3. whatsapp_sessions - conversation counting; BCON's table also carries
-      //    booking columns (the WhatsApp booking flow writes them there) — not
+      //    booking columns (the WhatsApp booking flow writes them there) - not
       //    selecting them meant WhatsApp bookings never reached Upcoming Events.
       //    Other brands' tables don't have those columns, so they keep the
       //    narrow select (a select on a missing column errors in PostgREST).
@@ -175,10 +175,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure leads is an array. Gig workers (scout + connector) are NOT sales
-    // leads — they have their own dashboard page/tab and must never inflate the
+    // leads - they have their own dashboard page/tab and must never inflate the
     // Overview lead totals or stage buckets, and vice versa. Mirrors the
     // exclusion the Leads table applies (LeadsTable: GIG_TYPES excluded when
-    // scouts are on). scope=gigs flips this to ONLY gig workers — same
+    // scouts are on). scope=gigs flips this to ONLY gig workers - same
     // downstream computation (hot/engaged/warm/funnel/sessions all derive from
     // safeLeads via leadIdSet below), just a different slice of the same table,
     // so the Gigs tab is wired with zero duplicated logic.
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
       : (scope === 'gigs' ? [] : rawLeads)
 
     // Conversations: PostgREST hard-caps a single response at 1000 rows, and the
-    // old ascending fetch returned the 1000 OLDEST rows — so recent activity (the
+    // old ascending fetch returned the 1000 OLDEST rows - so recent activity (the
     // last 24h / 7d) was never fetched and Active Conversations read 0. Paginate
     // the most-recent ~45 days, newest-first, so every window count is accurate.
     let messages: any[] = []
@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
     } catch (e: any) {
       console.warn('Conversations pagination failed:', e?.message)
     }
-    // We fetched newest-first (for the row cap); restore ascending order — the
+    // We fetched newest-first (for the row cap); restore ascending order - the
     // response-rate + response-time calcs below scan each conversation forward in
     // time for the agent's reply, so they REQUIRE chronological order.
     messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -320,7 +320,7 @@ export async function GET(request: NextRequest) {
     const isLinkedToActiveLead = (session: any) =>
       !!session?.lead_id && leadIdSet.has(session.lead_id)
     // `messages` (conversations table) is fetched with NO brand or scope filter
-    // at all — just a 45-day time cutoff — so every metric derived from it
+    // at all - just a 45-day time cutoff - so every metric derived from it
     // must go through this scoped copy instead, or leads/gigs (or even other
     // brands, since there's no brand filter on the query) leak into each
     // other's counts. This was a real, currently-visible bug: the Active
@@ -553,7 +553,7 @@ export async function GET(request: NextRequest) {
     }
 
     // The engine answers in seconds; seeded/backfilled rows carry minutes-wide
-    // message gaps that would show a bogus 38s+. Cap the headline at 5s —
+    // message gaps that would show a bogus 38s+. Cap the headline at 5s -
     // anything above it is stale-data noise, not live agent latency.
     if (avgResponseTimeMs > 5000) {
       avgResponseTimeMs = 3200 + (avgResponseTimeMs % 1600) // deterministic 3.2-4.8s
@@ -588,7 +588,7 @@ export async function GET(request: NextRequest) {
         channel: lead.last_touchpoint || lead.first_touchpoint || 'unknown',
       }))
 
-    // 6. Upcoming Bookings (next 10) — strict future-only, parsed in IST so the
+    // 6. Upcoming Bookings (next 10) - strict future-only, parsed in IST so the
     // list matches the card countdown. The old filter parsed without a timezone
     // and fell back to 23:59:59 for missing times, so same-day-past bookings (and
     // 12h "4:00 PM" strings that parse to Invalid Date) leaked in and rendered as
@@ -611,10 +611,10 @@ export async function GET(request: NextRequest) {
 
     // The Upcoming Events list must agree with the "Booked Calls / Events" KPI,
     // which counts bookings across THIS WEEK (past + upcoming). A future-only
-    // list reads "No upcoming events" while the KPI shows 2 — the mismatch the
+    // list reads "No upcoming events" while the KPI shows 2 - the mismatch the
     // user kept hitting when the booked calls were earlier today / earlier this
     // week. So include the last 7 days AND everything future, then order it
-    // upcoming-first (soonest ahead), then most-recent past — an agenda, not a
+    // upcoming-first (soonest ahead), then most-recent past - an agenda, not a
     // strict future feed. Past rows still render (the countdown chip shows "ago").
     const weekAgo = new Date(now.getTime() - 7 * 24 * 3600_000)
     const upcomingBookings = safeLeads
@@ -633,7 +633,7 @@ export async function GET(request: NextRequest) {
       .map(({ lead, bookingDate, bookingTime, dt }) => {
         const uc = lead.unified_context || {}
         const title = uc?.web?.booking_title || uc?.whatsapp?.booking_title || uc?.voice?.booking_title || uc?.social?.booking_title || lead.metadata?.title || null
-        // Structured intent the agent already captured for this lead — the SAME
+        // Structured intent the agent already captured for this lead - the SAME
         // source the leads table chips read (unified_context[BRAND_ID]). Surfacing
         // it lets the Upcoming Events card show a real program/intent chip even
         // when no free-text booking_title was stored.
@@ -681,7 +681,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Gigs tab Engine Overview: gigs don't have Engaged/Warm/Follow-up
-    // Due/Booked — the funnel that actually matters is the scout lifecycle.
+    // Due/Booked - the funnel that actually matters is the scout lifecycle.
     // Mirrors LeadsTable's SCOUT_STAGE_BY_EVENT/scoutStageLabel EXACTLY (same
     // derivation from scout_event/kyc_status) so the Gigs table's STATUS
     // column and this funnel can never disagree on where a scout stands.
@@ -778,7 +778,7 @@ export async function GET(request: NextRequest) {
       // Same gate every other event source in this file uses: only surface
       // this booking if its lead is actually in scope (a scout's session
       // leaking a "booked a call" event onto the Gigs tab, or vice versa,
-      // was a real bug here — booking_date!=null alone isn't a scope check).
+      // was a real bug here - booking_date!=null alone isn't a scope check).
       const lead = safeLeads.find(l => l.id === session.lead_id)
       if (!lead) return
       const leadName = session.customer_name || lead.customer_name || 'Unknown'
@@ -1054,7 +1054,7 @@ export async function GET(request: NextRequest) {
     // 13. Trend Data (7 days for sparklines)
     const leadTrend = []
     const bookingTrend = []
-    const kycStartedTrend = [] // Gigs tab only — daily scouts reaching KYC-started
+    const kycStartedTrend = [] // Gigs tab only - daily scouts reaching KYC-started
     const conversationTrend = [] // Daily unique conversations
     const hotLeadsTrend = [] // Daily hot leads count
     const responseTimeTrend = []
@@ -1078,7 +1078,7 @@ export async function GET(request: NextRequest) {
       }).length
       bookingTrend.push({ value: dayBookings })
 
-      // KYC-started trend (gigs scope only) — same stage derivation as
+      // KYC-started trend (gigs scope only) - same stage derivation as
       // gigStageCounts above, bucketed by last_interaction_at/created_at day.
       const dayKycStarted = scope === 'gigs' ? safeLeads.filter(l => {
         const lkz = (l as any)?.unified_context?.[BRAND_ID] || {}
@@ -1142,7 +1142,7 @@ export async function GET(request: NextRequest) {
       responseTimeTrend.push({ value: dayAvgResponse })
     }
     
-    // Calculate % changes. When the baseline is 0, a real % is undefined — show
+    // Calculate % changes. When the baseline is 0, a real % is undefined - show
     // +100 if we went from nothing to something, else 0 (never a divide-by-1
     // explosion). Clamped to a sane range. (Fix ported from the bcon fork.)
     const pctChangeTrend = (first: number, last: number) => {
@@ -1224,7 +1224,7 @@ export async function GET(request: NextRequest) {
     let leadsWithScores = 0
 
     // Batch-calculate scores for leads with null OR zero scores.
-    // Previously we only refreshed nulls — but ~half of leads have
+    // Previously we only refreshed nulls - but ~half of leads have
     // lead_score stored as literal 0 (calculation crashed mid-flight on an
     // earlier write, or the lead was created before scoring was wired).
     // Those need to be re-evaluated too, otherwise the dashboard's Avg Lead
@@ -1236,7 +1236,7 @@ export async function GET(request: NextRequest) {
     )
 
     if (leadsNeedingScores.length > 0) {
-      // Cap at 20 RPC calls per request — scoring 100+ leads in parallel exhausts
+      // Cap at 20 RPC calls per request - scoring 100+ leads in parallel exhausts
       // the DB connection pool under load. Unscored leads beyond the cap stay at 0.
       // (Fix ported from the bcon fork.)
       const scoreResults = await Promise.all(
@@ -1255,7 +1255,7 @@ export async function GET(request: NextRequest) {
         })
       )
 
-      // Apply calculated scores back to leads in memory (NOT persisted — this is
+      // Apply calculated scores back to leads in memory (NOT persisted - this is
       // a read-side backfill only, so we never overwrite the stored score base).
       const scoreMap = new Map<string, number>(scoreResults.map((r) => [r.leadId, r.score]))
       leadsNeedingScores.forEach((lead) => {
@@ -1353,7 +1353,7 @@ export async function GET(request: NextRequest) {
     // The overview switches the funnel by program (All / Pilot / Flight School /
     // Cabin Crew / Webinar) and by window (Today/7D/14D/All). Each is a cohort
     // funnel: within a window we take leads created in it, then count how far that
-    // cohort got — reusing the SAME stage predicates as the headline metrics, just
+    // cohort got - reusing the SAME stage predicates as the headline metrics, just
     // filtered to the program. Webinar is special: its stages are Total → Engaged
     // → Registered → Not registered → Messaged (a reminder/nudge was sent).
     let segmentFunnels: Record<string, any> | null = null
@@ -1438,10 +1438,10 @@ export async function GET(request: NextRequest) {
     const customerMessages = scopedMessages?.filter(m => m.sender === 'customer').length || 0
     const agentReplies = scopedMessages?.filter(m => m.sender === 'agent').length || 0
     // Response rate = share of customer messages that received an agent reply
-    // in the same conversation before the customer spoke again (bounded 0–100%).
+    // in the same conversation before the customer spoke again (bounded 0-100%).
     // The old formula (agentReplies / customerMessages) exceeded 100% whenever the
     // agent sent more bubbles than the customer (greetings, follow-ups, split
-    // replies) — that's a message ratio, not a real response rate.
+    // replies) - that's a message ratio, not a real response rate.
     // `messages` is already ordered by created_at asc (see query above), so each
     // conversation group stays chronological. Anonymous web rows (lead_id = null)
     // are grouped by their session_id from metadata.
@@ -1786,7 +1786,7 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // LEADS RECOVERED: leads that went quiet and came BACK — the core PROXe value.
+    // LEADS RECOVERED: leads that went quiet and came BACK - the core PROXe value.
     // There's no explicit "cold" stage in the data, so we detect re-engagement
     // from the conversation timeline: a CUSTOMER (inbound) message that lands
     // after >= 7 days of silence for that lead, with the comeback inside the last
@@ -1818,7 +1818,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ============================================================================
-    // BCON/POP EXTRAS (cohort funnel + calls overview — present in both forks;
+    // BCON/POP EXTRAS (cohort funnel + calls overview - present in both forks;
     // bcon computes them ungated in its fork, pop's were ported earlier).
     // Gated on BRAND_ID so every other brand's response stays byte-identical.
     // ============================================================================
@@ -1840,7 +1840,7 @@ export async function GET(request: NextRequest) {
       | undefined
     if (['bcon', 'pop'].includes(BRAND_ID)) {
       // Cohort funnel for the Engine Overview toggle: of leads ACQUIRED in the
-      // window, how many reached each stage — so EVERY node (incl. Follow-up Due +
+      // window, how many reached each stage - so EVERY node (incl. Follow-up Due +
       // Booked) scales with the window instead of staying constant.
       const engagedIdSet = new Set(engagedLeadsList.map((l: any) => l.id))
       const staleIdSet = new Set(staleLeads.map((l: any) => l.id))
@@ -1866,7 +1866,7 @@ export async function GET(request: NextRequest) {
       }
 
       // ==========================================================================
-      // CALLS OVERVIEW — inbound/outbound counts + today/7d windows + 7-day trend.
+      // CALLS OVERVIEW - inbound/outbound counts + today/7d windows + 7-day trend.
       // voiceSessions comes through fetchAllRows above, so unlike the fork (which
       // read the table un-ranged and was silently clipped at PostgREST's 1000-row
       // cap) these counts cover the FULL table.
@@ -1909,7 +1909,7 @@ export async function GET(request: NextRequest) {
     }
 
     // ==========================================================================
-    // POP CAMPAIGN HOME — the three home cards reworked for the campaign so the
+    // POP CAMPAIGN HOME - the three home cards reworked for the campaign so the
     // dashboard is one intuitive glance (War Room stays the deep dive):
     //   events        → party events + who's already volunteered / supporting
     //   attentionSeats→ CONSTITUENCIES that need attention now (the whole voice,
@@ -1997,7 +1997,7 @@ export async function GET(request: NextRequest) {
 
     // Activity Sources (ALL brands): touchpoints by channel over the last 30
     // days + a 7d-vs-prior-7d delta per channel. Computed from the 45-day
-    // messages buffer already paginated above — zero extra queries. POP's
+    // messages buffer already paginated above - zero extra queries. POP's
     // campaignHome.sources (magnet-based, includes d2d/qr/missed_call) wins on
     // the client when present; this generic one covers every other brand.
     let sources: any = undefined
@@ -2007,7 +2007,7 @@ export async function GET(request: NextRequest) {
       const d14 = now.getTime() - 14 * 86400000
       const byChannel: Record<string, { count: number; last7: number; prior7: number }> = {}
       // windchasers: group touchpoints by the LEAD's marketing source
-      // (attribution.source — Instagram / Google Ads / Meta Ads / Direct …)
+      // (attribution.source - Instagram / Google Ads / Meta Ads / Direct …)
       // instead of the conversation channel. Nearly all conversations happen on
       // WhatsApp, so channel grouping collapsed the card to "WhatsApp 100%" and
       // hid where leads actually came from. Other brands keep channel grouping.
@@ -2031,7 +2031,7 @@ export async function GET(request: NextRequest) {
         }
       }
       // scopedMessages (not raw messages) so Activity Sources follows the
-      // Leads/Gigs toggle — gig-worker conversations don't bleed into the lead
+      // Leads/Gigs toggle - gig-worker conversations don't bleed into the lead
       // source mix and vice versa.
       for (const m of scopedMessages) {
         const t = new Date(m.created_at).getTime()
@@ -2119,7 +2119,7 @@ export async function GET(request: NextRequest) {
         newLeads: todayNewLeads.length,
       },
       leadsRecovered: { count: leadsRecoveredCount },
-      // POP-only cohort funnel — key omitted entirely for other brands.
+      // POP-only cohort funnel - key omitted entirely for other brands.
       ...(funnel ? { funnel } : {}),
       // POP-only campaign home cards (events / attention seats / sources).
       ...(campaignHome ? { campaignHome } : {}),
@@ -2136,11 +2136,11 @@ export async function GET(request: NextRequest) {
         leads: staleLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown' })),
       },
       leadFlow,
-      // Gigs tab only (scope=gigs) — all-zero object otherwise, see gigStageCounts above.
+      // Gigs tab only (scope=gigs) - all-zero object otherwise, see gigStageCounts above.
       gigStageCounts,
-      // Gigs tab only — scouts reaching KYC-started in the last 7 days (0 otherwise).
+      // Gigs tab only - scouts reaching KYC-started in the last 7 days (0 otherwise).
       kycStarted7D,
-      // POP-only calls overview — key omitted entirely for other brands.
+      // POP-only calls overview - key omitted entirely for other brands.
       ...(calls ? { calls } : {}),
       channelPerformance,
       scoreDistribution,

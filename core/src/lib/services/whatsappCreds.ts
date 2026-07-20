@@ -1,10 +1,10 @@
 /**
- * services/whatsappCreds.ts — single source of truth for WhatsApp Cloud API
+ * services/whatsappCreds.ts - single source of truth for WhatsApp Cloud API
  * credentials.
  *
  * Resolution order:
  *   1. Active row in `whatsapp_connections` (created by the dashboard's
- *      embedded-signup "Connect WhatsApp" flow — Agents → WhatsApp).
+ *      embedded-signup "Connect WhatsApp" flow - Agents → WhatsApp).
  *   2. META_WHATSAPP_* env vars (legacy per-brand wiring). Brands that never
  *      run the connect flow keep working exactly as before.
  *
@@ -73,7 +73,7 @@ export async function getWhatsAppCreds(): Promise<WhatsAppCreds | null> {
   return creds;
 }
 
-/** Drop the cache — call after connect/disconnect so sends pick up the change. */
+/** Drop the cache - call after connect/disconnect so sends pick up the change. */
 export function invalidateWhatsAppCreds(): void {
   cached = null;
 }

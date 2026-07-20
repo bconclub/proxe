@@ -30,7 +30,7 @@ interface DailyPoint {
 
 const fmt = (n: number) => n.toLocaleString('en-IN')
 const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`
-// Voice rows (ElevenLabs TTS) are billed by characters spoken, not LLM tokens —
+// Voice rows (ElevenLabs TTS) are billed by characters spoken, not LLM tokens -
 // their Input/Total columns hold char counts, so label them and blank Output.
 const VOICE_CATEGORIES = new Set(['brain_voice'])
 // Short IST day label from a 'YYYY-MM-DD' key, e.g. "18 Jun".
@@ -184,7 +184,7 @@ export default function TokenUsagePage() {
               </span>
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Rough Claude spend by area. Experimental — counts are best-effort and costs are estimates.
+              Rough Claude spend by area. Experimental - counts are best-effort and costs are estimates.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -206,7 +206,7 @@ export default function TokenUsagePage() {
           {updatedAt ? ` · updated ${new Date(updatedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}
         </p>
 
-        {/* Window toggle — sums per-day buckets (All = cumulative since metering began) */}
+        {/* Window toggle - sums per-day buckets (All = cumulative since metering began) */}
         <div className="inline-flex items-center rounded-lg border p-0.5 mb-5" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
           {(['Today', '7D', '14D', '30D', 'All'] as const).map((r) => (
             <button
@@ -243,7 +243,7 @@ export default function TokenUsagePage() {
           </div>
         )}
 
-        {/* Daily trend — see day-by-day spend at a glance */}
+        {/* Daily trend - see day-by-day spend at a glance */}
         {!loading && daily.length > 0 && <DailyChart daily={daily} />}
 
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border-primary)' }}>
@@ -270,7 +270,7 @@ export default function TokenUsagePage() {
                   <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.label}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{fmt(r.calls)}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{isVoice ? `${fmt(r.input_tokens)} chars` : fmt(r.input_tokens)}</td>
-                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{isVoice ? '—' : fmt(r.output_tokens)}</td>
+                  <td className="px-4 py-3 text-sm text-right tabular-nums" style={{ color: 'var(--text-secondary)' }}>{isVoice ? '-' : fmt(r.output_tokens)}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums font-semibold" style={{ color: 'var(--text-primary)' }}>{isVoice ? `${fmt(r.total_tokens)} chars` : fmt(r.total_tokens)}</td>
                   <td className="px-4 py-3 text-sm text-right tabular-nums font-semibold" style={{ color: 'var(--accent-primary)' }}>{usd(r.cost_usd)}</td>
                 </tr>
@@ -282,7 +282,7 @@ export default function TokenUsagePage() {
 
         <p className="text-[11px] mt-4" style={{ color: 'var(--text-muted)' }}>
           Web chat streaming isn't metered yet. Costs use public per-model pricing and are indicative, not billed amounts.
-          Voice rows (Ask PROXe voice) are ElevenLabs text-to-speech, billed by characters spoken — their Input/Total columns show character counts, not tokens.
+          Voice rows (Ask PROXe voice) are ElevenLabs text-to-speech, billed by characters spoken - their Input/Total columns show character counts, not tokens.
         </p>
       </div>
     </>

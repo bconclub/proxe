@@ -7,7 +7,7 @@ import { resolveModel } from '@/lib/agent-core';
 
 // Vapi retries end-of-call-report, so this handler runs concurrently for the
 // same call more than once. A select-then-insert idempotency check has a
-// race — both deliveries can pass the SELECT before either INSERT lands,
+// race - both deliveries can pass the SELECT before either INSERT lands,
 // doubling every transcript row (confirmed in prod: one call had 32 rows for
 // what should've been ~16 turns). Deterministic per-message ids + upsert
 // closes the race at the DB level instead of a check-then-act.
@@ -19,7 +19,7 @@ function deterministicId(seed: string): string {
 export const dynamic = 'force-dynamic';
 
 // The dashboard reads English. Grievance text extracted from a Punjabi/Hindi call
-// may come back in Gurmukhi/Devanagari — translate it to English before storing so
+// may come back in Gurmukhi/Devanagari - translate it to English before storing so
 // the People table is always legible. English/Latin text passes straight through;
 // on any failure we keep the original rather than lose the grievance.
 async function toEnglish(text: string): Promise<string> {
@@ -49,8 +49,8 @@ async function toEnglish(text: string): Promise<string> {
 //   • end-of-call-report→ persist the finished call (voice_sessions + conversations
 //                         transcript + summary/recording) + score the lead.
 //
-// HARDENING: the voice_sessions row is written FIRST — before lead resolution, the
-// VoBiz CDR recovery fetch, and lead scoring — each of which can be slow or fail.
+// HARDENING: the voice_sessions row is written FIRST - before lead resolution, the
+// VoBiz CDR recovery fetch, and lead scoring - each of which can be slow or fail.
 // Previously those ran before the session insert, so a downstream timeout/error
 // dropped the call from the dashboard even though its transcript was logged. The
 // session write now runs up front, in its own try/catch with loud error logging,
@@ -85,7 +85,7 @@ async function upsertSession(
     // this exact select-then-insert-or-update let Vapi's webhook retries pile
     // up 71 duplicate rows for one call). Real upsert closes the race; created_at
     // is only included when explicitly given, since an upsert's ON CONFLICT DO
-    // UPDATE sets every column present — including it unconditionally would
+    // UPDATE sets every column present - including it unconditionally would
     // reset created_at to "now" on every retry instead of just the first insert.
     const payload: Record<string, any> = { external_session_id: callId, brand: BRAND_ID, ...row };
     if (createdAtIfNew) payload.created_at = createdAtIfNew;
@@ -97,7 +97,7 @@ async function upsertSession(
 }
 
 // On an OUTBOUND bridge (VoBiz -> Vapi) both SIP ends are the BCON number, so Vapi's
-// customer.number is OUR number, not the lead's — and the two VoBiz legs are NOT
+// customer.number is OUR number, not the lead's - and the two VoBiz legs are NOT
 // parent-linked, so we recover the real destination from the VoBiz CDR by matching
 // the human leg whose time is closest to the Vapi leg's start.
 async function recoverOutboundDestination(startedAtIso: string | null): Promise<{ full: string | null; norm: string | null }> {
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve the real party. customer.number is reliable for INBOUND. For OUTBOUND
-    // it is OUR own VoBiz number (bridge artifact) — detect that and recover the
+    // it is OUR own VoBiz number (bridge artifact) - detect that and recover the
     // actual destination from the VoBiz CDR so the call files under the lead, not us.
     const rawCustomer = msg.customer?.number || call.customer?.number || null;
     let { full: phone, norm } = normalizePhone(rawCustomer);
@@ -225,10 +225,10 @@ export async function POST(req: NextRequest) {
     const messages: any[] = msg.artifact?.messages || msg.messages || [];
 
     // The contact name the call was placed with (passed as assistantOverrides at
-    // dial time) — so a lead created/updated from a voice call carries a name
+    // dial time) - so a lead created/updated from a voice call carries a name
     // instead of showing "Unknown caller".
     const vv = call?.assistantOverrides?.variableValues || msg?.assistantOverrides?.variableValues || {};
-    // POP grievance calls have no business — never let a business name become the
+    // POP grievance calls have no business - never let a business name become the
     // caller's name (it produced leads named "Pulse of Punjab"). Only the typed
     // contact name counts here; the real name is captured in-call via analysis.
     const vapiName = BRAND_ID === 'pop'
@@ -272,7 +272,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 1b) If phone-based resolution failed (e.g. outbound bridge couldn't recover
-    //     the number), fall back to the lead linked at call INITIATION — the
+    //     the number), fall back to the lead linked at call INITIATION - the
     //     test-call route stamps lead_id onto the session up front.
     if (!leadId && callId) {
       const { data: s } = await supabase
@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2b) POP grievance calls: the assistant's analysisPlan extracts the grievance
-    //     fields from the transcript AFTER the call (silently — never spoken). Land
+    //     fields from the transcript AFTER the call (silently - never spoken). Land
     //     them on the lead's constituent columns so the People table shows
     //     constituency / grievance / lean / intent / loop for this caller.
     //     POP-only + only fields we actually got (never null-overwrite).
@@ -307,12 +307,12 @@ export async function POST(req: NextRequest) {
       if (structured && typeof structured === 'object') {
         // The pop all_leads columns carry CHECK constraints (pop_lean_chk etc.).
         // Supabase updates are atomic, so a single off-schema value (e.g. the LLM
-        // returning lean="negative") rejects the WHOLE row — losing the grievance
+        // returning lean="negative") rejects the WHOLE row - losing the grievance
         // text too. So validate every constrained field and drop/map strays.
         const LEAN = ['supporter', 'leaning', 'undecided', 'opposed'];
         const CAT = ['jobs', 'water', 'power', 'roads', 'drugs', 'farm_debt', 'health', 'education', 'other'];
         const INTENT = ['vote', 'volunteer', 'rally', 'share', 'none'];
-        // NOTE: no 'negative'→'opposed' — a stray sentiment word is not political
+        // NOTE: no 'negative'→'opposed' - a stray sentiment word is not political
         // opposition. Only genuine anti-party words map to opposed.
         const LEAN_MAP: Record<string, string> = { against: 'opposed', anti: 'opposed', positive: 'supporter', support: 'supporter', supportive: 'supporter', neutral: 'undecided', unsure: 'undecided' };
         const norm = (v: any) => String(v ?? '').toLowerCase().trim();
@@ -339,15 +339,15 @@ export async function POST(req: NextRequest) {
         }
         put('lean', leanVal);
         // The name the caller gave in-call. The extractor may key it as `name` or
-        // `caller_name` — accept either.
+        // `caller_name` - accept either.
         const capturedName = String(structured.name || structured.caller_name || '').trim();
         // A logged grievance enters the follow-up loop as "raised".
         if (structured.captured !== false && (cols.grievance_text || cols.grievance_category)) {
           cols.loop_status = 'raised';
         }
         if (capturedName) {
-          // A name already on the row — whether set by a prior call or a manual
-          // dashboard edit — is authoritative and must never be overwritten by a
+          // A name already on the row - whether set by a prior call or a manual
+          // dashboard edit - is authoritative and must never be overwritten by a
           // later call's captured name. Only fill it in when it's genuinely blank.
           const { data: cur } = await supabase.from('all_leads').select('customer_name').eq('id', leadId).maybeSingle();
           if (cur && !cur.customer_name) cols.customer_name = capturedName;
@@ -389,7 +389,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) Store the call summary + recording link as a summary row — same
+    // 4) Store the call summary + recording link as a summary row - same
     //    deterministic-id + upsert pattern closes the retry-duplicate race.
     if (summary || recordingUrl) {
       const { error: smErr } = await supabase.from('conversations').upsert(
@@ -415,7 +415,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 5) Trigger lead scoring. Awaited (a fire-and-forget fetch is dropped when the
-    //    Vercel lambda freezes) but it runs LAST — all call persistence above is
+    //    Vercel lambda freezes) but it runs LAST - all call persistence above is
     //    already committed, so even if scoring is slow/times out the call is saved.
     if (leadId) {
       try {
@@ -433,7 +433,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, leadId, callId, durationSecs });
   } catch (err: any) {
     console.error('[vapi-webhook] error:', err?.message);
-    // Always 200 — never make Vapi retry-storm on our own bug.
+    // Always 200 - never make Vapi retry-storm on our own bug.
     return NextResponse.json({ ok: false, error: err?.message || 'error' });
   }
 }

@@ -1,4 +1,4 @@
-// D2D — QR badge verification. The field app (or anyone scanning a worker's
+// D2D - QR badge verification. The field app (or anyone scanning a worker's
 // badge) checks a verification_code and gets the worker's identity + booth
 // assignments back. Auth: x-api-key = INBOUND_API_KEY (machine intake).
 

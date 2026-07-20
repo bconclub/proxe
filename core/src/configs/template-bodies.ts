@@ -63,7 +63,7 @@ export function fillTemplateWithChips(body: string): string {
 }
 
 /**
- * Tiered free-form nudge preview — MIRRORS the worker's buildTieredNudge
+ * Tiered free-form nudge preview - MIRRORS the worker's buildTieredNudge
  * (task-worker.js). Tiers on what the task metadata knows; variables render as
  * [[label]] chips. KEEP IN SYNC with the worker.
  */
@@ -74,22 +74,22 @@ export function buildNudgePreview(md: Record<string, any>): string {
   const src = String(md?.bucket || md?.source || md?.channel || '')
   const cameFromForm = /form|meta|pabbly|facebook|lead[_ -]?machine/i.test(src)
 
-  // Tier 3 — form lead, goal + brand known.
+  // Tier 3 - form lead, goal + brand known.
   if (cameFromForm && goal && brand) {
     return `Hey ${chip('customer_name')}, saw you reached out about ${chip('service_interest')} for ${chip('brand_name')}. Want me to map out how we'd get you there? I can set up a quick call.`
   }
-  // Tier 2 — some concrete detail (goal, challenge, or brand).
+  // Tier 2 - some concrete detail (goal, challenge, or brand).
   if (goal || pain || brand) {
     const detailChip = goal ? chip('service_interest') : pain ? chip('pain_point') : chip('brand_name')
     return `Hey ${chip('customer_name')}, you mentioned ${detailChip} earlier. Want me to show you how we'd fix that with AI? Takes 2 mins.`
   }
-  // Tier 1 — nothing known yet.
+  // Tier 1 - nothing known yet.
   return `Hey ${chip('customer_name')}, you dropped in earlier but we didn't get to chat. What are you working on right now, more leads, better content, or better ads?`
 }
 
 export function resolveTaskTemplate(taskType: string, bucket?: string | null, sequence?: string | null): string | null {
   const t = taskType || ''
-  // RNR pair (approved 13 Jul 2026) fires ONLY on the call-miss touches —
+  // RNR pair (approved 13 Jul 2026) fires ONLY on the call-miss touches -
   // the scheduled day 1/3/5 retries preview the standard cadence below.
   if (t === 'missed_call_followup') return 'bcon_service_rnr_1_v1'
   if (t === 'booking_reminder_24h' || t === 'reminder_24h') return 'bcon_proxe_booking_reminder_24h'
@@ -111,7 +111,7 @@ export function resolveTaskTemplate(taskType: string, bucket?: string | null, se
     if (t === 'follow_up_day3') return 'bcon_lowtouch_d3_v1'
     if (t === 'follow_up_day5') return 'bcon_lowtouch_d7_v1'
   }
-  // Unbucketed day-N tasks (rnr retries etc.) preview the day-wise ladder —
+  // Unbucketed day-N tasks (rnr retries etc.) preview the day-wise ladder -
   // onetouch as the representative variant (engaged leads get lowtouch at
   // send time; we can't know engagement here).
   if (t === 'follow_up_day1') return 'bcon_onetouch_d1_v1'

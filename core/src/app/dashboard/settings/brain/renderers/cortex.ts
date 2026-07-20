@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Cortex — a wide side-profile neural brain with input fibers from the left.
+// Cortex - a wide side-profile neural brain with input fibers from the left.
 //
 // Shape/connectome math copied from NeuralBrain.tsx (lcg / inBrain /
 // buildParticles / buildEdges / perspective projection) and simplified: fixed
 // side-profile view (no drag, no functional regions), one brand palette.
 // Fibers stream into the brain's left pole carrying signal packets; packets
 // accelerate while thinking and speaking. Speaking also makes the whole cloud
-// malleable — the same blob deformation the orb uses, driven by live amp.
+// malleable - the same blob deformation the orb uses, driven by live amp.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { CreateRenderer } from './types'
@@ -165,7 +165,7 @@ export const createCortex: CreateRenderer = (canvas, env) => {
       proj[i * 4 + 3] = scale
     }
 
-    // the brain's left pole in screen space (where fibers converge) — project
+    // the brain's left pole in screen space (where fibers converge) - project
     // the point (0, yPole, -1.0) per fiber for spread-out entry points
     const polePoint = (yPole: number): [number, number] => {
       const x = 0, y = yPole * 0.5, z = -1.0
@@ -196,12 +196,12 @@ export const createCortex: CreateRenderer = (canvas, env) => {
       ctx.stroke()
     }
 
-    // packets racing the fibers — faster while thinking/speaking
+    // packets racing the fibers - faster while thinking/speaking
     const bez = (p0: number, p1: number, p2: number, p3: number, tt: number) => {
       const u = 1 - tt
       return u * u * u * p0 + 3 * u * u * tt * p1 + 3 * u * tt * tt * p2 + tt * tt * tt * p3
     }
-    // flat two-circle packets — per-packet radial gradients are murder on
+    // flat two-circle packets - per-packet radial gradients are murder on
     // software-rendered canvases
     for (const pk of packets) {
       pk.t += pk.speed * (1 + amp * 2.5 + think * 2)
@@ -226,7 +226,7 @@ export const createCortex: CreateRenderer = (canvas, env) => {
     ctx.fillStyle = g
     ctx.fillRect(cx - glowR, cy - glowR, glowR * 2, glowR * 2)
 
-    // edges (faint, depth-faded; wake up with amp) — bucketed into 4 alpha
+    // edges (faint, depth-faded; wake up with amp) - bucketed into 4 alpha
     // bins so the whole connectome is 4 stroke calls, not one per edge
     ctx.lineWidth = dpr2 * 0.7
     const edgeGain = (1 + amp * 1.6 + think * 0.8) * (isLight ? 1.6 : 1)

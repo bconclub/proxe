@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
  * GET /api/dashboard/brain/region?id=<region>
  *
  * The drill-down behind a click on the brain: the ACTUAL contents of that
- * region right now — real leads, real chats, real sequences, real KB items —
+ * region right now - real leads, real chats, real sequences, real KB items -
  * not counts. Max ~8 items each, newest first.
  *
  * Regions: intake · conversation · decisions · scoring · memory · timing · output

@@ -1,5 +1,5 @@
 /**
- * Sarvam AI — server-side proxy for Indian-language STT / TTS / translate / chat.
+ * Sarvam AI - server-side proxy for Indian-language STT / TTS / translate / chat.
  *
  * One integration point so the SARVAM_API_KEY never reaches the client. Every
  * action returns `latencyMs` so Sarvam can be benchmarked as a "V3" engine

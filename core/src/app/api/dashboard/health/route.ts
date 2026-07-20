@@ -2,10 +2,10 @@
  * GET /api/dashboard/health
  *
  * Passive endpoint-health summary derived from real traffic. No synthetic
- * pings — we read existing tables and infer "is this thing working?" from
+ * pings - we read existing tables and infer "is this thing working?" from
  * the latest successful event per service.
  *
- * Thresholds (founder-chosen — aggressive):
+ * Thresholds (founder-chosen - aggressive):
  *   >15 min idle = degraded (amber)
  *   >45 min idle = down     (red)
  *   plus: >5 send failures in last hour on outbound_meta = degraded regardless
@@ -35,12 +35,12 @@ export const dynamic = 'force-dynamic';
 type Status = 'ok' | 'degraded' | 'down' | 'unknown';
 
 /**
- * Status model — FAILURE-DRIVEN, not idle-driven.
+ * Status model - FAILURE-DRIVEN, not idle-driven.
  *
  * Passive monitoring can't tell "service is down" from "service is up but
  * no traffic". So we only flag amber/red when we have a CONFIRMED failure
  * signal (failed Meta sends in last hour, DB slow, etc.). "No recent
- * activity" is reported as a hint, not a red status — quiet hours are
+ * activity" is reported as a hint, not a red status - quiet hours are
  * normal, not an outage.
  *
  * Service health rules:
@@ -51,7 +51,7 @@ type Status = 'ok' | 'degraded' | 'down' | 'unknown';
  *                some, else 'ok'.
  *   - anthropic_ai: derive from outbound_meta failures + age of last
  *                ai_generated message (only flag if BOTH stale AND failures
- *                exist — Anthropic is a downstream of every outbound).
+ *                exist - Anthropic is a downstream of every outbound).
  *   - supabase_db: latency-based.
  */
 const FAILURE_RATE_RED = 5;      // ≥5 failures/hr on outbound → DOWN
@@ -83,7 +83,7 @@ export async function GET() {
     const dbStart = Date.now();
     const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
 
-    // Fire all the queries in parallel — these are cheap, indexed reads.
+    // Fire all the queries in parallel - these are cheap, indexed reads.
     const [
       latestCustomerWA,
       latestAgentWASuccess,
@@ -122,7 +122,7 @@ export async function GET() {
         .eq('metadata->>send_succeeded', 'false')
         .order('created_at', { ascending: false })
         .limit(10),
-      // inbound_api: most recent lead created (any source — form / api / pabbly)
+      // inbound_api: most recent lead created (any source - form / api / pabbly)
       supabase
         .from('all_leads')
         .select('created_at')
@@ -167,7 +167,7 @@ export async function GET() {
     const aiMin = minutesSince(latestAiMsg.data?.created_at);
     const calendarMin = minutesSince(latestBookingLead.data?.updated_at);
 
-    // Outbound is the ONE service where we have hard failure data — flag based on that.
+    // Outbound is the ONE service where we have hard failure data - flag based on that.
     const failures1h = (recentSendFailures.data || []).length;
     let outboundStatus: Status = 'ok';
     if (failures1h >= FAILURE_RATE_RED) outboundStatus = 'down';
@@ -183,7 +183,7 @@ export async function GET() {
     const aiStatus: Status = outboundStatus === 'down' ? 'degraded' : 'ok';
 
     // Passive receive endpoints (inbound channels): we have NO active failure
-    // signal — they're either receiving or they're not, and we can't tell
+    // signal - they're either receiving or they're not, and we can't tell
     // until traffic arrives. Default 'ok'. We surface last-seen as info so
     // the operator can spot suspicious quiet (e.g. usually busy at 11am
     // but suddenly nothing).
@@ -228,7 +228,7 @@ export async function GET() {
         status: aiStatus,
         last_at: latestAiMsg.data?.created_at || null,
         minutes_since: aiMin,
-        hint: 'Anthropic API — agent replies',
+        hint: 'Anthropic API - agent replies',
       },
       google_calendar: {
         label: 'Google Calendar',
