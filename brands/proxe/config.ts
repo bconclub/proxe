@@ -24,6 +24,7 @@ export const proxeConfig: BrandConfig = {
     pipelineFunnel: false,
     followUpSequence: false,
     campaigns: true, // AI campaign workspace
+    logCallChat: true, // chat with PROXe after logging a call
   },
   systemPrompt: {
     path: '@/api/prompts/proxe-prompt',

@@ -27,6 +27,7 @@ export const windchasersConfig: BrandConfig = {
     followUpSequence: false,
     leadAccess: true, // per-user pipelines + allowed_lead_types + sticky first-touch ownership
     campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
+    logCallChat: true, // chat with PROXe after logging a call
   },
   // Campaigns workspace content in Windchasers' aviation language (shared core
   // ships neutral defaults; this keeps the pilot/cabin-crew audience prompts on

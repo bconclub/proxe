@@ -26,6 +26,7 @@ export const lokazenConfig: BrandConfig = {
     scouts: true, // Scout segment: /dashboard/scouts + scout widget mode + scout KB scope
     leadAccess: true, // Per-user ownership + Owner/Brand/Scout access + Humans overview (needs migration 005)
     campaigns: true, // AI campaign workspace
+    logCallChat: true, // chat with PROXe after logging a call
   },
   brain: {
     persona: ' — the intelligence behind Lokazen\'s commercial real-estate matching operation in Bangalore',
