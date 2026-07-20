@@ -126,6 +126,39 @@ function matchTemplates(templates: any[], outcome: string): TemplateOpt[] {
     })
 }
 
+// Auto-pick the RIGHT post-call template for THIS call, by name keyword:
+//   demo booked on the call → the demo-confirmed thank-you (…demo_booked…)
+//   lead closed             → the opt-out message (…optout…)
+//   missed call             → the callback message (…callback…)
+//   else (interested)       → the general thank-you (…thankyou / …thank…)
+// Returns the matched templates reordered best-first, so the top is the
+// suggested send and the rest stay as one-tap overrides. Falls back gracefully
+// when the preferred one isn't approved (keeps whatever matched).
+function rankPostCall(matches: TemplateOpt[], outcome: string, steps: DecisionStep[]): TemplateOpt[] {
+  const has = (a: StepAction) => (steps || []).some((s) => s.action === a)
+  const prefer =
+    outcome !== 'Connected' ? ['callback'] :
+    has('book') ? ['demo_booked', 'demo'] :
+    has('close') ? ['optout', 'opt_out', 'opt-out'] :
+    ['thankyou', 'thank']
+  const rank = (name: string) => {
+    const n = name.toLowerCase()
+    for (let i = 0; i < prefer.length; i++) if (n.includes(prefer[i])) return i
+    // gentle fallback: a plain thank-you outranks any other leftover match
+    return n.includes('thank') ? prefer.length : prefer.length + 1
+  }
+  return [...matches].sort((a, b) => rank(a.name) - rank(b.name))
+}
+
+// One-line reason for the auto-pick, shown to the operator.
+function postCallReason(outcome: string, steps: DecisionStep[]): string {
+  const has = (a: StepAction) => (steps || []).some((s) => s.action === a)
+  if (outcome !== 'Connected') return 'a callback message'
+  if (has('book')) return 'the demo-confirmed thank-you'
+  if (has('close')) return 'the opt-out message'
+  return 'a general thank-you'
+}
+
 // PROXe's avatar = the canonical PROXe mark (the same infinity logo the Ask
 // PROXe dock uses), NOT the brand icon and never a generic robot glyph.
 function ProxeAvatar({ size = 28 }: { size?: number }) {
@@ -260,7 +293,19 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
         const kind = outcome === 'Connected' ? 'post-call thank-you' : 'missed-call'
         setMessages((cur) => [...cur, { role: 'assistant', content: `There's no approved ${kind} template yet, so I can't send one (WhatsApp blocks open messages outside the 24 hour window). Add one from Configure, WhatsApp, then it will show up here.` }])
       } else {
-        setMessages((cur) => [...cur, { role: 'assistant', content: 'Pick the template to send:', templateOptions: matches }])
+        // Auto-pick the template that fits this call (demo booked / opt-out /
+        // callback / general thank-you); confirm-ready, with the rest as overrides.
+        const ranked = rankPostCall(matches, outcome, activePlan?.steps || [])
+        const top = ranked[0]
+        const why = postCallReason(outcome, activePlan?.steps || [])
+        setMessages((cur) => [...cur, {
+          role: 'assistant',
+          content: ranked.length > 1
+            ? `Based on this call, I'll send ${why}. Confirm below, or pick another.`
+            : `Based on this call, I'll send ${why}. Confirm below.`,
+          plan: { summary: `Send the ${top.name} template to ${leadName}`, steps: [{ action: 'message', detail: { template: top.name, param_names: top.param_names } }] },
+          templateOptions: ranked.slice(1),
+        }])
       }
     } catch (e: any) {
       setError(e?.message || 'Could not load templates')
