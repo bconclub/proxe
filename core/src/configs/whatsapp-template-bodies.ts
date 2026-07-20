@@ -123,6 +123,31 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
     buttons: ['Join WhatsApp Group'],
     buttonType: 'quick_reply',
   },
+  // ── Post-call thank-you templates (LogCallChat "Send a thank-you" picker) ──
+  // Submitted to Meta as Utility (approval ~1 week out). The picker reads Meta's
+  // live APPROVED list, so once approved these auto-appear and match a Connected
+  // call by the 'postcall' name keyword (a missed call also matches _callback).
+  // Bodies/buttons recorded here so the inbox renders the exact template on send.
+  windchasers_postcall_thankyou_v1: {
+    body: `Hi {{customer_name}}, thank you for your time on the call today.\n\nWhenever you're ready to move forward with your pilot training, we're here to help.`,
+    footer: 'Team WindChasers',
+    buttons: ['Book a Demo Class', 'Ask a Question'],
+  },
+  windchasers_postcall_callback_v1: {
+    body: `Hi {{customer_name}}, thank you for your time. Looks like we caught you at a busy moment.\n\nWe'll call you back on {{callback_date}} at {{callback_time}}.`,
+    footer: 'Team WindChasers',
+    buttons: ['Reschedule', 'Ask a Question'],
+  },
+  windchasers_postcall_demo_booked_v1: {
+    body: `Hi {{customer_name}}, thank you for your time on the call today. Your demo session is confirmed.\n\nDate: {{date}}\nTime: {{time}}\n{{link_or_location}}\n\nSee you there.`,
+    footer: 'Team WindChasers',
+    buttons: ['Add to Calendar', 'Ask a Question'],
+  },
+  windchasers_postcall_optout_v1: {
+    body: `Hi {{customer_name}}, thank you for your time. We won't reach out further.\n\nIf your plans change, you're always welcome to contact us.`,
+    footer: 'Team WindChasers',
+    buttons: ['Ask a Question'],
+  },
 }
 
 export type RenderedTemplate = {
