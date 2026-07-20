@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
-import { FileUploader, UrlInput, TextInput, KnowledgeList } from '@/components/dashboard/KnowledgeBase'
+import { FileUploader, UrlInput, TextInput, KnowledgeList, KnowledgeGraphSection } from '@/components/dashboard/KnowledgeBase'
 import { MdCloudUpload, MdLink, MdTextSnippet } from 'react-icons/md'
 import type { KnowledgeBaseItem } from '@/types'
 
@@ -71,59 +71,21 @@ export default function KnowledgeBaseClient() {
             Knowledge Base
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Add content that your AI agent uses to answer customer questions.
+            Everything your AI agent knows — knowledge sources and prompts — in one place.
           </p>
         </div>
 
-        {/* Stats Bar */}
-        {items.length > 0 && (
-          <div className="flex gap-4 mb-6">
-            <div
-              className="flex-1 p-4 rounded-lg"
-              style={{ background: 'var(--bg-secondary)' }}
-            >
-              <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                {items.length}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total Items</p>
-            </div>
-            <div
-              className="flex-1 p-4 rounded-lg"
-              style={{ background: 'var(--bg-secondary)' }}
-            >
-              <p className="text-2xl font-bold" style={{ color: '#22C55E' }}>
-                {readyCount}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ready</p>
-            </div>
-            <div
-              className="flex-1 p-4 rounded-lg"
-              style={{ background: 'var(--bg-secondary)' }}
-            >
-              <p className="text-2xl font-bold" style={{ color: '#3B82F6' }}>
-                {pendingCount}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Pending</p>
-            </div>
-            {errorCount > 0 && (
-              <div
-                className="flex-1 p-4 rounded-lg"
-                style={{ background: 'var(--bg-secondary)' }}
-              >
-                <p className="text-2xl font-bold" style={{ color: '#EF4444' }}>
-                  {errorCount}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Errors</p>
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── HIGHLIGHT: the knowledge graph ── */}
+        <KnowledgeGraphSection />
 
-        {/* Add Content Section */}
+        {/* Add Content Section (demoted below the highlight) */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-            Add Content
+          <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+            Add to Knowledge Base
           </h2>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+            Upload documents, add a URL, or paste text for your agent to learn from.
+          </p>
 
           <div className="p-6 rounded-lg" style={{ background: 'var(--bg-secondary)' }}>
             {/* Tab Switcher */}
@@ -165,15 +127,24 @@ export default function KnowledgeBaseClient() {
                 </span>
               )}
             </h2>
-            {items.length > 0 && (
-              <button
-                onClick={fetchItems}
-                className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-                style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
-              >
-                Refresh
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {items.length > 0 && (
+                <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <span><span style={{ color: '#22C55E' }}>{readyCount}</span> ready</span>
+                  {pendingCount > 0 && <span><span style={{ color: '#3B82F6' }}>{pendingCount}</span> pending</span>}
+                  {errorCount > 0 && <span><span style={{ color: '#EF4444' }}>{errorCount}</span> errors</span>}
+                </div>
+              )}
+              {items.length > 0 && (
+                <button
+                  onClick={fetchItems}
+                  className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="rounded-lg overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
