@@ -2,7 +2,7 @@
 //
 // Add the NEWEST entry at the TOP. Each shows once per viewer (dismiss = seen,
 // tracked in localStorage), pinned above lead activity. Keep titles short and
-// human — this is product comms, not a version number.
+// human. This is product comms, not a version number.
 //
 //   brands omitted or ['*']  → common: every brand sees it
 //   brands: ['lokazen']      → only that brand's dashboard sees it
@@ -11,7 +11,7 @@ export type ProductUpdate = {
   title: string       // short headline
   detail?: string     // optional one-liner
   date: string        // ISO date, e.g. '2026-07-05'
-  version?: string    // release it shipped in, e.g. '0.2' — shown as a chip
+  version?: string    // release it shipped in, e.g. '0.2', shown as a chip
   brands?: string[]   // omit / ['*'] = all brands; else specific slugs
 }
 
@@ -23,23 +23,37 @@ export type ProductUpdate = {
 // older than 0.1 predate the scheme and carry no version chip.
 export const PRODUCT_UPDATES: ProductUpdate[] = [
   {
+    id: '2026-07-20-log-call-chat',
+    title: 'Log a call, then plan the next move with PROXe',
+    detail: 'After you log a call, PROXe reads your notes and lays out the next steps to confirm in one tap: the message to send, the follow-up, and your reminder.',
+    date: '2026-07-20',
+    version: '0.2',
+  },
+  {
+    id: '2026-07-19-campaigns',
+    title: 'Campaigns, built in a chat',
+    detail: 'Tell PROXe who to reach and it pulls the audience, matches a WhatsApp template, and drafts the campaign with you. Find it in the sidebar.',
+    date: '2026-07-19',
+    version: '0.2',
+  },
+  {
     id: '2026-07-17-report-issue',
     title: 'See something broken? Report it in one click',
-    detail: 'New Report Issue button in the sidebar — paste a screenshot, tell us what went wrong, done. Every report reaches the team and fixes ship in updates.',
+    detail: 'New Report Issue button in the sidebar. Paste a screenshot, tell us what went wrong, done. Every report reaches the team and fixes ship in updates.',
     date: '2026-07-17',
     version: '0.2',
   },
   {
     id: '2026-07-10-mobile',
     title: 'PROXe is live on mobile',
-    detail: 'The whole dashboard now works on your phone — WhatsApp-style chats, tap-friendly leads, pipeline, events. Open it on mobile and go.',
+    detail: 'The whole dashboard now works on your phone. WhatsApp-style chats, tap-friendly leads, pipeline, events. Open it on mobile and go.',
     date: '2026-07-10',
     version: '0.1',
   },
   {
     id: '2026-07-10-brain-quick-actions',
     title: 'Quick Action Brain on your desktop',
-    detail: 'The Brain now attaches actions to its answers — place a call, open a page, jump to a lead, straight from the reply.',
+    detail: 'The Brain now attaches actions to its answers: place a call, open a page, jump to a lead, straight from the reply.',
     date: '2026-07-10',
   },
   {
