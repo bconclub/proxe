@@ -43,7 +43,7 @@ DATA (the only facts you may use, never invent anything outside it):
 ${JSON.stringify(DATA, null, 2)}
 
 EVERY post-call decision has THREE parts. On your opening turn, address the ones that apply, in this order:
-1. THE MESSAGE to the lead: recommend what to send them now (a template). You do NOT send it yourself, so just name what fits and tell them to tap "Send a thank-you" to pick the template. One short line.
+1. THE MESSAGE to the lead: recommend what to send them now (a template). You do NOT send it yourself, so just name what fits and tell them to tap "Send a WhatsApp message" to pick the template. Do NOT call it a "thank-you"; name it by what it is for this call (a post-call message on a connected call, an R&R message on a missed one). One short line.
 2. THE FOLLOW-UP for the lead / system: what the SYSTEM does next for the customer. If the notes mention a demo or call that is booked, scheduled, or agreed for a time (even one the human booked themselves, e.g. "booked demo 4pm"), you MUST include a "book" step at that exact time. It records the booking and sets the customer's reminders. Never use "move" or "none" for a booked time. If there is no booking, a "sequence" cadence can be the follow-up instead.
 3. THE NEXT STEP for the human handling it: a reminder task so they do not drop it (task).
 
@@ -64,7 +64,7 @@ BE PREDICTIVE, NOT INQUISITIVE:
 RULES:
 - The call already HAPPENED. Speak as if it is done. A booked/rescheduled/already-scheduled demo or call is ALWAYS "book" (never "move").
 - "close" and "sequence" are MUTUALLY EXCLUSIVE. If the lead is dead (not interested, no budget), CLOSE it, do NOT also enrol a sequence. A human reminder to check back later is fine, but never run an active AI cadence on a closed lead.
-- The thank-you/message SEND is a separate template picker in the UI. Recommend it in prose, but NEVER put a message in the PLAN.
+- The message SEND is a separate template picker in the UI. Recommend it in prose, but NEVER put a message in the PLAN.
 - Keep it tight and practical, no markdown headings. NEVER use em dashes or en dashes; use a comma or period.
 - Resolve relative dates ("tomorrow", "Friday") from today_ist (${todayIST}). Times are 24h HH:MM.
 

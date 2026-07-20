@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   MdClose, MdSend, MdCheck, MdAutorenew, MdPerson,
-  MdOutlineWavingHand, MdEventAvailable, MdNotificationsActive,
+  MdEventAvailable, MdNotificationsActive,
   MdSwapHoriz, MdRepeat, MdBlock, MdWhatsapp,
 } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
@@ -56,7 +56,7 @@ function describeStep(step: DecisionStep): string {
 // proposed plan touches gets highlighted, so "send thank-you + book + remind"
 // all light up together. `rec` maps an AI-proposed action to a highlight.
 const NEXT_STEPS: Array<{ key: string; label: string; icon: React.ReactNode; prompt?: string; rec: string[] }> = [
-  { key: 'message', label: 'Send a thank-you', icon: <MdOutlineWavingHand size={15} />, rec: ['post_call', 'message', 'none'] },
+  { key: 'message', label: 'Send a WhatsApp message', icon: <MdWhatsapp size={15} />, rec: ['post_call', 'message', 'none'] },
   { key: 'book', label: 'Book / reschedule', icon: <MdEventAvailable size={15} />, prompt: 'Help me book or reschedule a demo for this lead.', rec: ['book'] },
   { key: 'task', label: 'Remind me', icon: <MdNotificationsActive size={15} />, prompt: 'Set me a follow-up reminder for this lead.', rec: [] },
   { key: 'close', label: 'Close lead', icon: <MdBlock size={15} />, prompt: 'Close this lead.', rec: ['close'] },
@@ -71,7 +71,14 @@ const STEP_ICON: Record<string, React.ReactNode> = {
   close: <MdBlock size={14} />,
   sequence: <MdRepeat size={14} />,
   move: <MdSwapHoriz size={14} />,
-  message: <MdOutlineWavingHand size={14} />,
+  message: <MdWhatsapp size={14} />,
+}
+// The message action's menu label depends on the call outcome: a connected
+// call sends a post-call WhatsApp message; a missed call sends an R&R
+// (ring-no-response) template. Never called a "thank-you" - the body may say
+// thanks, but the action is just "send the right message for this call".
+function messageMenuLabel(outcome: string): string {
+  return outcome === 'Connected' ? 'Send a WhatsApp message' : 'Send an R&R message'
 }
 // Human date + time for the chips: relative day (Today/Tomorrow) or "Mon, 20
 // Jul", and 12-hour time with AM/PM. Never a raw ISO string.
@@ -153,10 +160,10 @@ function rankPostCall(matches: TemplateOpt[], outcome: string, steps: DecisionSt
 // One-line reason for the auto-pick, shown to the operator.
 function postCallReason(outcome: string, steps: DecisionStep[]): string {
   const has = (a: StepAction) => (steps || []).some((s) => s.action === a)
-  if (outcome !== 'Connected') return 'a callback message'
-  if (has('book')) return 'the demo-confirmed thank-you'
+  if (outcome !== 'Connected') return 'an R&R callback message'
+  if (has('book')) return 'the demo-confirmed message'
   if (has('close')) return 'the opt-out message'
-  return 'a general thank-you'
+  return 'a post-call message'
 }
 
 // PROXe's avatar = the canonical PROXe mark (the same infinity logo the Ask
@@ -290,7 +297,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
       }
       const matches = matchTemplates(tpls || [], outcome)
       if (matches.length === 0) {
-        const kind = outcome === 'Connected' ? 'post-call thank-you' : 'missed-call'
+        const kind = outcome === 'Connected' ? 'post-call' : 'R&R'
         setMessages((cur) => [...cur, { role: 'assistant', content: `There's no approved ${kind} template yet, so I can't send one (WhatsApp blocks open messages outside the 24 hour window). Add one from Configure, WhatsApp, then it will show up here.` }])
       } else {
         // Auto-pick the template that fits this call (demo booked / opt-out /
@@ -418,7 +425,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                       <div className="flex flex-wrap gap-1.5 mb-2.5">
                         {outcome === 'Connected' && (
                           <button onClick={openThankYou} className="flex items-center gap-1.5 text-[11.5px] font-medium px-2.5 py-1.5 rounded-lg border transition-colors hover:opacity-90" style={{ borderColor: ACCENT, background: `color-mix(in srgb, ${ACCENT} 12%, transparent)`, color: 'var(--text-primary)' }} title="Pick the template to send">
-                            <MdOutlineWavingHand size={14} style={{ color: ACCENT }} /> Send a thank-you
+                            <MdWhatsapp size={14} style={{ color: ACCENT }} /> {messageMenuLabel(outcome)}
                           </button>
                         )}
                         {m.plan.steps.map((s, j) => (
@@ -457,7 +464,7 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
                   style={{ borderColor: lit ? ACCENT : 'var(--border-primary)', background: lit ? `color-mix(in srgb, ${ACCENT} 10%, var(--bg-primary))` : 'var(--bg-primary)', color: 'var(--text-primary)' }}
                   title={lit ? 'PROXe suggests this' : undefined}>
                   <span style={{ color: lit ? ACCENT : 'var(--text-secondary)' }}>{s.icon}</span>
-                  <span className="truncate">{s.label}</span>
+                  <span className="truncate">{s.key === 'message' ? messageMenuLabel(outcome) : s.label}</span>
                 </button>
               )
             })}
