@@ -18,6 +18,7 @@ import {
   notifySlackLead,
   sendWhatsAppTemplate,
   sendWebinarConfirm,
+  sendOfflineEventConfirm,
   isCabinCrewSource,
   sendCabinCrewWelcome,
   pickWelcomeTemplate,
@@ -1371,17 +1372,18 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Offline-event registration → confirmation template ────────────────────
-    // Demo class / open house etc. - reuses the already-approved
-    // windchasers_demo_offline_v2 template (the same one the 1-on-1 "book a
-    // demo" campus-visit flow uses: NAMED customer_name/date/time, no buttons).
-    // No dedicated offline-event template exists yet (would need Meta review),
-    // so this is the immediate fix for leads getting no real confirmation.
-    // Guarded the same way as the webinar confirm: dedup window + soft-fail.
+    // Demo class / open house etc. - dedicated template (distinct from
+    // windchasers_demo_offline_v2, which is the unrelated 1-on-1 "book a demo"
+    // campus-visit flow). This fires once the lead actually completes THIS
+    // landing-page form - the real "you're confirmed" moment, mirroring the
+    // webinar confirm above. PENDING Meta review as of 2026-07-21 - soft-fails
+    // (logs, doesn't throw) until approved, same as the webinar confirm.
+    // Guarded the same way: dedup window + soft-fail.
     if (phone && isOfflineEventLead) {
       const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
       const eventName = String(cfields.offline_event_name || cfields.event_name || (body as any).offline_event_name || (body as any).event_name || '').trim()
       const eventDate = String(cfields.offline_event_date || cfields.event_date || (body as any).offline_event_date || '').trim()
-      const confirmTpl = 'windchasers_demo_offline_v2'
+      const confirmTpl = 'windchasers_offline_event_confirmation_v2'
       const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
         console.log(`[inbound] Offline-event confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
@@ -1389,14 +1391,15 @@ export async function POST(request: NextRequest) {
         const [eDatePart, eTimePart] = String(eventDate || '').split(/\s+at\s+/i)
         const dateDisplay = (eDatePart || eventDate || 'the scheduled date').trim()
         const timeDisplay = (eTimePart || '11:00 AM IST').trim()
-        const result = await sendDemoConfirmation(phone, firstName, dateDisplay, timeDisplay, 'offline')
+        const result = await sendOfflineEventConfirm(phone, firstName, eventName || 'the WindChasers Demo Class', eventDate || `${dateDisplay} at ${timeDisplay}`)
         const rendered = renderWaTemplate(confirmTpl, {
           customer_name: firstName,
+          event_name: eventName || 'the WindChasers Demo Class',
           date: dateDisplay,
           time: timeDisplay,
         })
         const bodyText = rendered?.content
-          || `Hi ${firstName}, your visit for ${eventName || 'the demo class'} is confirmed for ${dateDisplay} at ${timeDisplay}.`
+          || `Hi ${firstName}, you're all set for ${eventName || 'the demo class'} on ${dateDisplay} at ${timeDisplay}.`
         await supabase.from('conversations').insert({
           lead_id: leadId,
           channel: 'whatsapp',
