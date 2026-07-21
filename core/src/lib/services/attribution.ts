@@ -67,6 +67,7 @@ const FIRST_TOUCH_LABELS: Record<string, string> = {
   meta_lead_form: 'Meta Lead Form',
   facebook_lead: 'Meta Lead Form',
   webinar: 'Webinar',
+  offline_event: 'Offline Event',
   newsletter: 'Newsletter',
   contact: 'Contact Form',
   landing_page: 'Landing Page',

@@ -105,6 +105,8 @@ export {
   sendParentWelcomeTemplate,
   isCabinCrewSource,
   sendCabinCrewWelcome,
+  isDemoClassSource,
+  normalizeDemoClassDayPreference,
   sendWebinarConfirm,
   sendWebinarConfirmParents,
   sendWebinarReminder,

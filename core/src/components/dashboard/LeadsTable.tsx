@@ -303,6 +303,7 @@ export default function LeadsTable({
   const [searchQuery, setSearchQuery] = useState('')
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
+  const [offlineEventView, setOfflineEventView] = useState(false)
   const [gigsView, setGigsView] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -416,6 +417,18 @@ export default function LeadsTable({
       })
     }
 
+    // Offline Event segment (windchasers): demo classes, open houses, etc.
+    // Distinct MARKETING segment from a lead's own "Key Event" (a scheduled
+    // call/demo booking) - many leads registering for the same in-person
+    // session. Same pattern as Webinar: the tab shows ONLY registrants, the
+    // default Leads view excludes them.
+    if (showWebinarTab) {
+      filtered = filtered.filter((lead) => {
+        const isOfflineEvent = lead.unified_context?.[brandId]?.lead_type === 'offline_event'
+        return offlineEventView ? isOfflineEvent : !isOfflineEvent
+      })
+    }
+
     if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
@@ -469,7 +482,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, gigsView, showGigsTab])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -692,33 +705,38 @@ export default function LeadsTable({
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : (showWebinarTab && courseInterestFilter === 'Cabin Crew') ? 'Cabin Crew' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : offlineEventView ? 'Offline Events' : (showWebinarTab && courseInterestFilter === 'Cabin Crew') ? 'Cabin Crew' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
           </h2>
           <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
             {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
           </span>
 
-          {/* Leads | Cabin Crew | Webinar segment (windchasers). Cabin Crew reuses
-             the courseInterestFilter so it stays in sync with the course dropdown;
-             the live Google-Ads /cabin-crew campaign floods the list, so a
-             one-click segment keeps those leads findable. */}
+          {/* Leads | Cabin Crew | Webinar | Offline Events segment (windchasers).
+             Cabin Crew reuses the courseInterestFilter so it stays in sync with
+             the course dropdown; the live Google-Ads /cabin-crew campaign floods
+             the list, so a one-click segment keeps those leads findable. Offline
+             Events groups demo-class/open-house registrants the same way Webinar
+             does - a marketing segment, not to be confused with a lead's own
+             "Key Event" (their scheduled call/demo booking). */}
           {showWebinarTab && (
-            <div role="tablist" aria-label="Leads, Cabin Crew or Webinar" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar or Offline Events" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
               {([
-                { label: 'Leads', selected: !webinarView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setCourseInterestFilter('all') } },
-                { label: 'Cabin Crew', selected: !webinarView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setCourseInterestFilter('Cabin Crew') } },
-                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setCourseInterestFilter('all') } },
+                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('Cabin Crew') } },
+                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setCourseInterestFilter('all') } },
               ] as const).map((t) => (
                 <button
                   key={t.label}
                   role="tab"
                   aria-selected={t.selected}
                   onClick={t.onSelect}
-                  className="px-2 py-0.5 text-xs font-medium transition-colors whitespace-nowrap"
+                  className="px-2 py-1 text-xs font-semibold transition-colors whitespace-nowrap"
                   style={{
-                    backgroundColor: t.selected ? 'var(--button-bg)' : 'var(--bg-primary)',
-                    color: t.selected ? 'var(--text-button)' : 'var(--text-secondary)',
+                    backgroundColor: t.selected ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'var(--bg-primary)',
+                    color: t.selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
                     borderRight: '1px solid var(--border-primary)',
+                    borderBottom: t.selected ? '2px solid var(--accent-primary)' : '2px solid transparent',
                   }}
                 >
                   {t.label}
@@ -736,11 +754,12 @@ export default function LeadsTable({
                   role="tab"
                   aria-selected={gigsView === t.key}
                   onClick={() => setGigsView(t.key)}
-                  className="px-2 py-0.5 text-xs font-medium transition-colors"
+                  className="px-2 py-1 text-xs font-semibold transition-colors"
                   style={{
-                    backgroundColor: gigsView === t.key ? 'var(--button-bg)' : 'var(--bg-primary)',
-                    color: gigsView === t.key ? 'var(--text-button)' : 'var(--text-secondary)',
+                    backgroundColor: gigsView === t.key ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'var(--bg-primary)',
+                    color: gigsView === t.key ? 'var(--accent-primary)' : 'var(--text-secondary)',
                     borderRight: '1px solid var(--border-primary)',
+                    borderBottom: gigsView === t.key ? '2px solid var(--accent-primary)' : '2px solid transparent',
                   }}
                 >
                   {t.label}
@@ -1043,7 +1062,7 @@ export default function LeadsTable({
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
-            {webinarView && <col style={{ width: '11%' }} />}
+            {(webinarView || offlineEventView) && <col style={{ width: '11%' }} />}
             {scoutView && <col style={{ width: '9%' }} />}
             {scoutView && <col style={{ width: '8%' }} />}
             <col style={{ width: '9%' }} />
@@ -1072,7 +1091,7 @@ export default function LeadsTable({
                 { label: 'Score',      align: 'center' as const },
                 { label: 'Stage',      align: 'center' as const },
                 { label: 'Active',     align: 'left'   as const },
-                { label: scoutView ? 'Properties' : 'Booking', align: 'center' as const },
+                { label: scoutView ? 'Properties' : webinarView ? 'Zoom' : offlineEventView ? 'RSVP' : 'Booking', align: 'center' as const },
                 ...(showAviationColumns ? [
                   { label: 'Type',   align: 'center' as const },
                   { label: 'Course', align: 'center' as const },
@@ -1080,6 +1099,9 @@ export default function LeadsTable({
                 ] : []),
                 ...(webinarView ? [
                   { label: 'Webinar', align: 'center' as const },
+                ] : []),
+                ...(offlineEventView ? [
+                  { label: 'Event', align: 'center' as const },
                 ] : []),
                 ...(scoutView ? [
                   { label: 'Area Covered',     align: 'center' as const },
@@ -1101,11 +1123,11 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={(showAviationColumns ? 12 : scoutView ? 11 : 9) + (webinarView ? 1 : 0)}
+                  colSpan={(showAviationColumns ? 12 : scoutView ? 11 : 9) + ((webinarView || offlineEventView) ? 1 : 0)}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {gigsView ? 'No gigs yet' : webinarView ? 'No webinar registrations yet' : brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
+                  {gigsView ? 'No gigs yet' : webinarView ? 'No webinar registrations yet' : offlineEventView ? 'No offline event registrations yet' : brandId === 'pop' ? 'No constituents captured yet' : 'No leads found'}
                 </td>
               </tr>
             ) : (
@@ -1980,6 +2002,21 @@ export default function LeadsTable({
                         ) : (
                           <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
                         )
+                      })() : offlineEventView ? (() => {
+                        // Offline event view: no Zoom-style attendance signal yet
+                        // (that's a manual venue check, not automated) - show
+                        // whether the registration itself was captured.
+                        const wc = uc?.[brandId] || {}
+                        return wc.offline_event_registered_at ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                            style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
+                          >
+                            <span aria-hidden="true">✓</span> Registered
+                          </span>
+                        ) : (
+                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
+                        )
                       })() : bookingDate ? (() => {
                         // Resolve session type: explicit field wins, else infer from meet link presence.
                         const brandCtx = uc?.[brandId] || uc?.windchasers || uc?.bcon || {}
@@ -2116,6 +2153,31 @@ export default function LeadsTable({
                               {wc.webinar_name || 'Webinar'}
                               {wc.webinar_date ? <span className="block text-[9px] font-medium opacity-80">{wc.webinar_date}</span> : null}
                             </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                          )}
+                        </td>
+                      )
+                    })()}
+
+                    {/* OFFLINE EVENT: which event + date + location + who they're bringing (offline event view only) */}
+                    {offlineEventView && (() => {
+                      const wc = lead.unified_context?.[brandId] || {}
+                      const label = [wc.offline_event_name, wc.offline_event_date, wc.offline_event_location, wc.offline_event_coming_with ? `Bringing: ${wc.offline_event_coming_with}` : null].filter(Boolean).join(' · ')
+                      return (
+                        <td className="px-3 py-2 text-xs">
+                          {wc.offline_event_name || wc.offline_event_date ? (
+                            <div className="leading-tight min-w-0" title={label}>
+                              <span className="block truncate text-[11px] font-semibold" style={{ color: '#fbbf24' }}>
+                                {wc.offline_event_name || 'Offline Event'}
+                              </span>
+                              {wc.offline_event_date ? (
+                                <span className="block truncate text-[9.5px]" style={{ color: 'var(--text-muted)' }}>{wc.offline_event_date}</span>
+                              ) : null}
+                              {wc.offline_event_coming_with ? (
+                                <span className="block truncate text-[9.5px]" style={{ color: 'var(--text-secondary)' }}>With: {wc.offline_event_coming_with}</span>
+                              ) : null}
+                            </div>
                           ) : (
                             <span style={{ color: 'var(--text-muted)' }}>-</span>
                           )}
