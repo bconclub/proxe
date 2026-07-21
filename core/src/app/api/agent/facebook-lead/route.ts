@@ -21,12 +21,34 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, isDemoClassSource, normalizeDemoClassDayPreference, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, isDemoClassSource, normalizeDemoClassDayPreference, sendDemoConfirmation, sendEmail, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 import { normalizeCourse } from '@/configs/courses';
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies';
 
 export const dynamic = 'force-dynamic';
+
+// Same dedup window as leads/inbound/route.ts's wasTemplateRecentlySent -
+// protects against Pabbly retrying the same webhook / duplicate submissions.
+const TEMPLATE_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
+async function wasTemplateRecentlySent(
+  supabase: any,
+  leadId: string,
+  templateName: string,
+  windowMs: number = TEMPLATE_DEDUP_WINDOW_MS,
+): Promise<boolean> {
+  const { data: recentSend } = await supabase
+    .from('conversations')
+    .select('created_at')
+    .eq('lead_id', leadId)
+    .eq('channel', 'whatsapp')
+    .filter('metadata->>template_name', 'eq', templateName)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return !!(recentSend?.created_at && (Date.now() - new Date(recentSend.created_at).getTime()) < windowMs);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -285,6 +307,77 @@ export async function POST(request: NextRequest) {
 
     if (inCooldown) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
+    } else if (isDemoClassLead) {
+      // ── 3a. Demo-class lead → confirmation, not the generic welcome ─────────
+      // Reuses the already-approved windchasers_demo_offline_v2 template (the
+      // same one the 1-on-1 "book a demo" campus-visit flow uses: NAMED
+      // customer_name/date/time, no buttons) - no dedicated offline-event
+      // template exists yet (would need Meta review), so this is the immediate
+      // fix for leads getting no real confirmation. Dedup-guarded like the
+      // webinar/cabin-crew confirms in leads/inbound.
+      const confirmTpl = 'windchasers_demo_offline_v2';
+      const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl);
+      const first = (cleanName || name || 'there').split(' ')[0];
+      const dateDisplay = windchasersProfile.offline_event_date || 'the scheduled date';
+      const timeDisplay = '11:00 AM IST';
+      if (confirmAlreadySent) {
+        console.log(`[facebook-lead] Demo-class confirm SKIPPED as duplicate lead=${leadId} phone=${normalizedPhone}`);
+      } else {
+        const confirmResult = await sendDemoConfirmation(phone, first, dateDisplay, timeDisplay, 'offline');
+        whatsappSent = confirmResult.success;
+        if (!confirmResult.success) {
+          console.error('[facebook-lead] Demo-class confirm send failed:', confirmResult.error);
+        } else {
+          const rendered = renderWaTemplate(confirmTpl, { customer_name: first, date: dateDisplay, time: timeDisplay });
+          const logText = rendered?.content || `Hi ${first}, your visit for the demo class is confirmed for ${dateDisplay} at ${timeDisplay}.`;
+          await logMessage(
+            leadId,
+            'whatsapp',
+            'agent',
+            logText,
+            'template',
+            {
+              source: 'facebook_lead',
+              template_name: confirmTpl,
+              trigger: 'offline_event_registration',
+              ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+              ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+              offline_event_date: dateDisplay,
+              ...facebookMeta,
+            },
+            supabase,
+          );
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId);
+        }
+      }
+
+      // ── 3b. Confirmation email ── Meta lead forms capture email directly
+      // (the landing-page register modal doesn't ask for one, so this only
+      // fires on the FB-ad path). Plain HTML - no Meta approval needed, unlike
+      // WhatsApp templates, so this can say exactly what's true today.
+      if (email) {
+        try {
+          const emailResult = await sendEmail({
+            to: email,
+            subject: "You're confirmed - WindChasers Demo Class",
+            html: `<p>Hi ${first},</p>` +
+              `<p>You're confirmed for the WindChasers Demo Class on <strong>${dateDisplay}</strong> at <strong>${timeDisplay}</strong>, at our Bengaluru campus.</p>` +
+              `<p>We'll follow up on WhatsApp with directions and anything else you need. See you there!</p>` +
+              `<p>- Team WindChasers</p>`,
+          });
+          if (!emailResult.sent) console.error('[facebook-lead] Confirmation email failed:', emailResult.error);
+        } catch (err: any) {
+          console.error('[facebook-lead] Confirmation email exception:', err?.message || err);
+        }
+      }
+
+      // ── 3c. Trigger AI scoring (fire-and-forget) ─────────────────────────────
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      fetch(`${appUrl}/api/webhooks/message-created`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: leadId }),
+      }).catch((err) => console.error('[facebook-lead] Scoring trigger failed:', err));
     } else {
       // ── 3. Fire the welcome template - parent enquiry gets its own template
       // (named param `parent_name`); otherwise pilot vs generic by the

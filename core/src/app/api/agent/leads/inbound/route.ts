@@ -895,7 +895,7 @@ export async function POST(request: NextRequest) {
       String(cf2.form_type || '').toLowerCase() === 'demo_booked'
     const isWindchasersWelcomeLead =
       leadBrand === 'windchasers' && !!phone && isNewLead &&
-      !isWebinarReg && !isCabinCrewLead && !isPatEarly && !isDemoEarly
+      !isWebinarReg && !isOfflineEventLead && !isCabinCrewLead && !isPatEarly && !isDemoEarly
     // bcon: every brand-new inbound lead with a phone gets an IMMEDIATE welcome
     // (website form -> web welcome, Meta/AI-Lead-Machine -> campaign welcome).
     // The old path parked a first_outreach task for the task-worker - which is
@@ -1367,6 +1367,64 @@ export async function POST(request: NextRequest) {
         }
       } catch (err: any) {
         console.error(`[inbound] Webinar confirm EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
+      }
+    }
+
+    // ── Offline-event registration → confirmation template ────────────────────
+    // Demo class / open house etc. - reuses the already-approved
+    // windchasers_demo_offline_v2 template (the same one the 1-on-1 "book a
+    // demo" campus-visit flow uses: NAMED customer_name/date/time, no buttons).
+    // No dedicated offline-event template exists yet (would need Meta review),
+    // so this is the immediate fix for leads getting no real confirmation.
+    // Guarded the same way as the webinar confirm: dedup window + soft-fail.
+    if (phone && isOfflineEventLead) {
+      const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
+      const eventName = String(cfields.offline_event_name || cfields.event_name || (body as any).offline_event_name || (body as any).event_name || '').trim()
+      const eventDate = String(cfields.offline_event_date || cfields.event_date || (body as any).offline_event_date || '').trim()
+      const confirmTpl = 'windchasers_demo_offline_v2'
+      const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
+      if (confirmAlreadySent) {
+        console.log(`[inbound] Offline-event confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
+      } else try {
+        const [eDatePart, eTimePart] = String(eventDate || '').split(/\s+at\s+/i)
+        const dateDisplay = (eDatePart || eventDate || 'the scheduled date').trim()
+        const timeDisplay = (eTimePart || '11:00 AM IST').trim()
+        const result = await sendDemoConfirmation(phone, firstName, dateDisplay, timeDisplay, 'offline')
+        const rendered = renderWaTemplate(confirmTpl, {
+          customer_name: firstName,
+          date: dateDisplay,
+          time: timeDisplay,
+        })
+        const bodyText = rendered?.content
+          || `Hi ${firstName}, your visit for ${eventName || 'the demo class'} is confirmed for ${dateDisplay} at ${timeDisplay}.`
+        await supabase.from('conversations').insert({
+          lead_id: leadId,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: result.success ? bodyText : `[Template send FAILED: ${confirmTpl}]\n\n${bodyText}`,
+          message_type: 'template',
+          metadata: {
+            template_name: confirmTpl,
+            template_language: 'en',
+            auto_sent: true,
+            trigger: 'offline_event_registration',
+            sent_by: 'system (inbound webhook)',
+            offline_event_name: eventName || null,
+            offline_event_date: eventDate || null,
+            send_succeeded: !!result.success,
+            send_error: result.success ? null : (result.error || 'unknown'),
+          },
+        })
+        if (result.success) {
+          await supabase.from('all_leads').update({ last_touchpoint: 'whatsapp', last_interaction_at: now }).eq('id', leadId)
+        }
+        if (!result.success) {
+          console.error(`[inbound] Offline-event confirm send FAILED lead=${leadId} phone=${phone} tpl=${confirmTpl} error=${result.error}`)
+        } else {
+          console.log(`[inbound] Offline-event confirm OK lead=${leadId} phone=${phone} tpl=${confirmTpl} event=${eventName}`)
+        }
+      } catch (err: any) {
+        console.error(`[inbound] Offline-event confirm EXCEPTION lead=${leadId} phone=${phone}: ${err?.message || err}`)
       }
     }
 
