@@ -21,7 +21,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, isDemoClassSource, normalizeDemoClassDayPreference, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
 import { BRAND_ID } from '@/configs';
 import { normalizeCourse } from '@/configs/courses';
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies';
@@ -66,11 +66,26 @@ export async function POST(request: NextRequest) {
     const startTimeline: string | null =
       body.start_timeline || body.when_looking_to_start || null;
     const age: string | null = body.age != null ? String(body.age) : null;
+    // Demo Class lead form's own qualifying question - which single-day session
+    // they'd attend (e.g. "27th_july"). Interest-stage only; the landing-page
+    // form completion is what actually confirms their spot.
+    const dayPreference: string | null =
+      body.which_day_works_for_you || body.day_preference || null;
     // Explicit course/interest the Pabbly workflow can set (e.g. "cabin_crew",
     // "pilot", "cpl"). Drives welcome routing deterministically instead of
     // relying on the ad/form name - set a static value per dedicated workflow.
     const course: string | null =
       body.course || body.course_interest || body.interest || body.program || null;
+    // Two separate, explicit markers a Pabbly workflow can set - deliberately
+    // split so one field never has to describe both dimensions at once:
+    //   lead_type     = WHO the person is    ("Student Lead", "Parent Lead")
+    //   campaign_type = WHAT campaign/event  ("DGCA Demo Session", "Cabin Crew")
+    // Neither feeds into `course` directly (so e.g. "DGCA Demo Session" isn't
+    // misread by normalizeCourse as the DGCA ground-class course just because
+    // the word "DGCA" appears in it) - both are fed into the keyword
+    // detectors below instead, each on its own natural dimension.
+    const leadTypeSignal: string | null = body.lead_type || null;
+    const campaignTypeSignal: string | null = body.campaign_type || null;
 
     // UTM attribution from Facebook Ads
     const utmData = {
@@ -132,14 +147,46 @@ export async function POST(request: NextRequest) {
     if (class12Pcm) windchasersProfile.class_12_pcm = class12Pcm;
     if (startTimeline) windchasersProfile.start_timeline = startTimeline;
     if (age) windchasersProfile.age = age;
+    // TYPE column (student/parent) - this route previously never set it at
+    // all, so every Meta lead-ad lead showed a blank TYPE regardless of which
+    // audience the ad targeted. Explicit body.audience/user_type wins (mirrors
+    // leads/inbound); else infer from the lead_type marker ("Parent Lead" /
+    // "Student Lead") a dedicated Pabbly workflow can set.
+    const audienceRaw = String(body.audience || body.user_type || '').toLowerCase().trim();
+    if (audienceRaw === 'student' || audienceRaw === 'parent') {
+      windchasersProfile.user_type = audienceRaw;
+    } else if (leadTypeSignal) {
+      const lt = leadTypeSignal.toLowerCase();
+      if (/\bparent\b/.test(lt)) windchasersProfile.user_type = 'parent';
+      else if (/\bstudent\b/.test(lt)) windchasersProfile.user_type = 'student';
+    }
     if (course) windchasersProfile.course_interest = normalizeCourse(course);
     // Cabin-crew ad/form with no explicit course field → tag the course so the
     // COURSE column shows "Cabin Crew" (TYPE stays user_type: student/parent).
     if (!windchasersProfile.course_interest && isCabinCrewSource(
-      course, facebookMeta.form_name, facebookMeta.campaign_name,
+      course, campaignTypeSignal, facebookMeta.form_name, facebookMeta.campaign_name,
       facebookMeta.adset_name, facebookMeta.ad_name, facebookMeta.utm_campaign, facebookMeta.utm_content,
     )) {
       windchasersProfile.course_interest = 'Cabin Crew';
+    }
+
+    // Demo Class ad/campaign (e.g. "Demo Session 27-28th July") - tag INTEREST
+    // immediately so the lead shows in the dashboard's Offline Events tab and a
+    // counsellor can follow up, but do NOT mark offline_event_registered_at:
+    // that's reserved for when they actually complete the landing-page form
+    // (this is only the ad-lead-form stage, same distinction webinar makes
+    // between lead_type='webinar' and zoom_registered).
+    const isDemoClassLead = isDemoClassSource(
+      course, campaignTypeSignal, facebookMeta.form_name, facebookMeta.campaign_name,
+      facebookMeta.adset_name, facebookMeta.ad_name, facebookMeta.utm_campaign, facebookMeta.utm_content,
+    );
+    if (isDemoClassLead) {
+      windchasersProfile.lead_type = 'offline_event';
+      windchasersProfile.offline_event_name = 'WindChasers Demo Class';
+      const normalizedDay = normalizeDemoClassDayPreference(dayPreference);
+      if (normalizedDay || dayPreference) windchasersProfile.offline_event_date = normalizedDay || String(dayPreference);
+      windchasersProfile.offline_event_interest_source = 'facebook_lead_form';
+      if (!windchasersProfile.course_interest) windchasersProfile.course_interest = 'Pilot';
     }
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
@@ -166,6 +213,19 @@ export async function POST(request: NextRequest) {
       leadId = existing.id;
       const existingCtx = existing.unified_context || {};
 
+      // Never DEMOTE an existing lead into the offline-event segment - a
+      // re-click on the demo-class ad shouldn't hide an active, already-being-
+      // worked lead from the main Leads view. Registration details (name/
+      // date/interest-source) still merge in either way; only the segment
+      // tag itself is protected. Mirrors the same guard in leads/inbound.
+      const mergedWindchasers: Record<string, any> = {
+        ...(existingCtx.windchasers || {}),
+        ...windchasersProfile,
+      };
+      if (windchasersProfile.lead_type === 'offline_event' && existingCtx.windchasers?.lead_type !== 'offline_event') {
+        mergedWindchasers.lead_type = existingCtx.windchasers?.lead_type;
+      }
+
       await supabase
         .from('all_leads')
         .update({
@@ -182,10 +242,7 @@ export async function POST(request: NextRequest) {
               ...facebookMeta,
               last_lead_at: now,
             },
-            windchasers: {
-              ...(existingCtx.windchasers || {}),
-              ...windchasersProfile,
-            },
+            windchasers: mergedWindchasers,
             // Attribution is immutable - keep existing if already set
             attribution: existingCtx.attribution ?? attribution,
           },
@@ -237,6 +294,7 @@ export async function POST(request: NextRequest) {
       // when the ad/form/campaign names don't carry the audience keyword.
       const attributionSignals = [
         course,
+        leadTypeSignal,
         facebookMeta.form_name,
         facebookMeta.campaign_name,
         facebookMeta.adset_name,

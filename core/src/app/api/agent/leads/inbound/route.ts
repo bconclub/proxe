@@ -300,6 +300,12 @@ export async function POST(request: NextRequest) {
     // block so these get the generic welcome (which has a "Flight Schools"
     // button) rather than the pilot-training welcome.
     let isFlightSchoolLead = false
+    // Offline-event lead flag (windchasers) - set below. Unlike webinar, this
+    // does NOT skip first_outreach: there's no confirmation/reminder template
+    // yet, so a counsellor still needs to follow up. Flip this once a
+    // dedicated offline-event WhatsApp confirm exists (mirror the webinar
+    // isWebinarReg skip at the first_outreach block below).
+    let isOfflineEventLead = false
     const audienceRaw = String(cf2.audience || cf2.user_type || (body as any).audience || (body as any).user_type || '').toLowerCase().trim()
     if (
       audienceRaw === 'student' ||
@@ -386,6 +392,32 @@ export async function POST(request: NextRequest) {
           brandCtxData.zoom_registered_at = now
           if (zoomJoinUrl) brandCtxData.zoom_join_url = zoomJoinUrl
         }
+      }
+
+      // ── Offline event registration (demo class, open house, etc.) ─────────
+      // Distinct from "Key Event" (a lead's own scheduled call/demo booking on
+      // all_leads.booking_date) — this is a MARKETING segment, many leads
+      // registering for the SAME in-person session, same shape as webinar but
+      // for a physical venue instead of a Zoom link. Tagged lead_type=
+      // 'offline_event' so the Leads page's Offline Events tab can segment
+      // them out. user_type (student/parent) is NOT touched here.
+      isOfflineEventLead =
+        normalizedSource === 'offline_event' ||
+        String(cf2.form_type || (body as any).form_type || '').toLowerCase().trim() === 'offline_event' ||
+        String(cf2.lead_type || (body as any).lead_type || '').toLowerCase().trim() === 'offline_event'
+      if (isOfflineEventLead) {
+        brandCtxData.lead_type = 'offline_event'
+        const offlineEventName = String(cf2.offline_event_name || cf2.event_name || (body as any).offline_event_name || (body as any).event_name || '').trim()
+        if (offlineEventName) brandCtxData.offline_event_name = offlineEventName
+        const offlineEventDate = String(cf2.offline_event_date || cf2.event_date || (body as any).offline_event_date || '').trim()
+        if (offlineEventDate) brandCtxData.offline_event_date = offlineEventDate
+        const offlineEventLocation = String(cf2.offline_event_location || cf2.event_location || (body as any).offline_event_location || '').trim()
+        if (offlineEventLocation) brandCtxData.offline_event_location = offlineEventLocation
+        // Who they're bringing (parent/guest, free text from the landing page
+        // form) - so the counsellor/venue knows headcount without a callback.
+        const offlineEventComingWith = String(cf2.offline_event_coming_with || (body as any).offline_event_coming_with || '').trim()
+        if (offlineEventComingWith) brandCtxData.offline_event_coming_with = offlineEventComingWith
+        brandCtxData.offline_event_registered_at = now
       }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
@@ -676,6 +708,13 @@ export async function POST(request: NextRequest) {
         // registered_at) still merge in either way.
         if (mergedBrandCtx && brandCtxData.lead_type === 'webinar' &&
             (existingCtx[leadBrand] as any)?.lead_type !== 'webinar') {
+          delete mergedBrandCtx.lead_type
+        }
+        // Same guard for offline-event registrations: never demote an existing
+        // real lead into the offline-event segment. Registration details
+        // (offline_event_name/date/location/registered_at) still merge in.
+        if (mergedBrandCtx && brandCtxData.lead_type === 'offline_event' &&
+            (existingCtx[leadBrand] as any)?.lead_type !== 'offline_event') {
           delete mergedBrandCtx.lead_type
         }
         // Attribution is IMMUTABLE - never overwrite existing source/first_touch.

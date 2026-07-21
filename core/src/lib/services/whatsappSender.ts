@@ -598,6 +598,35 @@ export function isCabinCrewSource(...signals: Array<string | null | undefined>):
 }
 
 /**
+ * Detects a Meta lead-ad submission for the offline Demo Class event (the
+ * in-person group session, e.g. campaign "Demo Session 27-28th July") - NOT
+ * the individual 1-on-1 "book a demo" flow. Matches on campaign/ad/adset name
+ * since that's the only reliable signal Pabbly forwards without a dedicated
+ * static field. This is the INTEREST stage only (they clicked the ad) - the
+ * landing-page form completion is what actually confirms their spot.
+ */
+export function isDemoClassSource(...signals: Array<string | null | undefined>): boolean {
+  const hay = signals.filter(Boolean).join(' ').toLowerCase()
+  return /\bdemo[\s_-]?(class|session)\b/.test(hay)
+}
+
+/**
+ * Normalizes the lead-form's day-preference answer ("27th_july", "28 July",
+ * "27th July") into the short label our offline-event sessions use ("27
+ * July"). Returns null if it doesn't look like a day+month at all - callers
+ * should fall back to storing the raw value instead of guessing.
+ */
+export function normalizeDemoClassDayPreference(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const cleaned = String(raw).toLowerCase().replace(/[_-]+/g, ' ').trim()
+  const match = cleaned.match(/(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)/)
+  if (!match) return null
+  const day = match[1]
+  const month = match[2]
+  return `${day} ${month.charAt(0).toUpperCase()}${month.slice(1)}`
+}
+
+/**
  * Welcome for cabin-crew leads. Tries the cabin-crew-specific template; if it's
  * not approved in Meta yet, falls back to the generic welcome so a live
  * cabin-crew ad lead is NEVER left unwelcomed. Auto-upgrades to the dedicated
