@@ -76,6 +76,18 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
     body: `Hi {{customer_name}}, your Pilot Aptitude Test result is ready.\n\nScore: *{{score}}/100*\nTier: *{{tier}}*\n\n{{tier_message}}\n\n_*Team Windchasers*_`,
     buttons: ['Book a Demo Class'],
   },
+  // Offline event (demo class, open house, etc.) - distinct from the 1-on-1
+  // "book a demo" flow above (windchasers_demo_offline_v2). Submitted to Meta
+  // 2026-07-21, PENDING review.
+  windchasers_offline_event_register_nudge_v3: {
+    body: `Hi {{customer_name}}, you told us you are interested in {{event_name}} and we would love to see you there. Tap below to confirm your seat now.`,
+    footer: 'Team Windchasers',
+    buttons: ['Confirm My Seat'],
+  },
+  windchasers_offline_event_confirmation_v2: {
+    body: `Hi {{customer_name}}, you are all set for {{event_name}} on {{date}} at {{time}} and we cannot wait to see you at our Bengaluru campus.`,
+    footer: 'Team Windchasers',
+  },
 
   // Webinar day-of + follow-up templates (v3 = clean copy with a real button;
   // the join link lives in the button, never inline). The _v1 day-of names are

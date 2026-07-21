@@ -858,6 +858,70 @@ export async function sendWebinarRegisterNudge(
 }
 
 /**
+ * Offline-event (demo class, open house, etc.) "confirm your seat" nudge -
+ * fired when a lead only shows INTEREST (e.g. a Meta lead-ad form) but hasn't
+ * completed the actual landing-page registration yet. Distinct from
+ * sendDemoConfirmation (windchasers_demo_offline_v2), which is for the 1-on-1
+ * "book a demo" campus-visit flow, not this group event.
+ *
+ * Template: windchasers_offline_event_register_nudge_v3 - NAMED params:
+ *   customer_name · event_name   + a static "Confirm My Seat" URL button
+ * (points at the landing page - static, so no send-time button component
+ * needed). PENDING Meta review as of 2026-07-21 - a 4xx here just means it
+ * isn't approved yet; caller falls back to the plain welcome template.
+ */
+export async function sendOfflineEventRegisterNudge(
+  to: string,
+  name: string,
+  eventName: string,
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_offline_event_register_nudge_v3', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'event_name', text: eventName || 'our demo class' },
+      ],
+    },
+  ])
+}
+
+/**
+ * Offline-event registration confirmation - fired once a lead actually
+ * completes the landing-page form (the real "you're confirmed" moment).
+ * Mirrors sendWebinarConfirm's shape exactly.
+ *
+ * Template: windchasers_offline_event_confirmation_v2 - NAMED params:
+ *   customer_name · event_name · date · time
+ * `dateTime` is the combined "27 July 2026 at 11:00 AM IST" label - split
+ * into the separate date + time the template expects. PENDING Meta review
+ * as of 2026-07-21 - soft-fails (logs, doesn't throw) until approved.
+ */
+export async function sendOfflineEventConfirm(
+  to: string,
+  name: string,
+  eventName: string,
+  dateTime: string,
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  const [datePart, timePart] = String(dateTime || '').split(/\s+at\s+/i)
+  return sendWhatsAppTemplate(to, 'windchasers_offline_event_confirmation_v2', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'event_name', text: eventName || 'our demo class' },
+        { type: 'text', parameter_name: 'date', text: (datePart || dateTime || 'the scheduled date').trim() },
+        { type: 'text', parameter_name: 'time', text: (timePart || 'the scheduled time').trim() },
+      ],
+    },
+  ])
+}
+
+/**
  * Pick the RNR (no-reply / missed-call) re-engagement template.
  * Two steps per segment - step 1 = first re-attempt, step 2 = "tried again".
  * Routed pilot vs generic by the lead's source. Names are Meta-approved with a

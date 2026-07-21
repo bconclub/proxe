@@ -113,6 +113,8 @@ export {
   sendWebinarStartingSoon,
   sendWebinarLiveNow,
   sendWebinarRegisterNudge,
+  sendOfflineEventRegisterNudge,
+  sendOfflineEventConfirm,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';
