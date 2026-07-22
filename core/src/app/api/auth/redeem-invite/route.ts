@@ -42,6 +42,35 @@ const LEAD_ACCESS_ON = !!getBrandConfig().features?.leadAccess
 // the user_invitations row has a junk role somehow, we cap what gets applied.
 const ALLOWED_ROLES = new Set(['viewer', 'admin'])
 
+/**
+ * GET /api/auth/redeem-invite?token=...
+ *
+ * Server-side invitation VERIFICATION for the accept-invite page. The page
+ * previously read user_invitations directly from the browser with the anon
+ * key — on brands whose RLS does not allow anonymous reads that lookup failed
+ * and the page hung on "Verifying invitation..." forever. The token is the
+ * auth here too; the service client bypasses RLS.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const token = String(request.nextUrl.searchParams.get('token') || '').trim()
+    if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 })
+    const service = getServiceClient()
+    if (!service) return NextResponse.json({ error: 'Server unavailable' }, { status: 500 })
+    const { data, error } = await service
+      .from('user_invitations')
+      .select('id, email, role, accepted_at, expires_at, created_at')
+      .eq('token', token)
+      .maybeSingle()
+    if (error || !data) return NextResponse.json({ error: 'Invalid or expired invitation' }, { status: 404 })
+    if (data.accepted_at) return NextResponse.json({ error: 'This invitation has already been accepted' }, { status: 410 })
+    if (new Date(data.expires_at) < new Date()) return NextResponse.json({ error: 'This invitation has expired' }, { status: 410 })
+    return NextResponse.json({ ok: true, email: data.email, role: data.role, expires_at: data.expires_at })
+  } catch {
+    return NextResponse.json({ error: 'Verification failed' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))

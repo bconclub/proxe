@@ -30,42 +30,23 @@ function AcceptInviteForm() {
       return
     }
 
-    // Verify invitation token
+    // Verify invitation token SERVER-SIDE. The old direct browser query on
+    // user_invitations used the anon key — on brands whose RLS blocks anonymous
+    // reads it failed and (because the spinner branch never rendered `error`)
+    // the page hung on "Verifying invitation..." forever.
     const verifyInvitation = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('user_invitations')
-        .select('*')
-        .eq('token', token)
-        .single()
-
-      if (error || !data) {
-        setError('Invalid or expired invitation')
-        return
+      try {
+        const res = await fetch(`/api/auth/redeem-invite?token=${encodeURIComponent(token)}`)
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data?.ok) {
+          setError(data?.error || 'Invalid or expired invitation')
+          return
+        }
+        setInvitation(data)
+        setEmail(data.email)
+      } catch {
+        setError('Could not verify the invitation. Check your connection and reload this page.')
       }
-
-      const invitationData = data as {
-        id: string
-        email: string
-        token: string
-        role: string
-        accepted_at: string | null
-        expires_at: string
-        created_at: string
-      }
-
-      if (invitationData.accepted_at) {
-        setError('This invitation has already been accepted')
-        return
-      }
-
-      if (new Date(invitationData.expires_at) < new Date()) {
-        setError('This invitation has expired')
-        return
-      }
-
-      setInvitation(invitationData)
-      setEmail(invitationData.email)
     }
 
     verifyInvitation()
@@ -152,9 +133,19 @@ function AcceptInviteForm() {
   if (!invitation) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: colors.primaryDark }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: colors.primary }}></div>
-          <p className="mt-4 text-gray-400">Verifying invitation...</p>
+        <div className="text-center px-6">
+          {error ? (
+            <>
+              <h2 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>Invitation problem</h2>
+              <p className="mt-2 text-gray-400 max-w-sm mx-auto">{error}</p>
+              <p className="mt-3 text-sm text-gray-500">Ask your admin to send a fresh invite if this keeps happening.</p>
+            </>
+          ) : (
+            <>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: colors.primary }}></div>
+              <p className="mt-4 text-gray-400">Verifying invitation...</p>
+            </>
+          )}
         </div>
       </div>
     )
