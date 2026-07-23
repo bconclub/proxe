@@ -1071,11 +1071,28 @@ export async function POST(request: NextRequest) {
         // dashboard inbox shows the same chips (confirm has none).
         let templateButtons: string[] = []
 
-        if (isBrandLead) {
-          const brandName = String(brandCtxData.brand_name || '').trim() || 'your brand'
-          const rentRange = String(brandCtxData.budget_monthly_rent || '').trim() || 'your budget'
-          const sizeRange = String(brandCtxData.required_size_sqft || '').trim() || 'your requirement'
-          const locations = String(brandCtxData.target_zones || '').trim() || 'your preferred areas'
+        // Only send the rich "Got your brief" templates when a brief actually
+        // EXISTS at send time. Leads often arrive with just name+phone (details
+        // come later in chat), and sending the brief template then filled every
+        // slot with placeholder text ("Budget: ₹your budget/mo") — broken-looking.
+        // Brand brief = brand name + at least one requirement field. Owner brief
+        // = at least two of location / size / rent. Anything less falls through
+        // to the plain confirm template, which claims no brief.
+        const bBrand = String(brandCtxData.brand_name || '').trim()
+        const bRent = String(brandCtxData.budget_monthly_rent || '').trim()
+        const bSize = String(brandCtxData.required_size_sqft || '').trim()
+        const bAreas = String(brandCtxData.target_zones || '').trim()
+        const brandHasBrief = !!bBrand && !!(bRent || bSize || bAreas)
+        const oLoc = String(brandCtxData.property_zone || brandCtxData.google_maps_url || '').trim()
+        const oSize = String(brandCtxData.property_size_sqft || '').trim()
+        const oRent = String(brandCtxData.asking_rent_monthly || '').trim()
+        const ownerHasBrief = [oLoc, oSize, oRent].filter(Boolean).length >= 2
+
+        if (isBrandLead && brandHasBrief) {
+          const brandName = bBrand
+          const rentRange = bRent || 'your budget'
+          const sizeRange = bSize || 'your requirement'
+          const locations = bAreas || 'your preferred areas'
           templateName = 'lokazen_brand_welcome_v1'
           components = [{ type: 'body', parameters: [
             { type: 'text', parameter_name: 'contact_name', text: firstName },
@@ -1086,13 +1103,13 @@ export async function POST(request: NextRequest) {
           ] }]
           renderedBody = `Hi ${firstName}, Loka here from Lokazen\n\nGot your brief for ${brandName}:\n\nBudget: ₹${rentRange}/mo\nSize: ${sizeRange} sq ft\nAreas: ${locations}\n\nWe are pulling matched spaces that fit your requirement.\n\nTeam Lokazen`
           templateButtons = ['How it works', 'Talk to The Team']
-        } else if (isOwnerLead) {
+        } else if (isOwnerLead && ownerHasBrief) {
           // Owners often drop a Google Maps pin instead of typing a locality, so
           // property_zone can be empty while the map link is present - use it as
           // the location before falling back to a generic phrase.
-          const location = String(brandCtxData.property_zone || brandCtxData.google_maps_url || '').trim() || 'your area'
-          const size = String(brandCtxData.property_size_sqft || '').trim() || 'your space'
-          const rent = String(brandCtxData.asking_rent_monthly || '').trim() || 'your expected rent'
+          const location = oLoc || 'your area'
+          const size = oSize || 'your space'
+          const rent = oRent || 'your expected rent'
           templateName = 'lokazen_property_owner_welcome_v1'
           components = [{ type: 'body', parameters: [
             { type: 'text', parameter_name: 'contact_name', text: firstName },
