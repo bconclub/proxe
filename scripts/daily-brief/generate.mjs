@@ -7,16 +7,19 @@
  *      with Authorization: Bearer $BRIEFS_SECRET   (the token route we shipped)
  *   2. Feed the day's conversations/leads/stage-changes to a model, asking for a
  *      deep-pattern brief as Markdown.
- *   3. Write the Markdown into the Obsidian vault folder ($VAULT_DIR), one file
- *      per brand per day, with frontmatter tags + [[links]] so it reads as a
- *      real knowledge backend. Headless Obsidian Sync (running on the VPS)
- *      propagates it to your PC and to ARC.
+ *   3. Push the brief to TWO sinks (both optional, at least one required):
+ *      a. ARC (the fortress frontend) — POST /api/proxe/briefs, shows under the
+ *         PROXe wing. This is the primary surface Z looks at.
+ *      b. The git-synced Obsidian vault ($VAULT_DIR) — one MD file per brand per
+ *         day, so the knowledge graph renders it. Secondary / backend.
  *
  * No secrets live in this file — everything comes from env (see .env alongside).
  *
  * Env:
  *   BRIEFS_SECRET        bearer token the aggregate route expects
- *   VAULT_DIR            path to the synced Obsidian vault on the VPS (e.g. /root/vault)
+ *   ARC_BASE             ARC base URL (e.g. https://arc-liard-two.vercel.app) — sink A
+ *   ARC_INGEST_SECRET    bearer token ARC's /api/proxe/briefs expects
+ *   VAULT_DIR            path to the git-synced Obsidian vault (optional) — sink B
  *   OPENROUTER_API_KEY   model key (OpenRouter). Optional if ANTHROPIC_API_KEY set.
  *   ANTHROPIC_API_KEY    fallback model provider
  *   BRIEF_MODEL          model id (default: anthropic/claude-sonnet-5 via OpenRouter)
@@ -39,6 +42,8 @@ const BRANDS = [
 
 const {
   BRIEFS_SECRET,
+  ARC_BASE,
+  ARC_INGEST_SECRET,
   VAULT_DIR,
   OPENROUTER_API_KEY,
   ANTHROPIC_API_KEY,
@@ -51,9 +56,27 @@ function die(msg) {
   process.exit(1)
 }
 
+const ARC_ENABLED = Boolean(ARC_BASE && ARC_INGEST_SECRET)
 if (!BRIEFS_SECRET) die('BRIEFS_SECRET not set')
-if (!VAULT_DIR) die('VAULT_DIR not set')
+if (!ARC_ENABLED && !VAULT_DIR) die('need a sink: set ARC_BASE + ARC_INGEST_SECRET, and/or VAULT_DIR')
 if (!OPENROUTER_API_KEY && !ANTHROPIC_API_KEY) die('need OPENROUTER_API_KEY or ANTHROPIC_API_KEY')
+
+async function postToArc(agg, bodyMd) {
+  const res = await fetch(`${ARC_BASE.replace(/\/$/, '')}/api/proxe/briefs`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ARC_INGEST_SECRET}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      kind: 'brief',
+      brand: agg.brand.id,
+      brief_date: agg.date,
+      title: `${agg.totals.new_leads} leads, ${agg.totals.conversations_with_summary} conversations`,
+      body_md: bodyMd,
+      totals: agg.totals,
+      source: 'daily-brief',
+    }),
+  })
+  if (!res.ok) throw new Error(`ARC ingest ${res.status}: ${await res.text()}`)
+}
 
 const yesterdayUTC = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
 const DATE = BRIEF_DATE || yesterdayUTC()
@@ -172,13 +195,22 @@ async function run() {
       }
 
       const body = await callModel(buildPrompt(agg))
-      const md = `${frontmatter(agg)}# ${agg.brand.name} — ${DATE}\n\n${body}\n\n---\n_Auto-generated. Source: /api/briefs/aggregate. Related: [[${brand.id}]]_\n`
 
-      const dir = join(VAULT_DIR, 'briefs', brand.id)
-      await mkdir(dir, { recursive: true })
-      const file = join(dir, `${DATE}.md`)
-      await writeFile(file, md, 'utf8')
-      console.log(`[daily-brief] wrote ${file}`)
+      // Sink A — ARC fortress frontend (primary).
+      if (ARC_ENABLED) {
+        await postToArc(agg, body)
+        console.log(`[daily-brief] ${brand.id}: pushed to ARC`)
+      }
+
+      // Sink B — git-synced Obsidian vault (optional, for the knowledge graph).
+      if (VAULT_DIR) {
+        const md = `${frontmatter(agg)}# ${agg.brand.name} — ${DATE}\n\n${body}\n\n---\n_Auto-generated. Source: /api/briefs/aggregate. Related: [[${brand.id}]]_\n`
+        const dir = join(VAULT_DIR, 'briefs', brand.id)
+        await mkdir(dir, { recursive: true })
+        const file = join(dir, `${DATE}.md`)
+        await writeFile(file, md, 'utf8')
+        console.log(`[daily-brief] ${brand.id}: wrote ${file}`)
+      }
       indexLines.push(`- [[briefs/${brand.id}/${DATE}|${agg.brand.name}]] — ${agg.totals.new_leads} leads, ${agg.totals.conversations_with_summary} convos`)
     } catch (err) {
       console.error(`[daily-brief] ${brand.id}: ${err.message}`)
@@ -186,7 +218,7 @@ async function run() {
   }
 
   // A dated index note ties the day together for the Obsidian graph.
-  if (indexLines.length > 2) {
+  if (VAULT_DIR && indexLines.length > 2) {
     const idxDir = join(VAULT_DIR, 'briefs', '_index')
     await mkdir(idxDir, { recursive: true })
     await writeFile(join(idxDir, `${DATE}.md`), indexLines.join('\n') + '\n', 'utf8')
