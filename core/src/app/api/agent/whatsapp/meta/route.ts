@@ -43,6 +43,7 @@ import {
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
+import { resolveMapsLink } from '@/lib/services/mapsResolver';
 
 export const dynamic = 'force-dynamic';
 // 60s (was 30s): long multi-part questions + tool calls were exceeding 30s and
@@ -374,9 +375,20 @@ async function captureWhatsAppLocation(mapsUrl: string, customerPhone: string, b
   const ctx = lead.unified_context || {};
   const bctx = ctx[brand] || {};
   if (bctx.google_maps_url) return; // keep the first/explicit one
-  ctx[brand] = { ...bctx, google_maps_url: mapsUrl };
+
+  // Resolve the link so we store WHERE it is, not just a URL.
+  const resolved = await resolveMapsLink(mapsUrl);
+  ctx[brand] = {
+    ...bctx,
+    google_maps_url: mapsUrl,
+    ...(resolved.name ? { property_location_name: resolved.name } : {}),
+    ...(resolved.coords ? { property_coords: resolved.coords } : {}),
+    // Only fill the locality if the owner never typed one - never overwrite
+    // an explicitly stated area.
+    ...(resolved.name && !bctx.property_zone ? { property_zone: resolved.name } : {}),
+  };
   await supabase.from('all_leads').update({ unified_context: ctx }).eq('id', lead.id);
-  console.log(`[meta/location] saved map link for lead ${lead.id}`);
+  console.log(`[meta/location] saved map link for lead ${lead.id} resolved="${resolved.name || 'unresolved'}" coords=${resolved.coords || 'none'}`);
 }
 
 // ─── Channel Performance Tracking ─────────────────────────────────────────────
