@@ -98,8 +98,12 @@ User's message: ${input.message}`
     crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
   }
 
-  // Fetch form data from unified_context if available
+  // Fetch form data + EVERY captured detail from unified_context. capturedDetails
+  // is the durable memory: the transcript window can slide past an answer, but a
+  // fact we already stored must NEVER be asked again. See buildPrompt's
+  // KNOWN DETAILS block.
   let formData: Record<string, any> | null = null;
+  let capturedDetails: Record<string, any> | null = null;
   if (input.userProfile.phone) {
     try {
       const normalizedPhone = input.userProfile.phone.replace(/\D/g, '').slice(-10);
@@ -109,6 +113,7 @@ User's message: ${input.message}`
         .eq('customer_phone_normalized', normalizedPhone)
         .maybeSingle();
       formData = leadCtx?.unified_context?.form_data || null;
+      capturedDetails = leadCtx?.unified_context?.[brandId] || null;
     } catch { /* non-critical */ }
   }
 
@@ -128,6 +133,7 @@ User's message: ${input.message}`
     crossChannelContext: crossChannelContext || undefined,
     promptOverride,
     formData,
+    capturedDetails,
   });
   // Lock the model to the resolved Lokazen audience so it can't drift into the
   // wrong flow (e.g. answering a scout's "money debited" with brand/CRE copy,
@@ -507,9 +513,12 @@ User's message: ${input.message}`
       crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
     }
 
-    // Form data is only needed for booking context
+    // Durable memory: pull every captured detail (not just booking form data) so
+    // the agent never re-asks something already stored, even on a long chat whose
+    // transcript window has slid past the answer.
     let formData: Record<string, any> | null = null;
-    if (hasBookingIntent && input.userProfile.phone) {
+    let capturedDetails: Record<string, any> | null = null;
+    if (input.userProfile.phone) {
       try {
         const normalizedPhone = input.userProfile.phone.replace(/\D/g, '').slice(-10);
         const { data: leadCtx } = await supabase
@@ -518,6 +527,7 @@ User's message: ${input.message}`
           .eq('customer_phone_normalized', normalizedPhone)
           .maybeSingle();
         formData = leadCtx?.unified_context?.form_data || null;
+        capturedDetails = leadCtx?.unified_context?.[brandId] || null;
       } catch { /* non-critical */ }
     }
 
@@ -537,6 +547,7 @@ User's message: ${input.message}`
       crossChannelContext: crossChannelContext || undefined,
       promptOverride,
       formData,
+      capturedDetails,
     });
     // Lock the model to the resolved audience (see the WhatsApp path above).
     systemPrompt += lokazenAudienceDirective(input, brandId);
