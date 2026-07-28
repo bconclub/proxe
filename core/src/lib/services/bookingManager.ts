@@ -27,7 +27,9 @@ export type BookingSessionType = 'online' | 'offline';
 // Online runs three fixed start times only — 3:00, 4:00, 5:00 PM (hourly step,
 // last start 5 PM since each session is 60 min). Offline keeps 30-min granularity.
 const BOOKING_WINDOWS: Record<BookingSessionType, { start: string; end: string; stepMinutes: number }> = {
-  online: { start: '15:00', end: '18:00', stepMinutes: 60 },
+  // Callback window: 11:00 AM to 6:00 PM (last start 6 PM). end is 19:00 so the
+  // lastStart math (end - duration) yields 18:00 as the final bookable slot.
+  online: { start: '11:00', end: '19:00', stepMinutes: 60 },
   offline: { start: '11:00', end: '19:00', stepMinutes: 30 },
 };
 const BOOKING_DURATION_MINUTES = 60;
@@ -99,7 +101,9 @@ export function getBookableSlotStartsForDate(dateStr: string, sessionType?: stri
   });
   const [h, m] = hm.split(':').map(Number);
   const nowMinutes = h * 60 + m;
-  return all.filter(slot => timeToMinutes(slot) > nowMinutes);
+  // Team rule: always at least 90 minutes from the time of booking, so the team
+  // has lead time to prepare and call.
+  return all.filter(slot => timeToMinutes(slot) >= nowMinutes + 90);
 }
 
 // ─── Types ──────────────────────────────────────────────────────────────────
