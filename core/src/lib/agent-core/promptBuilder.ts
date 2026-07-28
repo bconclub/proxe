@@ -27,6 +27,8 @@ interface PromptOptions {
   /** Dashboard-configured prompt (from dashboard_settings via getPromptOverride). When set, replaces the hardcoded brand prompt file. */
   promptOverride?: string | null;
   formData?: Record<string, any> | null;
+  /** Everything already captured on this lead (unified_context[brand]) - injected every turn as durable memory so nothing is ever re-asked. */
+  capturedDetails?: Record<string, any> | null;
 }
 
 /** The hardcoded brand prompt file output — the default/seed shown in the Configure editor when no DB override is saved. Exported for the settings API. */
@@ -65,13 +67,14 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
     brand,
     promptOverride,
     formData,
+    capturedDetails,
   } = options;
 
   // Resolve brand: explicit param > env var > default (windchasers)
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers';
 
   // Build the core system prompt (dashboard override if set, else brand prompt file)
-  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone, promptOverride);
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData, userEmail, userPhone, promptOverride, capturedDetails);
 
   // Calculate lead's average message length from history to enforce mirroring
   if (history && history.length > 0) {
@@ -111,6 +114,7 @@ function buildSystemPrompt(
   userEmail?: string | null,
   userPhone?: string | null,
   promptOverride?: string | null,
+  capturedDetails?: Record<string, any> | null,
 ): string {
   // Guard: only inject the name when it looks like a real person, not a brand
   // label, UI string, or other junk that leaked into the customer_name column.
@@ -167,11 +171,62 @@ function buildSystemPrompt(
     }
   }
 
+  // ── KNOWN DETAILS (durable memory) ─────────────────────────────────────────
+  // Everything already captured on this lead, injected EVERY turn. The
+  // transcript window only carries the recent messages, so on a long chat an
+  // answer given 30 turns ago is no longer visible - that is exactly how the bot
+  // ended up re-asking rent/floor/size it had already been told. These facts live
+  // in the DB permanently, so they go in the prompt permanently.
+  let capturedBlock = '';
+  if (capturedDetails && typeof capturedDetails === 'object') {
+    const LABELS: Record<string, string> = {
+      user_type: 'Lead type', property_type: 'Property type',
+      property_size_sqft: 'Size (sqft)', property_zone: 'Area / locality',
+      asking_rent_monthly: 'Monthly rent', floor: 'Floor', deposit: 'Deposit / terms',
+      frontage_ft: 'Frontage (ft)', amenities: 'Amenities',
+      availability_date: 'Availability', google_maps_url: 'Google Maps location',
+      brand_name: 'Brand name', brand_category: 'Category',
+      current_outlets: 'Current outlets', target_zones: 'Preferred areas',
+      preferred_format: 'Preferred format', required_size_sqft: 'Size needed (sqft)',
+      budget_monthly_rent: 'Budget (monthly rent)', target_audience: 'Target audience',
+      city: 'City', notes: 'Other details', key_interest_signal: 'Key interest',
+    };
+    const rows: string[] = [];
+    for (const [key, label] of Object.entries(LABELS)) {
+      const v = (capturedDetails as any)[key];
+      if (v === null || v === undefined || v === '') continue;
+      const text = Array.isArray(v) ? v.filter(Boolean).join(', ') : String(v);
+      if (text.trim()) rows.push(`- ${label}: ${text.trim()}`);
+    }
+    const photoCount = Array.isArray((capturedDetails as any).property_images)
+      ? (capturedDetails as any).property_images.length : 0;
+    if (photoCount) rows.push(`- Photos shared: ${photoCount}`);
+    if (rows.length) {
+      capturedBlock = `\n\n=================================================================================
+KNOWN DETAILS - ALREADY CAPTURED (NEVER ASK FOR ANY OF THESE AGAIN)
+=================================================================================
+${rows.join('\n')}
+
+These facts are stored on this lead. The customer ALREADY told us. Treat every one
+as answered even if you cannot see it in the recent messages above - the visible
+transcript is only the latest part of a longer conversation.
+
+HARD RULES:
+- NEVER ask for anything listed above. Not "what's the monthly rent?", not "which
+  floor?", not "what size?" - if it is listed, it is known.
+- If you need to confirm one, CONFIRM it, do not re-ask: "Just to confirm, the
+  1400 sqft ground-floor space at ITPL back gate, right?"
+- Move the conversation FORWARD to what is genuinely missing or to the next step.
+- If everything needed is already known, do not ask more questions - proceed to
+  the action (submit / match / book / hand off) and say what happens next.`;
+    }
+  }
+
   // Dashboard-configured prompt (Configure section) wins over the brand file.
   const basePrompt = (promptOverride && promptOverride.trim())
     ? promptOverride + (knowledgeBase ? `\n\n${knowledgeBase}` : '')
     : getBrandSystemPrompt(brand, knowledgeBase || '', messageCount, channel);
-  return basePrompt + nameLine + knownContactBlock + channelNote + crossChannelNote + formDataNote;
+  return basePrompt + nameLine + knownContactBlock + capturedBlock + channelNote + crossChannelNote + formDataNote;
 }
 
 /**
