@@ -1256,18 +1256,26 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
 async function fetchRecentHistory(
   leadId: string,
   supabase: any,
-  limit: number = 20,
+  limit: number = 40,
 ): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
   try {
+    // CRITICAL: fetch the MOST RECENT `limit` messages, not the oldest. This was
+    // ascending+limit, which returned the FIRST 20 messages of the conversation —
+    // so once a chat passed 20 turns the model was permanently stuck seeing only
+    // the opening and NONE of the recent answers. Result: the bot re-asked
+    // questions it had already been told (floor, rent) and never accumulated
+    // enough to book. Descending+limit gets the newest window; reverse back to
+    // chronological order for the model.
     const { data, error } = await supabase
       .from('conversations')
-      .select('sender, content, metadata')
+      .select('sender, content, metadata, created_at')
       .eq('lead_id', leadId)
       .eq('channel', 'whatsapp')
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error || !data) return [];
+    data.reverse();
 
     // A human teammate's manual reply (inbox/reply sets metadata.human) is stored
     // as sender='agent', so without a marker the model reads it as its OWN prior
