@@ -233,8 +233,9 @@ function buildUserPrompt(params: {
         // stray "6:00 PM in-person visit" once the online slots closed).
         const callbackOnly = getCurrentBrandId() === 'lokazen';
         const isSunday = weekday === 'Sunday';
-        const onlineOpenToday = !isSunday && nowMin + 60 <= 17 * 60;
-        const offlineOpenToday = !callbackOnly && !isSunday && nowMin + 60 <= 18 * 60;
+        // Callback window 11:00 AM–6:00 PM, always at least 90 minutes from now.
+        const onlineOpenToday = !isSunday && nowMin + 90 <= 18 * 60;
+        const offlineOpenToday = !callbackOnly && !isSunday && nowMin + 90 <= 18 * 60;
         const todayOpen = onlineOpenToday || offlineOpenToday;
 
         // Day axis for choosing which day buttons to show. We are CLOSED Sundays,
@@ -280,11 +281,11 @@ function buildUserPrompt(params: {
         const dateRef = `Upcoming dates - resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
         const upcomingRule = `TIME AWARENESS - a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
-        const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. Online slots are 3:00 PM, 4:00 PM, 5:00 PM. The moment the user taps or states a specific time (for example "3:00 PM"), that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns (for example the user tapped "3:00 PM" and then "Tomorrow"), do NOT ask anything else: call book_consultation right away with that day and time, then confirm. Never switch to the 11 AM to 7 PM offline window after offering the 3/4/5 PM slots, because mixing windows is what restarts the loop.`;
+        const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. Callback slots run 11:00 AM to 6:00 PM, always at least 90 minutes from the current time. Offer up to 3 concrete times from that window (e.g. the next few open hours). The moment the user taps or states a specific time, that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns, do NOT ask anything else: call book_consultation right away with that day and time, then confirm.`;
         const bookingRegisterRule = `BOOKING MUST BE REGISTERED (critical). The ONLY way a call is actually booked is by calling the book_consultation tool. NEVER type a confirmation like "the team will confirm and call you", "you're booked", or "works, the team will call you then" unless book_consultation has ALREADY returned success this turn - a typed confirmation with no tool call registers nothing and the customer is left stranded. If book_consultation returns an error, tell the user honestly in ONE line that you have flagged it to the team who will call them to confirm, do NOT claim it is booked, and do NOT re-offer slots. Once a booking is registered (or you have told the user the team will call), it is DONE: if the user then asks a follow-up like "what if they don't call" or "will they actually call", reassure them briefly and, if needed, that you have noted it as priority - NEVER restart slot selection, never re-offer times, never send the slot buttons again.`;
         const windowsLine = callbackOnly
-          ? `Booking is a phone callback at an online slot only: 3:00 PM, 4:00 PM, or 5:00 PM IST, Monday to Saturday. There are NO in-person visits, NO facility or site-visit bookings, and NO 11 AM to 7 PM window. NEVER offer an in-person visit or an offline slot. If today's callback slots are already done, offer the next working day, never a later in-person time.`
-          : `Booking windows IST (Mon-Sat): online 3:00 PM / 4:00 PM / 5:00 PM only, offline 11:00 AM-7:00 PM.`;
+          ? `Booking is a phone CALLBACK, Monday to Saturday, 11:00 AM to 6:00 PM IST, always at least 90 minutes from the current time. There are NO in-person visits and NO site-visit bookings. NEVER offer an in-person or facility visit. If today's callback window is already past (or under 90 minutes left), offer the next working day.`
+          : `Booking window IST (Mon-Sat): callback 11:00 AM to 6:00 PM, at least 90 minutes from now.`;
         return `Current IST: ${time} on ${weekday}, ${isoDate}. ${windowsLine} ${todayRule} ${closedRule}\n\n${bookingSequenceRule}\n\n${bookingRegisterRule}\n\n${upcomingRule}\n\n${dateRef}`;
       })()
     : channel === 'voice'
