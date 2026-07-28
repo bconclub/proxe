@@ -2092,7 +2092,7 @@ export default function InboxPage() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto px-6 py-3 relative"
+              className="flex-1 overflow-y-auto px-3 md:px-6 py-3 relative overflow-x-hidden"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
@@ -2132,7 +2132,7 @@ export default function InboxPage() {
                   if (formFields.length === 0) return null
                   return (
                     <div className="flex justify-start mb-2">
-                      <div className="max-w-[440px] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
+                      <div className="max-w-[85%] md:max-w-[440px] rounded-lg px-3 py-2 border" style={{ background: 'var(--bg-secondary)', borderColor: 'rgba(24,119,242,0.3)' }}>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
@@ -2283,7 +2283,7 @@ export default function InboxPage() {
                       {dateSeparator}
                       <div className="flex justify-start">
                         <div
-                          className="max-w-[440px] rounded-xl px-3.5 py-2.5 border"
+                          className="max-w-[85%] md:max-w-[440px] rounded-xl px-3.5 py-2.5 border"
                           style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.35)' }}
                         >
                           {/* Header */}
@@ -2371,8 +2371,8 @@ export default function InboxPage() {
                     >
                       <div
                         className={isTemplate
-                          ? 'max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
-                          : `max-w-[440px] rounded-2xl px-3 py-2 shadow-sm border wa-bubble ${isCustomer ? 'wa-in' : 'wa-out'}`}
+                          ? 'max-w-[85%] md:max-w-[440px] rounded-xl shadow-sm border overflow-hidden'
+                          : `max-w-[85%] md:max-w-[440px] rounded-2xl px-3 py-2 shadow-sm border wa-bubble ${isCustomer ? 'wa-in' : 'wa-out'}`}
                         style={{
                           // WhatsApp bubble tints — incoming (customer) neutral,
                           // outgoing (agent/template) WhatsApp-green. The tail
@@ -2442,8 +2442,8 @@ export default function InboxPage() {
                             text, with the time (and ticks) tucked bottom-right. */}
                         <div
                           className={isTemplate
-                            ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap'
-                            : 'text-[13px] leading-relaxed'}
+                            ? 'text-[12px] leading-snug px-2.5 pt-1 pb-2 whitespace-pre-wrap break-words'
+                            : 'text-[13px] leading-relaxed break-words'}
                           style={{ color: 'var(--text-primary)' }}
                         >
                           {/* Pick the formatter by what the source platform actually
