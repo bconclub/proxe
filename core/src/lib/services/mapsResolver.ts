@@ -15,6 +15,23 @@ export interface ResolvedMapsLink {
   resolvedUrl?: string;
 }
 
+
+/**
+ * A resolved "name" is only useful if it names a PLACE. Google hands back junk
+ * for un-geocoded or consent-gated links - the page title ("Google Search",
+ * "Sign in"), or the coordinate pair itself. Storing those would put nonsense
+ * into the agent's KNOWN DETAILS (and into property_zone), which is worse than
+ * storing nothing.
+ */
+function isUsablePlaceName(s?: string | null): boolean {
+  const t = String(s || '').trim();
+  if (!t || t.length < 3 || t.length > 160) return false;
+  if (t.startsWith('@')) return false;
+  if (/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(t)) return false; // bare coordinates
+  if (/^(google|google maps|google search|maps|sign in|untitled|consent)$/i.test(t)) return false;
+  return true;
+}
+
 export async function resolveMapsLink(mapsUrl: string): Promise<ResolvedMapsLink> {
   try {
     const res = await fetch(mapsUrl, {
@@ -29,7 +46,7 @@ export async function resolveMapsLink(mapsUrl: string): Promise<ResolvedMapsLink
     const place = finalUrl.match(/\/maps\/place\/([^/@?]+)/);
     if (place?.[1]) {
       const decoded = decodeURIComponent(place[1]).replace(/\+/g, ' ').trim();
-      if (decoded && !decoded.startsWith('@')) out.name = decoded;
+      if (isUsablePlaceName(decoded)) out.name = decoded;
     }
 
     // Coordinates: @lat,lng | !3d<lat>!4d<lng> | ?q=lat,lng
@@ -45,7 +62,7 @@ export async function resolveMapsLink(mapsUrl: string): Promise<ResolvedMapsLink
         || html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
       if (title) {
         const t = title.replace(/\s*[-–|]\s*Google\s*Maps.*$/i, '').trim();
-        if (t && !/^google maps$/i.test(t) && t.length < 120) out.name = t;
+        if (isUsablePlaceName(t)) out.name = t;
       }
     }
     return out;
