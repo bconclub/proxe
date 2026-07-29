@@ -11,6 +11,8 @@ import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
 import { getCurrentBrandId, brandConfig, brandLabel } from '@/configs'
 import { COURSE_OPTIONS, normalizeCourse } from '@/configs/courses'
+import { getOfflineEvent, eventLastSessionMs } from '@/configs/offline-events'
+import { resolveOfflineEventKey } from '@/lib/offlineEventContext'
 import { CONSTITUENCIES, normName as normSeat } from '@/lib/war-room/constituencies'
 import {
   MdLanguage,
@@ -305,6 +307,9 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
   const [offlineEventView, setOfflineEventView] = useState(false)
+  // Which offline-event groups the user has collapsed. Absent = use the
+  // default (newest event open, older ones closed).
+  const [collapsedEvents, setCollapsedEvents] = useState<Record<string, boolean>>({})
   const [gigsView, setGigsView] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -484,6 +489,72 @@ export default function LeadsTable({
 
     setFilteredLeads(filtered as ExtendedLead[])
   }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
+
+  /**
+   * Rows to render. Outside the Offline Events tab this is an identity
+   * passthrough of filteredLeads, so every other tab renders exactly what it
+   * did before. Inside it, leads are grouped into collapsible per-event
+   * sections, newest event first - many events share lead_type='offline_event',
+   * so without grouping they'd be one undifferentiated list.
+   */
+  const displayRows = useMemo((): Array<
+    | { kind: 'lead'; lead: ExtendedLead }
+    | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; collapsed: boolean }
+  > => {
+    if (!offlineEventView) return filteredLeads.map((lead) => ({ kind: 'lead' as const, lead }))
+
+    const groups = new Map<string, ExtendedLead[]>()
+    for (const lead of filteredLeads) {
+      const key = resolveOfflineEventKey(lead.unified_context?.[brandId] || {})
+      const bucket = groups.get(key)
+      if (bucket) bucket.push(lead)
+      else groups.set(key, [lead])
+    }
+
+    const ordered = [...groups.entries()]
+      .map(([key, groupLeads]) => {
+        const event = getOfflineEvent(key)
+        // Registry date when we know the event; otherwise the most recent
+        // registration in the group. Unknown/undated events sort last.
+        const sortMs = event
+          ? eventLastSessionMs(event)
+          : groupLeads.reduce((max, l) => {
+              const at = l.unified_context?.[brandId]?.offline_event_registered_at
+              const ms = at ? new Date(at).getTime() : 0
+              return isNaN(ms) ? max : Math.max(max, ms)
+            }, 0)
+        const label = event?.name
+          || String(groupLeads[0]?.unified_context?.[brandId]?.offline_event_name || '').trim()
+          || 'Unspecified event'
+        const sub = event
+          ? event.sessions.map((s) => s.label).join(' / ')
+          : String(groupLeads[0]?.unified_context?.[brandId]?.offline_event_date || '').trim()
+        return { key, groupLeads, sortMs, label, sub }
+      })
+      .sort((a, b) => b.sortMs - a.sortMs)
+
+    return ordered.flatMap((g, i) => {
+      const collapsed = collapsedEvents[g.key] ?? i > 0
+      const registered = g.groupLeads.filter(
+        (l) => l.unified_context?.[brandId]?.offline_event_registered_at,
+      ).length
+      const header = {
+        kind: 'group' as const,
+        key: g.key,
+        label: g.label,
+        sub: g.sub,
+        total: g.groupLeads.length,
+        registered,
+        collapsed,
+      }
+      return collapsed
+        ? [header]
+        : [header, ...g.groupLeads.map((lead) => ({ kind: 'lead' as const, lead }))]
+    })
+  }, [filteredLeads, offlineEventView, collapsedEvents, brandId])
+
+  /** Column count for full-width rows (empty state, group headers). */
+  const columnCount = (showAviationColumns ? 12 : scoutView ? 11 : 9) + ((webinarView || offlineEventView) ? 1 : 0)
 
   useEffect(() => {
     if (filteredLeads.length === 0) return
@@ -974,7 +1045,30 @@ export default function LeadsTable({
               {loading ? 'Loading...' : 'No leads found'}
             </div>
           ) : (
-            filteredLeads.map((lead) => {
+            displayRows.map((row) => {
+              if (row.kind === 'group') {
+                return (
+                  <div
+                    key={`oe-group-m-${row.key}`}
+                    onClick={() => setCollapsedEvents((prev) => ({ ...prev, [row.key]: !row.collapsed }))}
+                    className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="text-[10px]"
+                      style={{ color: 'var(--accent-primary)', transform: row.collapsed ? 'rotate(-90deg)' : 'none' }}
+                    >
+                      ▼
+                    </span>
+                    <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{row.label}</span>
+                    <span className="ml-auto text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
+                      {row.registered}/{row.total}
+                    </span>
+                  </div>
+                )
+              }
+              const lead = row.lead
               const calculatedScore = calculatedScores[lead.id]
               const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
               const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
@@ -1123,7 +1217,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={(showAviationColumns ? 12 : scoutView ? 11 : 9) + ((webinarView || offlineEventView) ? 1 : 0)}
+                  colSpan={columnCount}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -1131,7 +1225,39 @@ export default function LeadsTable({
                 </td>
               </tr>
             ) : (
-              filteredLeads.map((lead) => {
+              displayRows.map((row) => {
+                if (row.kind === 'group') {
+                  return (
+                    <tr
+                      key={`oe-group-${row.key}`}
+                      onClick={() => setCollapsedEvents((prev) => ({ ...prev, [row.key]: !row.collapsed }))}
+                      className="cursor-pointer select-none"
+                      style={{ backgroundColor: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
+                    >
+                      <td colSpan={columnCount} className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="text-[10px] transition-transform"
+                            style={{ color: 'var(--accent-primary)', transform: row.collapsed ? 'rotate(-90deg)' : 'none' }}
+                          >
+                            ▼
+                          </span>
+                          <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                            {row.label}
+                          </span>
+                          {row.sub ? (
+                            <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>· {row.sub}</span>
+                          ) : null}
+                          <span className="ml-auto text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
+                            {row.registered} registered · {row.total - row.registered} interested
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                }
+                const lead = row.lead
                 const calculatedScore = calculatedScores[lead.id]
                 const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? null)
                 const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
