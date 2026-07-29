@@ -1014,13 +1014,17 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
-    // HUMAN HANDLING - is a teammate actively working this lead (replied from the
-    // dashboard inbox / Slack in the last day)? We no longer hard-pause the bot on
-    // a blunt timer. The bot still runs WITH the human's messages in context
-    // (labelled in fetchRecentHistory) so it's aware a colleague stepped in - and
-    // we only suppress its reply below if it has NOTHING useful to add (a generic
-    // escalation). That way it never talks over the human with a canned
-    // "flagged to the team" line, but a genuine, contextual answer still goes out.
+    // HUMAN HANDLING - HARD PAUSE. Once a teammate replies manually (dashboard
+    // inbox or Slack), the bot goes SILENT on this lead for 24 hours. The window
+    // rolls forward with every manual message, so an active human conversation is
+    // never interrupted.
+    //
+    // This used to be a soft rule (suppress only when the bot had nothing useful),
+    // which let a plausible-sounding reply talk straight over the human: a manual
+    // "you can log in now, OTP will arrive on your email" was followed by the
+    // customer's "Ok", and the bot immediately barged in with an unrelated "I'll
+    // get the team to prioritise calling you back". The customer's message is still
+    // logged and the lead still updates - we simply do not send.
     let humanHandlingLead = false;
     {
       const HUMAN_HANDLING_WINDOW_MIN = 24 * 60;
@@ -1031,6 +1035,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         const ageMin = (Date.now() - new Date(takeoverAt).getTime()) / 60000;
         humanHandlingLead = ageMin >= 0 && ageMin < HUMAN_HANDLING_WINDOW_MIN;
       }
+    }
+    if (humanHandlingLead) {
+      console.log(`[meta/webhook] HUMAN HANDLING lead ${leadId} (manual reply within 24h) - bot staying silent, not generating a reply`);
+      return;
     }
 
     const aiStartTime = Date.now();
@@ -1049,16 +1057,6 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
     const responseTimeMs = Date.now() - aiStartTime;
-
-    // A teammate is handling this lead and the bot only produced a generic
-    // "nothing useful → flagged to the team" fallback (or nothing at all). Stay
-    // SILENT and let the human run it - a redundant escalation talks over them.
-    // (The team was already pinged inside the engine, and the human is on it.)
-    // A real, substantive answer is not `escalated`, so it still sends below.
-    if (humanHandlingLead && (!result.response || result.escalated)) {
-      console.log(`[meta/webhook] Teammate handling lead ${leadId}; bot had no useful reply (escalated=${result.escalated}) - staying silent`);
-      return;
-    }
 
     if (!result.response) {
       console.error('[meta/webhook] Empty AI response after retry - sending fallback');
