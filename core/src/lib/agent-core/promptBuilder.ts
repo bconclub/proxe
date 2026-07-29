@@ -192,6 +192,9 @@ function buildSystemPrompt(
       preferred_format: 'Preferred format', required_size_sqft: 'Size needed (sqft)',
       budget_monthly_rent: 'Budget (monthly rent)', target_audience: 'Target audience',
       city: 'City', notes: 'Other details', key_interest_signal: 'Key interest',
+      payment_status: 'Payment status', payment_plan: 'Plan paid for',
+      payment_amount: 'Amount paid', payment_receipt_url: 'Receipt link',
+      dashboard_status: 'Their dashboard account status',
     };
     const rows: string[] = [];
     for (const [key, label] of Object.entries(LABELS)) {
