@@ -1214,6 +1214,11 @@ export default function InboxPage() {
                 ? { property_type: lkz.property_type, size_sqft: lkz.property_size_sqft, rent: lkz.asking_rent_monthly, floor: lkz.floor, area: lkz.property_zone, deposit: lkz.deposit, map: lkz.google_maps_url }
                 : { brand: lkz.brand_name, category: lkz.brand_category, areas: lkz.target_zones, format: lkz.preferred_format, size_sqft: lkz.required_size_sqft, budget: lkz.budget_monthly_rent, outlets: lkz.current_outlets }
               for (const [k, v] of Object.entries(cre)) if (v != null && v !== '') base[k] = v
+              // form_data.brand_name and the CRE `brand` both render with the
+              // SAME "Brand" label, so a brand lead showed the chip twice
+              // ("BRAND: Blue   BRAND: Blue"). The CRE value is the canonical
+              // captured one - keep it and drop the duplicate.
+              if (base.brand && base.brand_name) delete base.brand_name
             }
             return Object.keys(base).length ? base : null
           })(),
