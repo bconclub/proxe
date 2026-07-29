@@ -2,76 +2,54 @@
  * Cron: Offline-event reminders (windchasers)
  * GET /api/cron/offline-event-reminder
  *
- * Offline-event (demo class) leads (unified_context.windchasers.lead_type =
- * 'offline_event') get two follow-ups, mirroring webinar-reminder's shape:
- *   • Not yet registered (no offline_event_registered_at) → ONE "confirm your
- *     seat" nudge with the landing-page link, fired once, any time before the
- *     event (not date-gated - the template has no date/time param, so there's
- *     nothing to get stale). This is what actually drives the registration
- *     count up.
+ * Drives reminders for EVERY event in the offline-event registry
+ * (core/src/configs/offline-events.ts). Two follow-ups per lead per event,
+ * mirroring webinar-reminder's shape:
+ *   • Not yet registered (no registered_at) → ONE "confirm your seat" nudge
+ *     carrying that event's own landing link. Not date-gated beyond the
+ *     event's own cutoff - the template has no date/time param, so there's
+ *     nothing to go stale.
  *   • Registered → ONE "get directions" reminder in the EVENING BEFORE their
- *     specific session (window: 14-22h before start) - not 1 hour before, per
- *     explicit instruction. WhatsApp resends the approved confirmation
- *     template; email carries the real address + Maps link (WhatsApp
- *     templates can't be edited post-approval to add those).
+ *     session (14-22h before start), not an hour before. WhatsApp resends the
+ *     approved confirmation template; email carries the venue + Maps link
+ *     (approved WhatsApp templates can't be edited to add those).
  *
- * Idempotent via per-step markers on the lead's context
- * (offline_event_register_reminder_sent / offline_event_directions_reminder_sent).
+ * Everything event-specific - sessions, venue, landing URL, cutoff - comes
+ * from the registry. Reminder markers live at
+ * unified_context.windchasers.offline_events[key].*, so a lead reminded about
+ * one event can still be reminded about the next. Legacy leads carrying only
+ * the old flat fields are handled by readOfflineEvents()'s synthesis, which
+ * seeds those markers - so nobody is re-messaged about a past event.
  *
- * Registered in vercel.json's crons array (hourly) - no external scheduler
- * setup needed, unlike webinar-reminder.
+ * Registered in core/vercel.json (every 10 min).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, logMessage, sendOfflineEventRegisterNudge, sendOfflineEventConfirm, sendEmail } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import {
+  getOfflineEvent,
+  eventLastSessionMs,
+  resolveSessionStartMs,
+  offlineEventSendsEnabled,
+  type OfflineEventConfig,
+} from '@/configs/offline-events'
+import { resolveOfflineEventKey, readOfflineEventEntry, writeOfflineEvent } from '@/lib/offlineEventContext'
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const NUDGE_TEMPLATE = 'windchasers_offline_event_register_nudge_v3'
 const CONFIRM_TEMPLATE = 'windchasers_offline_event_confirmation_v2'
 
-// Real campus address - same one used site-wide (Footer.tsx/Navbar.tsx/contact-us).
-// Can't live in lib/offline-events.ts (that's the separate site repo) - duplicated
-// here deliberately since this is the backend's own copy for the email send.
-const VENUE_ADDRESS = 'WindChasers Aviation Academy, Kothanur, Bengaluru, Karnataka 560077'
-const VENUE_MAPS_URL = 'https://maps.google.com/maps?q=WindChasers+Aviation+Academy+Kothanur+Bengaluru'
-const LANDING_URL = 'https://windchasers.in/dgca-demo-class'
+/** How long after the last session we stop nudging people to register. */
+const POST_EVENT_GRACE_MS = 6 * 3_600_000
+/** Directions reminder window: the evening before an 11 AM start. */
+const DIRECTIONS_WINDOW_MIN_H = 14
+const DIRECTIONS_WINDOW_MAX_H = 22
 
-// The two fixed sessions for this event (mirrors lib/offline-events.ts's
-// DEMO_CLASS_SESSIONS in the site repo). A not-yet-registered lead's
-// offline_event_date is often just a day preference ("27 July") with no
-// year/time - map those to the known session start so window math works.
-const KNOWN_SESSIONS: Record<string, string> = {
-  '27 july': '2026-07-27T11:00:00+05:30',
-  '28 july': '2026-07-28T11:00:00+05:30',
-}
-
-/** Parse a stored offline_event_date into epoch ms. Handles both the full
- *  landing-page label ("27 July 2026 at 11:00 AM IST") and the short FB-ad
- *  day-preference form ("27 July"). Returns NaN if genuinely unparseable. */
-function parseOfflineEventDateMs(raw: string): number {
-  const cleaned = String(raw || '').toLowerCase().trim()
-  for (const [key, iso] of Object.entries(KNOWN_SESSIONS)) {
-    if (cleaned.startsWith(key)) return new Date(iso).getTime()
-  }
-  const direct = new Date(raw).getTime()
-  if (!isNaN(direct)) return direct
-  const m = cleaned.match(/(\d{1,2})\s+([a-z]+)\s+(\d{4}).*?(\d{1,2}):(\d{2})\s*([ap]m)/i)
-  if (!m) return NaN
-  const months: Record<string, number> = {
-    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
-    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
-  }
-  const mo = months[m[2]]
-  if (mo === undefined) return NaN
-  let hh = parseInt(m[4], 10) % 12
-  if (/pm/.test(m[6])) hh += 12
-  const day = parseInt(m[1], 10), yr = parseInt(m[3], 10), mm = parseInt(m[5], 10)
-  return Date.UTC(yr, mo, day, hh, mm) - 5.5 * 3_600_000
-}
+type EventTally = { nudged: number; directionsSent: number; wouldSend: number; skipped: number; errors: number }
+const emptyTally = (): EventTally => ({ nudged: 0, directionsSent: 0, wouldSend: 0, skipped: 0, errors: 0 })
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -92,13 +70,10 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Date.now()
-  const results = { checked: 0, nudged: 0, directionsSent: 0, wouldSend: 0, skipped: 0, errors: 0 }
+  const byEvent: Record<string, EventTally> = {}
+  const tally = (key: string): EventTally => (byEvent[key] ||= emptyTally())
   const log: string[] = []
-  // Kill-switch: no message reaches a real lead until this is explicitly set
-  // to 'true' in the windchasers env. Default OFF = dry run: the cron still
-  // computes who is DUE and logs it (results.wouldSend), but sends nothing and
-  // sets no markers, so enabling it later delivers to everyone still eligible.
-  const sendsEnabled = process.env.WINDCHASERS_OFFLINE_EVENT_SENDS_ENABLED === 'true'
+  let checked = 0
 
   const { data: leads, error: queryErr } = await supabase
     .from('all_leads')
@@ -112,38 +87,55 @@ export async function GET(req: NextRequest) {
   }
 
   for (const lead of leads || []) {
-    results.checked++
+    checked++
+    const ctx: any = lead.unified_context || {}
+    const wc: any = ctx.windchasers || {}
+    const key = resolveOfflineEventKey(wc)
+
     try {
-      const ctx: any = lead.unified_context || {}
-      const wc: any = ctx.windchasers || {}
-      if (!lead.phone) { results.skipped++; continue }
+      if (!lead.phone) { tally(key).skipped++; continue }
 
-      const eventName = String(wc.offline_event_name || 'the WindChasers Demo Class').trim()
-      const registered = !!wc.offline_event_registered_at
+      // A key with no registry entry is a free-text event we know nothing
+      // about - no dates, no venue, no landing link. Never message those.
+      const event: OfflineEventConfig | null = getOfflineEvent(key)
+      if (!event) { tally(key).skipped++; continue }
+
+      const entry = readOfflineEventEntry(wc, key)
+      const sendsEnabled = offlineEventSendsEnabled(key)
       const firstName = (lead.customer_name || 'there').split(' ')[0]
+      const eventName = entry.name || event.name
 
-      if (!registered) {
-        // ── Not registered → one-time "confirm your seat" nudge ─────────────
-        if (wc.offline_event_register_reminder_sent) { results.skipped++; continue }
-        // Too late once even the LATER session is well past - no point nudging.
-        const lastSessionMs = new Date(KNOWN_SESSIONS['28 july']).getTime()
-        if (now > lastSessionMs + 6 * 3_600_000) { results.skipped++; continue }
+      // ── Not registered → one-time "confirm your seat" nudge ───────────────
+      if (!entry.registered_at) {
+        if (entry.register_reminder_sent) { tally(key).skipped++; continue }
+        // PER-EVENT cutoff. This replaced a single global one hardcoded to the
+        // Demo Class's last session, which silently disabled the nudge for
+        // every offline-event lead once that date passed. Scoping it per event
+        // is also what keeps past-event leads suppressed instead of blasting
+        // them about something that already happened.
+        if (now > eventLastSessionMs(event) + POST_EVENT_GRACE_MS) { tally(key).skipped++; continue }
 
-        if (!sendsEnabled) { results.wouldSend++; log.push(`lead=${lead.id} DRY-RUN nudge (sends disabled)`); continue }
+        if (!sendsEnabled) {
+          tally(key).wouldSend++
+          log.push(`lead=${lead.id} event=${key} DRY-RUN nudge (sends disabled)`)
+          continue
+        }
 
-        const result = await sendOfflineEventRegisterNudge(lead.phone, lead.customer_name || '', eventName)
-        let waOk = result.success
-        if (!result.success) {
-          log.push(`lead=${lead.id} nudge send failed (falls back next run once approved): ${result.error}`)
+        const result = await sendOfflineEventRegisterNudge(lead.phone, lead.customer_name || '', eventName, event.slugPath)
+        const waOk = result.success
+        if (!waOk) {
+          log.push(`lead=${lead.id} event=${key} nudge WhatsApp failed: ${result.error}`)
         } else {
-          const rendered = renderWaTemplate(NUDGE_TEMPLATE, { customer_name: firstName, event_name: eventName })
+          const rendered = renderWaTemplate(result.templateUsed, { customer_name: firstName, event_name: eventName })
           await logMessage(
             lead.id, 'whatsapp', 'agent',
-            rendered?.content || `Hi ${firstName}, you told us you're interested in ${eventName} - tap below to confirm your seat.`,
+            rendered?.content || `Hi ${firstName}, tap below to confirm your seat for ${eventName}.`,
             'template',
             {
-              source: 'offline_event_reminder', template_name: NUDGE_TEMPLATE, trigger: 'offline_event_register_reminder',
-              offline_event_name: eventName, wa_message_id: result.messageId || null,
+              source: 'offline_event_reminder', template_name: result.templateUsed,
+              trigger: 'offline_event_register_reminder',
+              offline_event_key: key, offline_event_name: eventName,
+              wa_message_id: result.messageId || null,
               delivery_status: result.messageId ? 'sent' : undefined,
               template_footer: rendered?.footer, template_buttons: rendered?.buttons,
             },
@@ -158,45 +150,51 @@ export async function GET(req: NextRequest) {
             subject: `Don't forget to confirm your seat - ${eventName}`,
             html: `<p>Hi ${firstName},</p>` +
               `<p>You told us you're interested in <strong>${eventName}</strong> - we'd love to see you there!</p>` +
-              `<p><a href="${LANDING_URL}">Tap here to confirm your seat</a>.</p>` +
+              `<p><a href="${event.landingUrl}">Tap here to confirm your seat</a>.</p>` +
               `<p>- Team WindChasers</p>`,
           })
           emailOk = !!emailResult.sent
-          if (!emailResult.sent) log.push(`lead=${lead.id} nudge email failed: ${emailResult.error}`)
+          if (!emailResult.sent) log.push(`lead=${lead.id} event=${key} nudge email failed: ${emailResult.error}`)
         }
 
-        // Mark sent as long as AT LEAST one channel got through, so a lead
-        // with a broken email but a working WhatsApp send (or vice versa)
-        // isn't retried forever once it has genuinely reached them.
+        // Mark sent when AT LEAST one channel got through, so a lead with a
+        // broken email but a working WhatsApp send (or vice versa) isn't
+        // retried forever once it has genuinely reached them. A total failure
+        // leaves the marker unset, so the next run retries - which is how the
+        // WhatsApp path auto-upgrades once Meta approves the v4 template.
         if (waOk || emailOk) {
-          await supabase.from('all_leads').update({
-            unified_context: { ...ctx, windchasers: { ...wc, offline_event_register_reminder_sent: new Date(now).toISOString() } },
-          }).eq('id', lead.id)
-          results.nudged++
+          await persistEventPatch(supabase, lead.id, key, { register_reminder_sent: new Date(now).toISOString() })
+          tally(key).nudged++
         } else {
-          results.errors++
+          tally(key).errors++
         }
         continue
       }
 
-      // ── Registered → "get directions" reminder, evening before their session ──
-      if (wc.offline_event_directions_reminder_sent) { results.skipped++; continue }
-      const rawDate = wc.offline_event_date
-      const startsAt = parseOfflineEventDateMs(rawDate)
-      if (isNaN(startsAt)) { results.skipped++; continue }
+      // ── Registered → "get directions" reminder, evening before ────────────
+      if (entry.directions_reminder_sent) { tally(key).skipped++; continue }
+      const startsAt = resolveSessionStartMs(event, entry.date)
+      if (isNaN(startsAt)) { tally(key).skipped++; continue }
       const hoursUntil = (startsAt - now) / 3_600_000
-      // 14-22h before an 11 AM session = roughly 1 PM-9 PM the evening before.
-      if (hoursUntil < 14 || hoursUntil > 22) { results.skipped++; continue }
+      if (hoursUntil < DIRECTIONS_WINDOW_MIN_H || hoursUntil > DIRECTIONS_WINDOW_MAX_H) {
+        tally(key).skipped++
+        continue
+      }
 
-      if (!sendsEnabled) { results.wouldSend++; log.push(`lead=${lead.id} DRY-RUN directions (sends disabled)`); continue }
+      if (!sendsEnabled) {
+        tally(key).wouldSend++
+        log.push(`lead=${lead.id} event=${key} DRY-RUN directions (sends disabled)`)
+        continue
+      }
 
-      const [datePart, timePart] = String(rawDate || '').split(/\s+at\s+/i)
-      const dateDisplay = (datePart || rawDate || 'the scheduled date').trim()
-      const timeDisplay = (timePart || '11:00 AM IST').trim()
+      const rawDate = entry.date || ''
+      const [datePart, timePart] = String(rawDate).split(/\s+at\s+/i)
+      const dateDisplay = (datePart || rawDate || event.sessions[0]?.label || 'the scheduled date').trim()
+      const timeDisplay = (timePart || event.timeDisplay).trim()
       const result = await sendOfflineEventConfirm(lead.phone, lead.customer_name || '', eventName, rawDate || `${dateDisplay} at ${timeDisplay}`)
-      let waOk = result.success
-      if (!result.success) {
-        log.push(`lead=${lead.id} directions WhatsApp send failed: ${result.error}`)
+      const waOk = result.success
+      if (!waOk) {
+        log.push(`lead=${lead.id} event=${key} directions WhatsApp failed: ${result.error}`)
       } else {
         const rendered = renderWaTemplate(CONFIRM_TEMPLATE, { customer_name: firstName, event_name: eventName, date: dateDisplay, time: timeDisplay })
         await logMessage(
@@ -204,8 +202,10 @@ export async function GET(req: NextRequest) {
           rendered?.content || `Hi ${firstName}, reminder - you're all set for ${eventName} on ${dateDisplay} at ${timeDisplay}.`,
           'template',
           {
-            source: 'offline_event_reminder', template_name: CONFIRM_TEMPLATE, trigger: 'offline_event_directions_reminder',
-            offline_event_name: eventName, offline_event_date: rawDate, wa_message_id: result.messageId || null,
+            source: 'offline_event_reminder', template_name: CONFIRM_TEMPLATE,
+            trigger: 'offline_event_directions_reminder',
+            offline_event_key: key, offline_event_name: eventName, offline_event_date: rawDate || null,
+            wa_message_id: result.messageId || null,
             delivery_status: result.messageId ? 'sent' : undefined,
             template_footer: rendered?.footer, template_buttons: rendered?.buttons,
           },
@@ -220,28 +220,62 @@ export async function GET(req: NextRequest) {
           subject: `See you tomorrow - ${eventName}`,
           html: `<p>Hi ${firstName},</p>` +
             `<p>Quick reminder - you're all set for <strong>${eventName}</strong> on <strong>${dateDisplay}</strong> at <strong>${timeDisplay}</strong>.</p>` +
-            `<p><strong>Venue:</strong> ${VENUE_ADDRESS}<br/>` +
-            `<a href="${VENUE_MAPS_URL}">Get directions</a></p>` +
+            `<p><strong>Venue:</strong> ${event.venue.address}<br/>` +
+            `<a href="${event.venue.mapsUrl}">Get directions</a></p>` +
             `<p>We can't wait to see you there!</p>` +
             `<p>- Team WindChasers</p>`,
         })
         emailOk = !!emailResult.sent
-        if (!emailResult.sent) log.push(`lead=${lead.id} directions email failed: ${emailResult.error}`)
+        if (!emailResult.sent) log.push(`lead=${lead.id} event=${key} directions email failed: ${emailResult.error}`)
       }
 
       if (waOk || emailOk) {
-        await supabase.from('all_leads').update({
-          unified_context: { ...ctx, windchasers: { ...wc, offline_event_directions_reminder_sent: new Date(now).toISOString() } },
-        }).eq('id', lead.id)
-        results.directionsSent++
+        await persistEventPatch(supabase, lead.id, key, { directions_reminder_sent: new Date(now).toISOString() })
+        tally(key).directionsSent++
       } else {
-        results.errors++
+        tally(key).errors++
       }
     } catch (e: any) {
-      results.errors++
-      log.push(`lead=${lead.id} error: ${e?.message || e}`)
+      tally(key).errors++
+      log.push(`lead=${lead.id} event=${key} error: ${e?.message || e}`)
     }
   }
 
-  return NextResponse.json({ success: true, sendsEnabled, results, log, timestamp: new Date(now).toISOString() })
+  return NextResponse.json({
+    success: true,
+    results: { checked, byEvent },
+    log,
+    timestamp: new Date(now).toISOString(),
+  })
+}
+
+/**
+ * Write a marker onto ONE event's entry.
+ *
+ * Re-reads the row immediately before updating: unified_context is a single
+ * JSONB column, so a stale in-memory copy would clobber anything an inbound
+ * registration wrote while this run was in flight. (A jsonb_set RPC touching
+ * only the marker path is the fuller fix; this closes the realistic window.)
+ *
+ * mirrorFlat:false - a reminder about an older event must not repoint the flat
+ * offline_event_* mirror, which tracks the lead's most RECENT event.
+ */
+async function persistEventPatch(
+  supabase: any,
+  leadId: string,
+  key: string,
+  patch: Record<string, string>,
+): Promise<void> {
+  const { data: fresh } = await supabase
+    .from('all_leads')
+    .select('unified_context')
+    .eq('id', leadId)
+    .maybeSingle()
+  const freshCtx: any = fresh?.unified_context || {}
+  const freshWc: any = freshCtx.windchasers || {}
+  const updates = writeOfflineEvent(freshWc, key, patch, { mirrorFlat: false })
+  await supabase
+    .from('all_leads')
+    .update({ unified_context: { ...freshCtx, windchasers: { ...freshWc, ...updates } } })
+    .eq('id', leadId)
 }

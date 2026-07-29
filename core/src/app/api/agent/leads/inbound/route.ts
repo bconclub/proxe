@@ -30,6 +30,13 @@ import {
 } from '@/lib/services'
 import type { DemoFormat } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import {
+  getOfflineEvent,
+  matchOfflineEventByName,
+  slugifyEventKey,
+  LEGACY_DEFAULT_EVENT_KEY,
+} from '@/configs/offline-events'
+import { mergeOfflineEventMaps } from '@/lib/offlineEventContext'
 import { normalizeCourse } from '@/configs/courses'
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
 
@@ -409,16 +416,45 @@ export async function POST(request: NextRequest) {
       if (isOfflineEventLead) {
         brandCtxData.lead_type = 'offline_event'
         const offlineEventName = String(cf2.offline_event_name || cf2.event_name || (body as any).offline_event_name || (body as any).event_name || '').trim()
-        if (offlineEventName) brandCtxData.offline_event_name = offlineEventName
         const offlineEventDate = String(cf2.offline_event_date || cf2.event_date || (body as any).offline_event_date || '').trim()
-        if (offlineEventDate) brandCtxData.offline_event_date = offlineEventDate
         const offlineEventLocation = String(cf2.offline_event_location || cf2.event_location || (body as any).offline_event_location || '').trim()
-        if (offlineEventLocation) brandCtxData.offline_event_location = offlineEventLocation
         // Who they're bringing (parent/guest, free text from the landing page
         // form) - so the counsellor/venue knows headcount without a callback.
         const offlineEventComingWith = String(cf2.offline_event_coming_with || (body as any).offline_event_coming_with || '').trim()
+        // 'scholarship' = they also ticked the scholarship application on the
+        // landing page. Still a registration - just a stronger signal.
+        const offlineEventIntent =
+          String(cf2.offline_event_intent || (body as any).offline_event_intent || '').toLowerCase().trim() === 'scholarship'
+            ? 'scholarship'
+            : 'register'
+
+        // Which event? The landing page submits an explicit key; fall back to
+        // matching the submitted name against the registry, then to a slug.
+        // The REGISTRY wins on name/venue so a stale string on the site can't
+        // corrupt what the cron and dashboard read.
+        const submittedKey = String(cf2.offline_event_key || (body as any).offline_event_key || '').trim()
+        const event = getOfflineEvent(submittedKey) || matchOfflineEventByName(offlineEventName)
+        const eventKey = event?.key || slugifyEventKey(offlineEventName) || LEGACY_DEFAULT_EVENT_KEY
+        const resolvedName = event?.name || offlineEventName
+        const resolvedLocation = offlineEventLocation || event?.venue.address || ''
+
+        brandCtxData.offline_event_key = eventKey
+        if (resolvedName) brandCtxData.offline_event_name = resolvedName
+        if (offlineEventDate) brandCtxData.offline_event_date = offlineEventDate
+        if (resolvedLocation) brandCtxData.offline_event_location = resolvedLocation
         if (offlineEventComingWith) brandCtxData.offline_event_coming_with = offlineEventComingWith
+        brandCtxData.offline_event_intent = offlineEventIntent
         brandCtxData.offline_event_registered_at = now
+        brandCtxData.offline_events = {
+          [eventKey]: {
+            ...(resolvedName ? { name: resolvedName } : {}),
+            ...(offlineEventDate ? { date: offlineEventDate } : {}),
+            ...(resolvedLocation ? { location: resolvedLocation } : {}),
+            ...(offlineEventComingWith ? { coming_with: offlineEventComingWith } : {}),
+            intent: offlineEventIntent,
+            registered_at: now,
+          },
+        }
       }
 
       // ── PAT (Pilot Aptitude Test) submission ──────────────────────────────
@@ -717,6 +753,14 @@ export async function POST(request: NextRequest) {
         if (mergedBrandCtx && brandCtxData.lead_type === 'offline_event' &&
             (existingCtx[leadBrand] as any)?.lead_type !== 'offline_event') {
           delete mergedBrandCtx.lead_type
+        }
+        // The shallow merge above REPLACES offline_events wholesale, which
+        // would erase every event this lead already registered for. Deep-merge
+        // it back so a second registration adds to the map instead of
+        // destroying the first.
+        if (mergedBrandCtx) {
+          const mergedEvents = mergeOfflineEventMaps(existingCtx[leadBrand], inboundContext[leadBrand])
+          if (mergedEvents) mergedBrandCtx.offline_events = mergedEvents
         }
         // Attribution is IMMUTABLE - never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
@@ -1398,20 +1442,23 @@ export async function POST(request: NextRequest) {
     // Guarded the same way: dedup window + soft-fail.
     if (phone && isOfflineEventLead) {
       const firstName = (leadName !== 'Lead' && isLikelyRealPersonName(leadName) ? leadName : 'there').split(' ')[0]
-      const eventName = String(cfields.offline_event_name || cfields.event_name || (body as any).offline_event_name || (body as any).event_name || '').trim()
-      const eventDate = String(cfields.offline_event_date || cfields.event_date || (body as any).offline_event_date || '').trim()
+      // Resolved above during tagging - the registry's name/session wins over
+      // whatever display strings the landing page happened to submit.
+      const confirmEvent = getOfflineEvent(String(brandCtxData.offline_event_key || ''))
+      const eventName = String(brandCtxData.offline_event_name || confirmEvent?.name || 'our event').trim()
+      const eventDate = String(brandCtxData.offline_event_date || '').trim()
       const confirmTpl = 'windchasers_offline_event_confirmation_v2'
       const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
         console.log(`[inbound] Offline-event confirm SKIPPED as duplicate lead=${leadId} phone=${phone}`)
       } else try {
         const [eDatePart, eTimePart] = String(eventDate || '').split(/\s+at\s+/i)
-        const dateDisplay = (eDatePart || eventDate || 'the scheduled date').trim()
-        const timeDisplay = (eTimePart || '11:00 AM IST').trim()
-        const result = await sendOfflineEventConfirm(phone, firstName, eventName || 'the WindChasers Demo Class', eventDate || `${dateDisplay} at ${timeDisplay}`)
+        const dateDisplay = (eDatePart || eventDate || confirmEvent?.sessions[0]?.label || 'the scheduled date').trim()
+        const timeDisplay = (eTimePart || confirmEvent?.timeDisplay || '11:00 AM IST').trim()
+        const result = await sendOfflineEventConfirm(phone, firstName, eventName, eventDate || `${dateDisplay} at ${timeDisplay}`)
         const rendered = renderWaTemplate(confirmTpl, {
           customer_name: firstName,
-          event_name: eventName || 'the WindChasers Demo Class',
+          event_name: eventName,
           date: dateDisplay,
           time: timeDisplay,
         })

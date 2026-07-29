@@ -77,8 +77,16 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
     buttons: ['Book a Demo Class'],
   },
   // Offline event (demo class, open house, etc.) - distinct from the 1-on-1
-  // "book a demo" flow above (windchasers_demo_offline_v2). Submitted to Meta
-  // 2026-07-21, PENDING review.
+  // "book a demo" flow above (windchasers_demo_offline_v2). APPROVED.
+  // v4 supersedes v3: identical copy, but its button URL is DYNAMIC
+  // (https://windchasers.in/{{1}}), so one template serves every event. v3 is
+  // kept because its static /dgca-demo-class button is still a valid fallback
+  // for that one event, and past sends logged under that name must still render.
+  windchasers_offline_event_register_nudge_v4: {
+    body: `Hi {{customer_name}}, you told us you are interested in {{event_name}} and we would love to see you there. Tap below to confirm your seat now.`,
+    footer: 'Team Windchasers',
+    buttons: ['Confirm My Seat'],
+  },
   windchasers_offline_event_register_nudge_v3: {
     body: `Hi {{customer_name}}, you told us you are interested in {{event_name}} and we would love to see you there. Tap below to confirm your seat now.`,
     footer: 'Team Windchasers',
