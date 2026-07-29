@@ -234,6 +234,7 @@ export async function POST(request: NextRequest) {
                 messageCount,
                 usedButtons,
                 pageAudience,
+                attribution,
               );
             } catch (err) {
               console.error('[agent/web/chat] Post-processing error:', err);
@@ -736,6 +737,10 @@ async function postProcess(
   messageCount: number = 0,
   usedButtons: string[] = [],
   originAudience: LokazenAudience = null,
+  // First-touch attribution captured by the widget. Declared in the POST handler,
+  // so it MUST be passed in - referencing it directly here was out of scope and
+  // silently killed attribution stamping for every web-chat lead.
+  attribution: Record<string, any> = {},
 ): Promise<void> {
   try {
     // 1. Check for existing lead from session first
