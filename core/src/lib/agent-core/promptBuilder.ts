@@ -7,7 +7,8 @@ import { Channel, HistoryEntry } from './types';
 // Active brand's prompt, loaded via @brand (→ /brands/<id>/prompts). Adding a
 // brand needs NO edit here - the alias resolves its prompt at build time.
 import { getSystemPrompt, getWebSystemPrompt } from '@brand/prompts';
-import { isLikelyRealPersonName } from '../services/utils';
+import { isLikelyRealPersonName, formatTimeForDisplay } from '../services/utils';
+import { getBookableSlotStartsForDate } from '../services/bookingManager';
 import { getCurrentBrandId } from '@/configs';
 
 interface PromptOptions {
@@ -305,6 +306,9 @@ function buildUserPrompt(params: {
         const baseUTC = Date.UTC(ty, tmo - 1, td, 12, 0, 0);
         const weekdayAt = (i: number) =>
           new Date(baseUTC + i * 86400000).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+        // ISO date N days from today (IST) - used to ask bookingManager for that
+        // day's real open slots.
+        const isoAt = (i: number) => new Date(baseUTC + i * 86400000).toISOString().slice(0, 10);
         // Soonest open day at/after tomorrow (skip Sundays).
         let firstOpen = 1;
         while (weekdayAt(firstOpen) === 'Sunday') firstOpen++;
@@ -341,7 +345,21 @@ function buildUserPrompt(params: {
         const dateRef = `Upcoming dates - resolve EVERY relative date ("tomorrow", "this Friday", "next Monday") by matching this list. Do NOT calculate dates yourself. "Next <weekday>" = the soonest <weekday> listed below:\n${upcoming.join('\n')}`;
 
         const upcomingRule = `TIME AWARENESS - a call or booking scheduled for a time LATER than the Current IST above is UPCOMING, not missed. NEVER apologize for a "missed call" or say you couldn't connect for a slot that has not happened yet. Only treat a slot as missed once its time has actually passed relative to the Current IST.`;
-        const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. Callback slots run 11:00 AM to 6:00 PM, always at least 90 minutes from the current time. Offer up to 3 concrete times from that window (e.g. the next few open hours). The moment the user taps or states a specific time, that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns, do NOT ask anything else: call book_consultation right away with that day and time, then confirm.`;
+        // The EXACT bookable slots, computed by the same function the booking tool
+        // validates against. Previously the prompt only described the window
+        // ("at least 90 minutes from now") and the model did the arithmetic
+        // itself - at 10:18 AM it offered "11:48 AM", which is not a real slot,
+        // so book_consultation rejected it and the customer saw a confusing
+        // "11:48 wasn't available". Never make the model invent times.
+        const todaySlots = getBookableSlotStartsForDate(isoDate, 'online').map(formatTimeForDisplay);
+        const tomorrowSlots = getBookableSlotStartsForDate(isoAt(firstOpen), 'online').map(formatTimeForDisplay);
+        const slotLine = todaySlots.length
+          ? `Open slots TODAY (${isoDate}): ${todaySlots.join(', ')}.`
+          : `No slots left today.`;
+        const slotLineNext = tomorrowSlots.length
+          ? ` Open slots on ${firstOpenLabel} (${isoAt(firstOpen)}): ${tomorrowSlots.slice(0, 8).join(', ')}.`
+          : '';
+        const bookingSequenceRule = `BOOKING SEQUENCE (never loop). Pin the DATE first using the day buttons above, THEN offer times for that date. ${slotLine}${slotLineNext} Offer at most 3 of those EXACT times, copied verbatim. NEVER invent a time and never compute one yourself (no "90 minutes from now" arithmetic) - only times from the lists above are bookable. The moment the user taps or states a specific time, that time is LOCKED: do NOT ask for the date afterwards and do NOT re-ask or re-offer a time. If you already hold BOTH a day and a time from this conversation, even across separate turns, do NOT ask anything else: call book_consultation right away with that day and time, then confirm.`;
         const bookingRegisterRule = `BOOKING MUST BE REGISTERED (critical). The ONLY way a call is actually booked is by calling the book_consultation tool. NEVER type a confirmation like "the team will confirm and call you", "you're booked", or "works, the team will call you then" unless book_consultation has ALREADY returned success this turn - a typed confirmation with no tool call registers nothing and the customer is left stranded. If book_consultation returns an error, tell the user honestly in ONE line that you have flagged it to the team who will call them to confirm, do NOT claim it is booked, and do NOT re-offer slots. Once a booking is registered (or you have told the user the team will call), it is DONE: if the user then asks a follow-up like "what if they don't call" or "will they actually call", reassure them briefly and, if needed, that you have noted it as priority - NEVER restart slot selection, never re-offer times, never send the slot buttons again.`;
         const windowsLine = callbackOnly
           ? `Booking is a phone CALLBACK, Monday to Saturday, 11:00 AM to 6:00 PM IST, always at least 90 minutes from the current time. There are NO in-person visits and NO site-visit bookings. NEVER offer an in-person or facility visit. If today's callback window is already past (or under 90 minutes left), offer the next working day.`
