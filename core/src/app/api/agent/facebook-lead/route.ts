@@ -26,6 +26,7 @@ import { matchOfflineEvent } from '@/configs/offline-events';
 import { mergeOfflineEventMaps } from '@/lib/offlineEventContext';
 import { BRAND_ID } from '@/configs';
 import { normalizeCourse } from '@/configs/courses';
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies';
 
 export const dynamic = 'force-dynamic';
 
