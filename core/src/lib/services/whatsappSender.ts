@@ -602,10 +602,14 @@ export function isDemoClassSource(...signals: Array<string | null | undefined>):
 }
 
 /**
- * Normalizes the lead-form's day-preference answer ("27th_july", "28 July",
+ * Normalizes the lead-form's day-preference answer ("27th_july", "15 August",
  * "27th July") into the short label our offline-event sessions use ("27
  * July"). Returns null if it doesn't look like a day+month at all - callers
  * should fall back to storing the raw value instead of guessing.
+ *
+ * Despite the legacy name this was never Demo-Class-specific (it lists all
+ * twelve months), so it handles any event's day preference. Prefer the
+ * normalizeOfflineEventDayPreference alias below in new code.
  */
 export function normalizeDemoClassDayPreference(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -616,6 +620,9 @@ export function normalizeDemoClassDayPreference(raw: string | null | undefined):
   const month = match[2]
   return `${day} ${month.charAt(0).toUpperCase()}${month.slice(1)}`
 }
+
+/** Event-neutral name for normalizeDemoClassDayPreference. Same function. */
+export const normalizeOfflineEventDayPreference = normalizeDemoClassDayPreference
 
 /**
  * Welcome for cabin-crew leads. Tries the cabin-crew-specific template; if it's
@@ -853,6 +860,9 @@ export async function sendWebinarRegisterNudge(
   ])
 }
 
+/** Landing path baked into the v3 template's STATIC button URL. */
+const NUDGE_V3_STATIC_PATH = 'dgca-demo-class'
+
 /**
  * Offline-event (demo class, open house, etc.) "confirm your seat" nudge -
  * fired when a lead only shows INTEREST (e.g. a Meta lead-ad form) but hasn't
@@ -860,28 +870,57 @@ export async function sendWebinarRegisterNudge(
  * sendDemoConfirmation (windchasers_demo_offline_v2), which is for the 1-on-1
  * "book a demo" campus-visit flow, not this group event.
  *
- * Template: windchasers_offline_event_register_nudge_v3 - NAMED params:
- *   customer_name · event_name   + a static "Confirm My Seat" URL button
- * (points at the landing page - static, so no send-time button component
- * needed). PENDING Meta review as of 2026-07-21 - a 4xx here just means it
- * isn't approved yet; caller falls back to the plain welcome template.
+ * Prefers windchasers_offline_event_register_nudge_v4, whose "Confirm My Seat"
+ * button URL is DYNAMIC (`https://windchasers.in/{{1}}`) - so one template
+ * serves every event instead of a Meta review cycle per event. The button
+ * param is POSITIONAL (Meta rejects parameter_name on URL buttons); only the
+ * body is named.
+ *
+ * Falls back to the older v3 ONLY for the Demo Class, because v3's button URL
+ * is statically baked to /dgca-demo-class - sending it for any other event
+ * would route the lead to the wrong page, which is worse than not sending
+ * (the caller's email carries the correct link either way, and the WhatsApp
+ * send auto-upgrades on the next run once v4 is approved).
  */
 export async function sendOfflineEventRegisterNudge(
   to: string,
   name: string,
   eventName: string,
-): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  landingPath: string,
+): Promise<{ success: boolean; error?: string; messageId?: string; templateUsed: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
-  return sendWhatsAppTemplate(to, 'windchasers_offline_event_register_nudge_v3', [
+  const slug = String(landingPath || '').replace(/^\/+|\/+$/g, '')
+  const body = {
+    type: 'body' as const,
+    parameters: [
+      { type: 'text', parameter_name: 'customer_name', text: firstName },
+      { type: 'text', parameter_name: 'event_name', text: eventName || 'our event' },
+    ],
+  }
+
+  const v4 = await sendWhatsAppTemplate(to, 'windchasers_offline_event_register_nudge_v4', [
+    body,
     {
-      type: 'body',
-      parameters: [
-        { type: 'text', parameter_name: 'customer_name', text: firstName },
-        { type: 'text', parameter_name: 'event_name', text: eventName || 'our demo class' },
-      ],
+      type: 'button' as const,
+      sub_type: 'url' as const,
+      index: 0,
+      parameters: [{ type: 'text', text: slug }],
     },
   ])
+  if (v4.success) {
+    return { ...v4, templateUsed: 'windchasers_offline_event_register_nudge_v4' }
+  }
+
+  if (slug !== NUDGE_V3_STATIC_PATH) {
+    return {
+      success: false,
+      error: `${v4.error || 'v4 send failed'} (no v3 fallback - its button URL is hardcoded to /${NUDGE_V3_STATIC_PATH})`,
+      templateUsed: 'windchasers_offline_event_register_nudge_v4',
+    }
+  }
+  const v3 = await sendWhatsAppTemplate(to, 'windchasers_offline_event_register_nudge_v3', [body])
+  return { ...v3, templateUsed: 'windchasers_offline_event_register_nudge_v3' }
 }
 
 /**

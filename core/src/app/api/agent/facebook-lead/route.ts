@@ -21,7 +21,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, isDemoClassSource, normalizeDemoClassDayPreference, sendOfflineEventRegisterNudge, sendEmail, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { getServiceClient, normalizePhone, logMessage, sendWelcomeTemplate, pickWelcomeTemplate, isParentSource, sendParentWelcomeTemplate, isCabinCrewSource, sendCabinCrewWelcome, normalizeOfflineEventDayPreference, sendOfflineEventRegisterNudge, sendEmail, buildAttribution, isLikelyRealPersonName } from '@/lib/services';
+import { matchOfflineEvent } from '@/configs/offline-events';
+import { mergeOfflineEventMaps } from '@/lib/offlineEventContext';
 import { BRAND_ID } from '@/configs';
 import { normalizeCourse } from '@/configs/courses';
 
@@ -162,7 +164,8 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     let leadId: string;
 
-    const windchasersProfile: Record<string, string> = {};
+    // `any` (not `string`) because offline_events holds a nested per-event map.
+    const windchasersProfile: Record<string, any> = {};
     if (education) windchasersProfile.education = education;
     if (city) windchasersProfile.city = city;
     if (class12Pcm) windchasersProfile.class_12_pcm = class12Pcm;
@@ -191,23 +194,43 @@ export async function POST(request: NextRequest) {
       windchasersProfile.course_interest = 'Cabin Crew';
     }
 
-    // Demo Class ad/campaign (e.g. "Demo Session 27-28th July") - tag INTEREST
-    // immediately so the lead shows in the dashboard's Offline Events tab and a
-    // counsellor can follow up, but do NOT mark offline_event_registered_at:
-    // that's reserved for when they actually complete the landing-page form
-    // (this is only the ad-lead-form stage, same distinction webinar makes
-    // between lead_type='webinar' and zoom_registered).
-    const isDemoClassLead = isDemoClassSource(
+    // Offline-event ad/campaign (e.g. "Demo Session 27-28th July", "Wings of
+    // Freedom") - tag INTEREST immediately so the lead shows in the dashboard's
+    // Offline Events tab and a counsellor can follow up, but do NOT mark
+    // registered_at: that's reserved for when they actually complete the
+    // landing-page form (same distinction webinar makes between
+    // lead_type='webinar' and zoom_registered).
+    //
+    // Which event it is comes from the registry, not a hardcoded name - that's
+    // what lets two events run concurrently. `enabled` is checked so a stale ad
+    // still running for a finished event can't keep tagging leads into it.
+    const matchedEvent = matchOfflineEvent(
       course, campaignTypeSignal, facebookMeta.form_name, facebookMeta.campaign_name,
       facebookMeta.adset_name, facebookMeta.ad_name, facebookMeta.utm_campaign, facebookMeta.utm_content,
     );
-    if (isDemoClassLead) {
+    const isOfflineEventLead = !!matchedEvent?.enabled;
+    if (matchedEvent && isOfflineEventLead) {
+      const normalizedDay = normalizeOfflineEventDayPreference(dayPreference);
+      const eventDate = normalizedDay || (dayPreference ? String(dayPreference) : '');
       windchasersProfile.lead_type = 'offline_event';
-      windchasersProfile.offline_event_name = 'WindChasers Demo Class';
-      const normalizedDay = normalizeDemoClassDayPreference(dayPreference);
-      if (normalizedDay || dayPreference) windchasersProfile.offline_event_date = normalizedDay || String(dayPreference);
+      windchasersProfile.offline_event_key = matchedEvent.key;
+      windchasersProfile.offline_event_name = matchedEvent.name;
+      windchasersProfile.offline_event_location = matchedEvent.venue.address;
+      if (eventDate) windchasersProfile.offline_event_date = eventDate;
       windchasersProfile.offline_event_interest_source = 'facebook_lead_form';
-      if (!windchasersProfile.course_interest) windchasersProfile.course_interest = 'Pilot';
+      // '' means the event spans multiple tracks - leave COURSE blank rather
+      // than guessing and mislabelling half the room.
+      if (!windchasersProfile.course_interest && matchedEvent.defaultCourseInterest) {
+        windchasersProfile.course_interest = matchedEvent.defaultCourseInterest;
+      }
+      windchasersProfile.offline_events = {
+        [matchedEvent.key]: {
+          name: matchedEvent.name,
+          location: matchedEvent.venue.address,
+          interest_source: 'facebook_lead_form',
+          ...(eventDate ? { date: eventDate } : {}),
+        },
+      };
     }
 
     // Attribution: Facebook Lead Form is always Meta paid. Source precedence:
@@ -246,6 +269,10 @@ export async function POST(request: NextRequest) {
       if (windchasersProfile.lead_type === 'offline_event' && existingCtx.windchasers?.lead_type !== 'offline_event') {
         mergedWindchasers.lead_type = existingCtx.windchasers?.lead_type;
       }
+      // The spread above REPLACES offline_events wholesale, which would erase
+      // every event this lead already registered for. Deep-merge it back.
+      const mergedEvents = mergeOfflineEventMaps(existingCtx.windchasers, windchasersProfile);
+      if (mergedEvents) mergedWindchasers.offline_events = mergedEvents;
 
       await supabase
         .from('all_leads')
@@ -306,26 +333,28 @@ export async function POST(request: NextRequest) {
 
     if (inCooldown) {
       console.log(`[facebook-lead] Lead ${leadId} in cooldown until ${cooldownUntil}, skipping WhatsApp`);
-    } else if (isDemoClassLead) {
-      // ── 3a. Demo-class lead → "confirm your seat" nudge, NOT a booking
+    } else if (matchedEvent && isOfflineEventLead) {
+      // ── 3a. Offline-event lead → "confirm your seat" nudge, NOT a booking
       // confirmation. This is only interest (a Meta lead-ad form) - they
       // haven't completed the landing-page registration yet, so saying
       // "confirmed" here would be wrong (and windchasers_demo_offline_v2 is
       // for the unrelated 1-on-1 "book a demo" campus-visit flow anyway).
-      // windchasers_offline_event_register_nudge_v3 has a "Confirm My Seat"
-      // URL button pointing at the landing page; completing that form is what
-      // actually fires sendOfflineEventConfirm in leads/inbound and flips the
-      // dashboard's RSVP chip to Registered. PENDING Meta review as of
-      // 2026-07-21 - falls back to the plain welcome until it's approved so
-      // leads are never left unmessaged. Dedup-guarded against retries.
-      const nudgeTpl = 'windchasers_offline_event_register_nudge_v3';
-      const nudgeAlreadySent = await wasTemplateRecentlySent(supabase, leadId, nudgeTpl);
+      // The nudge template's "Confirm My Seat" button carries THIS event's
+      // landing path; completing that form is what fires
+      // sendOfflineEventConfirm in leads/inbound and flips the dashboard's
+      // RSVP chip to Registered. If the template isn't approved for this
+      // event's URL yet the send fails and we fall back to the plain welcome,
+      // so a lead is never left unmessaged. Dedup-guarded against retries.
+      const nudgeAlreadySent =
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_offline_event_register_nudge_v4')) ||
+        (await wasTemplateRecentlySent(supabase, leadId, 'windchasers_offline_event_register_nudge_v3'));
       const first = (cleanName || name || 'there').split(' ')[0];
-      const eventName = windchasersProfile.offline_event_name || 'the WindChasers Demo Class';
+      const eventName = matchedEvent.name;
       if (nudgeAlreadySent) {
         console.log(`[facebook-lead] Offline-event nudge SKIPPED as duplicate lead=${leadId} phone=${normalizedPhone}`);
       } else {
-        const nudgeResult = await sendOfflineEventRegisterNudge(phone, first, eventName);
+        const nudgeResult = await sendOfflineEventRegisterNudge(phone, first, eventName, matchedEvent.slugPath);
+        const nudgeTpl = nudgeResult.templateUsed;
         if (nudgeResult.success) {
           whatsappSent = true;
           const rendered = renderWaTemplate(nudgeTpl, { customer_name: first, event_name: eventName });
@@ -340,6 +369,7 @@ export async function POST(request: NextRequest) {
               source: 'facebook_lead',
               template_name: nudgeTpl,
               trigger: 'offline_event_interest',
+              offline_event_key: matchedEvent.key,
               ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
               ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
               ...(nudgeResult.messageId ? { wa_message_id: nudgeResult.messageId, delivery_status: 'sent' } : {}),
@@ -383,7 +413,7 @@ export async function POST(request: NextRequest) {
       // same reasoning as the WhatsApp nudge above.
       if (email) {
         try {
-          const landingUrl = 'https://windchasers.in/dgca-demo-class';
+          const landingUrl = matchedEvent.landingUrl;
           const emailResult = await sendEmail({
             to: email,
             subject: `Confirm your seat - ${eventName}`,
