@@ -58,6 +58,14 @@ export interface OfflineEventConfig {
    * room. Omit and the tap falls back to the webinar group.
    */
   whatsappGroupUrl?: string
+  /**
+   * Set when the event carries a scholarship whose application starts on the
+   * landing page. Registrants who tick that box get the application-process
+   * message instead of the plain "you're confirmed" one - applying opens a
+   * process (aptitude test, documents, interview, counselling), it doesn't
+   * award anything, and the confirmation must not imply otherwise.
+   */
+  scholarshipName?: string
   /** false = past/paused. Blocks intake tagging AND all reminder sends. */
   enabled: boolean
 }
@@ -110,6 +118,7 @@ const WINDCHASERS_EVENTS: OfflineEventConfig[] = [
     // Tracking params from the shared invite stripped - only the invite code
     // matters, and the rest would follow every lead into the group.
     whatsappGroupUrl: 'https://chat.whatsapp.com/BiPGKSg03CzETSljBUO9sa',
+    scholarshipName: 'Freedom to Fly',
     enabled: true,
   },
 ]

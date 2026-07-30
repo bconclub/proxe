@@ -19,6 +19,7 @@ import {
   sendWhatsAppTemplate,
   sendWebinarConfirm,
   sendOfflineEventConfirm,
+  sendScholarshipApplicationStep,
   isCabinCrewSource,
   sendCabinCrewWelcome,
   pickWelcomeTemplate,
@@ -1458,14 +1459,35 @@ export async function POST(request: NextRequest) {
         const [eDatePart, eTimePart] = String(eventDate || '').split(/\s+at\s+/i)
         const dateDisplay = (eDatePart || eventDate || confirmEvent?.sessions[0]?.label || 'the scheduled date').trim()
         const timeDisplay = (eTimePart || confirmEvent?.timeDisplay || '11:00 AM IST').trim()
-        const result = await sendOfflineEventConfirm(
-          phone,
-          firstName,
-          eventName,
-          eventDate || `${dateDisplay} at ${timeDisplay}`,
-          confirmEvent?.whatsappGroupUrl ? confirmEvent.key : undefined,
-        )
+        // A scholarship applicant gets a DIFFERENT message. The plain confirm
+        // ("you're all set, see you there") reads as if the scholarship is
+        // settled, when ticking the box only opens an application - the
+        // aptitude test, documents, interview and counselling all still follow.
+        const isScholarshipApplicant =
+          String(brandCtxData.offline_event_intent || '') === 'scholarship' &&
+          Boolean(confirmEvent?.whatsappGroupUrl)
+        const result = isScholarshipApplicant
+          ? {
+              ...(await sendScholarshipApplicationStep(
+                phone,
+                firstName,
+                confirmEvent!.scholarshipName || 'the scholarship',
+                dateDisplay,
+                confirmEvent!.key,
+              )),
+              templateUsed: 'windchasers_wof_scholarship_step_v1',
+            }
+          : await sendOfflineEventConfirm(
+              phone,
+              firstName,
+              eventName,
+              eventDate || `${dateDisplay} at ${timeDisplay}`,
+              confirmEvent?.whatsappGroupUrl ? confirmEvent.key : undefined,
+            )
+        // The scholarship template's own params - harmless extras for the
+        // registration templates, which only read the keys they declare.
         const rendered = renderWaTemplate(result.templateUsed || confirmTpl, {
+          scholarship_name: confirmEvent?.scholarshipName || 'the scholarship',
           customer_name: firstName,
           event_name: eventName,
           date: dateDisplay,

@@ -94,6 +94,19 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
     footer: 'Team WindChasers',
     buttons: ['Join the Group'],
   },
+  // Scholarship applicants get this INSTEAD of the plain confirmation - the
+  // generic "you're all set" reads as if the scholarship itself is settled.
+  windchasers_wof_scholarship_step_v1: {
+    body: `Hi {{customer_name}}, your application for *{{scholarship_name}}* is open.
+
+📅 *{{date}}* | 📍 *WindChasers HQ, Kothanur, Bengaluru*
+
+Your seat is booked. The scholarship is not decided yet: next comes the Pilot Aptitude Test, then documents, a personal interview and a counselling session. Selection is merit-based.
+
+Your test link and dates go out in the group. Tap below to join and complete your application.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join the Group'],
+  },
   // Standalone group hand-off, so "send me the group" is answered with a
   // template rather than a free-form session message.
   windchasers_event_group_invite_v1: {
