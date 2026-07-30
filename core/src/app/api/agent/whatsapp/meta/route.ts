@@ -43,7 +43,7 @@ import {
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
 import { getOfflineEvent, matchOfflineEvent } from '@/configs/offline-events';
-import { resolveOfflineEventKey } from '@/lib/offlineEventContext';
+import { resolveOfflineEventKey, readOfflineEventEntry } from '@/lib/offlineEventContext';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { resolveMapsLink } from '@/lib/services/mapsResolver';
 
@@ -877,6 +877,81 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // to 'Direct'. Stamp a distinct source (once) so attribution reflects the form.
     if (isMetaFormClickThrough(messageText)) {
       await tagMetaFormClickThrough(leadId, messageText, supabase);
+    }
+
+    // Offline-event enquiry → short, deterministic reply with tappable next
+    // steps. Left to the LLM this produced a wall of text: the whole agenda,
+    // both scholarship amounts and a bare link, in one message.
+    //
+    // It also answers the question the lead actually has. Someone who already
+    // registered doesn't want the pitch again - they want to know we have
+    // them, and what's left to do.
+    if (brand === 'windchasers' && !isMetaFormClickThrough(messageText)) {
+      const enquiryEvent = matchOfflineEvent(messageText);
+      if (enquiryEvent?.enabled) {
+        const { data: enqLead } = await supabase
+          .from('all_leads')
+          .select('unified_context, customer_name')
+          .eq('id', leadId)
+          .maybeSingle();
+        const enqWc: any = enqLead?.unified_context?.[BRAND_ID] || {};
+        const entry = readOfflineEventEntry(enqWc, enquiryEvent.key);
+        const first = (enqLead?.customer_name || '').split(' ')[0];
+        const hi = first && isLikelyRealPersonName(first) ? `${first}, ` : '';
+        const session = enquiryEvent.sessions[0];
+        const whenLine = `${session?.label || 'the event day'}, ${enquiryEvent.timeDisplay}`;
+        const alreadyApplied = entry.intent === 'scholarship';
+
+        const body = entry.registered_at
+          ? `${hi}we've got your registration for *${enquiryEvent.name}*.\n\n📅 *${whenLine}*\n📍 *${enquiryEvent.venue.address}*\n\nWhat would you like to do next?`
+          : `${hi}*${enquiryEvent.name}* is a free, women-only aviation day.\n\n📅 *${whenLine}*\n📍 *${enquiryEvent.venue.address}*\n\nSimulator time, a masterclass with a serving airline captain, and the Freedom to Fly scholarship reveal.\n\nWhat would you like to do?`;
+
+        const buttons = [
+          ...(entry.registered_at ? [] : ['Confirm my seat']),
+          ...(alreadyApplied ? [] : ['Apply for scholarship']),
+          'Join WhatsApp Group',
+        ].slice(0, 3);
+
+        const sent = await sendWhatsAppInteractiveButtons(customerPhone, body, buttons);
+        if (sent.success) {
+          await logMessage(leadId, 'whatsapp', 'agent', body, 'interactive', {
+            trigger: 'offline_event_enquiry',
+            offline_event_key: enquiryEvent.key,
+            registered: !!entry.registered_at,
+            buttons,
+            wa_message_id: sent.messageId || null,
+          }, supabase);
+          return;
+        }
+        // Interactive send failed (e.g. outside the 24h window) - fall through
+        // to the normal flow rather than leaving them with nothing.
+        console.error('[meta/webhook] offline-event enquiry buttons failed:', sent.error);
+      }
+    }
+
+    // Taps from the buttons above - each hands back the one link it promises,
+    // deterministically, instead of re-entering the LLM.
+    if (brand === 'windchasers' && /^(confirm my seat|apply for scholarship)$/i.test((messageText || '').trim())) {
+      const { data: tapLead } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .maybeSingle();
+      const tapWc: any = tapLead?.unified_context?.[BRAND_ID] || {};
+      const tapEvent = getOfflineEvent(resolveOfflineEventKey(tapWc)) || matchOfflineEvent('wings of freedom');
+      if (tapEvent) {
+        const isScholarship = /scholarship/i.test(messageText || '');
+        await sendAndLogReply(
+          supabase,
+          leadId,
+          customerPhone,
+          isScholarship
+            ? `Here's the form - tick *"I'd also like to apply for the Freedom to Fly scholarship"* and pick your track:\n\n${tapEvent.landingUrl}\n\nShortlisted applicants are called for an interview.\n- Team Windchasers`
+            : `Takes about 20 seconds - name and phone:\n\n${tapEvent.landingUrl}\n\nSee you on ${tapEvent.sessions[0]?.label || 'the day'}.\n- Team Windchasers`,
+          { quickReplyTrigger: `offline_event_${isScholarship ? 'apply' : 'confirm'}:${tapEvent.key}` },
+        );
+        return;
+      }
     }
 
     // "Join WhatsApp Group" quick-reply tap → reply the invite link straight
