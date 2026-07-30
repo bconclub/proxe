@@ -165,7 +165,18 @@ export function matchOfflineEvent(
 ): OfflineEventConfig | null {
   const hay = signals.filter(Boolean).join(' ').toLowerCase()
   if (!hay) return null
-  return OFFLINE_EVENTS.find((e) => e.matchPatterns.some((re) => re.test(hay))) || null
+  const matches = OFFLINE_EVENTS.filter((e) => e.matchPatterns.some((re) => re.test(hay)))
+  if (!matches.length) return null
+  // An ENABLED match always wins over a disabled one, regardless of list order.
+  //
+  // The signals are joined into ONE haystack, so reusing a past event's assets
+  // makes two events match at once: a Wings of Freedom campaign running on the
+  // old "Demo Class" instant form matches both, and plain list order handed it
+  // to demo-class - which is disabled, so the caller treated the lead as NOT an
+  // offline-event lead at all. Silent, total loss of the funnel: no event tag,
+  // no nudge, no group. Reused forms are normal practice, so the matcher has to
+  // survive them.
+  return matches.find((e) => e.enabled) || matches[0]
 }
 
 /** Newest event first (by latest session). Drives the dashboard's group order. */
