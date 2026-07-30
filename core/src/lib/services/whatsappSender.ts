@@ -887,6 +887,7 @@ export async function sendOfflineEventRegisterNudge(
   name: string,
   eventName: string,
   landingPath: string,
+  when?: { date?: string; time?: string },
 ): Promise<{ success: boolean; error?: string; messageId?: string; templateUsed: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
@@ -898,15 +899,34 @@ export async function sendOfflineEventRegisterNudge(
       { type: 'text', parameter_name: 'event_name', text: eventName || 'our event' },
     ],
   }
+  const urlButton = {
+    type: 'button' as const,
+    sub_type: 'url' as const,
+    index: 0,
+    parameters: [{ type: 'text', text: slug }],
+  }
+
+  // Preferred: the formatted version carrying date/time/venue lines and a
+  // "Join WhatsApp Group" quick-reply alongside the Confirm My Seat button.
+  // Needs date + time, so it's only attempted when the caller supplied them.
+  if (when?.date) {
+    const wof = await sendWhatsAppTemplate(to, 'windchasers_wof_register_nudge_v1', [
+      {
+        ...body,
+        parameters: [
+          ...body.parameters,
+          { type: 'text', parameter_name: 'date', text: when.date },
+          { type: 'text', parameter_name: 'time', text: when.time || 'the scheduled time' },
+        ],
+      },
+      urlButton,
+    ])
+    if (wof.success) return { ...wof, templateUsed: 'windchasers_wof_register_nudge_v1' }
+  }
 
   const v4 = await sendWhatsAppTemplate(to, 'windchasers_offline_event_register_nudge_v4', [
     body,
-    {
-      type: 'button' as const,
-      sub_type: 'url' as const,
-      index: 0,
-      parameters: [{ type: 'text', text: slug }],
-    },
+    urlButton,
   ])
   if (v4.success) {
     return { ...v4, templateUsed: 'windchasers_offline_event_register_nudge_v4' }
@@ -943,17 +963,24 @@ export async function sendOfflineEventConfirm(
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const [datePart, timePart] = String(dateTime || '').split(/\s+at\s+/i)
-  return sendWhatsAppTemplate(to, 'windchasers_offline_event_confirmation_v2', [
+  const body = [
     {
-      type: 'body',
+      type: 'body' as const,
       parameters: [
         { type: 'text', parameter_name: 'customer_name', text: firstName },
-        { type: 'text', parameter_name: 'event_name', text: eventName || 'our demo class' },
+        { type: 'text', parameter_name: 'event_name', text: eventName || 'our event' },
         { type: 'text', parameter_name: 'date', text: (datePart || dateTime || 'the scheduled date').trim() },
         { type: 'text', parameter_name: 'time', text: (timePart || 'the scheduled time').trim() },
       ],
     },
-  ])
+  ]
+  // v1 is the properly formatted version (labelled date/time/venue lines and a
+  // "Join WhatsApp Group" quick-reply, matching the webinar templates' house
+  // style) - v2 is one run-on sentence. Identical params, so this simply
+  // upgrades itself the moment Meta approves v1.
+  const v1 = await sendWhatsAppTemplate(to, 'windchasers_wof_confirmation_v1', body)
+  if (v1.success) return v1
+  return sendWhatsAppTemplate(to, 'windchasers_offline_event_confirmation_v2', body)
 }
 
 /**

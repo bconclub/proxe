@@ -354,7 +354,12 @@ export async function POST(request: NextRequest) {
       if (nudgeAlreadySent) {
         console.log(`[facebook-lead] Offline-event nudge SKIPPED as duplicate lead=${leadId} phone=${normalizedPhone}`);
       } else {
-        const nudgeResult = await sendOfflineEventRegisterNudge(phone, first, eventName, matchedEvent.slugPath);
+        const nudgeResult = await sendOfflineEventRegisterNudge(phone, first, eventName, matchedEvent.slugPath, {
+          // Their day preference if the ad form captured one, else the event's
+          // own first session - the formatted template needs a real date.
+          date: windchasersProfile.offline_event_date || matchedEvent.sessions[0]?.label,
+          time: matchedEvent.timeDisplay,
+        });
         const nudgeTpl = nudgeResult.templateUsed;
         if (nudgeResult.success) {
           whatsappSent = true;
