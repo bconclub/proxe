@@ -963,7 +963,8 @@ export async function sendOfflineEventConfirm(
   name: string,
   eventName: string,
   dateTime: string,
-): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  joinSlug?: string,
+): Promise<{ success: boolean; error?: string; messageId?: string; templateUsed: string }> {
   const cleanName = /\d/.test(name || '') ? '' : name
   const firstName = (cleanName || 'there').split(' ')[0]
   const [datePart, timePart] = String(dateTime || '').split(/\s+at\s+/i)
@@ -978,13 +979,72 @@ export async function sendOfflineEventConfirm(
       ],
     },
   ]
-  // v1 is the properly formatted version (labelled date/time/venue lines and a
-  // "Join WhatsApp Group" quick-reply, matching the webinar templates' house
-  // style) - v2 is one run-on sentence. Identical params, so this simply
-  // upgrades itself the moment Meta approves v1.
+  // Preferred: wof_confirmation_v2 carries a real "Join the Group" URL button,
+  // so the group arrives inside the template instead of as a follow-up plain
+  // message. Its button is dynamic (/join/{{1}}), so one template covers every
+  // event - only attempted when the caller knows which group to point at.
+  if (joinSlug) {
+    const v2 = await sendWhatsAppTemplate(to, 'windchasers_wof_confirmation_v2', [
+      ...body,
+      groupJoinUrlButton(joinSlug, 0),
+    ])
+    if (v2.success) return { ...v2, templateUsed: 'windchasers_wof_confirmation_v2' }
+  }
+  // v1 is the same formatted copy but offers the group as a quick-reply, which
+  // costs a second message. offline_event_confirmation_v2 is the original
+  // one-run-on-sentence version and the last resort. Identical body params, so
+  // each rung upgrades itself the moment the one above is approved.
   const v1 = await sendWhatsAppTemplate(to, 'windchasers_wof_confirmation_v1', body)
-  if (v1.success) return v1
-  return sendWhatsAppTemplate(to, 'windchasers_offline_event_confirmation_v2', body)
+  if (v1.success) return { ...v1, templateUsed: 'windchasers_wof_confirmation_v1' }
+  const legacy = await sendWhatsAppTemplate(to, 'windchasers_offline_event_confirmation_v2', body)
+  return { ...legacy, templateUsed: 'windchasers_offline_event_confirmation_v2' }
+}
+
+/**
+ * The URL-button component every group-join template shares.
+ *
+ * Meta rejects template buttons pointing straight at chat.whatsapp.com
+ * ("Direct links to WhatsApp aren't allowed for buttons"), so the approved
+ * URL is `https://windchasers.in/join/{{1}}` and the site 302s the tap to the
+ * real invite. Button params are POSITIONAL - `parameter_name` is rejected
+ * here even when the body is NAMED.
+ */
+function groupJoinUrlButton(joinSlug: string, index: number) {
+  return {
+    type: 'button' as const,
+    sub_type: 'url' as const,
+    index,
+    parameters: [{ type: 'text', text: String(joinSlug).replace(/^\/+|\/+$/g, '') }],
+  }
+}
+
+/**
+ * Standalone "here's the group" template.
+ *
+ * Used when a lead asks for the group (or taps the quick-reply on an older
+ * template that only promises one) - the reply has to be a template, not a
+ * free-form session message, so it renders with the same header, footer and
+ * tappable button as everything else we send. `joinSlug` selects the group via
+ * the site's /join/<slug> redirect: an offline event's key, or 'webinar'.
+ */
+export async function sendEventGroupInvite(
+  to: string,
+  name: string,
+  eventName: string,
+  joinSlug: string,
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_event_group_invite_v1', [
+    {
+      type: 'body' as const,
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'event_name', text: eventName || 'our event' },
+      ],
+    },
+    groupJoinUrlButton(joinSlug, 0),
+  ])
 }
 
 /**

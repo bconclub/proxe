@@ -1447,6 +1447,9 @@ export async function POST(request: NextRequest) {
       const confirmEvent = getOfflineEvent(String(brandCtxData.offline_event_key || ''))
       const eventName = String(brandCtxData.offline_event_name || confirmEvent?.name || 'our event').trim()
       const eventDate = String(brandCtxData.offline_event_date || '').trim()
+      // Dedup key stays the legacy name so a lead can't be confirmed twice
+      // across a template upgrade; the ACTUAL template used is whatever the
+      // sender managed to send, reported back as `templateUsed`.
       const confirmTpl = 'windchasers_offline_event_confirmation_v2'
       const confirmAlreadySent = await wasTemplateRecentlySent(supabase, leadId, confirmTpl)
       if (confirmAlreadySent) {
@@ -1455,8 +1458,14 @@ export async function POST(request: NextRequest) {
         const [eDatePart, eTimePart] = String(eventDate || '').split(/\s+at\s+/i)
         const dateDisplay = (eDatePart || eventDate || confirmEvent?.sessions[0]?.label || 'the scheduled date').trim()
         const timeDisplay = (eTimePart || confirmEvent?.timeDisplay || '11:00 AM IST').trim()
-        const result = await sendOfflineEventConfirm(phone, firstName, eventName, eventDate || `${dateDisplay} at ${timeDisplay}`)
-        const rendered = renderWaTemplate(confirmTpl, {
+        const result = await sendOfflineEventConfirm(
+          phone,
+          firstName,
+          eventName,
+          eventDate || `${dateDisplay} at ${timeDisplay}`,
+          confirmEvent?.whatsappGroupUrl ? confirmEvent.key : undefined,
+        )
+        const rendered = renderWaTemplate(result.templateUsed || confirmTpl, {
           customer_name: firstName,
           event_name: eventName,
           date: dateDisplay,
@@ -1471,7 +1480,7 @@ export async function POST(request: NextRequest) {
           content: result.success ? bodyText : `[Template send FAILED: ${confirmTpl}]\n\n${bodyText}`,
           message_type: 'template',
           metadata: {
-            template_name: confirmTpl,
+            template_name: result.templateUsed || confirmTpl,
             template_language: 'en',
             auto_sent: true,
             trigger: 'offline_event_registration',
