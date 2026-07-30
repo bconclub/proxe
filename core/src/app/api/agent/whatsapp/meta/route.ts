@@ -42,7 +42,7 @@ import {
   META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
-import { getOfflineEvent } from '@/configs/offline-events';
+import { getOfflineEvent, matchOfflineEvent } from '@/configs/offline-events';
 import { resolveOfflineEventKey } from '@/lib/offlineEventContext';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { resolveMapsLink } from '@/lib/services/mapsResolver';
@@ -285,6 +285,8 @@ export async function POST(request: NextRequest) {
         timestamp,
         brand,
         triggerKind,
+        // Only present on the first message from a click-to-WhatsApp ad.
+        referral: (msg as any).referral,
       });
 
       // Capture any attached media AFTER the lead exists (fire-and-forget so it
@@ -562,6 +564,9 @@ interface IncomingMessage {
   timestamp: string;
   brand: string;
   triggerKind?: 'text' | 'button' | 'interactive_button' | 'interactive_list';
+  /** Meta's click-to-WhatsApp payload - present only on the first message
+   *  from an ad. Carries the ad id, its headline/body and the ctwa_clid. */
+  referral?: any;
 }
 
 /**
@@ -671,6 +676,94 @@ function parseFormPrefill(text: string): Record<string, string> {
  * the lead model shows the WhatsApp account name and no email/city. Idempotent -
  * never clobbers an existing real marketing source, and only fills empty fields.
  */
+/**
+ * Click-to-WhatsApp ad attribution.
+ *
+ * Meta attaches a `referral` object to the FIRST message from a CTWA ad. It
+ * was never read, so every WhatsApp lead that came from an ad looked organic -
+ * no campaign, no creative, nothing to report on.
+ *
+ * What Meta actually sends: `source_id` (the AD id), `source_type`, the ad's
+ * `headline`/`body`, `source_url`, and `ctwa_clid` (the click id used for
+ * conversion matching). Note it does NOT include campaign or adset names -
+ * resolving those needs a Marketing API lookup on the ad id, which is a
+ * separate job; the ad id is the stable key to do it with later.
+ *
+ * The headline/body are also fed to the offline-event matcher, so a lead who
+ * taps a Wings of Freedom ad is tagged to the event exactly as a lead-form
+ * lead would be.
+ */
+async function tagCtwaReferral(leadId: string, referral: any, supabase: any): Promise<void> {
+  try {
+    const { data } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+    const uc = data?.unified_context || {};
+
+    // First touch wins - a returning lead who taps a new ad keeps their
+    // original attribution, same rule as everywhere else.
+    if (uc.meta_referral?.source_id) return;
+
+    const sourceType = String(referral.source_type || '').toLowerCase();
+    uc.meta_referral = {
+      source_id: referral.source_id || null,
+      source_type: referral.source_type || null,
+      source_url: referral.source_url || null,
+      headline: referral.headline || null,
+      body: referral.body || null,
+      media_type: referral.media_type || null,
+      ctwa_clid: referral.ctwa_clid || null,
+      captured_at: new Date().toISOString(),
+    };
+
+    const existing = String(uc?.attribution?.source || '').toLowerCase().trim();
+    if (!existing || existing === 'direct') {
+      const isAd = sourceType === 'ad';
+      uc.attribution = {
+        ...(uc.attribution || {}),
+        source: isAd ? 'meta_ads' : 'facebook',
+        source_label: isAd ? 'Meta Ads' : 'Facebook',
+        first_touch: 'ctwa',
+        first_touch_label: isAd ? 'Click-to-WhatsApp Ad' : 'Click-to-WhatsApp',
+        captured_at: new Date().toISOString(),
+      };
+    }
+
+    // Tag the event from the ad's own copy, so CTWA leads land in the right
+    // Offline Events group instead of the generic list.
+    const matched = matchOfflineEvent(referral.headline, referral.body, referral.source_url);
+    if (matched?.enabled) {
+      const wc = uc[BRAND_ID] || {};
+      if (wc.lead_type !== 'offline_event') {
+        uc[BRAND_ID] = {
+          ...wc,
+          lead_type: 'offline_event',
+          offline_event_key: matched.key,
+          offline_event_name: matched.name,
+          offline_event_location: matched.venue.address,
+          offline_event_interest_source: 'click_to_whatsapp_ad',
+          offline_events: {
+            ...(wc.offline_events || {}),
+            [matched.key]: {
+              ...((wc.offline_events || {})[matched.key] || {}),
+              name: matched.name,
+              location: matched.venue.address,
+              interest_source: 'click_to_whatsapp_ad',
+            },
+          },
+        };
+      }
+    }
+
+    await supabase.from('all_leads').update({ unified_context: uc }).eq('id', leadId);
+    console.log(`[meta/webhook] CTWA referral captured lead=${leadId} ad=${referral.source_id} event=${matched?.key || '-'}`);
+  } catch (err: any) {
+    console.error('[meta/webhook] tagCtwaReferral failed:', err?.message || err);
+  }
+}
+
 async function tagMetaFormClickThrough(leadId: string, messageText: string, supabase: any): Promise<void> {
   try {
     const { data } = await supabase
@@ -770,6 +863,13 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       console.error('[meta/webhook] Failed to create/update lead');
       await sendWhatsAppReply(customerPhone, "Hey! Give me just a moment, I'll get the team to reach out to you directly.");
       return;
+    }
+
+    // Click-to-WhatsApp ad: Meta only sends `referral` on the first message,
+    // so capture it before anything else can early-return past it. This is the
+    // ONLY attribution a CTWA lead ever gets.
+    if (msg.referral?.source_id) {
+      await tagCtwaReferral(leadId, msg.referral, supabase);
     }
 
     // Meta lead-form "Chat on WhatsApp" click-through: the first inbound message
