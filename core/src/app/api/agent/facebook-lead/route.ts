@@ -369,7 +369,48 @@ export async function POST(request: NextRequest) {
         const nudgeTpl = nudgeResult.templateUsed;
         if (nudgeResult.success) {
           whatsappSent = true;
-          const rendered = renderWaTemplate(nudgeTpl, { customer_name: first, event_name: eventName });
+          // Claim the cron's register-nudge marker. This IS that nudge - same
+          // template, same ask - just triggered by the ad instead of the
+          // schedule. Without the marker the cron saw an un-nudged lead and
+          // sent it a second time minutes later.
+          try {
+            const { data: markerRow } = await supabase
+              .from('all_leads')
+              .select('unified_context')
+              .eq('id', leadId)
+              .maybeSingle();
+            const markerCtx: any = markerRow?.unified_context || {};
+            const markerWc: any = markerCtx[BRAND_ID] || {};
+            await supabase
+              .from('all_leads')
+              .update({
+                unified_context: {
+                  ...markerCtx,
+                  [BRAND_ID]: {
+                    ...markerWc,
+                    // Both args are brand CONTEXTS, not maps - the helper reads
+                    // .offline_events off each (and synthesises one from the
+                    // flat fields when it's absent).
+                    offline_events: mergeOfflineEventMaps(markerWc, {
+                      offline_events: { [matchedEvent.key]: { register_reminder_sent: now } },
+                    } as any),
+                    offline_event_register_reminder_sent: now,
+                  },
+                },
+              })
+              .eq('id', leadId);
+          } catch (err: any) {
+            console.error('[facebook-lead] nudge marker write failed:', err?.message || err);
+          }
+          // Date/time were missing here, so the dashboard preview rendered the
+          // template with empty 📅 / 🕐 lines even though the real WhatsApp
+          // message carried them. Pass exactly what was sent.
+          const rendered = renderWaTemplate(nudgeTpl, {
+            customer_name: first,
+            event_name: eventName,
+            date: windchasersProfile.offline_event_date || matchedEvent.sessions[0]?.label || '',
+            time: matchedEvent.timeDisplay,
+          });
           const logText = rendered?.content || `Hi ${first}, tap below to confirm your seat for ${eventName}.`;
           await logMessage(
             leadId,
