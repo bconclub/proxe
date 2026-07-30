@@ -42,6 +42,8 @@ import {
   META_FORM_CLICKTHROUGH_FIRST_TOUCH_LABEL,
 } from '@/lib/services/attribution';
 import { BRAND_ID } from '@/configs';
+import { getOfflineEvent } from '@/configs/offline-events';
+import { resolveOfflineEventKey } from '@/lib/offlineEventContext';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { resolveMapsLink } from '@/lib/services/mapsResolver';
 
@@ -777,17 +779,35 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       await tagMetaFormClickThrough(leadId, messageText, supabase);
     }
 
-    // Webinar "Join WhatsApp Group" quick-reply tap (from the confirmation
-    // template) → send the webinar group link straight away, deterministically
-    // (never leave the LLM to guess or forget it). Windchasers only.
+    // "Join WhatsApp Group" quick-reply tap → reply the invite link straight
+    // away, deterministically (never leave the LLM to guess or forget it).
+    // Windchasers only.
+    //
+    // The same button label ships on both the webinar templates and the
+    // offline-event ones, so route by which event THIS lead belongs to -
+    // otherwise a Wings of Freedom registrant tapping it lands in the webinar
+    // group. Falls back to the webinar group when the lead isn't tied to an
+    // offline event that has its own.
     if (brand === 'windchasers' && /\bjoin\b[\s\S]*\bwhatsapp\b[\s\S]*\bgroup\b/i.test(messageText || '')) {
       const WEBINAR_GROUP_URL = 'https://chat.whatsapp.com/IEi11O7U90T88K2d7YMOxx';
+      const { data: groupLead } = await supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .maybeSingle();
+      const groupWc: any = groupLead?.unified_context?.windchasers || {};
+      const groupEvent =
+        groupWc.lead_type === 'offline_event'
+          ? getOfflineEvent(resolveOfflineEventKey(groupWc))
+          : null;
+      const groupUrl = groupEvent?.whatsappGroupUrl || WEBINAR_GROUP_URL;
+      const groupLabel = groupEvent?.whatsappGroupUrl ? groupEvent.name : 'webinar';
       await sendAndLogReply(
         supabase,
         leadId,
         customerPhone,
-        `You're in! Here's our webinar WhatsApp group for updates and session resources:\n\n${WEBINAR_GROUP_URL}\n\nSee you there.\n- Team Windchasers`,
-        { quickReplyTrigger: 'webinar_join_group' },
+        `You're in! Here's our ${groupLabel} WhatsApp group for updates and resources:\n\n${groupUrl}\n\nSee you there.\n- Team Windchasers`,
+        { quickReplyTrigger: groupEvent?.whatsappGroupUrl ? `offline_event_join_group:${groupEvent.key}` : 'webinar_join_group' },
       );
       return;
     }

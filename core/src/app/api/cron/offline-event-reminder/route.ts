@@ -121,7 +121,10 @@ export async function GET(req: NextRequest) {
           continue
         }
 
-        const result = await sendOfflineEventRegisterNudge(lead.phone, lead.customer_name || '', eventName, event.slugPath)
+        const result = await sendOfflineEventRegisterNudge(lead.phone, lead.customer_name || '', eventName, event.slugPath, {
+          date: String(entry.date || event.sessions[0]?.label || '').split(/\s+at\s+/i)[0],
+          time: event.timeDisplay,
+        })
         const waOk = result.success
         if (!waOk) {
           log.push(`lead=${lead.id} event=${key} nudge WhatsApp failed: ${result.error}`)

@@ -51,6 +51,13 @@ export interface OfflineEventConfig {
   matchPatterns: RegExp[]
   /** course_interest to stamp when the ad form doesn't carry one. '' = leave blank. */
   defaultCourseInterest: string
+  /**
+   * Invite link replied when a registrant taps the "Join WhatsApp Group"
+   * quick-reply. Per-event: the handler used to send the webinar group to
+   * anyone who tapped it, which would put this event's leads in the wrong
+   * room. Omit and the tap falls back to the webinar group.
+   */
+  whatsappGroupUrl?: string
   /** false = past/paused. Blocks intake tagging AND all reminder sends. */
   enabled: boolean
 }
@@ -100,6 +107,9 @@ const WINDCHASERS_EVENTS: OfflineEventConfig[] = [
     // Women-only day with BOTH a pilot and a cabin-crew track - guessing either
     // would mislabel half the room, so leave COURSE blank until they tell us.
     defaultCourseInterest: '',
+    // Tracking params from the shared invite stripped - only the invite code
+    // matters, and the rest would follow every lead into the group.
+    whatsappGroupUrl: 'https://chat.whatsapp.com/BiPGKSg03CzETSljBUO9sa',
     enabled: true,
   },
 ]

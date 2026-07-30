@@ -82,6 +82,19 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
   // (https://windchasers.in/{{1}}), so one template serves every event. v3 is
   // kept because its static /dgca-demo-class button is still a valid fallback
   // for that one event, and past sends logged under that name must still render.
+  // Wings of Freedom - formatted to the same house style as the webinar
+  // templates (labelled date/time/venue lines, bold values, group quick-reply)
+  // rather than the single run-on sentence the earlier offline-event pair used.
+  windchasers_wof_confirmation_v1: {
+    body: `Hi {{customer_name}}, your seat for *{{event_name}}* is confirmed.\n\n📅 *{{date}}* | 🕐 *{{time}}*\n📍 *WindChasers HQ, Kothanur, Bengaluru*\n\nSimulator time, a masterclass with a serving airline captain, and the Freedom to Fly scholarship reveal.\n\nTap below to join the group for updates.\n\nSee you there.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join WhatsApp Group'],
+  },
+  windchasers_wof_register_nudge_v1: {
+    body: `Hi {{customer_name}}, you told us you are interested in *{{event_name}}*.\n\n📅 *{{date}}* | 🕐 *{{time}}*\n📍 *WindChasers HQ, Kothanur, Bengaluru*\n\nYour seat is not confirmed yet. Tap below to confirm it, or join the group for updates.\n\nFree to attend, women only.`,
+    footer: 'Team WindChasers',
+    buttons: ['Confirm My Seat', 'Join WhatsApp Group'],
+  },
   windchasers_offline_event_register_nudge_v4: {
     body: `Hi {{customer_name}}, you told us you are interested in {{event_name}} and we would love to see you there. Tap below to confirm your seat now.`,
     footer: 'Team Windchasers',
