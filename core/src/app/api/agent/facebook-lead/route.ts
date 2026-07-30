@@ -132,6 +132,12 @@ export async function POST(request: NextRequest) {
       form_name:     body.form_name || body.leadgen_form_name || null,
       form_id:       body.form_id || null,
       lead_id:       body.lead_id || body.fb_lead_id || null,
+      // IDs alongside the names: names are editable in Ads Manager and get
+      // reused across campaigns, so they're a poor reporting key. Map these in
+      // Pabbly and creative-level reporting stays stable when copy is renamed.
+      ad_id:         body.ad_id || null,
+      adset_id:      body.adset_id || null,
+      campaign_id:   body.campaign_id || null,
       ...utmData,
     };
 
