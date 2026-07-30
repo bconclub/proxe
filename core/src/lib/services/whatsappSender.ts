@@ -1015,6 +1015,37 @@ function groupJoinUrlButton(joinSlug: string, index: number) {
 }
 
 /**
+ * Scholarship applicant's next step.
+ *
+ * A landing-page tick-box is the START of an application, not an award, and
+ * the generic registration confirm ("you're all set, see you there") reads as
+ * if the scholarship is settled. This says what actually follows - aptitude
+ * test, documents, interview, counselling - and points at the group, which is
+ * where the test link and dates are published.
+ */
+export async function sendScholarshipApplicationStep(
+  to: string,
+  name: string,
+  scholarshipName: string,
+  dateDisplay: string,
+  joinSlug: string,
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
+  const cleanName = /\d/.test(name || '') ? '' : name
+  const firstName = (cleanName || 'there').split(' ')[0]
+  return sendWhatsAppTemplate(to, 'windchasers_wof_scholarship_step_v1', [
+    {
+      type: 'body' as const,
+      parameters: [
+        { type: 'text', parameter_name: 'customer_name', text: firstName },
+        { type: 'text', parameter_name: 'scholarship_name', text: scholarshipName || 'the scholarship' },
+        { type: 'text', parameter_name: 'date', text: dateDisplay || 'the scheduled date' },
+      ],
+    },
+    groupJoinUrlButton(joinSlug, 0),
+  ])
+}
+
+/**
  * Standalone "here's the group" template.
  *
  * Used when a lead asks for the group (or taps the quick-reply on an older
