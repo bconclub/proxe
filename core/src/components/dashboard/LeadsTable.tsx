@@ -499,7 +499,7 @@ export default function LeadsTable({
    */
   const displayRows = useMemo((): Array<
     | { kind: 'lead'; lead: ExtendedLead }
-    | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; collapsed: boolean }
+    | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; scholarship: number; collapsed: boolean }
   > => {
     if (!offlineEventView) return filteredLeads.map((lead) => ({ kind: 'lead' as const, lead }))
 
@@ -538,6 +538,12 @@ export default function LeadsTable({
       const registered = g.groupLeads.filter(
         (l) => l.unified_context?.[brandId]?.offline_event_registered_at,
       ).length
+      // Scholarship applicants are a SUBSET of registrations, not a third
+      // bucket - applying also books the seat. Counted separately so the
+      // header answers "how many want the scholarship" at a glance.
+      const scholarship = g.groupLeads.filter(
+        (l) => l.unified_context?.[brandId]?.offline_event_intent === 'scholarship',
+      ).length
       const header = {
         kind: 'group' as const,
         key: g.key,
@@ -545,6 +551,7 @@ export default function LeadsTable({
         sub: g.sub,
         total: g.groupLeads.length,
         registered,
+        scholarship,
         collapsed,
       }
       return collapsed
@@ -1064,6 +1071,7 @@ export default function LeadsTable({
                     <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{row.label}</span>
                     <span className="ml-auto text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
                       {row.registered}/{row.total}
+                      {row.scholarship > 0 ? ` · ★${row.scholarship}` : ''}
                     </span>
                   </div>
                 )
@@ -1249,8 +1257,20 @@ export default function LeadsTable({
                           {row.sub ? (
                             <span className="text-[10.5px]" style={{ color: 'var(--text-muted)' }}>· {row.sub}</span>
                           ) : null}
-                          <span className="ml-auto text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
-                            {row.registered} registered · {row.total - row.registered} interested
+                          <span className="ml-auto flex items-center gap-2 text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
+                            <span>{row.registered} registered · {row.total - row.registered} interested</span>
+                            {row.scholarship > 0 && (
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                style={{
+                                  background: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+                                  color: 'var(--accent-primary)',
+                                  border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                                }}
+                              >
+                                {row.scholarship} scholarship
+                              </span>
+                            )}
                           </span>
                         </div>
                       </td>
@@ -2138,17 +2158,37 @@ export default function LeadsTable({
                       })() : offlineEventView ? (() => {
                         // Offline event view: no Zoom-style attendance signal yet
                         // (that's a manual venue check, not automated) - show
-                        // whether the registration itself was captured.
+                        // whether the registration itself was captured, plus a
+                        // scholarship marker. Applying also books the seat, so
+                        // these stack rather than being either/or.
                         const wc = uc?.[brandId] || {}
-                        return wc.offline_event_registered_at ? (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
-                            style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
-                          >
-                            <span aria-hidden="true">✓</span> Registered
-                          </span>
-                        ) : (
-                          <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
+                        const isScholarship = wc.offline_event_intent === 'scholarship'
+                        return (
+                          <div className="inline-flex flex-col items-center gap-1">
+                            {wc.offline_event_registered_at ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{ background: 'rgba(45,140,255,0.15)', color: '#4aa3ff', border: '1px solid rgba(45,140,255,0.35)' }}
+                              >
+                                <span aria-hidden="true">✓</span> Registered
+                              </span>
+                            ) : (
+                              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
+                            )}
+                            {isScholarship && (
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
+                                style={{
+                                  background: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
+                                  color: 'var(--accent-primary)',
+                                  border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                                }}
+                                title={wc.scholarship_track_label || wc.scholarship_track || 'Scholarship applicant'}
+                              >
+                                ★ Scholarship
+                              </span>
+                            )}
+                          </div>
                         )
                       })() : bookingDate ? (() => {
                         // Resolve session type: explicit field wins, else infer from meet link presence.
