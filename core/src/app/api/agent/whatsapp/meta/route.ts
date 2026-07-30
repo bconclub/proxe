@@ -33,7 +33,9 @@ import {
   findQuickReplyFor,
   extractButtonsFromLLMResponse,
   updateLeadProfile,
+  sendEventGroupInvite,
 } from '@/lib/services';
+import { renderWaTemplate } from '@/configs/whatsapp-template-bodies';
 import {
   isMetaFormClickThrough,
   META_FORM_CLICKTHROUGH_SOURCE,
@@ -954,9 +956,15 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       }
     }
 
-    // "Join WhatsApp Group" quick-reply tap → reply the invite link straight
+    // "Join WhatsApp Group" quick-reply tap → hand back the group straight
     // away, deterministically (never leave the LLM to guess or forget it).
     // Windchasers only.
+    //
+    // Sent as a TEMPLATE with a "Join the Group" button, not as a free-form
+    // session message with the raw invite pasted in: an unstyled bubble with a
+    // bare chat.whatsapp.com URL right after a formatted template reads like a
+    // different sender. The button routes via windchasers.in/join/<slug>
+    // because Meta rejects chat.whatsapp.com links in template buttons.
     //
     // The same button label ships on both the webinar templates and the
     // offline-event ones, so route by which event THIS lead belongs to -
@@ -964,10 +972,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // group. Falls back to the webinar group when the lead isn't tied to an
     // offline event that has its own.
     if (brand === 'windchasers' && /\bjoin\b[\s\S]*\bwhatsapp\b[\s\S]*\bgroup\b/i.test(messageText || '')) {
-      const WEBINAR_GROUP_URL = 'https://chat.whatsapp.com/IEi11O7U90T88K2d7YMOxx';
       const { data: groupLead } = await supabase
         .from('all_leads')
-        .select('unified_context')
+        .select('unified_context, customer_name')
         .eq('id', leadId)
         .maybeSingle();
       const groupWc: any = groupLead?.unified_context?.windchasers || {};
@@ -975,14 +982,44 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         groupWc.lead_type === 'offline_event'
           ? getOfflineEvent(resolveOfflineEventKey(groupWc))
           : null;
-      const groupUrl = groupEvent?.whatsappGroupUrl || WEBINAR_GROUP_URL;
-      const groupLabel = groupEvent?.whatsappGroupUrl ? groupEvent.name : 'webinar';
+      const ownGroup = Boolean(groupEvent?.whatsappGroupUrl);
+      const joinSlug = ownGroup ? groupEvent!.key : 'webinar';
+      const groupLabel = ownGroup ? groupEvent!.name : 'the WindChasers Aviation Webinar';
+      const groupName = (groupLead?.customer_name || customerName || 'there').split(' ')[0];
+      const invite = await sendEventGroupInvite(customerPhone, groupName, groupLabel, joinSlug);
+      if (invite.success) {
+        const rendered = renderWaTemplate('windchasers_event_group_invite_v1', {
+          customer_name: groupName,
+          event_name: groupLabel,
+        });
+        await logMessage(
+          leadId,
+          'whatsapp',
+          'agent',
+          rendered?.content || `Hi ${groupName}, here is the WhatsApp group for ${groupLabel}.`,
+          'template',
+          {
+            source: 'meta_webhook',
+            template_name: 'windchasers_event_group_invite_v1',
+            trigger: ownGroup ? `offline_event_join_group:${groupEvent!.key}` : 'webinar_join_group',
+            ...(rendered?.buttons?.length ? { template_buttons: rendered.buttons } : {}),
+            ...(rendered?.footer ? { template_footer: rendered.footer } : {}),
+            ...(invite.messageId ? { wa_message_id: invite.messageId, delivery_status: 'sent' } : {}),
+          },
+          supabase,
+        ).catch((err: any) => console.error('[meta/webhook] group invite log failed:', err?.message || err));
+        return;
+      }
+      // Template unavailable (still in review, or a send error). Saying nothing
+      // to someone who just tapped "Join WhatsApp Group" is the worse failure,
+      // so fall through to the plain-text invite for this one case only.
+      console.error('[meta/webhook] group invite template failed, falling back to text:', invite.error);
       await sendAndLogReply(
         supabase,
         leadId,
         customerPhone,
-        `You're in! Here's our ${groupLabel} WhatsApp group for updates and resources:\n\n${groupUrl}\n\nSee you there.\n- Team Windchasers`,
-        { quickReplyTrigger: groupEvent?.whatsappGroupUrl ? `offline_event_join_group:${groupEvent.key}` : 'webinar_join_group' },
+        `You're in! Here's our ${groupLabel} WhatsApp group for updates and resources:\n\n${groupEvent?.whatsappGroupUrl || 'https://chat.whatsapp.com/IEi11O7U90T88K2d7YMOxx'}\n\nSee you there.\n- Team Windchasers`,
+        { quickReplyTrigger: ownGroup ? `offline_event_join_group:${groupEvent!.key}` : 'webinar_join_group' },
       );
       return;
     }

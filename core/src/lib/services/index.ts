@@ -116,6 +116,7 @@ export {
   sendWebinarRegisterNudge,
   sendOfflineEventRegisterNudge,
   sendOfflineEventConfirm,
+  sendEventGroupInvite,
   pickRnrTemplate,
   sendWhatsAppInteractiveButtons,
 } from './whatsappSender';

@@ -85,6 +85,22 @@ export const WA_TEMPLATE_BODIES: Record<string, WaTemplateBody> = {
   // Wings of Freedom - formatted to the same house style as the webinar
   // templates (labelled date/time/venue lines, bold values, group quick-reply)
   // rather than the single run-on sentence the earlier offline-event pair used.
+  // v2 supersedes v1: same copy, but the group is a real "Join the Group" URL
+  // button instead of a quick-reply, so it arrives inside this message rather
+  // than as a follow-up. Button points at windchasers.in/join/<event> because
+  // Meta rejects chat.whatsapp.com links in template buttons.
+  windchasers_wof_confirmation_v2: {
+    body: `Hi {{customer_name}}, your seat for *{{event_name}}* is confirmed.\n\n📅 *{{date}}* | 🕐 *{{time}}*\n📍 *WindChasers HQ, Kothanur, Bengaluru*\n\nSimulator time, a masterclass with a serving airline captain, and the Freedom to Fly scholarship reveal.\n\nTap below to join the group for updates.\n\nSee you there.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join the Group'],
+  },
+  // Standalone group hand-off, so "send me the group" is answered with a
+  // template rather than a free-form session message.
+  windchasers_event_group_invite_v1: {
+    body: `Hi {{customer_name}}, here is the WhatsApp group for *{{event_name}}*.\n\nUpdates, reminders and everything you need on the day land there. Tap below to join.`,
+    footer: 'Team WindChasers',
+    buttons: ['Join the Group'],
+  },
   windchasers_wof_confirmation_v1: {
     body: `Hi {{customer_name}}, your seat for *{{event_name}}* is confirmed.\n\n📅 *{{date}}* | 🕐 *{{time}}*\n📍 *WindChasers HQ, Kothanur, Bengaluru*\n\nSimulator time, a masterclass with a serving airline captain, and the Freedom to Fly scholarship reveal.\n\nTap below to join the group for updates.\n\nSee you there.`,
     footer: 'Team WindChasers',

@@ -194,7 +194,13 @@ export async function GET(req: NextRequest) {
       const [datePart, timePart] = String(rawDate).split(/\s+at\s+/i)
       const dateDisplay = (datePart || rawDate || event.sessions[0]?.label || 'the scheduled date').trim()
       const timeDisplay = (timePart || event.timeDisplay).trim()
-      const result = await sendOfflineEventConfirm(lead.phone, lead.customer_name || '', eventName, rawDate || `${dateDisplay} at ${timeDisplay}`)
+      const result = await sendOfflineEventConfirm(
+        lead.phone,
+        lead.customer_name || '',
+        eventName,
+        rawDate || `${dateDisplay} at ${timeDisplay}`,
+        event.whatsappGroupUrl ? event.key : undefined,
+      )
       const waOk = result.success
       if (!waOk) {
         log.push(`lead=${lead.id} event=${key} directions WhatsApp failed: ${result.error}`)
