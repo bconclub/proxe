@@ -28,6 +28,15 @@ const CACHE_TTL = 300_000 // 5 minutes in milliseconds
 // every metric once a brand passed 1000 leads/sessions (windchasers reported
 // exactly 1000 leads while holding 1018). Page through with .range() instead.
 const PAGE_SIZE = 1000
+
+/**
+ * How many leads the per-lead computations may scan. POP alone keeps a bound:
+ * 27k rows carrying full unified_context is a payload measured in tens of MB,
+ * and its exact campaign numbers come from the pop_home_agg RPC instead. Every
+ * other brand scans in full, so the funnel counts are the real totals.
+ */
+const LEADS_SCAN_CAP = BRAND_ID === 'pop' ? 2000 : undefined
+
 async function fetchAllRows<T = any>(
   buildQuery: () => any,
   // Safety cap: OFFSET pagination is O(N²), so an unbounded scan of a very large
@@ -43,6 +52,37 @@ async function fetchAllRows<T = any>(
     if (!data || data.length === 0) break
     all.push(...data)
     if (data.length < PAGE_SIZE || all.length >= maxRows) break
+  }
+  return { data: all.length > maxRows ? all.slice(0, maxRows) : all, error: null }
+}
+
+/**
+ * Keyset variant of the above, for tables big enough that OFFSET hurts.
+ *
+ * `.range(from, to)` makes Postgres walk and discard `from` rows on every page,
+ * so a full scan is O(N²) - that cost is the only reason the leads fetch was
+ * capped at 2000, which silently truncated every headline metric once
+ * windchasers passed 2000 leads. Seeking on the last id instead is O(N), so the
+ * scan can be unbounded.
+ *
+ * CONTRACT: the query must be ordered by `id` ascending and nothing else. Any
+ * other primary sort makes `.gt('id', last)` skip rows.
+ */
+async function fetchAllRowsByKeyset<T = any>(
+  buildQuery: () => any,
+  maxRows = 200000,
+): Promise<{ data: T[] | null; error: any }> {
+  const all: T[] = []
+  let cursor: string | number | null = null
+  while (all.length < maxRows) {
+    let q = buildQuery().limit(PAGE_SIZE)
+    if (cursor !== null) q = q.gt('id', cursor)
+    const { data, error } = await q
+    if (error) return { data: all.length ? all : null, error }
+    if (!data || data.length === 0) break
+    all.push(...data)
+    cursor = (data[data.length - 1] as any)?.id ?? null
+    if (data.length < PAGE_SIZE || cursor === null) break
   }
   return { data: all.length > maxRows ? all.slice(0, maxRows) : all, error: null }
 }
@@ -95,14 +135,22 @@ export async function GET(request: NextRequest) {
       { data: stageChanges },
     ] = await Promise.all([
       // 1. all_leads - core lead data (booking date/time are sourced from session tables / unified_context)
-      // Capped: the generic funnel/booking match only needs the top leads by
-      // score. POP's real campaign totals come from the pop_home_agg RPC (exact,
-      // server-side), so this bounded scan keeps the route fast at 27k+ volume.
-      fetchAllRows(() => supabase
+      //
+      // Was capped at 2000 and sorted by score, so the cap kept "the top" leads.
+      // That silently truncated EVERY headline metric the moment a brand passed
+      // 2000 leads - windchasers reported a flat "Total Leads 2000" while
+      // holding more. Keyset paging is O(N) (see fetchAllRowsByKeyset), so the
+      // scan is now unbounded for every brand except POP, whose 27k leads x
+      // unified_context is a payload worth avoiding and whose exact campaign
+      // totals already come from the pop_home_agg RPC.
+      //
+      // Ordering dropped to id-only: required by the keyset contract, and safe
+      // because every consumer of safeLeads aggregates (filter/find/length) or
+      // re-sorts before slicing - nothing depended on DB score order.
+      fetchAllRowsByKeyset(() => supabase
         .from('all_leads')
         .select('id, customer_name, email, phone, lead_score, lead_stage, last_interaction_at, unified_context, metadata, created_at, first_touchpoint, last_touchpoint')
-        .order('lead_score', { ascending: false })
-        .order('id', { ascending: true }), 2000),
+        .order('id', { ascending: true }), LEADS_SCAN_CAP),
       // 2. web_sessions - ONE query for bookings + conversation counting + booking events
       fetchAllRows(() => supabase
         .from('web_sessions')
@@ -391,7 +439,27 @@ export async function GET(request: NextRequest) {
     const totalUniqueConversations = totalWebConversations + totalWhatsappConversations
     
     // Total leads count (all time + time-filtered)
-    const totalLeadsCount = safeLeads.length
+    //
+    // Counted server-side rather than taken from safeLeads.length so the
+    // headline is the true total even when the scan is bounded (POP) or a page
+    // fails mid-scan. Only valid for the default scope: `gigs` and the
+    // scouts-brand split are filters applied in JS above, which SQL here can't
+    // reproduce, so those keep the array length.
+    let totalLeadsCount = safeLeads.length
+    if (scope !== 'gigs' && !brandConfig.features?.scouts) {
+      // Cast: this file's Supabase client generic makes every .from() call
+      // non-callable to tsc (92 pre-existing errors of exactly this shape).
+      // Casting here keeps the new code from adding to that pile.
+      const { count: exactLeadCount, error: countErr } = await (supabase as any)
+        .from('all_leads')
+        .select('id', { count: 'exact', head: true })
+      if (!countErr && typeof exactLeadCount === 'number') {
+        if (exactLeadCount !== safeLeads.length) {
+          console.warn(`[founder-metrics] scanned ${safeLeads.length} leads but table holds ${exactLeadCount} - per-lead metrics are from the scanned subset`)
+        }
+        totalLeadsCount = exactLeadCount
+      }
+    }
 
     const totalLeads7D = safeLeads.filter(lead => {
       const created = new Date(lead.created_at)
