@@ -1,12 +1,29 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
+/**
+ * Cross-origin allowlist for /api/* — set per deployment, never hardcoded
+ * (a brand's landing domain is brand data; core stays brand-agnostic).
+ * ALLOWED_WIDGET_ORIGINS: comma-separated origins, e.g.
+ *   https://example.com,https://www.example.com
+ * Unset ⇒ no CORS header ⇒ same-origin only (the old code pinned one brand's
+ * domain here, which broke every other brand's cross-origin widget anyway).
+ */
+const ALLOWED_ORIGINS = (process.env.ALLOWED_WIDGET_ORIGINS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
+
 export async function middleware(request: NextRequest) {
   // Skip auth check for API routes to prevent loops
   if (request.nextUrl.pathname.startsWith('/api/')) {
     const response = await updateSession(request)
-    // Add CORS headers for API routes
-    response.headers.set('Access-Control-Allow-Origin', 'https://goproxe.com')
+    // CORS: echo the request Origin only when allowlisted
+    const origin = request.headers.get('origin')
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+      response.headers.set('Access-Control-Allow-Origin', origin)
+      response.headers.set('Vary', 'Origin')
+    }
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
     return response
