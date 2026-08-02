@@ -227,8 +227,8 @@ BEGIN
 END $$;
 
 -- Step 13: Grant SELECT on unified_leads view to anon role (for unauthenticated access)
-GRANT SELECT ON unified_leads TO anon;
-GRANT SELECT ON unified_leads TO authenticated;
+-- (fresh-bootstrap: unified_leads GRANT removed — view created + granted in block 20)
+-- (fresh-bootstrap: unified_leads GRANT removed — view created + granted in block 20)
 
 -- Migration complete!
 

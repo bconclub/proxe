@@ -1,4 +1,4 @@
-import { getBconSystemPrompt } from './system';
-import { getBconWebSystemPrompt } from './web';
-export const getSystemPrompt = getBconSystemPrompt;
-export const getWebSystemPrompt = getBconWebSystemPrompt;
+import { getProxeSystemPrompt } from './system';
+import { getProxeWebSystemPrompt } from './web';
+export const getSystemPrompt = getProxeSystemPrompt;
+export const getWebSystemPrompt = getProxeWebSystemPrompt;

@@ -6,31 +6,32 @@ import type { BrandConfig } from '@/configs/types';
 export const proxeConfig: BrandConfig = {
   name: 'PROXe',
   brand: 'proxe',
-  tagline: 'PROXe',
+  tagline: 'Never Miss a Lead Ever Again',
   website: 'https://goproxe.com',
-  // Matches the LIVE proxe deployment, which serves the windchasers icon today.
-  // Swap for a real PROXe icon when one exists.
-  iconPath: '/windchasers-icon.png',
+  // <html data-theme> — matches the [data-theme="proxe-purple"] block in
+  // core/src/styles/theme.css (without this the theme block is orphaned and
+  // the app falls back to data-theme="proxe", which nothing styles).
+  themeDataAttr: 'proxe-purple',
+  iconPath: '/proxe-icon.png',
   widget: {
     headerName: 'PROXe',
     welcomeSequence: [
-      { text: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?", delay: 0 },
+      { text: "Hi, I'm PROXe. Ask me anything, I'm the product.", delay: 0 },
+      { text: 'Losing leads somewhere between inquiry and sale? That’s exactly what I fix.', delay: 900 },
     ],
   },
-  // All extras OFF for the bare PROXe template — flip on as features land.
   features: {
     voice: false,
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
-    pipelineFunnel: false,
-    followUpSequence: false,
+    pipelineFunnel: true, // dashboard pipeline view — ad leads land here
+    followUpSequence: false, // on once PROXe follow-up templates are authored
     campaigns: true, // AI campaign workspace
     logCallChat: true, // chat with PROXe after logging a call
   },
-  systemPrompt: {
-    path: '@/api/prompts/proxe-prompt',
-  },
   styles: {
-    themePath: '@/styles/themes/proxe.css',
+    // Bridge config.colors into CSS vars so the widget carries the PROXe
+    // palette without a per-brand stylesheet.
+    colorVarsFromConfig: true,
   },
   chatStructure: {
     showQuickButtons: true,

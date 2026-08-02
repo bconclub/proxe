@@ -68,6 +68,12 @@
       "port": 4002
     },
     {
+      "name": "proxe-core",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd core&&set BRAND_ID=proxe&&set NEXT_DIST_DIR=.next-proxe&&node scripts/stage-brand.js&&npx next dev -p 4010"],
+      "port": 4010
+    },
+    {
       "name": "bcon",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd core&&set BRAND_ID=bcon&&npm run dev"],
