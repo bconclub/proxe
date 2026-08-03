@@ -112,14 +112,21 @@ const ICONS = {
   infinity: <InfinitySymbol />,
 };
 
-// Brand-aware welcome message
-const welcomeMessages: Record<string, string> = {
-  windchasers: "Hi! I'm here to help you understand Aviation training at WindChasers, ask me anything.",
-  bcon: "Hi! I'm PROXe, BCON's AI Agent. Tell me more about you and your business, or ask any question you might have.",
-  proxe: "Hi! I'm PROXe — your AI-powered business assistant. How can I help you today?",
-};
-function getWelcomeMessage(brand: string): string {
-  return welcomeMessages[brand] || welcomeMessages['proxe'];
+// Opening AI bubbles - brand copy lives in the pack (config.widget.welcomeSequence),
+// exactly as core/src/components/widget/ChatWidget.tsx reads it. This fork used to
+// carry a hardcoded per-brand map here, which silently shadowed the pack: PROXe's
+// config already said "Hi, I'm PROXe. Ask me anything, I'm the product." while the
+// widget shipped "your AI-powered business assistant" - wrong identity (PROXe IS
+// the product, not somebody's assistant) and unreachable from the brand pack.
+function getWelcomeSequence(): string[] {
+  const seq = getBrandConfig().widget?.welcomeSequence;
+  if (seq?.length) return seq.map((s) => s.text);
+  return [`Hi! I'm ${getBrandConfig().name}. How can I help you today?`];
+}
+
+// Emit the sequence as separate bubbles (one per entry), matching core.
+function playWelcome(addAIMessage: (text: string) => void): void {
+  for (const text of getWelcomeSequence()) addAIMessage(text);
 }
 
 // Helper function to clean metadata strings from conversation summary
@@ -1855,14 +1862,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           
           // No conversations found, show welcome message
           if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
+            playWelcome(addAIMessage);
             hasShownWelcomeRef.current = true;
           }
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
           if (addAIMessage) {
-            addAIMessage(getWelcomeMessage(brand));
+            playWelcome(addAIMessage);
             hasShownWelcomeRef.current = true;
           }
         }
@@ -1871,7 +1878,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       fetchConversationsOnReopen();
     } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
-      addAIMessage(getWelcomeMessage(brand));
+      playWelcome(addAIMessage);
       hasShownWelcomeRef.current = true;
     }
   }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);
