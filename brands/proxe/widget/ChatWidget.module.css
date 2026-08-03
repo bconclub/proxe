@@ -113,8 +113,13 @@
 }
 
 /* Mobile quick actions pinned near the bottom of the chat modal */
+/* Welcome options. Named "mobile" because they used to be mobile-only, but the
+   welcome now ends on "What would you like to do today?" and a question with no
+   visible answers on desktop is just a dead end. The mobile block below still
+   adds the sticky/horizontal-scroll treatment for narrow screens. */
 .mobileQuickActions {
-  display: none;
+  display: flex;
+  padding: 4px 16px 12px 16px;
 }
 
 .mobileQuickActionsInner {

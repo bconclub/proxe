@@ -1681,7 +1681,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const defaultQuickButtons = dynamicQuickButtons ?? config?.quickButtons ?? [];
   const quickButtonOptions = isMobileNewChat ? mobileQuickActions : defaultQuickButtons;
   const hasQuickButtons = quickButtonOptions.length > 0;
-  const showMobileQuickActions = isMobileViewport && isOpen && hasQuickButtons && messages.length <= 1;
+  // "The visitor hasn't said anything yet", which is what `messages.length <= 1`
+  // was reaching for. That count only held while the welcome was a single
+  // hardcoded bubble; a config-driven welcomeSequence emits one message PER
+  // entry, so a 2- or 3-bubble welcome silently pushed the count past 1 and the
+  // buttons stopped rendering entirely. Counting user turns is what actually
+  // means "conversation not started" and is independent of welcome length.
+  const hasUserSpoken = messages.some((message) => message.type === 'user');
+  const showWelcomeQuickActions = isOpen && hasQuickButtons && !hasUserSpoken;
 
   const isResponding = useMemo(
     () =>
@@ -3295,7 +3302,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         <div ref={messagesEndRef} />
       </div>
       {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
-      {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
+      {showWelcomeQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
 
       {/* Desktop: quick buttons near input when showing welcome message */}
       {(!isMobileViewport) && isOpen && hasShownWelcomeRef.current && messages.length === 1 && messages[0].type === 'ai' && !messages[0].isStreaming && conversationsToRestoreRef.current.length === 0 && renderWelcomeButtons(styles.welcomeQuickButtons)}

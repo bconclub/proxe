@@ -15,9 +15,13 @@ export const proxeConfig: BrandConfig = {
   iconPath: '/proxe-icon.png',
   widget: {
     headerName: 'PROXe',
+    // Split across three bubbles the way Windchasers' Avia opens: identity,
+    // then what it does, then the question. One long paragraph reads like a
+    // brochure; three short bubbles read like someone typing to you.
     welcomeSequence: [
-      { text: "Hi, I'm PROXe. Ask me anything, I'm the product.", delay: 0 },
-      { text: 'Losing leads somewhere between inquiry and sale? That’s exactly what I fix.', delay: 900 },
+      { text: 'Hi, I am PROXe, your customer-facing AI.', delay: 0 },
+      { text: 'I take care of your leads and conversations across all channels.', delay: 800 },
+      { text: 'What would you like to do today?', delay: 1600 },
     ],
   },
   features: {
@@ -88,7 +92,11 @@ export const proxeConfig: BrandConfig = {
     buttonHover: 'rgba(91, 26, 140, 0.2)',
     buttonActive: 'rgba(91, 26, 140, 0.3)',
   },
-  quickButtons: ['What\'s PROXe', 'Deploy PROXe', 'PROXe Pricing', 'Book a Demo'],
+  // Three, not four: the welcome now ends on "What would you like to do today?"
+  // and three options read as a clear choice where four start to read as a menu.
+  // These are the three real answers to that question - understand it, price it,
+  // or talk to someone.
+  quickButtons: ['What\'s PROXe', 'PROXe Pricing', 'Book a Demo'],
   exploreButtons: ['Web PROXe', 'WhatsApp PROXe', 'Voice PROXe', 'Social PROXe'],
   followUpButtons: ['Schedule a Call', 'Book a Demo', 'Deploy PROXe', 'Get a Call Back', 'Talk to The Team'],
   firstMessageButtons: ['Learn More', 'Book a Demo'],
