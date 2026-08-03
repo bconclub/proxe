@@ -732,9 +732,13 @@ export default function FounderDashboard() {
   // ── Movable-card slot geometry (xl only) ─────────────────────────────────
   // slots 0+1 = top row, 2+3 = bottom row; spans follow the brand variants
   // that used to size the rows. A card adopts the span of the slot it's in.
-  // windchasers: even 50-50 rows - Engine Overview at span 8 left Upcoming
+  // windchasers/proxe: even 50-50 rows - Engine Overview at span 8 left Upcoming
   // Events squeezed (user-requested true 50-50 split).
-  const engineNarrow = (isPop && !!metrics.campaignHome?.ladder) || showGigsTab || brandCfg.brand === 'windchasers'
+  const engineNarrow =
+    (isPop && !!metrics.campaignHome?.ladder) ||
+    showGigsTab ||
+    brandCfg.brand === 'windchasers' ||
+    brandCfg.brand === 'proxe'
   const SLOT_SPANS = engineNarrow ? [6, 6, 6, 6] : [8, 4, 6, 6]
   const slotStyle = (id: string) => {
     const slot = Math.max(0, cardOrder.indexOf(id))
