@@ -39,6 +39,10 @@ export const proxeConfig: BrandConfig = {
     maxFollowUps: 3,
     avatar: {
       type: 'logo',
+      // DashboardLayout reads the sidebar mark from chatStructure.avatar.source
+      // and deliberately never falls back to another brand's asset — without
+      // this the header rendered the name with no icon at all.
+      source: '/proxe-icon.png',
     },
   },
   colors: {
