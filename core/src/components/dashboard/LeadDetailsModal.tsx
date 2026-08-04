@@ -4329,11 +4329,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         ? String(legacyLast).replace(/[_-]+/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
                         : null;
 
+                      // Meta LEAD-FORM ads never pass through a URL, so they carry
+                      // no UTMs and no fbclid - every field below would read empty
+                      // even though Pabbly sends the full campaign/adset/ad/form
+                      // set. That lands in unified_context.facebook, which this
+                      // panel never looked at. Use it as the fallback.
+                      const fbMeta: any = (currentLead.unified_context as any)?.facebook || {};
+
                       // Rich UTM / ad fields - pull from utm{}, fall back to URL params
                       const utmSource   = utm.source   || urlParams.utm_source   || null;
                       const utmMedium   = utm.medium   || urlParams.utm_medium   || null;
-                      const utmCampaign = utm.campaign || urlParams.utm_campaign || null;
-                      const utmContent  = utm.content  || urlParams.utm_content  || null;
+                      const utmCampaign = utm.campaign || urlParams.utm_campaign || fbMeta.campaign_name || null;
+                      const utmContent  = utm.content  || urlParams.utm_content  || fbMeta.ad_name || null;
                       const utmTerm     = utm.term     || urlParams.utm_term     || null;
                       const utmId       = utm.id       || utm.utm_id || urlParams.utm_id || null;
                       const fbclid      = urlParams.fbclid || null;
@@ -4354,6 +4361,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       if (utmTerm)          rows.push({ label: 'Term / Ad ID',value: String(utmTerm), mono: true });
                       if (fbclid)           rows.push({ label: 'Facebook click ID', value: String(fbclid).slice(0, 40) + (String(fbclid).length > 40 ? '…' : ''), mono: true });
                       if (brid)             rows.push({ label: 'Reel/Branded ID',   value: String(brid).slice(0, 40) + (String(brid).length > 40 ? '…' : ''), mono: true });
+                      // Lead-form specifics. Ad set and form have no UTM equivalent,
+                      // so they only ever come from the Pabbly payload.
+                      if (fbMeta.adset_name)  rows.push({ label: 'Ad set',      value: String(fbMeta.adset_name) });
+                      if (fbMeta.form_name)   rows.push({ label: 'Lead form',   value: String(fbMeta.form_name), mono: true });
+                      if (fbMeta.platform)    rows.push({ label: 'Placement',   value: fbMeta.platform === 'ig' ? 'Instagram' : fbMeta.platform === 'fb' ? 'Facebook' : String(fbMeta.platform) });
+                      if (fbMeta.campaign_id) rows.push({ label: 'Campaign ID', value: String(fbMeta.campaign_id), mono: true });
+                      if (fbMeta.ad_id)       rows.push({ label: 'Ad ID',       value: String(fbMeta.ad_id), mono: true });
+                      if (fbMeta.lead_id)     rows.push({ label: 'Meta lead ID', value: String(fbMeta.lead_id), mono: true });
                       if (referrer)         rows.push({ label: 'Referrer',    value: String(referrer) });
                       if (capturedAt) {
                         try {
