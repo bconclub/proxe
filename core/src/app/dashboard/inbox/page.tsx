@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import ScrollToBottomButton from '@/components/ScrollToBottomButton'
+import { markChatSeen } from '@/lib/useLiveAlerts'
 import {
   MdInbox,
   MdSend,
@@ -605,6 +606,13 @@ export default function InboxPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
+
+  // Opening a thread clears ITS entry in the Chats nav badge. One effect rather
+  // than a call at each setSelectedLeadId site, so deep links and the
+  // auto-select path count as "opened" too.
+  useEffect(() => {
+    markChatSeen(selectedLeadId)
+  }, [selectedLeadId])
 
   // Fetch conversations (grouped by lead_id)
   useEffect(() => {

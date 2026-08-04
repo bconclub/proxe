@@ -29,16 +29,58 @@ const POLL_MS = 20_000
 const FEED_CAP = 50
 const FEED_KEY = 'proxe-alert-feed'
 const SEEN_KEY = 'proxe-alert-seen-at'
+// Per-conversation "I opened this" stamps: { [leadId]: ISO }. Deliberately a
+// SEPARATE key from SEEN_KEY - see the two-counters note below.
+const CHAT_SEEN_KEY = 'proxe-chat-seen'
+const CHAT_SEEN_EVENT = 'proxe-chat-seen-changed'
+
+/**
+ * THE TWO COUNTERS MEAN DIFFERENT THINGS. Keep them that way.
+ *
+ *   bell "Activity" unread -> "what happened since I last looked at the bell"
+ *   Chats nav badge        -> "which conversations still need a reply"
+ *
+ * They were briefly wired to the same cursor, which meant opening the bell
+ * silently cleared the Chats badge even though you had not read a single
+ * conversation. Reading a notification is not replying to a customer.
+ *
+ * Known limit: the Chats badge only counts messages that arrived while a
+ * dashboard tab was open, because that is all the alerts poller sees. A true
+ * unread count needs server-side per-user read state on conversations.
+ */
 
 export interface LiveAlerts {
   /** newest first, capped at FEED_CAP */
   alerts: DashboardAlert[]
-  /** alerts newer than the last time the drawer was opened */
+  /** alerts newer than the last time the BELL was opened */
   unread: number
-  /** unread subset that are inbound messages - drives the Chats nav badge */
+  /** distinct conversations with an inbound message you have not OPENED */
   unreadMessages: number
-  /** call when the drawer opens: everything currently listed becomes read */
+  /** call when the bell drawer opens - does NOT touch the Chats badge */
   markAllSeen: () => void
+}
+
+/**
+ * Mark one conversation read. Called from the inbox when a thread is opened.
+ * Module-level (not a hook return) so any chat surface can clear its own badge
+ * without threading the hook through; the event keeps mounted hooks in sync.
+ */
+export function markChatSeen(leadId: string | null | undefined) {
+  if (!leadId || typeof window === 'undefined') return
+  try {
+    const map = readChatSeen()
+    map[leadId] = new Date().toISOString()
+    localStorage.setItem(CHAT_SEEN_KEY, JSON.stringify(map))
+    window.dispatchEvent(new CustomEvent(CHAT_SEEN_EVENT))
+  } catch { /* private mode */ }
+}
+
+function readChatSeen(): Record<string, string> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = JSON.parse(localStorage.getItem(CHAT_SEEN_KEY) || '{}')
+    return raw && typeof raw === 'object' ? raw : {}
+  } catch { return {} }
 }
 
 function readFeed(): DashboardAlert[] {
@@ -56,6 +98,7 @@ function readSeenAt(): string {
 export function useLiveAlerts(): LiveAlerts {
   const [alerts, setAlerts] = useState<DashboardAlert[]>([])
   const [seenAt, setSeenAt] = useState<string>('')
+  const [chatSeen, setChatSeen] = useState<Record<string, string>>({})
 
   // Server clock of the last successful poll. In a ref so changing it never
   // re-renders and never re-creates the interval.
@@ -67,6 +110,19 @@ export function useLiveAlerts(): LiveAlerts {
   useEffect(() => {
     setAlerts(readFeed())
     setSeenAt(readSeenAt())
+    setChatSeen(readChatSeen())
+  }, [])
+
+  // Opening a thread anywhere (inbox today) clears that conversation's badge.
+  // 'storage' covers a second tab doing the reading.
+  useEffect(() => {
+    const sync = () => setChatSeen(readChatSeen())
+    window.addEventListener(CHAT_SEEN_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(CHAT_SEEN_EVENT, sync)
+      window.removeEventListener('storage', sync)
+    }
   }, [])
 
   const poll = useCallback(async () => {
@@ -124,12 +180,26 @@ export function useLiveAlerts(): LiveAlerts {
   }, [])
 
   const seenMs = seenAt ? Date.parse(seenAt) : 0
-  const unreadList = alerts.filter((a) => Date.parse(a.timestamp) > seenMs)
+  // Bell: anything newer than the last time the drawer was opened.
+  const unread = alerts.filter((a) => Date.parse(a.timestamp) > seenMs).length
+
+  // Chats: distinct conversations whose newest inbound message postdates the
+  // last time that thread was opened. Counts CONVERSATIONS, not messages - five
+  // messages from one person is one chat needing a reply, not five.
+  const unreadChats = new Set(
+    alerts
+      .filter((a) => a.kind === 'message' && a.leadId)
+      .filter((a) => {
+        const openedAt = chatSeen[a.leadId as string]
+        return !openedAt || Date.parse(a.timestamp) > Date.parse(openedAt)
+      })
+      .map((a) => a.leadId as string)
+  )
 
   return {
     alerts,
-    unread: unreadList.length,
-    unreadMessages: unreadList.filter((a) => a.kind === 'message').length,
+    unread,
+    unreadMessages: unreadChats.size,
     markAllSeen,
   }
 }
