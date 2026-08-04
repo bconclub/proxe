@@ -23,6 +23,20 @@ export type ProductUpdate = {
 // older than 0.1 predate the scheme and carry no version chip.
 export const PRODUCT_UPDATES: ProductUpdate[] = [
   {
+    id: '2026-08-04-live-notifications',
+    title: 'You now hear it when a lead or a message lands',
+    detail: 'The bell moved to the sidebar, so it is there on every page, with a live Activity feed. New leads and incoming messages ping a sound while your tab is open. Turn any of it off in Configure → Notifications & Sounds.',
+    date: '2026-08-04',
+    version: '0.3',
+  },
+  {
+    id: '2026-08-04-jump-to-latest',
+    title: 'Jump back to the latest message',
+    detail: 'Scrolled up in a long chat? A button now drops you straight to the bottom, in every chat across the dashboard and the widget.',
+    date: '2026-08-04',
+    version: '0.3',
+  },
+  {
     id: '2026-07-20-log-call-chat',
     title: 'Log a call, then plan the next move with PROXe',
     detail: 'After you log a call, PROXe reads your notes and lays out the next steps to confirm in one tap: the message to send, the follow-up, and your reminder.',
