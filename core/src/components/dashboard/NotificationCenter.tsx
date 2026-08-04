@@ -23,6 +23,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { PRODUCT_UPDATES, type ProductUpdate } from '@/lib/product-updates'
 import { getCurrentBrandId } from '@/configs'
@@ -87,6 +88,12 @@ export default function NotificationCenter({
   const router = useRouter()
   const mode = variant || (inline ? 'topbar' : 'sidebar')
   const [open, setOpen] = useState(false)
+  // The drawer is portalled to <body>. It has to be: the sidebar rail carries a
+  // transform (md:translate-x-0), and a transformed ancestor becomes the
+  // containing block for position:fixed descendants - so rendering the drawer
+  // in place trapped it inside the 184px rail instead of the viewport.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const [tab, setTab] = useState<'activity' | 'updates'>('activity')
   const [unreadUpdates, setUnreadUpdates] = useState(0)
   const [updates, setUpdates] = useState<ProductUpdate[]>([])
@@ -215,8 +222,8 @@ export default function NotificationCenter({
         </button>
       )}
 
-      {/* Slide-out drawer */}
-      {open && (
+      {/* Slide-out drawer - portalled to <body>, see the `mounted` note above. */}
+      {open && mounted && createPortal(
         <div className="fixed inset-0 z-[70]" aria-modal="true" role="dialog">
           <div
             className="absolute inset-0"
@@ -338,7 +345,8 @@ export default function NotificationCenter({
               <a href="/dashboard/settings/notifications" className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sound settings</a>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style jsx global>{`
