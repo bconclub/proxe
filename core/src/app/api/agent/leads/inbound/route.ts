@@ -445,6 +445,18 @@ export async function POST(request: NextRequest) {
         if (resolvedLocation) brandCtxData.offline_event_location = resolvedLocation
         if (offlineEventComingWith) brandCtxData.offline_event_coming_with = offlineEventComingWith
         brandCtxData.offline_event_intent = offlineEventIntent
+        // A scholarship applicant PICKS a track (Pilot / Cabin Crew) on the
+        // registration form, so COURSE is stated, not guessed. The event's
+        // registry entry deliberately leaves defaultCourseInterest blank
+        // because the day covers both tracks - but that blank should not
+        // swallow a choice the applicant actually made.
+        const pickedTrack = String(
+          cf2.scholarship_track_label || cf2.scholarship_track ||
+          (body as any).scholarship_track_label || (body as any).scholarship_track || '',
+        ).trim()
+        if (pickedTrack && !brandCtxData.course_interest) {
+          brandCtxData.course_interest = normalizeCourse(pickedTrack)
+        }
         brandCtxData.offline_event_registered_at = now
         brandCtxData.offline_events = {
           [eventKey]: {
@@ -531,6 +543,11 @@ export async function POST(request: NextRequest) {
           declaration_accepted_at: cf2.declaration_accepted_at ?? now,
           submitted_at: now,
         }
+        // Same rule for the standalone application: /scholarship/pilot and
+        // /scholarship/cabin-crew are track-specific pages, so the track is
+        // explicit. Overwrite here (unlike above): someone who applies for a
+        // named scholarship has told us more than an earlier ad guess did.
+        if (track) brandCtxData.course_interest = normalizeCourse(track.replace(/_/g, ' '))
         brandCtxData.scholarship_applied_at = now
         brandCtxData.scholarship_stage = 'applied'
         console.log(`[inbound] Scholarship application track=${track || 'unknown'} phone=${phone}`)
