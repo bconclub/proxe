@@ -19,6 +19,7 @@ import {
   MdSwapHoriz, MdRepeat, MdBlock, MdWhatsapp,
 } from 'react-icons/md'
 import ProxeMark from '@/components/ProxeMark'
+import ScrollToBottomButton from '@/components/ScrollToBottomButton'
 
 interface Props {
   leadId: string
@@ -370,6 +371,8 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
           <button onClick={onCancel} className="p-1 rounded shrink-0" style={{ color: 'var(--text-secondary)' }} aria-label="Cancel"><MdClose size={18} /></button>
         </div>
 
+        {/* Wrapper so the jump-to-latest button sits outside the scroller. */}
+        <div className="flex-1 min-h-0 flex flex-col relative">
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
           {/* What the human logged (their input), shown up top. */}
           <div className="flex items-start gap-2 text-[12px] rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
@@ -443,6 +446,8 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
             )
           })}
           {busy && (<div className="flex items-center gap-2 text-xs pl-8" style={{ color: 'var(--text-muted)' }}><span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ background: ACCENT }} /> Working…</div>)}
+        </div>
+        <ScrollToBottomButton scrollRef={scrollRef} watch={messages.length} bottom={12} />
         </div>
 
         {/* Fixed, predictable next-steps menu */}

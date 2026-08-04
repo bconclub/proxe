@@ -13,6 +13,7 @@ import { useState, useRef, useEffect, useCallback, Fragment } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { MdClose, MdSend, MdArrowForward, MdCall, MdOpenInNew } from 'react-icons/md'
+import ScrollToBottomButton from '@/components/ScrollToBottomButton'
 import ProxeMark from '@/components/ProxeMark'
 import { BRAND_ID } from '@/configs'
 import { PAGE_ROUTES, type BrainAction } from '@/lib/brain/actions'
@@ -174,6 +175,7 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
   const [followups, setFollowups] = useState<string[]>([])
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MSGS[0])
   const endRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // ── Draggable dock bubble ────────────────────────────────────────────────
   // The persistent bottom-right bubble can be picked up and dropped anywhere;
@@ -680,7 +682,10 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {/* Wrapper so the jump-to-latest button can sit outside the
+                scroller (inside it, it would scroll away with the messages). */}
+            <div className="flex-1 flex flex-col relative min-h-0">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
               {messages.length === 0 && (
                 <div className="text-center py-6">
                   {/* Glowing brand mark */}
@@ -802,6 +807,8 @@ export default function DashboardBrain({ inline = false, label, dock = false }: 
               )}
               {error && <p className="text-xs text-red-500">{error}</p>}
               <div ref={endRef} />
+            </div>
+            <ScrollToBottomButton scrollRef={scrollRef} watch={messages.length} bottom={12} />
             </div>
 
             {/* Input */}
