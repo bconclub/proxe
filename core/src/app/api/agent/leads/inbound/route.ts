@@ -498,6 +498,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Wind Chasers full-scholarship application (windchasers) ──────────────
+    // Stage 1 of the academy's own selection process, submitted from
+    // /scholarship/pilot or /scholarship/cabin-crew on the marketing site.
+    //
+    // The join is the PHONE: ensureOrUpdateLead already dedupes on it, so an
+    // applicant who is an existing lead gets the application attached to the
+    // record the team is already working, rather than becoming a second row.
+    // A new number simply creates a lead, which is correct - they applied.
+    //
+    // Marks are NOT computed here. The application carries eight free-text
+    // answers (Stage 1 is worth 20 of 100), Stage 2 is a 45-minute 40-mark
+    // aptitude test and Stage 3 a 40-mark interview panel. Only Stage 2 could
+    // ever be machine-scored; the rest are awarded by staff, so this stores the
+    // submission and leaves scoring to the dashboard.
+    if (leadBrand === 'windchasers') {
+      const isScholarshipApplication =
+        String(cf2.form_type || '') === 'scholarship_application' ||
+        normalizedSource === 'scholarship_application'
+      if (isScholarshipApplication) {
+        const track = String(cf2.scholarship_track || '').trim()
+        brandCtxData.lead_type = 'scholarship'
+        brandCtxData.scholarship_track = track || null
+        brandCtxData.scholarship_form_title = String(cf2.scholarship_form_title || '').trim() || null
+        // The submission itself, kept whole. One writer, one key - no deep
+        // merge needed (unlike offline_events, which two paths write to).
+        brandCtxData.scholarship_application = {
+          details: cf2.application_details ?? null,
+          answers: cf2.application_answers ?? null,
+          declaration_text: cf2.declaration_text ?? null,
+          declaration_accepted: cf2.declaration_accepted === true,
+          declaration_accepted_at: cf2.declaration_accepted_at ?? now,
+          submitted_at: now,
+        }
+        brandCtxData.scholarship_applied_at = now
+        brandCtxData.scholarship_stage = 'applied'
+        console.log(`[inbound] Scholarship application track=${track || 'unknown'} phone=${phone}`)
+      }
+    }
+
     // ── Lokazen: map Brand Onboarding / Property Owner Onboarding form fields ──
     // The lokazen.in onboarding forms (BrandOnboardingForm / PropertyOwner
     // OnboardingForm) POST rich details, but without this mapping they only
@@ -762,6 +801,32 @@ export async function POST(request: NextRequest) {
         if (mergedBrandCtx) {
           const mergedEvents = mergeOfflineEventMaps(existingCtx[leadBrand], inboundContext[leadBrand])
           if (mergedEvents) mergedBrandCtx.offline_events = mergedEvents
+        }
+        // Scholarship guards. A lead can submit again (browser back, a second
+        // track, a correction), and the dashboard ranks on these fields.
+        if (mergedBrandCtx) {
+          const prevWc: any = existingCtx[leadBrand] || {}
+          // Applied-at is the queue position - it belongs to the FIRST submission.
+          if (prevWc.scholarship_applied_at) {
+            mergedBrandCtx.scholarship_applied_at = prevWc.scholarship_applied_at
+          }
+          // Never walk the stage backwards. An applicant already at interview
+          // re-submitting the form must not drop to 'applied' and lose their
+          // place; staff move stages forward from the dashboard.
+          const RANK: Record<string, number> = {
+            applied: 1, exam_completed: 2, documents: 3, interview: 4,
+            selected: 5, rejected: 5,
+          }
+          const incomingStage = String(mergedBrandCtx.scholarship_stage || '')
+          const existingStage = String(prevWc.scholarship_stage || '')
+          if (existingStage && (RANK[incomingStage] ?? 0) <= (RANK[existingStage] ?? 0)) {
+            mergedBrandCtx.scholarship_stage = existingStage
+          }
+          // Keep the earlier application rather than letting a half-filled
+          // resubmit blank it. Latest wins only when it actually carries one.
+          if (prevWc.scholarship_application && !brandCtxData.scholarship_application) {
+            mergedBrandCtx.scholarship_application = prevWc.scholarship_application
+          }
         }
         // Attribution is IMMUTABLE - never overwrite existing source/first_touch.
         // Only write it if the lead doesn't already have attribution data.
