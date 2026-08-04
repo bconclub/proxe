@@ -118,15 +118,31 @@ const ICONS = {
 // config already said "Hi, I'm PROXe. Ask me anything, I'm the product." while the
 // widget shipped "your AI-powered business assistant" - wrong identity (PROXe IS
 // the product, not somebody's assistant) and unreachable from the brand pack.
-function getWelcomeSequence(): string[] {
+function getWelcomeSequence(): { text: string; delay: number }[] {
   const seq = getBrandConfig().widget?.welcomeSequence;
-  if (seq?.length) return seq.map((s) => s.text);
-  return [`Hi! I'm ${getBrandConfig().name}. How can I help you today?`];
+  if (seq?.length) return seq.map((s) => ({ text: s.text, delay: s.delay ?? 0 }));
+  return [{ text: `Hi! I'm ${getBrandConfig().name}. How can I help you today?`, delay: 0 }];
 }
 
-// Emit the sequence as separate bubbles (one per entry), matching core.
-function playWelcome(addAIMessage: (text: string) => void): void {
-  for (const text of getWelcomeSequence()) addAIMessage(text);
+/**
+ * Play the opening bubbles one at a time, honouring each entry's `delay`.
+ *
+ * The delays have always been in the brand pack (0 / 800 / 1600) and were being
+ * thrown away: emitting the whole sequence in a synchronous loop dumped all
+ * three bubbles in the same frame, so the agent read as a canned block of text
+ * instead of someone typing. `delay` is an offset from the START of the
+ * sequence, not a gap between bubbles, so we wait the difference between
+ * consecutive entries rather than the raw value.
+ */
+async function playWelcome(addAIMessage: (text: string) => void): Promise<void> {
+  const seq = getWelcomeSequence();
+  let elapsed = 0;
+  for (const entry of seq) {
+    const wait = Math.max(0, entry.delay - elapsed);
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    elapsed = Math.max(elapsed, entry.delay);
+    addAIMessage(entry.text);
+  }
 }
 
 // Helper function to clean metadata strings from conversation summary
@@ -1869,14 +1885,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           
           // No conversations found, show welcome message
           if (addAIMessage) {
-            playWelcome(addAIMessage);
+            void playWelcome(addAIMessage);
             hasShownWelcomeRef.current = true;
           }
         } catch (err) {
           console.error('[ChatWidget] Error fetching conversations on reopen:', err);
           // On error, show welcome message
           if (addAIMessage) {
-            playWelcome(addAIMessage);
+            void playWelcome(addAIMessage);
             hasShownWelcomeRef.current = true;
           }
         }
@@ -1885,7 +1901,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       fetchConversationsOnReopen();
     } else if (isOpen && messages.length === 0 && !hasShownWelcomeRef.current && conversationsToRestoreRef.current.length === 0 && addAIMessage) {
       // Show welcome message if no conversations to restore
-      playWelcome(addAIMessage);
+      void playWelcome(addAIMessage);
       hasShownWelcomeRef.current = true;
     }
   }, [isOpen, messages.length, externalSessionId, addAIMessage, addUserMessage, brandKey]);

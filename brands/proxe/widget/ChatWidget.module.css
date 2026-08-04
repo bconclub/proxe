@@ -827,11 +827,18 @@
   align-items: flex-start;
 }
 
+/* Chat bubbles only (the calendar / form / prompt bubbles don't use this
+   wrapper, so they keep their full width). `width: 100%` here defeated the
+   flex-start / flex-end alignment on .message: every bubble spanned the whole
+   panel, so an AI line and a one-word reply looked identical and the
+   conversation lost its two-sided shape. Hug the content instead, capped so a
+   long paragraph still leaves the opposite margin visible. */
 .messageContent {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  width: 100%;
+  width: fit-content;
+  max-width: 85%;
   min-width: 0;
   flex-direction: row;
 }
@@ -936,13 +943,20 @@
   margin: 0;
 }
 
+/* Now holds only a close button (the avatar + name that justified a titled,
+   ruled header row are gone). Keeping the border and padding drew a divider
+   across empty space above the content, so the row collapses to just the
+   button: no rule, no reserved height, pinned right by calendarCloseBtn's
+   existing margin-left:auto. */
 .bubbleHeader {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  margin-bottom: 4px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .calendarCloseBtn {
