@@ -29,58 +29,24 @@ const POLL_MS = 20_000
 const FEED_CAP = 50
 const FEED_KEY = 'proxe-alert-feed'
 const SEEN_KEY = 'proxe-alert-seen-at'
-// Per-conversation "I opened this" stamps: { [leadId]: ISO }. Deliberately a
-// SEPARATE key from SEEN_KEY - see the two-counters note below.
-const CHAT_SEEN_KEY = 'proxe-chat-seen'
-const CHAT_SEEN_EVENT = 'proxe-chat-seen-changed'
-
 /**
- * THE TWO COUNTERS MEAN DIFFERENT THINGS. Keep them that way.
+ * ONE notification number, on the bell. Nothing else.
  *
- *   bell "Activity" unread -> "what happened since I last looked at the bell"
- *   Chats nav badge        -> "which conversations still need a reply"
- *
- * They were briefly wired to the same cursor, which meant opening the bell
- * silently cleared the Chats badge even though you had not read a single
- * conversation. Reading a notification is not replying to a customer.
- *
- * Known limit: the Chats badge only counts messages that arrived while a
- * dashboard tab was open, because that is all the alerts poller sees. A true
- * unread count needs server-side per-user read state on conversations.
+ * There was briefly a second count on the Chats nav item fed from the same
+ * poller. Two badges sitting inches apart, both saying "1", answering subtly
+ * different questions ("what happened" vs "what needs a reply") read as one
+ * number that could not make up its mind. A real per-conversation unread count
+ * belongs on the inbox and needs server-side per-user read state, not a
+ * client-side guess derived from the notification feed.
  */
 
 export interface LiveAlerts {
   /** newest first, capped at FEED_CAP */
   alerts: DashboardAlert[]
-  /** alerts newer than the last time the BELL was opened */
+  /** alerts newer than the last time the bell was opened */
   unread: number
-  /** distinct conversations with an inbound message you have not OPENED */
-  unreadMessages: number
-  /** call when the bell drawer opens - does NOT touch the Chats badge */
+  /** call when the bell drawer opens */
   markAllSeen: () => void
-}
-
-/**
- * Mark one conversation read. Called from the inbox when a thread is opened.
- * Module-level (not a hook return) so any chat surface can clear its own badge
- * without threading the hook through; the event keeps mounted hooks in sync.
- */
-export function markChatSeen(leadId: string | null | undefined) {
-  if (!leadId || typeof window === 'undefined') return
-  try {
-    const map = readChatSeen()
-    map[leadId] = new Date().toISOString()
-    localStorage.setItem(CHAT_SEEN_KEY, JSON.stringify(map))
-    window.dispatchEvent(new CustomEvent(CHAT_SEEN_EVENT))
-  } catch { /* private mode */ }
-}
-
-function readChatSeen(): Record<string, string> {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = JSON.parse(localStorage.getItem(CHAT_SEEN_KEY) || '{}')
-    return raw && typeof raw === 'object' ? raw : {}
-  } catch { return {} }
 }
 
 function readFeed(): DashboardAlert[] {
@@ -98,7 +64,6 @@ function readSeenAt(): string {
 export function useLiveAlerts(): LiveAlerts {
   const [alerts, setAlerts] = useState<DashboardAlert[]>([])
   const [seenAt, setSeenAt] = useState<string>('')
-  const [chatSeen, setChatSeen] = useState<Record<string, string>>({})
 
   // Server clock of the last successful poll. In a ref so changing it never
   // re-renders and never re-creates the interval.
@@ -110,24 +75,16 @@ export function useLiveAlerts(): LiveAlerts {
   useEffect(() => {
     setAlerts(readFeed())
     setSeenAt(readSeenAt())
-    setChatSeen(readChatSeen())
-  }, [])
-
-  // Opening a thread anywhere (inbox today) clears that conversation's badge.
-  // 'storage' covers a second tab doing the reading.
-  useEffect(() => {
-    const sync = () => setChatSeen(readChatSeen())
-    window.addEventListener(CHAT_SEEN_EVENT, sync)
-    window.addEventListener('storage', sync)
-    return () => {
-      window.removeEventListener(CHAT_SEEN_EVENT, sync)
-      window.removeEventListener('storage', sync)
-    }
   }, [])
 
   const poll = useCallback(async () => {
     if (inFlightRef.current) return
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    // NOTE: this deliberately keeps polling while the tab is HIDDEN. A
+    // backgrounded dashboard is the main case for an audible ping - you are in
+    // another tab and want to know a lead landed. Skipping hidden tabs (an
+    // earlier "optimisation" here) made the feature silent exactly when it
+    // mattered. Browsers throttle background timers to roughly once a minute
+    // on their own, which is the right cost/benefit without us adding to it.
     inFlightRef.current = true
     try {
       const since = cursorRef.current
@@ -180,26 +137,22 @@ export function useLiveAlerts(): LiveAlerts {
   }, [])
 
   const seenMs = seenAt ? Date.parse(seenAt) : 0
-  // Bell: anything newer than the last time the drawer was opened.
+  // ONE number: anything newer than the last time the drawer was opened.
   const unread = alerts.filter((a) => Date.parse(a.timestamp) > seenMs).length
 
-  // Chats: distinct conversations whose newest inbound message postdates the
-  // last time that thread was opened. Counts CONVERSATIONS, not messages - five
-  // messages from one person is one chat needing a reply, not five.
-  const unreadChats = new Set(
-    alerts
-      .filter((a) => a.kind === 'message' && a.leadId)
-      .filter((a) => {
-        const openedAt = chatSeen[a.leadId as string]
-        return !openedAt || Date.parse(a.timestamp) > Date.parse(openedAt)
-      })
-      .map((a) => a.leadId as string)
-  )
+  // A hidden tab cannot show a badge, so put the count where a backgrounded
+  // tab still shows it. Also covers a muted team - they see it without hearing
+  // it. Restores the original title on cleanup and when the count hits zero.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const base = document.title.replace(/^\(\d+\)\s*/, '')
+    document.title = unread > 0 ? `(${unread}) ${base}` : base
+    return () => { document.title = document.title.replace(/^\(\d+\)\s*/, '') }
+  }, [unread])
 
   return {
     alerts,
     unread,
-    unreadMessages: unreadChats.size,
     markAllSeen,
   }
 }

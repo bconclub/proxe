@@ -33,9 +33,12 @@ import {
   MdNotificationsActive,
   MdClose,
   MdRocketLaunch,
-  MdPersonAddAlt1,
+  MdLanguage,
+  MdWhatsapp,
+  MdCall,
   MdChatBubble,
 } from 'react-icons/md'
+import { FaFacebookF, FaInstagram } from 'react-icons/fa'
 
 const UPDATE_SEEN_KEY = 'wc-notif-update-seen'
 
@@ -57,6 +60,27 @@ function fmtAgo(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
   } catch { return '' }
+}
+
+/**
+ * Channel glyph + brand colour for an alert row. The channel icon IS the label -
+ * a generic bubble next to a "MESSAGE" chip next to the word "WhatsApp" was
+ * three things saying one thing. Keys match the labels the alerts route emits
+ * (labelChannel), matched loosely so an unmapped raw channel still lands
+ * somewhere sensible.
+ */
+const CHANNEL_ICONS: { match: string[]; Icon: React.ComponentType<{ size?: number }>; color: string }[] = [
+  { match: ['whatsapp'], Icon: MdWhatsapp, color: '#25D366' },
+  { match: ['instagram'], Icon: FaInstagram, color: '#E4405F' },
+  { match: ['meta', 'facebook'], Icon: FaFacebookF, color: '#1877F2' },
+  { match: ['call', 'voice', 'phone'], Icon: MdCall, color: '#A855F7' },
+  { match: ['web', 'site', 'chat'], Icon: MdLanguage, color: '#3B82F6' },
+]
+
+function channelGlyph(channel: string) {
+  const c = (channel || '').toLowerCase()
+  const hit = CHANNEL_ICONS.find((x) => x.match.some((m) => c.includes(m)))
+  return hit || { Icon: MdChatBubble, color: '#7a8aa0' }
 }
 
 // Updates visible to THIS brand, newest first (source array is curated newest-first).
@@ -284,8 +308,7 @@ export default function NotificationCenter({
                 ) : (
                   alerts.map((a) => {
                     const isLead = a.kind === 'lead'
-                    const Icon = isLead ? MdPersonAddAlt1 : MdChatBubble
-                    const tint = isLead ? '#10B981' : '#3B82F6'
+                    const { Icon, color: tint } = channelGlyph(a.channel)
                     return (
                       <button
                         key={a.id}
@@ -299,11 +322,15 @@ export default function NotificationCenter({
                           <Icon size={16} />
                         </span>
                         <span className="flex-1 min-w-0">
+                          {/* Only the event TYPE needs words - the channel is the
+                              icon on the left. Messages carry no chip at all. */}
                           <span className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase" style={{ backgroundColor: `${tint}22`, color: tint }}>
-                              {isLead ? 'New lead' : 'Message'}
-                            </span>
-                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{a.channel} · {fmtAgo(a.timestamp)}</span>
+                            {isLead && (
+                              <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase" style={{ backgroundColor: '#10B98122', color: '#10B981' }}>
+                                New lead
+                              </span>
+                            )}
+                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtAgo(a.timestamp)}</span>
                           </span>
                           <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{a.content}</span>
                         </span>
