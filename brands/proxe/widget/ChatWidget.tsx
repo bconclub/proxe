@@ -6,6 +6,7 @@ import type { Message } from '@/hooks/useChatStream';
 import { InfinityLoader } from './InfinityLoader';
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from './BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import ScrollToBottomButton from '@/components/ScrollToBottomButton';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import type { BrandConfig } from '@/configs';
 import { useDeployModal } from '@/contexts/DeployModalContext';
@@ -2826,7 +2827,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </button>
         </div>
       </div>
-      <div 
+      {/* Relative wrapper: inherits messagesArea's flex sizing so layout is
+          unchanged, and anchors the jump-to-latest button OUTSIDE the scroller
+          (inside it, the button would scroll away with the messages). */}
+      <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div
         ref={messagesAreaRef}
         className={styles.messagesArea}
         data-scroll-lock="allow"
@@ -3264,6 +3269,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </div>
         )}
         <div ref={messagesEndRef} />
+      </div>
+      <ScrollToBottomButton scrollRef={messagesAreaRef} watch={messages.length} bottom={12} />
       </div>
       {/* Mobile: keep quick actions docked near the bottom, same layout as desktop */}
       {showWelcomeQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}

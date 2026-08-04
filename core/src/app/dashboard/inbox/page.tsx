@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
+import ScrollToBottomButton from '@/components/ScrollToBottomButton'
 import {
   MdInbox,
   MdSend,
@@ -570,6 +571,8 @@ export default function InboxPage() {
   const [conversationSummary, setConversationSummary] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
   const [replyText, setReplyText] = useState('')
+  // The scrolling message pane - target for the jump-to-latest button.
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const [isSending, setIsSending] = useState(false)
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -2095,8 +2098,12 @@ export default function InboxPage() {
               </div>
             )}
 
-            {/* Messages */}
+            {/* Messages. The wrapper exists so the jump-to-latest button can be
+                absolutely positioned OUTSIDE the scroller - inside it, the
+                button would scroll away with the content. */}
+            <div className="flex-1 flex flex-col relative min-h-0">
             <div
+              ref={messagesScrollRef}
               className="flex-1 overflow-y-auto px-3 md:px-6 py-3 relative overflow-x-hidden"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
@@ -2727,6 +2734,8 @@ export default function InboxPage() {
                 </>
               )}
             </div>
+            </div>
+            <ScrollToBottomButton scrollRef={messagesScrollRef} watch={messages.length} />
             </div>
 
             {/* Message Input - compact */}

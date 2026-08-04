@@ -6,6 +6,7 @@ import type { Message } from '@/hooks/useChatStream';
 
 import { BookingCalendarWidget, type BookingCalendarWidgetProps } from '@/components/widget/BookingCalendarWidget';
 import { DeployFormInline } from '@/components/widget/DeployFormInline';
+import ScrollToBottomButton from '@/components/ScrollToBottomButton';
 import { CostGuideFormInline } from '@/components/widget/CostGuideFormInline';
 import { getBrandConfig, getCurrentBrandId } from '@/configs';
 import type { BrandConfig } from '@/configs';
@@ -3555,7 +3556,11 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           </button>
         </div>
       </div>
-      <div 
+      {/* Relative wrapper: it inherits messagesArea's flex sizing so the layout
+          is unchanged, and gives the jump-to-latest button something to anchor
+          to OUTSIDE the scroller (inside, it would scroll away). */}
+      <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div
         ref={messagesAreaRef}
         className={styles.messagesArea}
         data-scroll-lock="allow"
@@ -4046,6 +4051,8 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
           !lastAiMessage?.isStreaming &&
           renderFlowOverrideButtons(styles.welcomeQuickButtons)}
         <div ref={messagesEndRef} />
+      </div>
+      <ScrollToBottomButton scrollRef={messagesAreaRef} watch={messages.length} bottom={12} />
       </div>
       {showMobileQuickActions && renderWelcomeButtons(styles.mobileQuickActions)}
       {desktopWelcomeEligible && renderWelcomeButtons(styles.welcomeQuickButtons)}
