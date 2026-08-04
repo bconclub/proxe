@@ -2,6 +2,13 @@
   "ignoreCommand": "bash scripts/vercel-ignore.sh",
   "crons": [
     { "path": "/api/cron/webinar-reminder", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/offline-event-reminder", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/offline-event-reminder", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/telegram-brief?kind=morning", "schedule": "30 3 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 4 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 5 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 7 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 8 * * *" },
+    { "path": "/api/cron/telegram-brief?kind=evening", "schedule": "30 11 * * *" }
   ]
 }
