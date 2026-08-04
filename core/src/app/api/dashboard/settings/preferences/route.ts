@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 const PREFS_KEY = 'dashboard_prefs'
 
 export interface GlobalPrefs {
-  sounds?: { muted?: boolean; new?: boolean; update?: boolean; ready?: boolean }
+  sounds?: { muted?: boolean; new?: boolean; message?: boolean; update?: boolean; ready?: boolean }
   theme?: { mode?: 'brand' | 'bw-dark' | 'bw-light'; accent?: string }
 }
 

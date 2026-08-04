@@ -2,7 +2,9 @@
 /**
  * stage-brand.js — prebuild step. Stages the active brand's assets into /core so
  * ONE core builds any brand. Chosen by BRAND_ID (or NEXT_PUBLIC_BRAND).
- *   - copies /brands/<id>/public/* → /core/public   (always — per-brand assets)
+ *   - copies /core/shared-public/* → /core/public   (brand-agnostic assets)
+ *   - copies /brands/<id>/public/* → /core/public   (always — per-brand assets,
+ *     copied second so a brand can override any shared file of the same name)
  *   - copies /brands/<id>/.env.local → /core/.env.local  (LOCAL only; on Vercel
  *     the env comes from project settings, so .env.local won't exist there)
  */
@@ -32,10 +34,16 @@ function copyDir(src, dst) {
 }
 
 // 1. brand public assets → core/public (wipe first — a previous brand's assets
-//    must never survive into this brand's staging)
+//    must never survive into this brand's staging).
+//    shared-public lands FIRST so brand files win on a name collision. This is
+//    how brand-agnostic assets referenced by shared core code (e.g. the
+//    notification sounds in /sounds, read by lib/sound-prefs) reach EVERY brand
+//    — before this, they only existed in the windchasers pack and 404'd
+//    everywhere else, so the dashboard was silent on 4 of 5 brands.
 const corePublic = path.join(core, 'public');
 fs.rmSync(corePublic, { recursive: true, force: true });
 fs.mkdirSync(corePublic, { recursive: true });
+copyDir(path.join(core, 'shared-public'), corePublic);
 copyDir(path.join(brandDir, 'public'), corePublic);
 
 // 2. local env (Vercel injects env itself, so this file only exists locally)

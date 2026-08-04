@@ -14,6 +14,9 @@ import ReportIssueModal from '@/components/dashboard/ReportIssueModal'
 import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
+import { useLiveAlerts } from '@/lib/useLiveAlerts'
+import { playSound } from '@/lib/sound-prefs'
+import NotificationCenter from '@/components/dashboard/NotificationCenter'
 import {
   MdInbox,
   MdDashboard,
@@ -157,7 +160,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
-  const [unreadCount] = useState(0) // TODO: Implement unread count logic
+  // Live leads + inbound messages. ONE poller for the whole dashboard shell:
+  // it feeds the sidebar bell's drawer/badge and the Chats nav badge below.
+  const { alerts, unread: unreadAlerts, unreadMessages, markAllSeen } = useLiveAlerts()
+  const unreadCount = unreadMessages // Chats badge = unread inbound messages
+  // One "dashboard loaded" chime per mount (see the prefs effect below).
+  const readyChimedRef = React.useRef(false)
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
@@ -254,6 +262,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         try { localStorage.setItem(`${brandId}-accent-theme`, accent) } catch { /* ignore */ }
         const effMode = mode || (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(accent, effMode)
+      }
+      // "Dashboard loaded" cue. It waits for the prefs round-trip on purpose:
+      // firing before applySoundsToLocal would chime once at the default-on
+      // setting even for a team that has globally muted sounds. This layout
+      // mounts once per FULL page load (client-side nav keeps it alive), so
+      // this is a reload cue, not a per-page-click cue.
+      if (!readyChimedRef.current) {
+        readyChimedRef.current = true
+        playSound('ready')
       }
     })()
     return () => { cancelled = true }
@@ -902,6 +919,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </React.Fragment>
               )
             })}
+          </div>
+
+          {/* Notifications - pinned under the nav, above Report Issue, so the
+              bell is reachable from EVERY dashboard page. It used to live only
+              in the Overview header, which meant a founder working out of Chats
+              or Leads had no way to reach it at all. */}
+          <div className="flex-shrink-0">
+            <NotificationCenter
+              variant="sidebar"
+              expanded={showExpanded}
+              alerts={alerts}
+              unreadAlerts={unreadAlerts}
+              onAlertsSeen={markAllSeen}
+            />
           </div>
 
           {/* Report Issue - pinned under the nav on every brand. Anyone on the

@@ -5,12 +5,10 @@ import ScoreRing from './ScoreRing'
 import InitialsAvatar from './InitialsAvatar'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
-import { playSound } from '@/lib/sound-prefs'
 import Image from 'next/image'
 import { MdDragIndicator, MdRestartAlt, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications, MdFavorite, MdSettings, MdLogout, MdCall, MdAssignment, MdVerified, MdAccountBalanceWallet, MdSmartphone, MdQrCode2, MdPhoneMissed, MdDoorFront, MdAutoAwesome, MdInsights, MdMic, MdPlace, MdAccessTime, MdChevronRight, MdStarBorder, MdGroups, MdMyLocation, MdMood } from 'react-icons/md'
 import { FaInstagram, FaFacebookF, FaGoogle, FaYoutube, FaLinkedinIn } from 'react-icons/fa'
 import LeadDetailsModal from './LeadDetailsModal'
-import NotificationCenter from './NotificationCenter'
 import { useFeatureFlags } from '@/lib/useFeatureFlags'
 import { getBrandConfig, brandLabel } from '@/configs'
 import type { Lead } from '@/types'
@@ -453,8 +451,8 @@ export default function FounderDashboard() {
     try { localStorage.removeItem(CARD_ORDER_KEY) } catch { /* ignore */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fire the soft "ready" chime once, when the home page's first load lands.
-  const readyChimedRef = useRef(false)
+  // The "ready" chime moved to DashboardLayout, so it fires on a reload of ANY
+  // dashboard page instead of only this one (and only once per load).
 
   const loadMetrics = useCallback(async () => {
     try {
@@ -476,10 +474,6 @@ export default function FounderDashboard() {
       setMetrics(null)
     } finally {
       setLoading(false)
-      if (!readyChimedRef.current) {
-        readyChimedRef.current = true
-        playSound('ready') // once per mount; gated by the Configure toggle + mute
-      }
     }
   }, [hotLeadThreshold, view])
 
@@ -871,7 +865,6 @@ export default function FounderDashboard() {
               <MdRestartAlt size={18} />
             </button>
           )}
-          <NotificationCenter inline />
           {/* Profile menu */}
           <div className="relative" ref={profileRef}>
             <button

@@ -18,21 +18,23 @@ import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
 import { brandLabel } from '@/configs';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
-  { ev: 'new', hint: `Pop cue when a fresh ${brandLabel('Lead').toLowerCase()} is scored` },
+  { ev: 'ready', hint: 'Cue when a dashboard page finishes loading' },
+  { ev: 'new', hint: `Pop cue when a fresh ${brandLabel('Lead').toLowerCase()} comes in` },
+  { ev: 'message', hint: 'Soft chime when someone messages you on any channel' },
   { ev: 'update', hint: 'Pop on a stage or score change' },
-  { ev: 'ready', hint: 'Cue when the home page finishes loading' },
 ];
 
 export default function NotificationsPage() {
   const [soundMuted, setSoundMuted] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState<Record<SoundEvent, boolean>>({
-    new: true, update: true, ready: true,
+    new: true, message: true, update: true, ready: true,
   });
 
   useEffect(() => {
     setSoundMuted(isMuted());
     setSoundEnabled({
       new: isEventEnabled('new'),
+      message: isEventEnabled('message'),
       update: isEventEnabled('update'),
       ready: isEventEnabled('ready'),
     });
