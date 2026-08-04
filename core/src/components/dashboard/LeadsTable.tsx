@@ -307,6 +307,10 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
   const [offlineEventView, setOfflineEventView] = useState(false)
+  // Scholarship segment (windchasers): applicants to the academy's full
+  // scholarship. Like Webinar/Offline Events, the tab shows ONLY applicants and
+  // the default Leads view excludes them.
+  const [scholarshipView, setScholarshipView] = useState(false)
   // Which offline-event groups the user has collapsed. Absent = use the
   // default (newest event open, older ones closed).
   const [collapsedEvents, setCollapsedEvents] = useState<Record<string, boolean>>({})
@@ -433,6 +437,14 @@ export default function LeadsTable({
         const isOfflineEvent = lead.unified_context?.[brandId]?.lead_type === 'offline_event'
         return offlineEventView ? isOfflineEvent : !isOfflineEvent
       })
+      // Applied-at rather than lead_type: an applicant is usually ALSO an
+      // event registrant or a plain lead, and lead_type is last-writer-wins.
+      // The timestamp is only ever set by the application form, so it is the
+      // one marker that cannot be overwritten by later activity.
+      filtered = filtered.filter((lead) => {
+        const hasApplied = Boolean(lead.unified_context?.[brandId]?.scholarship_applied_at)
+        return scholarshipView ? hasApplied : true
+      })
     }
 
     if (courseInterestFilter !== 'all') {
@@ -488,7 +500,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, scholarshipView, gigsView, showGigsTab])
 
   /**
    * Rows to render. Outside the Offline Events tab this is an identity
@@ -798,12 +810,13 @@ export default function LeadsTable({
              does - a marketing segment, not to be confused with a lead's own
              "Key Event" (their scheduled call/demo booking). */}
           {showWebinarTab && (
-            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar or Offline Events" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar, Offline Events or Scholarship" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
               {([
-                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('all') } },
-                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('Cabin Crew') } },
-                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setCourseInterestFilter('all') } },
-                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setCourseInterestFilter('all') } },
+                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
+                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('Cabin Crew') } },
+                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
+                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
+                { label: 'Scholarship', selected: scholarshipView, onSelect: () => { setScholarshipView(true); setOfflineEventView(false); setWebinarView(false); setCourseInterestFilter('all') } },
               ] as const).map((t) => (
                 <button
                   key={t.label}
