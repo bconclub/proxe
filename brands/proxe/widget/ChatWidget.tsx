@@ -2846,17 +2846,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                     <InfinityLoader />
                   ) : (
                     <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
-                      <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {message.type === 'ai' ? ICONS.ai(brand, config) : ICONS.user}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {message.type === 'ai' ? config.name : 'You'}
-                        </span>
-                      </div>
-                      
-                      {/* Message content */}
+                      {/* No per-message avatar/name chip. Core's widget (and so
+                          Windchasers) renders plain bubbles: the name is already
+                          in the chat header, and repeating "PROXe" with a logo
+                          above every single line ate roughly a third of the
+                          panel and pushed the actual reply down. Whose message
+                          it is reads from the bubble's own alignment and colour. */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', flexWrap: 'nowrap', gap: '8px', width: '100%' }}>
                         <div
                           className={styles.messageText}
@@ -2912,14 +2907,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
                     <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
                   <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
                     <button
                       type="button"
                       className={styles.calendarCloseBtn}
@@ -2974,14 +2962,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                 <div className={styles.messageContent}>
                   <div className={styles.bubble}>
                     <div className={styles.bubbleContent}>
-                      {/* Header with avatar and name inside the bubble */}
                       <div className={styles.bubbleHeader}>
-                        <div className={styles.bubbleAvatar}>
-                          {ICONS.ai(brand, config)}
-                        </div>
-                        <span className={styles.bubbleName}>
-                          {config.name}
-                        </span>
                         <button
                           type="button"
                           className={styles.calendarCloseBtn}
@@ -3031,14 +3012,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  {/* Header with avatar and name inside the bubble */}
                   <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
                     <button
                       type="button"
                       className={styles.calendarCloseBtn}
@@ -3092,14 +3066,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
             <div className={styles.messageContent}>
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
-                  <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
-                  </div>
                   <p className={styles.exploreTitle}>Choose your PROXe</p>
                   <div className={styles.exploreButtonGroup}>
                     {exploreButtons.map((option, optionIndex) => {
@@ -3154,12 +3120,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
                   <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
                     <button
                       type="button"
                       className={styles.inlinePromptClose}
@@ -3208,12 +3168,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
                   <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
                     <button
                       type="button"
                       className={styles.inlinePromptClose}
@@ -3263,12 +3217,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
               <div className={styles.bubble}>
                 <div className={styles.bubbleContent}>
                   <div className={styles.bubbleHeader}>
-                    <div className={styles.bubbleAvatar}>
-                      {ICONS.ai(brand, config)}
-                    </div>
-                    <span className={styles.bubbleName}>
-                      {config.name}
-                    </span>
                     <button
                       type="button"
                       className={styles.inlinePromptClose}
