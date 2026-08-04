@@ -251,6 +251,38 @@ function realEmail(v?: string | null): string {
   return !t || isSyntheticContact(t) ? '' : t
 }
 
+/**
+ * What stage of the scholarship a lead is actually at.
+ *
+ * These were all one "★ Scholarship" chip, which conflated two very different
+ * people: someone who ticked a box while booking an event seat, and someone
+ * who sat down and filled in an eight-question application. The first is a
+ * lead to chase; the second is a candidate to assess.
+ *
+ * Ordered most-progressed first - a lead who applied is also still flagged
+ * "interested" on their event registration, so the later state must win.
+ */
+function scholarshipStatus(
+  wc: any,
+): { label: string; icon: string; color: string; title: string } | null {
+  const stage = String(wc?.scholarship_stage || '')
+  const track = wc?.scholarship_track_label || wc?.scholarship_track || ''
+  const suffix = track ? ` - ${track}` : ''
+
+  if (stage === 'selected') return { label: 'Selected', icon: '★', color: '#22c55e', title: `Scholarship awarded${suffix}` }
+  if (stage === 'rejected') return { label: 'Not selected', icon: '×', color: '#8b8b8b', title: `Not selected${suffix}` }
+  if (stage === 'interview') return { label: 'Interview', icon: '◆', color: '#a78bfa', title: `At interview stage${suffix}` }
+  if (stage === 'documents') return { label: 'Documents', icon: '◆', color: '#a78bfa', title: `At documents stage${suffix}` }
+  if (stage === 'exam_completed') return { label: 'Exam done', icon: '✓', color: '#22c55e', title: `Aptitude test completed${suffix}` }
+  // The application form itself was submitted - the real signal.
+  if (wc?.scholarship_applied_at || stage === 'applied')
+    return { label: 'Form filled', icon: '✓', color: '#e0a63c', title: `Application submitted${suffix}` }
+  // Only ticked the box while registering for an event. Interest, nothing more.
+  if (wc?.offline_event_intent === 'scholarship')
+    return { label: 'Interested', icon: '★', color: '#8a7a5c', title: 'Ticked scholarship interest at event registration' }
+  return null
+}
+
 export default function LeadsTable({
   limit: initialLimit,
   sourceFilter: initialSourceFilter,
@@ -306,10 +338,6 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
   const [offlineEventView, setOfflineEventView] = useState(false)
-  // Scholarship segment (windchasers): applicants to the academy's full
-  // scholarship. Like Webinar/Offline Events, the tab shows ONLY applicants and
-  // the default Leads view excludes them.
-  const [scholarshipView, setScholarshipView] = useState(false)
   // Which offline-event groups the user has collapsed. Absent = use the
   // default (newest event open, older ones closed).
   const [collapsedEvents, setCollapsedEvents] = useState<Record<string, boolean>>({})
@@ -436,14 +464,6 @@ export default function LeadsTable({
         const isOfflineEvent = lead.unified_context?.[brandId]?.lead_type === 'offline_event'
         return offlineEventView ? isOfflineEvent : !isOfflineEvent
       })
-      // Applied-at rather than lead_type: an applicant is usually ALSO an
-      // event registrant or a plain lead, and lead_type is last-writer-wins.
-      // The timestamp is only ever set by the application form, so it is the
-      // one marker that cannot be overwritten by later activity.
-      filtered = filtered.filter((lead) => {
-        const hasApplied = Boolean(lead.unified_context?.[brandId]?.scholarship_applied_at)
-        return scholarshipView ? hasApplied : true
-      })
     }
 
     if (courseInterestFilter !== 'all') {
@@ -499,7 +519,7 @@ export default function LeadsTable({
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, scholarshipView, gigsView, showGigsTab])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
 
   /**
    * Rows to render. Outside the Offline Events tab this is an identity
@@ -809,13 +829,12 @@ export default function LeadsTable({
              does - a marketing segment, not to be confused with a lead's own
              "Key Event" (their scheduled call/demo booking). */}
           {showWebinarTab && (
-            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar, Offline Events or Scholarship" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar or Offline Events" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
               {([
-                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
-                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('Cabin Crew') } },
-                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
-                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setScholarshipView(false); setCourseInterestFilter('all') } },
-                { label: 'Scholarship', selected: scholarshipView, onSelect: () => { setScholarshipView(true); setOfflineEventView(false); setWebinarView(false); setCourseInterestFilter('all') } },
+                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('Cabin Crew') } },
+                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setCourseInterestFilter('all') } },
               ] as const).map((t) => (
                 <button
                   key={t.label}
@@ -2168,7 +2187,7 @@ export default function LeadsTable({
                         // scholarship marker. Applying also books the seat, so
                         // these stack rather than being either/or.
                         const wc = uc?.[brandId] || {}
-                        const isScholarship = wc.offline_event_intent === 'scholarship'
+                        const scholar = scholarshipStatus(wc)
                         return (
                           <div className="inline-flex flex-col items-center gap-1">
                             {wc.offline_event_registered_at ? (
@@ -2181,17 +2200,17 @@ export default function LeadsTable({
                             ) : (
                               <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Not yet</span>
                             )}
-                            {isScholarship && (
+                            {scholar && (
                               <span
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap"
                                 style={{
-                                  background: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
-                                  color: 'var(--accent-primary)',
-                                  border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                                  background: `color-mix(in srgb, ${scholar.color} 16%, transparent)`,
+                                  color: scholar.color,
+                                  border: `1px solid color-mix(in srgb, ${scholar.color} 40%, transparent)`,
                                 }}
-                                title={wc.scholarship_track_label || wc.scholarship_track || 'Scholarship applicant'}
+                                title={scholar.title}
                               >
-                                ★ Scholarship
+                                {scholar.icon} {scholar.label}
                               </span>
                             )}
                           </div>
