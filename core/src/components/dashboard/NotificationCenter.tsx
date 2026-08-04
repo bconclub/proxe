@@ -1,30 +1,39 @@
 'use client'
 
 /**
- * NotificationCenter — "what's new" only.
+ * NotificationCenter - the bell, and the only place notifications live.
  *
- * The bell now carries EXACTLY one thing: product updates (curated in
- * @/lib/product-updates) with their version numbers. No lead activity, no
- * toasts, no sounds — founder call 2026-07-10: "notification should be all the
- * new updates with version numbering. That's the only thing it has to do."
- * (The old lead-stage feed lives on in git history if we ever want it back.)
+ * It carries two feeds, split into tabs:
  *
- *   1. Bell (top bar) with an unread count = updates this viewer hasn't seen.
- *   2. Click → slide-out "What's new" drawer listing every update visible to
- *      this brand, newest first, each with a version chip + date.
- *   3. Opening the drawer marks everything seen (localStorage).
+ *   1. Activity - live leads + inbound messages, polled by useLiveAlerts and
+ *      passed in from DashboardLayout. This is new: until now nothing in the
+ *      product told a human "a lead just came in" while they sat on another
+ *      page, and the bell itself only existed on the Overview.
+ *   2. What's new - curated product updates with version numbers
+ *      (@/lib/product-updates), unchanged from the 2026-07-10 founder call.
  *
- * Footer shows the running app version from /api/build-info.
+ * The trigger renders two ways:
+ *   - variant="sidebar" (default) - a nav row in the left rail, so the bell is
+ *     reachable from EVERY dashboard page, not just the home page.
+ *   - variant="topbar" - the old 36px circular button, kept for any header
+ *     that still wants it inline.
+ *
+ * Opening the drawer marks the active tab's items seen (localStorage for
+ * updates, the useLiveAlerts cursor for activity).
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { PRODUCT_UPDATES, type ProductUpdate } from '@/lib/product-updates'
 import { getCurrentBrandId } from '@/configs'
+import type { DashboardAlert } from '@/app/api/dashboard/alerts/route'
 import {
   MdNotificationsNone,
   MdNotificationsActive,
   MdClose,
   MdRocketLaunch,
+  MdPersonAddAlt1,
+  MdChatBubble,
 } from 'react-icons/md'
 
 const UPDATE_SEEN_KEY = 'wc-notif-update-seen'
@@ -35,15 +44,51 @@ function fmtDate(iso: string): string {
   } catch { return iso }
 }
 
+/** "just now" / "12m" / "3h" / "Tue" - compact enough for a 380px drawer. */
+function fmtAgo(iso: string): string {
+  const ms = Date.now() - Date.parse(iso)
+  if (!Number.isFinite(ms)) return ''
+  const mins = Math.floor(ms / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  } catch { return '' }
+}
+
 // Updates visible to THIS brand, newest first (source array is curated newest-first).
 function visibleUpdates(): ProductUpdate[] {
   const brandId = getCurrentBrandId()
   return PRODUCT_UPDATES.filter((x) => !x.brands || x.brands.includes('*') || x.brands.includes(brandId))
 }
 
-export default function NotificationCenter({ inline = false }: { inline?: boolean }) {
+export interface NotificationCenterProps {
+  /** legacy alias for variant="topbar" */
+  inline?: boolean
+  variant?: 'sidebar' | 'topbar'
+  /** sidebar only: show the label next to the icon (rail expanded) */
+  expanded?: boolean
+  /** live feed from useLiveAlerts (DashboardLayout owns the poller) */
+  alerts?: DashboardAlert[]
+  unreadAlerts?: number
+  onAlertsSeen?: () => void
+}
+
+export default function NotificationCenter({
+  inline = false,
+  variant,
+  expanded = true,
+  alerts = [],
+  unreadAlerts = 0,
+  onAlertsSeen,
+}: NotificationCenterProps) {
+  const router = useRouter()
+  const mode = variant || (inline ? 'topbar' : 'sidebar')
   const [open, setOpen] = useState(false)
-  const [unread, setUnread] = useState(0)
+  const [tab, setTab] = useState<'activity' | 'updates'>('activity')
+  const [unreadUpdates, setUnreadUpdates] = useState(0)
   const [updates, setUpdates] = useState<ProductUpdate[]>([])
   const [appVersion, setAppVersion] = useState<string | null>(null)
 
@@ -53,7 +98,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
     setUpdates(ups)
     let seen: string[] = []
     try { seen = JSON.parse(localStorage.getItem(UPDATE_SEEN_KEY) || '[]') } catch { /* ignore */ }
-    setUnread(ups.filter((u) => !seen.includes(u.id)).length)
+    setUnreadUpdates(ups.filter((u) => !seen.includes(u.id)).length)
   }, [])
 
   // Running version for the drawer footer (same source as the sidebar badge).
@@ -64,54 +109,120 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
       .catch(() => { /* footer just omits it */ })
   }, [])
 
-  const openDrawer = useCallback(() => {
-    setOpen(true)
-    // Opening = seen. Record every visible update id.
+  const markUpdatesSeen = useCallback(() => {
     try {
       const seen: string[] = JSON.parse(localStorage.getItem(UPDATE_SEEN_KEY) || '[]')
       const all = Array.from(new Set([...seen, ...visibleUpdates().map((u) => u.id)]))
       localStorage.setItem(UPDATE_SEEN_KEY, JSON.stringify(all))
     } catch { /* ignore */ }
-    setUnread(0)
+    setUnreadUpdates(0)
   }, [])
+
+  const openDrawer = useCallback(() => {
+    setOpen(true)
+    // Land on whichever feed actually has something waiting.
+    const startTab = unreadAlerts > 0 || unreadUpdates === 0 ? 'activity' : 'updates'
+    setTab(startTab)
+    if (startTab === 'activity') onAlertsSeen?.()
+    else markUpdatesSeen()
+  }, [unreadAlerts, unreadUpdates, onAlertsSeen, markUpdatesSeen])
+
+  const selectTab = useCallback((next: 'activity' | 'updates') => {
+    setTab(next)
+    if (next === 'activity') onAlertsSeen?.()
+    else markUpdatesSeen()
+  }, [onAlertsSeen, markUpdatesSeen])
+
+  // A message has a thread to open. A brand-new lead often has none yet, so it
+  // goes to the Leads table rather than a conversation that may not exist.
+  const openAlert = useCallback((a: DashboardAlert) => {
+    setOpen(false)
+    if (a.kind === 'message' && a.leadId) router.push(`/dashboard/inbox?lead=${a.leadId}`)
+    else router.push('/dashboard/leads')
+  }, [router])
+
+  const totalUnread = unreadAlerts + unreadUpdates
+  const BellIcon = totalUnread > 0 ? MdNotificationsActive : MdNotificationsNone
+
+  const badge = (extraStyle?: React.CSSProperties) => (
+    totalUnread > 0 ? (
+      <span
+        className="flex items-center justify-center text-[10px] font-bold text-white rounded-full"
+        style={{ minWidth: '18px', height: '18px', padding: '0 4px', backgroundColor: '#EF4444', ...extraStyle }}
+      >
+        {totalUnread > 99 ? '99+' : totalUnread}
+      </span>
+    ) : null
+  )
 
   return (
     <>
-      {/* Bell — inline in the top bar (or fixed for legacy floating layouts). */}
-      <button
-        onClick={openDrawer}
-        className={`${inline ? 'relative' : 'fixed shadow-lg'} z-[60] flex items-center justify-center rounded-full transition hover:opacity-90`}
-        style={{
-          ...(inline
-            ? { backgroundColor: 'var(--accent-subtle)', border: '1px solid var(--accent-primary)', color: 'var(--accent-primary)' }
-            : { top: '54px', right: '20px', backgroundColor: 'var(--button-bg)', border: '1px solid var(--border-primary)', color: 'var(--text-button)' }),
-          width: '36px',
-          height: '36px',
-        }}
-        aria-label="What's new"
-        title="What's new"
-      >
-        {unread > 0 ? <MdNotificationsActive size={20} /> : <MdNotificationsNone size={20} />}
-        {unread > 0 && (
+      {mode === 'topbar' ? (
+        <button
+          onClick={openDrawer}
+          className="relative z-[60] flex items-center justify-center rounded-full transition hover:opacity-90"
+          style={{
+            backgroundColor: 'var(--accent-subtle)',
+            border: '1px solid var(--accent-primary)',
+            color: 'var(--accent-primary)',
+            width: '36px',
+            height: '36px',
+          }}
+          aria-label="Notifications"
+          title="Notifications"
+        >
+          <BellIcon size={20} />
+          {badge({ position: 'absolute', top: '-4px', right: '-4px' })}
+        </button>
+      ) : (
+        /* Sidebar rail row - mirrors the nav item geometry (40px icon box, 20px
+           line-height) so it sits flush with Overview/Leads/Chats above it. */
+        <button
+          onClick={openDrawer}
+          className="dashboard-layout-nav-item flex items-center w-full"
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--text-secondary)',
+            backgroundColor: 'transparent',
+            margin: '2px 0',
+            borderRadius: '8px',
+            padding: '7px 10px 7px 0',
+            width: !expanded ? '40px' : 'auto',
+            position: 'relative',
+            transition: 'background-color 180ms ease, color 180ms ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+          aria-label="Notifications"
+          title="Notifications"
+        >
           <span
-            className="absolute flex items-center justify-center text-[10px] font-bold text-white rounded-full"
-            style={{ top: '-4px', right: '-4px', minWidth: '18px', height: '18px', padding: '0 4px', backgroundColor: '#EF4444' }}
+            style={{ width: '40px', minWidth: '40px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'inherit', position: 'relative' }}
           >
-            {unread > 99 ? '99+' : unread}
+            <BellIcon size={16} />
+            {/* Collapsed rail has no room for a number - show a dot on the icon. */}
+            {!expanded && totalUnread > 0 && (
+              <span style={{ position: 'absolute', top: '-2px', right: '6px', width: '7px', height: '7px', borderRadius: '9999px', backgroundColor: '#EF4444' }} />
+            )}
           </span>
-        )}
-      </button>
+          {expanded && (
+            <>
+              <span className="flex-1 truncate text-left" style={{ lineHeight: '20px' }}>Notifications</span>
+              {badge()}
+            </>
+          )}
+        </button>
+      )}
 
-      {/* Slide-out "What's new" drawer */}
+      {/* Slide-out drawer */}
       {open && (
         <div className="fixed inset-0 z-[70]" aria-modal="true" role="dialog">
-          {/* Backdrop */}
           <div
             className="absolute inset-0"
             style={{ backgroundColor: 'rgba(0,0,0,0.45)', animation: 'wc-fade-in 160ms ease' }}
             onClick={() => setOpen(false)}
           />
-          {/* Panel — full-height, right side */}
           <div
             className="absolute top-0 right-0 h-full flex flex-col shadow-2xl"
             style={{
@@ -123,7 +234,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>What&rsquo;s new</h3>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Notifications</h3>
               <button
                 onClick={() => setOpen(false)}
                 className="p-1.5 rounded-md transition-colors"
@@ -134,8 +245,66 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
               </button>
             </div>
 
+            {/* Tabs */}
+            <div className="flex flex-shrink-0 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              {([
+                { key: 'activity' as const, label: 'Activity', count: unreadAlerts },
+                { key: 'updates' as const, label: "What's new", count: unreadUpdates },
+              ]).map(({ key, label, count }) => (
+                <button
+                  key={key}
+                  onClick={() => selectTab(key)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium transition-colors"
+                  style={{
+                    color: tab === key ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    borderBottom: `2px solid ${tab === key ? 'var(--accent-primary)' : 'transparent'}`,
+                  }}
+                >
+                  {label}
+                  {count > 0 && (
+                    <span className="text-[10px] font-bold text-white rounded-full px-1.5" style={{ backgroundColor: '#EF4444' }}>{count}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
             <div className="overflow-y-auto flex-1">
-              {updates.length === 0 ? (
+              {tab === 'activity' ? (
+                alerts.length === 0 ? (
+                  <p className="text-sm text-center py-12 px-6" style={{ color: 'var(--text-secondary)' }}>
+                    Nothing yet. New leads and incoming messages land here while this tab is open.
+                  </p>
+                ) : (
+                  alerts.map((a) => {
+                    const isLead = a.kind === 'lead'
+                    const Icon = isLead ? MdPersonAddAlt1 : MdChatBubble
+                    const tint = isLead ? '#10B981' : '#3B82F6'
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => openAlert(a)}
+                        className="flex items-start gap-3 px-4 py-3 border-b w-full text-left transition-colors"
+                        style={{ borderColor: 'var(--border-primary)' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${tint}22`, color: tint }}>
+                          <Icon size={16} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="flex items-center gap-1.5 mb-1">
+                            <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase" style={{ backgroundColor: `${tint}22`, color: tint }}>
+                              {isLead ? 'New lead' : 'Message'}
+                            </span>
+                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{a.channel} · {fmtAgo(a.timestamp)}</span>
+                          </span>
+                          <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{a.content}</span>
+                        </span>
+                      </button>
+                    )
+                  })
+                )
+              ) : updates.length === 0 ? (
                 <p className="text-sm text-center py-12" style={{ color: 'var(--text-secondary)' }}>No updates yet</p>
               ) : (
                 updates.map((u) => (
@@ -166,6 +335,7 @@ export default function NotificationCenter({ inline = false }: { inline?: boolea
 
             <div className="px-4 py-2.5 border-t flex-shrink-0 flex items-center justify-between" style={{ borderColor: 'var(--border-primary)' }}>
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>PROXe{appVersion ? ` · v${appVersion}` : ''}</span>
+              <a href="/dashboard/settings/notifications" className="text-xs" style={{ color: 'var(--text-secondary)' }}>Sound settings</a>
             </div>
           </div>
         </div>

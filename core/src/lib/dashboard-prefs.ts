@@ -7,10 +7,10 @@
  * setting reaches every user on their next load.
  */
 
-import { setMuted, setEventEnabled, type SoundEvent } from './sound-prefs'
+import { setMuted, setEventEnabled, SOUND_EVENT_ORDER } from './sound-prefs'
 
 export interface GlobalPrefs {
-  sounds?: { muted?: boolean; new?: boolean; update?: boolean; ready?: boolean }
+  sounds?: { muted?: boolean; new?: boolean; message?: boolean; update?: boolean; ready?: boolean }
   theme?: { mode?: 'brand' | 'bw-dark' | 'bw-light'; accent?: string }
 }
 
@@ -43,7 +43,7 @@ export async function saveGlobalPrefs(partial: GlobalPrefs): Promise<void> {
 export function applySoundsToLocal(sounds?: GlobalPrefs['sounds']) {
   if (!sounds) return
   if (typeof sounds.muted === 'boolean') setMuted(sounds.muted)
-  ;(['new', 'update', 'ready'] as SoundEvent[]).forEach((ev) => {
+  SOUND_EVENT_ORDER.forEach((ev) => {
     const v = sounds[ev]
     if (typeof v === 'boolean') setEventEnabled(ev, v)
   })
