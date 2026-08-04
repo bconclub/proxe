@@ -163,7 +163,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // Live leads + inbound messages. ONE poller for the whole dashboard shell:
   // it feeds the sidebar bell's drawer/badge and the Chats nav badge below.
   const { alerts, unread: unreadAlerts, unreadMessages, markAllSeen } = useLiveAlerts()
-  const unreadCount = unreadMessages // Chats badge = unread inbound messages
+  // Chats badge counts CONVERSATIONS still needing a reply. It is tracked
+  // separately from the bell's unread on purpose - opening the bell must not
+  // clear it. See the two-counters note in useLiveAlerts.
+  const unreadCount = unreadMessages
   // One "dashboard loaded" chime per mount (see the prefs effect below).
   const readyChimedRef = React.useRef(false)
   const [buildDate, setBuildDate] = useState<string>('')
