@@ -532,6 +532,17 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [showLogCallForm, setShowLogCallForm] = useState(false)
   const [logCallOutcome, setLogCallOutcome] = useState<string>('Connected')
   const [logCallNotes, setLogCallNotes] = useState('')
+  // The call-back slot. Defaults to tomorrow 11:00 IST - the answer nine times
+  // out of ten - so the common case is one tap, not three. Blank date = the
+  // caller deliberately promised nothing.
+  const [followupDate, setFollowupDate] = useState(() => {
+    const ist = new Date(Date.now() + 5.5 * 3600e3 + 86400e3)
+    return ist.toISOString().slice(0, 10)
+  })
+  const [followupTime, setFollowupTime] = useState('11:00')
+  // Ticked by default: a missed call with no message is indistinguishable from
+  // being ignored. Untick to stay quiet.
+  const [sendRnrMessage, setSendRnrMessage] = useState(true)
   const [savingLogCall, setSavingLogCall] = useState(false)
 
   // Convert lead state - explicit conversion with details (date/program/amount/notes)
@@ -1560,7 +1571,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       const response = await fetch(`/api/dashboard/leads/${lead.id}/log-call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome: logCallOutcome, notes: logCallNotes.trim() || undefined }),
+        body: JSON.stringify({
+          outcome: logCallOutcome,
+          notes: logCallNotes.trim() || undefined,
+          // Only a not-connected call promises a call-back; a connected one
+          // ends in a booking or a decision instead.
+          ...(logCallOutcome !== 'Connected' && followupDate
+            ? {
+                followup: { date: followupDate, time: followupTime || undefined, note: callNote || undefined },
+                send_rnr_message: sendRnrMessage,
+              }
+            : {}),
+        }),
       })
       if (!response.ok) {
         const data = await response.json()
@@ -3056,7 +3078,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Log a Call form */}
                 {/* Log a Call form - draft row (hidden once the bcon hub opens) */}
                 {showLogCallForm && !showLogCallHub && (
-                  <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                  <div className="lead-log-call-form mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                  <div className="flex items-center gap-2">
                     <select
                       value={logCallOutcome}
                       onChange={(e) => setLogCallOutcome(e.target.value)}
@@ -3101,6 +3124,51 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       <MdCheck size={12} />
                     </button>
                   </div>
+
+                  {/* Nobody picked up: the only thing that matters next is WHEN
+                      you ring back. Asked as a real field, because a promise
+                      typed into a note reaches no queue and nobody's day. */}
+                  {logCallOutcome !== 'Connected' && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-[var(--border-primary)]">
+                      <span className="text-[11px] font-semibold text-[var(--text-secondary)]">Call back</span>
+                      <input
+                        type="date"
+                        value={followupDate}
+                        onChange={(e) => setFollowupDate(e.target.value)}
+                        className="text-xs border border-[var(--border-primary)] rounded px-1.5 py-1 outline-none"
+                        style={{ colorScheme: 'light dark', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                        disabled={savingLogCall}
+                      />
+                      <input
+                        type="time"
+                        value={followupTime}
+                        onChange={(e) => setFollowupTime(e.target.value)}
+                        className="text-xs border border-[var(--border-primary)] rounded px-1.5 py-1 outline-none"
+                        style={{ colorScheme: 'light dark', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                        disabled={savingLogCall}
+                      />
+                      {!!getBrandConfig().pipeline?.rnrCallbackTemplate && (
+                        <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={sendRnrMessage}
+                            onChange={(e) => setSendRnrMessage(e.target.checked)}
+                            disabled={savingLogCall}
+                          />
+                          Tell them on WhatsApp
+                        </label>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setFollowupDate('')}
+                        className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] ml-auto"
+                        title="Log the call without promising a call-back"
+                      >
+                        No call-back
+                      </button>
+                    </div>
+                  )}
+                  </div>
                 )}
 
                 {/* Decision hub (bcon) - opens after the draft is saved */}
@@ -3111,6 +3179,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       leadName={lead.name || 'this lead'}
                       outcome={logCallOutcome}
                       notes={logCallNotes}
+                      // The slot the caller already picked on the draft row.
+                      // Carried through so the chat's commit persists it too -
+                      // otherwise deciding anything in chat loses the promise.
+                      initialFollowup={
+                        logCallOutcome !== 'Connected' && followupDate
+                          ? { date: followupDate, time: followupTime || undefined, send_message: sendRnrMessage }
+                          : undefined
+                      }
                       onCancel={() => setShowLogCallHub(false)}
                       onDone={finishLogCall}
                     />

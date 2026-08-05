@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { classifyAndAct, getServiceClient, resolveBookingDate, sendWhatsAppTemplate, type CallOutcome } from '@/lib/services'
+import { classifyAndAct, getServiceClient, resolveBookingDate, sendWhatsAppTemplate, sendMissedCallMessage, type CallOutcome } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { validateSteps, type DecisionStep } from '@/lib/logcall/decisionPlan'
@@ -193,6 +193,109 @@ export async function POST(
     // Done BEFORE the orchestrator so its fresh context re-read keeps the owner.
     await assignOwnerOnTouch(supabase, leadId, user)
 
+    // ── The follow-up: the actual pipeline ───────────────────────────────────
+    // Most calls are nobody-picked-up, and what happens next is a promise to
+    // ring back. That promise is the work queue, so it has to be stored as
+    // data rather than left as prose inside a note.
+    //
+    // It lands in activities.next_followup_date - indexed, already on the
+    // schema, and crucially NOT agent_tasks, whose inserts are silently
+    // dropped by the trigger installed to stop the automation. Writing there
+    // would look like it worked and reach nobody.
+    //
+    // Runs before the auto/decision branch below because both modes return
+    // early, and a follow-up must survive either path.
+    const followupIn = (body?.followup || null) as { date?: string; time?: string; note?: string } | null
+    const wantsRnrMessage = body?.send_rnr_message === true
+    let followupAt: Date | null = null
+
+    // Calling someone IS the follow-up happening. Whatever was outstanding is
+    // now settled, whether or not a new one replaces it - otherwise yesterday's
+    // promise sits in the queue forever, ageing.
+    await supabase
+      .from('activities')
+      .update({ next_followup_date: null })
+      .eq('lead_id', leadId)
+      .not('next_followup_date', 'is', null)
+      .then(undefined, (e: any) => console.error('[log-call] clearing old follow-ups failed:', e?.message))
+
+    if (followupIn?.date) {
+      try {
+        followupAt = resolveBookingDate(followupIn.date, followupIn.time || null)
+        const { error: fErr } = await supabase.from('activities').insert({
+          lead_id: leadId,
+          // Its own type so it never counts as a call in the stats.
+          activity_type: 'followup',
+          note: (followupIn.note || '').trim() || `Call back ${leadRow.customer_name || 'this lead'}`,
+          next_followup_date: followupAt.toISOString(),
+          created_by: activityCreatedBy,
+        })
+        if (fErr) console.error('[log-call] follow-up insert failed:', fErr.message)
+      } catch (e: any) {
+        console.error('[log-call] could not resolve the follow-up date:', e?.message)
+        followupAt = null
+      }
+    }
+
+    // Tell the lead we tried and when we will try again. A missed call with no
+    // message is indistinguishable from being ignored. Template only - open
+    // text cannot leave the 24h window - and brand-supplied, so a brand
+    // without one simply stays quiet.
+    if (outcome !== 'Connected' && wantsRnrMessage) {
+      const rnrTemplate = getBrandConfig().pipeline?.rnrCallbackTemplate
+      const phone = leadRow.customer_phone_normalized || leadRow.phone?.replace(/\D/g, '').slice(-10) || null
+      const firstName = (leadRow.customer_name || '').split(' ')[0] || 'there'
+      let sent = false
+      let sendErr = ''
+      if (!phone) {
+        sendErr = 'no phone on lead'
+      } else if (rnrTemplate && followupAt) {
+        const cbDate = followupAt.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })
+        const cbTime = followupAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+        try {
+          const res = await sendWhatsAppTemplate(phone, rnrTemplate, [{
+            type: 'body',
+            parameters: [
+              { type: 'text', parameter_name: 'customer_name', text: firstName },
+              { type: 'text', parameter_name: 'callback_date', text: cbDate },
+              { type: 'text', parameter_name: 'callback_time', text: cbTime },
+            ],
+          }] as any)
+          sent = res.success
+          sendErr = res.error || ''
+        } catch (e: any) { sendErr = e?.message || 'send failed' }
+      }
+      // No template, or no call-back slot to quote: fall back to the plain
+      // "we tried calling" message rather than saying nothing at all.
+      if (!sent && phone && !sendErr.includes('no phone')) {
+        try {
+          // Returns a plain boolean, not the {success,error} shape the
+          // template sender uses.
+          const ok = await sendMissedCallMessage(phone, firstName, 'your enquiry', null)
+          if (ok) { sent = true; sendErr = '' }
+          else if (!sendErr) sendErr = 'send failed'
+        } catch (e: any) { if (!sendErr) sendErr = e?.message || 'send failed' }
+      }
+      const { data: rr } = await supabase.from('all_leads').select('unified_context').eq('id', leadId).maybeSingle()
+      const rc: any = rr?.unified_context || {}
+      const rn: any[] = Array.isArray(rc.admin_notes) ? rc.admin_notes : []
+      await supabase.from('all_leads').update({
+        unified_context: {
+          ...rc,
+          admin_notes: [...rn, {
+            id: `rnr_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+            text: sent
+              ? `Sent the call-back message${followupAt ? ` for ${followupAt.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}`
+              : `Call-back message could not be sent (${sendErr || 'unknown'})`,
+            created_by: createdBy,
+            created_at: new Date().toISOString(),
+            source: 'log_call',
+            outcome,
+          }],
+        },
+      }).eq('id', leadId)
+    }
+
     // ── LEGACY auto mode: no human decision → classify + act as before ───────
     if (!hasDecision) {
       const result = await classifyAndAct({
@@ -304,6 +407,20 @@ export async function POST(
           metadata: { source: 'log_call_hub', remind_via: 'telegram', owner_email: createdBy, note: detail.note || null, human_task: true },
           created_at: now.toISOString(),
         })
+        // That insert above is swallowed by the agent_tasks trigger, so the
+        // reminder also goes where the pipeline can actually read it. Skipped
+        // when the form already set one - the picker is the deliberate answer
+        // and must not be overwritten by what the chat inferred.
+        if (!followupAt) {
+          const { error: tErr } = await supabase.from('activities').insert({
+            lead_id: leadId,
+            activity_type: 'followup',
+            note: detail.note || `Follow up with ${leadName}`,
+            next_followup_date: dueAt.toISOString(),
+            created_by: activityCreatedBy,
+          })
+          if (tErr) console.error('[log-call] chat follow-up insert failed:', tErr.message)
+        }
         actionsTaken.push(`Reminder set for ${detail.date || 'tomorrow'} ${detail.time || ''}`.trim())
       } else if (step.action === 'message' && detail.template) {
         // Send an APPROVED template (open text can't be sent outside the 24h

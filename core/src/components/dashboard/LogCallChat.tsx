@@ -26,6 +26,12 @@ interface Props {
   leadName: string
   outcome: string
   notes: string
+  /**
+   * The call-back slot already picked on the draft row. Carried into the
+   * commit so a promise made there survives whatever gets decided in chat -
+   * the chat may add actions, it must not quietly drop the call-back.
+   */
+  initialFollowup?: { date: string; time?: string; send_message?: boolean }
   onCancel: () => void
   onDone: () => void
 }
@@ -179,7 +185,7 @@ function UserAvatar({ size = 26 }: { size?: number }) {
 
 const ACCENT = '#22c55e'
 
-export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel, onDone }: Props) {
+export default function LogCallChat({ leadId, leadName, outcome, notes, initialFollowup, onCancel, onDone }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(true)
@@ -331,7 +337,17 @@ export default function LogCallChat({ leadId, leadName, outcome, notes, onCancel
       const decision_reason = [...messages].reverse().find((m) => m.role === 'user')?.content || null
       const r = await fetch(`/api/dashboard/leads/${leadId}/log-call`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ outcome, notes: notes.trim() || undefined, decisions: activePlan.steps, decision_reason, ai_proposed_plan: aiPlan, context_snapshot: snapshot, chat_transcript }),
+        body: JSON.stringify({
+          outcome, notes: notes.trim() || undefined,
+          decisions: activePlan.steps, decision_reason,
+          ai_proposed_plan: aiPlan, context_snapshot: snapshot, chat_transcript,
+          ...(initialFollowup?.date
+            ? {
+                followup: { date: initialFollowup.date, time: initialFollowup.time },
+                send_rnr_message: initialFollowup.send_message === true,
+              }
+            : {}),
+        }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d?.error || `Failed (${r.status})`)

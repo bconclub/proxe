@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo, type CSSProperties } from 'react'
+import { useEffect, useState, useMemo, useRef, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { formatDateTime } from '@/lib/utils'
@@ -768,6 +768,20 @@ export default function LeadsTable({
 
     calculateScores()
   }, [leads])
+
+  // ?leadId=<id> opens that lead straight away. The pipeline queue links here:
+  // a row you are being asked about is useless without the lead behind it.
+  // Runs once per id - re-opening after a manual close would be a trap.
+  const deepLinkedId = searchParams.get('leadId')
+  const openedDeepLink = useRef<string | null>(null)
+  useEffect(() => {
+    if (!deepLinkedId || loading || openedDeepLink.current === deepLinkedId) return
+    const match = leads.find((l) => l.id === deepLinkedId)
+    if (!match) return
+    openedDeepLink.current = deepLinkedId
+    handleRowClick(match as ExtendedLead)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedId, loading, leads])
 
   const handleRowClick = (lead: ExtendedLead) => {
     const modalLead: Lead = {
