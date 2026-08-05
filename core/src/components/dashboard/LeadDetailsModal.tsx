@@ -3476,7 +3476,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 >
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {[
-                      ['Track', wc.scholarship_track_label || wc.scholarship_track || '-'],
+                      // Only the raw track ('cabin_crew') and the form title are
+                      // stored; there is no pretty label field to read.
+                      ['Track', wc.scholarship_form_title || label(String(wc.scholarship_track || '')) || '-'],
                       ['Stage', stageLabels[String(wc.scholarship_stage || '')] || wc.scholarship_stage || 'Applied'],
                       ['Applied', fmt(wc.scholarship_applied_at)],
                       ['Exam', wc.scholarship_exam_score_100 != null ? `${wc.scholarship_exam_score_100}/100` : 'Not taken'],
