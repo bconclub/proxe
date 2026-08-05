@@ -530,7 +530,13 @@ export async function POST(request: NextRequest) {
         normalizedSource === 'scholarship_application'
       if (isScholarshipApplication) {
         const track = String(cf2.scholarship_track || '').trim()
-        brandCtxData.lead_type = 'scholarship'
+        // Deliberately NOT setting lead_type. A scholarship applicant is
+        // almost always an event registrant too, and lead_type drives which
+        // dashboard tab they appear in - stamping 'scholarship' here pulled
+        // Wings registrants out of Offline Events and dumped them into the
+        // general Leads list. The application is tracked by
+        // scholarship_applied_at / scholarship_stage, which no other path
+        // writes, so it needs no help from lead_type.
         brandCtxData.scholarship_track = track || null
         brandCtxData.scholarship_form_title = String(cf2.scholarship_form_title || '').trim() || null
         // The submission itself, kept whole. One writer, one key - no deep
