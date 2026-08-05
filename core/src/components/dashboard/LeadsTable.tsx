@@ -648,40 +648,6 @@ export default function LeadsTable({
     | { kind: 'lead'; lead: ExtendedLead }
     | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; scholarship: number; collapsed: boolean }
   > => {
-    // Webinar groups by its own name/date, Offline Events by event key. Any
-    // other view is a flat list.
-    if (webinarView) {
-      const wgroups = new Map<string, ExtendedLead[]>()
-      for (const lead of filteredLeads) {
-        const wc: any = lead.unified_context?.[brandId] || {}
-        const key = String(wc.webinar_name || 'Webinar')
-        const bucket = wgroups.get(key)
-        if (bucket) bucket.push(lead)
-        else wgroups.set(key, [lead])
-      }
-      const ordered = [...wgroups.entries()].sort((a, b) => {
-        const newest = (rows: ExtendedLead[]) =>
-          rows.reduce((m, r) => {
-            const t = String(r.last_interaction_at || r.timestamp || '')
-            return t > m ? t : m
-          }, '')
-        return newest(b[1]).localeCompare(newest(a[1]))
-      })
-      const out: Array<{ kind: 'lead'; lead: ExtendedLead } | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; scholarship: number; collapsed: boolean }> = []
-      ordered.forEach(([key, rows], i) => {
-        const collapsed = collapsedEvents[key] ?? i > 0
-        const wc0: any = rows[0]?.unified_context?.[brandId] || {}
-        const registered = rows.filter((r: any) => (r.unified_context?.[brandId] || {}).zoom_registered).length
-        out.push({
-          kind: 'group', key, label: key,
-          sub: String(wc0.webinar_date || ''),
-          total: rows.length, registered, scholarship: 0, collapsed,
-        })
-        if (!collapsed) for (const lead of rows) out.push({ kind: 'lead', lead })
-      })
-      return out
-    }
-
     if (!offlineEventView) return filteredLeads.map((lead) => ({ kind: 'lead' as const, lead }))
 
     const groups = new Map<string, ExtendedLead[]>()
@@ -946,11 +912,11 @@ export default function LeadsTable({
     // top of it fights that: headers detach from their rows at page edges, and
     // a collapsed group can straddle a boundary. Group sizes are small enough
     // that the whole list is fine in one go.
-    if (offlineEventView || webinarView) return displayRows
+    if (offlineEventView) return displayRows
 
     const start = Math.min(page, Math.max(0, Math.ceil(filteredLeads.length / pageSize) - 1)) * pageSize
     return displayRows.slice(start, start + pageSize)
-  }, [displayRows, filteredLeads.length, page, pageSize, offlineEventView, webinarView])
+  }, [displayRows, filteredLeads.length, page, pageSize, offlineEventView])
 
   const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize))
   const safePage = Math.min(page, totalPages - 1)
@@ -2808,7 +2774,7 @@ export default function LeadsTable({
       {/* Pager. The list is no longer capped, so on 2,800 leads an endless
           scroll is unusable - this bounds what is on screen without hiding
           anything from the filters, which still run over the whole set. */}
-      {!offlineEventView && !webinarView && filteredLeads.length > pageSize && (
+      {!offlineEventView && filteredLeads.length > pageSize && (
         <div
           className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5 flex-shrink-0"
           style={{ borderColor: 'var(--border-primary)' }}
