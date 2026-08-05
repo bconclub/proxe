@@ -400,7 +400,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const router = useRouter()
   const brandId = getCurrentBrandId()
   const featureFlags = useFeatureFlags()
-  const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution'>('summary')
+  const [activeTab, setActiveTab] = useState<'activity' | 'notes' | 'summary' | 'breakdown' | 'interaction' | 'attribution' | 'scholarship'>('summary')
   // Lead-modal tab visibility - configured per brand at Configure → Lead Modal.
   // Defaults every tab ON; only an explicit `false` hides one.
   const [leadTabCfg, setLeadTabCfg] = useState<Record<string, boolean>>({})
@@ -412,7 +412,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         const tabs = d?.tabs || {}
         setLeadTabCfg(tabs)
         // If the default/active tab is hidden, fall to the first visible one.
-        const order = ['summary', 'activity', 'notes', 'breakdown', 'interaction', 'attribution'] as const
+        const order = ['summary', 'activity', 'notes', 'breakdown', 'interaction', 'attribution', 'scholarship'] as const
         setActiveTab((cur) => (tabs[cur] !== false ? cur : (order.find((t) => tabs[t] !== false) || cur)))
       })
       .catch(() => {})
@@ -3432,10 +3432,104 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             >
               Attribution
             </button>
+            {/* Only for applicants. The application is eight written answers -
+                that deserves a tab, not a line buried in Summary. */}
+            {(currentLead.unified_context as any)?.[brandId]?.scholarship_applied_at && (
+              <button
+                onClick={() => setActiveTab('scholarship')}
+                className={`lead-modal-tab lead-details-modal-tab px-4 py-1.5 text-sm font-medium transition-colors border-b-2 focus:outline-none ${activeTab === 'scholarship'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                role="tab"
+                aria-selected={activeTab === 'scholarship'}
+                aria-controls="lead-tabpanel-scholarship"
+                id="lead-tab-scholarship"
+              >
+                Scholarship
+              </button>
+            )}
           </nav>
 
           {/* TAB CONTENT - Scrollable */}
           <main className="lead-modal-content lead-details-modal-tab-content overflow-y-auto flex-1 min-h-0">
+            {activeTab === 'scholarship' && (() => {
+              const wc: any = (currentLead.unified_context as any)?.[brandId] || {}
+              const app = wc.scholarship_application || {}
+              const details = app.details || {}
+              const answers = app.answers || {}
+              const fmt = (iso: string | null) => {
+                if (!iso) return '-'
+                try { return new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) } catch { return String(iso) }
+              }
+              const label = (k: string) => k.replace(/^q\d+_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+              const stageLabels: Record<string, string> = {
+                applied: 'Applied', exam_completed: 'Exam done', documents: 'Documents',
+                interview: 'Interview', selected: 'Selected', rejected: 'Not selected',
+              }
+              return (
+                <section
+                  id="lead-tabpanel-scholarship"
+                  role="tabpanel"
+                  aria-labelledby="lead-tab-scholarship"
+                  className="px-4 pt-4 pb-6 space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {[
+                      ['Track', wc.scholarship_track_label || wc.scholarship_track || '-'],
+                      ['Stage', stageLabels[String(wc.scholarship_stage || '')] || wc.scholarship_stage || 'Applied'],
+                      ['Applied', fmt(wc.scholarship_applied_at)],
+                      ['Exam', wc.scholarship_exam_score_100 != null ? `${wc.scholarship_exam_score_100}/100` : 'Not taken'],
+                    ].map(([k, v]) => (
+                      <div key={String(k)} className="rounded-lg border p-3" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{k}</p>
+                        <p className="mt-0.5 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{String(v)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {Object.keys(details).length > 0 && (
+                    <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                      <h4 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Application details</h4>
+                      <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                        {Object.entries(details).filter(([, v]) => String(v ?? '').trim()).map(([k, v]) => (
+                          <div key={k} className="flex justify-between gap-3 text-sm">
+                            <span style={{ color: 'var(--text-muted)' }}>{label(k)}</span>
+                            <span className="text-right font-medium" style={{ color: 'var(--text-primary)' }}>{String(v)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {Object.keys(answers).length > 0 && (
+                    <div className="rounded-lg border p-4 space-y-4" style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-primary)' }}>
+                      <h4 className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                        Their answers - this is what the committee reads
+                      </h4>
+                      {Object.entries(answers).map(([k, v], i) => (
+                        <div key={k}>
+                          <p className="text-[12px] font-semibold" style={{ color: 'var(--text-secondary)' }}>{i + 1}. {label(k)}</p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                            {String(v || '-')}
+                          </p>
+                          <p className="mt-1 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            {String(v || '').trim().split(/\s+/).filter(Boolean).length} words
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {app.declaration_text && (
+                    <div className="rounded-lg border p-3 text-[12px]" style={{ borderColor: 'var(--border-primary)', color: 'var(--text-muted)' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Declaration accepted {fmt(app.declaration_accepted_at)}:</span>{' '}
+                      {app.declaration_text}
+                    </div>
+                  )}
+                </section>
+              )
+            })()}
             {/* Activity Tab - 70% width with improved message display */}
             {activeTab === 'activity' && (
               <section
