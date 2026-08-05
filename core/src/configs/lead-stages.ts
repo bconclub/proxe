@@ -34,6 +34,11 @@ export const LEAD_STAGES: LeadStageDef[] = [
   { value: 'Not Qualified', label: 'Not Qualified', description: 'Wrong fit',                        color: '#f43f5e', bg: 'rgba(244,63,94,0.15)' },
   { value: 'Cold',          label: 'Cold',          description: 'No engagement',                    color: '#6b7280', bg: 'rgba(107,114,128,0.15)' },
   { value: 'R&R',           label: 'R&R',           description: 'Rang, no reply',                   color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  // The pipeline has always drawn a No Show tile, but the value was never in
+  // this list - so nothing could set it and the tile was permanently 0. Same
+  // for Parked. Both are set from the "did this happen?" prompt.
+  { value: 'No Show',       label: 'No Show',       description: 'Booked, did not turn up',           color: '#fb923c', bg: 'rgba(251,146,60,0.15)' },
+  { value: 'Parked',        label: 'Parked',        description: 'On hold, revisit later',           color: '#94a3b8', bg: 'rgba(148,163,184,0.15)' },
 ]
 
 export const LEAD_STAGE_VALUES = LEAD_STAGES.map((s) => s.value)
@@ -54,11 +59,14 @@ export const PIPELINE_STAGE_GROUPS: PipelineStageGroup[] = [
   { key: 'engaged',   label: 'Engaged',     values: ['Engaged'] },
   { key: 'qualified', label: 'Qualified',   values: ['Qualified', 'High Intent'] },
   { key: 'keyEvent',  label: 'Demo Booked', values: ['Booking Made'] },
-  { key: 'demoDone',  label: 'Demo Done',   values: ['Call Done', 'Demo Done'] },
+  // 'Demo Taken' is the real stage name; the group used to look for 'Demo
+  // Done'/'Call Done', neither of which exists, so this tile could only ever
+  // read 0. Legacy spellings kept so old rows still roll up.
+  { key: 'demoDone',  label: 'Demo Done',   values: ['Demo Taken', 'Call Done', 'Demo Done'] },
   { key: 'offerMade', label: 'Offer Made',  values: ['Proposal Sent', 'Offer Made'] },
   { key: 'won',       label: 'Won',         values: ['Closed Won', 'Converted', 'Won'] },
   { key: 'noShow',    label: 'No Show',     values: ['No Show'] },
-  { key: 'parked',    label: 'Parked',      values: ['Parked'] },
+  { key: 'parked',    label: 'Parked',      values: ['Parked', 'Nurture'] },
   { key: 'lost',      label: 'Lost',        values: ['Closed Lost', 'Lost', 'Cold', 'Not Qualified'] },
 ]
 

@@ -370,6 +370,11 @@ export default function PipelinePage() {
                     borderColor: 'var(--border-primary)',
                     background: members.some((m) => m.id === viewOwner) ? 'var(--bg-hover)' : 'var(--bg-secondary)',
                     color: members.some((m) => m.id === viewOwner) ? 'var(--text-primary)' : 'var(--text-muted)',
+                    // Without this the native popup paints on the OS's WHITE
+                    // background while the options inherit this select's light
+                    // theme colour - white on white. Every name except the
+                    // highlighted one was invisible, so the list looked empty.
+                    colorScheme: 'dark',
                   }}
                 >
                   <option value="">Team member…</option>
