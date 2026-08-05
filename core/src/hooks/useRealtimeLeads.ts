@@ -71,12 +71,23 @@ export function useRealtimeLeads() {
     // windchasers. It is only echoed into the CSV export - statusFilter runs
     // off lead_stage - so omitting it costs nothing here.
     const hasLegacyCols = brand !== 'windchasers'
-    const BASE_COLUMNS =
+    // needs_human_followup exists on some brands' all_leads and not others
+    // (Lokazen has never had it). Selecting it there returns 42703 "column does
+    // not exist", which failed the WHOLE query - the leads page rendered only
+    // "Error: column all_leads.needs_human_followup does not exist" and the
+    // Activity feed stayed empty. Keep it OPTIONAL: try with it, and if the
+    // column is missing, retry once without it instead of breaking the page.
+    const OPTIONAL_COLUMNS = ', needs_human_followup'
+    const CORE_COLUMNS =
       'id, customer_name, email, phone, created_at, updated_at, last_interaction_at, ' +
       'lead_score, lead_stage, sub_stage, stage_override, unified_context, ' +
-      'first_touchpoint, last_touchpoint, brand, metadata, owner_id, needs_human_followup' +
+      'first_touchpoint, last_touchpoint, brand, metadata, owner_id' +
       (hasLegacyCols ? ', status, booking_date, booking_time' : '') +
       (isPop ? POP_COLUMNS : '')
+    let BASE_COLUMNS = CORE_COLUMNS + OPTIONAL_COLUMNS
+    /** True when the error is Postgres "undefined column" (42703). */
+    const isMissingColumn = (err: any) =>
+      err?.code === '42703' || /column .* does not exist/i.test(String(err?.message || ''))
 
     const mapLead = (lead: any): Lead => ({
       id: lead.id,
@@ -134,9 +145,19 @@ export function useRealtimeLeads() {
       let cursor: string | null = null
       const acc: Lead[] = []
       for (let i = 0; i < 60; i++) {
-        let q = supabase.from('all_leads').select(BASE_COLUMNS).order('id', { ascending: true }).limit(PAGE)
-        if (cursor) q = q.gt('id', cursor)
-        const { data, error: pageErr } = await q
+        const runPage = async () => {
+          let q = supabase.from('all_leads').select(BASE_COLUMNS).order('id', { ascending: true }).limit(PAGE)
+          if (cursor) q = q.gt('id', cursor)
+          return q
+        }
+        let { data, error: pageErr } = await runPage()
+        // Brand's all_leads lacks an optional column - drop it and retry once so
+        // the dashboard still loads instead of showing a bare error string.
+        if (pageErr && isMissingColumn(pageErr) && BASE_COLUMNS !== CORE_COLUMNS) {
+          console.warn('[useRealtimeLeads] optional column missing on this brand, retrying without it:', pageErr.message)
+          BASE_COLUMNS = CORE_COLUMNS
+          ;({ data, error: pageErr } = await runPage())
+        }
         if (pageErr) {
           if (acc.length === 0) { setError(pageErr.message || 'Failed to fetch leads'); setLoading(false) }
           return
