@@ -27,9 +27,14 @@ import {
   MdRemove,
   MdSearch,
   MdAdd,
+  MdPeople,
+  MdFlight,
+  MdVideocam,
+  MdStar,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
-import { FaWhatsapp } from 'react-icons/fa'
+import { FaWhatsapp, FaInstagram, FaFacebookF, FaGoogle, FaGlobe, FaUserPlus } from 'react-icons/fa'
+import { SiMeta } from 'react-icons/si'
 import { LEAD_STAGES, getStageColor as getStageColorShared, pipelineGroupForStage } from '@/configs/lead-stages'
 
 // The legacy `status` taxonomy (New Lead / Follow Up / Wrong Enquiry…) is DEAD
@@ -262,6 +267,82 @@ function realEmail(v?: string | null): string {
  * Ordered most-progressed first - a lead who applied is also still flagged
  * "interested" on their event registration, so the later state must win.
  */
+/**
+ * The marketing source of a lead, first-touch.
+ *
+ * Mirrors the precedence the SOURCE column badge uses, so the cards and the
+ * column can never disagree: server-side attribution label, then the raw
+ * attribution source, then a legacy utm_source, and only then the channel the
+ * lead physically arrived on. Channel is the last resort because "whatsapp"
+ * answers how they reached us, not which ad they came from - and the ask here
+ * is Google Ads / Instagram / Meta / Facebook.
+ */
+function marketingSource(lead: any): string {
+  const uc = lead?.unified_context || {}
+  const attr = uc.attribution || {}
+  const raw =
+    String(attr.source_label || '').trim() ||
+    String(attr.source || '').trim() ||
+    String(uc.raw_form_fields?.utm_source || '').trim() ||
+    String(lead?.first_touchpoint || lead?.last_touchpoint || '').trim()
+  return canonicalSource(raw)
+}
+
+/**
+ * Collapse the many spellings of a channel onto one name.
+ *
+ * Ad platforms hand back the same source under several labels - Facebook,
+ * "Facebook Ads", and "an" (Audience Network) are all Meta placements - and
+ * splitting them makes every card lie about its size. Anything we cannot
+ * recognise, including unresolved template macros like "{{Site Source Name}}"
+ * that a mis-set ad shipped literally, becomes Others rather than its own
+ * phantom channel.
+ */
+function canonicalSource(rawInput: string): string {
+  const raw = String(rawInput || '').trim()
+  if (!raw) return 'Others'
+  // An unexpanded macro is a broken value, not a source.
+  if (/\{\{|\}\}/.test(raw)) return 'Others'
+  const s = raw.toLowerCase().replace(/[_-]+/g, ' ').trim()
+
+  if (/res1\s*platform|meta\s*(lead\s*)?forms?|lead\s*form/.test(s)) return 'Meta Forms'
+  if (/instagram|^ig$/.test(s)) return 'Instagram'
+  // Audience Network is a Meta placement, so it belongs with Facebook.
+  if (/facebook|^fb$|audience\s*network|^an$|^ans$/.test(s)) return 'Facebook'
+  if (/google\s*ads|adwords|^gads$|^ppc$/.test(s)) return 'Google Ads'
+  if (/google\s*organic|^google$|^organic$/.test(s)) return 'Google Organic'
+  if (/whatsapp|^wa$/.test(s)) return 'WhatsApp'
+  if (/^(web|form|website)$|web site/.test(s)) return 'Website'
+  if (/^direct$/.test(s)) return 'Direct'
+  if (/^manual$/.test(s)) return 'Manual entry'
+  if (/^voice$|^call$/.test(s)) return 'Voice'
+  if (/referral|friend/.test(s)) return 'Referral'
+  if (/walk\s*in/.test(s)) return 'Walk-in'
+  if (/^social$/.test(s)) return 'Social'
+  if (/^d2d$|door/.test(s)) return 'Door to door'
+  return 'Others'
+}
+
+/** Channel icons for the source cards. Falls back to a globe for anything new. */
+const SOURCE_ICON: Record<string, React.ReactNode> = {
+  'All Sources': <MdPeople size={15} />,
+  'Meta Forms': <SiMeta size={15} />,
+  'Meta Lead Form': <SiMeta size={15} />,
+  Instagram: <FaInstagram size={15} />,
+  Facebook: <FaFacebookF size={15} />,
+  'Google Ads': <FaGoogle size={15} />,
+  'Google Organic': <FaGoogle size={15} />,
+  WhatsApp: <FaWhatsapp size={15} />,
+  Website: <FaGlobe size={15} />,
+  Direct: <MdPerson size={15} />,
+  'Manual entry': <FaUserPlus size={15} />,
+  Manual: <FaUserPlus size={15} />,
+  Referral: <MdPeople size={15} />,
+  'Walk-in': <MdPeople size={15} />,
+  Voice: <MdCall size={15} />,
+  Social: <MdChat size={15} />,
+}
+
 function scholarshipStatus(
   wc: any,
 ): { label: string; icon: string; color: string; title: string } | null {
@@ -332,6 +413,16 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  // Page index for the footer pager. Reset whenever the visible set changes,
+  // or a filter can leave you stranded on a page that no longer exists.
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(50)
+  // Card filter is separate from the channel dropdown: one is marketing
+  // source (Google Ads, Instagram), the other is arrival channel (whatsapp).
+  const [sourceCardFilter, setSourceCardFilter] = useState<string>('all')
+  // Sources panel is opt-in - it is a drill-down, not something that should
+  // permanently cost a row of vertical space above the table.
+  const [showSources, setShowSources] = useState(false)
   const [userTypeFilter, setUserTypeFilter] = useState<string>(initialUserTypeFilter || 'all')
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -403,11 +494,16 @@ export default function LeadsTable({
       }
     }
 
+    if (sourceCardFilter !== 'all') {
+      filtered = filtered.filter((lead) => marketingSource(lead) === sourceCardFilter)
+    }
+
     if (sourceFilter !== 'all') {
+      const selectedKeys = [sourceFilter]
       filtered = filtered.filter(
         (lead) =>
-          lead.first_touchpoint === sourceFilter ||
-          lead.last_touchpoint === sourceFilter
+          selectedKeys.includes(String(lead.first_touchpoint)) ||
+          selectedKeys.includes(String(lead.last_touchpoint)),
       )
     }
 
@@ -464,6 +560,14 @@ export default function LeadsTable({
         const isOfflineEvent = lead.unified_context?.[brandId]?.lead_type === 'offline_event'
         return offlineEventView ? isOfflineEvent : !isOfflineEvent
       })
+      // Cabin Crew has its own tab, so the default Leads list excludes it -
+      // otherwise the same lead is counted in two places and Leads reads as
+      // "everything", which is what the tabs exist to avoid.
+      if (!webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew') {
+        filtered = filtered.filter(
+          (lead) => normalizeCourse(lead.unified_context?.[brandId]?.course_interest) !== 'Cabin Crew',
+        )
+      }
     }
 
     if (courseInterestFilter !== 'all') {
@@ -514,12 +618,23 @@ export default function LeadsTable({
       })
     }
 
-    if (limit) {
-      filtered = filtered.slice(0, limit)
+    // Only a caller-supplied limit still truncates - that is how compact
+    // embeds (dashboard widgets) ask for "just the top N". The full leads page
+    // passes none and is governed by the pager instead, so removing this is
+    // what lets you reach lead 101.
+    if (initialLimit) {
+      filtered = filtered.slice(0, initialLimit)
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, limit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
+  }, [leads, dateFilter, sourceFilter, sourceCardFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, initialLimit, presetFilter, stageParam, urlStageActive, calculatedScores, webinarView, offlineEventView, gigsView, showGigsTab])
+
+  useEffect(() => { setPage(0) }, [dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, scoreFilter, searchQuery, presetFilter, webinarView, offlineEventView, gigsView])
+
+  // Changing segment clears the source card filter. Carrying "Instagram" from
+  // Leads into Webinar silently hides most of the tab you just opened, which
+  // reads as an empty tab rather than an active filter.
+  useEffect(() => { setSourceCardFilter('all') }, [webinarView, offlineEventView, courseInterestFilter, gigsView])
 
   /**
    * Rows to render. Outside the Offline Events tab this is an identity
@@ -532,6 +647,40 @@ export default function LeadsTable({
     | { kind: 'lead'; lead: ExtendedLead }
     | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; scholarship: number; collapsed: boolean }
   > => {
+    // Webinar groups by its own name/date, Offline Events by event key. Any
+    // other view is a flat list.
+    if (webinarView) {
+      const wgroups = new Map<string, ExtendedLead[]>()
+      for (const lead of filteredLeads) {
+        const wc: any = lead.unified_context?.[brandId] || {}
+        const key = String(wc.webinar_name || 'Webinar')
+        const bucket = wgroups.get(key)
+        if (bucket) bucket.push(lead)
+        else wgroups.set(key, [lead])
+      }
+      const ordered = [...wgroups.entries()].sort((a, b) => {
+        const newest = (rows: ExtendedLead[]) =>
+          rows.reduce((m, r) => {
+            const t = String(r.last_interaction_at || r.timestamp || '')
+            return t > m ? t : m
+          }, '')
+        return newest(b[1]).localeCompare(newest(a[1]))
+      })
+      const out: Array<{ kind: 'lead'; lead: ExtendedLead } | { kind: 'group'; key: string; label: string; sub: string; total: number; registered: number; scholarship: number; collapsed: boolean }> = []
+      ordered.forEach(([key, rows], i) => {
+        const collapsed = collapsedEvents[key] ?? i > 0
+        const wc0: any = rows[0]?.unified_context?.[brandId] || {}
+        const registered = rows.filter((r: any) => (r.unified_context?.[brandId] || {}).zoom_registered).length
+        out.push({
+          kind: 'group', key, label: key,
+          sub: String(wc0.webinar_date || ''),
+          total: rows.length, registered, scholarship: 0, collapsed,
+        })
+        if (!collapsed) for (const lead of rows) out.push({ kind: 'lead', lead })
+      })
+      return out
+    }
+
     if (!offlineEventView) return filteredLeads.map((lead) => ({ kind: 'lead' as const, lead }))
 
     const groups = new Map<string, ExtendedLead[]>()
@@ -709,6 +858,119 @@ export default function LeadsTable({
     }
   }
 
+  /**
+   * Live counts for the segment pills and the source cards.
+   *
+   * Derived from `leads` (the whole set), NOT filteredLeads - a pill has to
+   * show what you would get by clicking it, so it cannot be filtered by the
+   * segment you are currently in.
+   */
+  const segmentCounts = useMemo(() => {
+    const wcOf = (l: any) => l.unified_context?.[brandId] || {}
+    return {
+      leads: leads.filter((l) => {
+        const t = wcOf(l).lead_type
+        return t !== 'webinar' && t !== 'offline_event'
+          && normalizeCourse(wcOf(l).course_interest) !== 'Cabin Crew'
+      }).length,
+      cabinCrew: leads.filter((l) => normalizeCourse(wcOf(l).course_interest) === 'Cabin Crew').length,
+      webinar: leads.filter((l) => wcOf(l).lead_type === 'webinar').length,
+      offlineEvent: leads.filter((l) => wcOf(l).lead_type === 'offline_event').length,
+    }
+  }, [leads, brandId])
+
+  /**
+   * Source breakdown, built from what the data actually contains rather than a
+   * hardcoded list - a brand that never sees Instagram should not be shown an
+   * empty Instagram card. Top six by volume, the rest collapsed into Others.
+   */
+  /**
+   * The current segment, before any source/stage/date filtering. The source
+   * cards count from this, not from every lead - sitting directly under the
+   * segment tabs, cards that ignore the selected tab read as broken (Offline
+   * Events showing 2,863 when the tab holds 169).
+   */
+  const segmentLeads = useMemo(() => {
+    const wcOf = (l: any) => l.unified_context?.[brandId] || {}
+    return leads.filter((l) => {
+      const t = wcOf(l).lead_type
+      if (showWebinarTab) {
+        if (webinarView) return t === 'webinar'
+        if (offlineEventView) return t === 'offline_event'
+        // normalizeCourse so the legacy 'Cabin' value lands with 'Cabin Crew' -
+        // stored raw by an older path, it was splitting the segment in two.
+        const isCabin = normalizeCourse(wcOf(l).course_interest) === 'Cabin Crew'
+        if (courseInterestFilter === 'Cabin Crew') return isCabin
+        // Leads = everything that does not already have its own tab.
+        return t !== 'webinar' && t !== 'offline_event' && !isCabin
+      }
+      return true
+    })
+  }, [leads, brandId, showWebinarTab, webinarView, offlineEventView, courseInterestFilter])
+
+  const sourceCards = useMemo(() => {
+    const byLabel = new Map<string, number>()
+    for (const l of segmentLeads) {
+      const label = marketingSource(l)
+      byLabel.set(label, (byLabel.get(label) || 0) + 1)
+    }
+    // 'Others' is the bucket, never a card of its own - otherwise unknowns
+    // compete for a top-six slot against real channels.
+    const othersDirect = byLabel.get('Others') || 0
+    byLabel.delete('Others')
+    const sorted = [...byLabel.entries()].sort((a, b) => b[1] - a[1])
+    return {
+      total: segmentLeads.length,
+      cards: sorted.slice(0, 6).map(([label, count]) => ({ key: label, label, count })),
+      othersCount: othersDirect + sorted.slice(6).reduce((n, [, c]) => n + c, 0),
+      // Every source in this segment, for the dropdown - which must offer the
+      // same names the cards show, not a separate channel vocabulary.
+      allLabels: [
+        ...sorted.map(([label, count]) => ({ label, count })),
+        ...(othersDirect ? [{ label: 'Others', count: othersDirect }] : []),
+      ],
+    }
+  }, [segmentLeads])
+
+  /** Rows actually rendered. Group headers are kept with their own leads by
+      slicing the already-built display list, so a group never loses its title. */
+  /**
+   * The rows actually rendered. Slicing displayRows (not filteredLeads) keeps
+   * group headers attached to their own leads; a header that lands at the end
+   * of a page with none of its rows is dropped rather than left dangling.
+   */
+  const pagedRows = useMemo(() => {
+    // Grouped mode (Offline Events) is NOT paged. The accordion is already the
+    // navigation - collapse the events you are not working on - and paging on
+    // top of it fights that: headers detach from their rows at page edges, and
+    // a collapsed group can straddle a boundary. Group sizes are small enough
+    // that the whole list is fine in one go.
+    if (offlineEventView || webinarView) return displayRows
+
+    const start = Math.min(page, Math.max(0, Math.ceil(filteredLeads.length / pageSize) - 1)) * pageSize
+    return displayRows.slice(start, start + pageSize)
+  }, [displayRows, filteredLeads.length, page, pageSize, offlineEventView, webinarView])
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
+  const pageStart = safePage * pageSize
+
+  /** 1 2 3 ... 99 - first, last and a window around the current page. */
+  const pageNumbers = useMemo(() => {
+    const out: number[] = []
+    const push = (n: number) => { if (!out.includes(n)) out.push(n) }
+    push(0)
+    for (let n = safePage - 1; n <= safePage + 1; n++) if (n > 0 && n < totalPages - 1) push(n)
+    if (totalPages > 1) push(totalPages - 1)
+    out.sort((a, b) => a - b)
+    const withGaps: number[] = []
+    for (let i = 0; i < out.length; i++) {
+      if (i > 0 && out[i] - out[i - 1] > 1) withGaps.push(-1)
+      withGaps.push(out[i])
+    }
+    return withGaps
+  }, [safePage, totalPages])
+
   const exportToCSV = () => {
     const headers = showAviationColumns
       ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
@@ -814,12 +1076,44 @@ export default function LeadsTable({
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
         {/* LEFT: Title + count + score filters */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {gigsView ? 'Gigs' : webinarView ? 'Webinar' : offlineEventView ? 'Offline Events' : (showWebinarTab && courseInterestFilter === 'Cabin Crew') ? 'Cabin Crew' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
-          </h2>
-          <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-            {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
-          </span>
+          {/* Title, count and a fill bar showing this segment against the whole
+              book. The bar is the quickest read of "how much of the list am I
+              actually looking at" once a filter is on. */}
+          <div className="flex flex-col gap-1 pr-1">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-[15px] font-bold leading-none" style={{ color: 'var(--text-primary)' }}>
+                {gigsView ? 'Gigs' : webinarView ? 'Webinar' : offlineEventView ? 'Offline Events' : (showWebinarTab && courseInterestFilter === 'Cabin Crew') ? 'Cabin Crew' : title || (() => { const noun = brandId === 'pop' ? 'People' : 'Leads'; return presetFilter === 'engaged' ? `Engaged ${noun}` : presetFilter === 'warm' ? `Warm ${noun}` : noun })()}
+              </h2>
+              <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                {filteredLeads.length}{leads.length !== filteredLeads.length ? ` / ${leads.length}` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSources((v) => !v)}
+                aria-expanded={showSources}
+                aria-label={showSources ? 'Hide source breakdown' : 'Show source breakdown'}
+                title="Source breakdown"
+                className="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded transition-transform"
+                style={{
+                  color: showSources ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  transform: showSources ? 'rotate(90deg)' : 'none',
+                }}
+              >
+                <MdChevronRight size={16} />
+              </button>
+            </div>
+            {leads.length > 0 && (
+              <div className="h-1 w-[132px] overflow-hidden rounded-full" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                <div
+                  className="h-full rounded-full transition-[width] duration-500"
+                  style={{
+                    width: `${Math.max(2, Math.round((filteredLeads.length / Math.max(leads.length, 1)) * 100))}%`,
+                    backgroundColor: 'var(--accent-primary)',
+                  }}
+                />
+              </div>
+            )}
+          </div>
 
           {/* Leads | Cabin Crew | Webinar | Offline Events segment (windchasers).
              Cabin Crew reuses the courseInterestFilter so it stays in sync with
@@ -829,27 +1123,42 @@ export default function LeadsTable({
              does - a marketing segment, not to be confused with a lead's own
              "Key Event" (their scheduled call/demo booking). */}
           {showWebinarTab && (
-            <div role="tablist" aria-label="Leads, Cabin Crew, Webinar or Offline Events" className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: 'var(--border-primary)' }}>
+            <div
+              role="tablist"
+              aria-label="Leads, Cabin Crew, Webinar or Offline Events"
+              className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide"
+            >
               {([
-                { label: 'Leads', selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('all') } },
-                { label: 'Cabin Crew', selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('Cabin Crew') } },
-                { label: 'Webinar', selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setCourseInterestFilter('all') } },
-                { label: 'Offline Events', selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setCourseInterestFilter('all') } },
+                { label: 'Leads', icon: <MdPeople size={15} />, count: segmentCounts.leads, selected: !webinarView && !offlineEventView && courseInterestFilter !== 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Cabin Crew', icon: <MdFlight size={15} />, count: segmentCounts.cabinCrew, selected: !webinarView && !offlineEventView && courseInterestFilter === 'Cabin Crew', onSelect: () => { setWebinarView(false); setOfflineEventView(false); setCourseInterestFilter('Cabin Crew') } },
+                { label: 'Webinar', icon: <MdVideocam size={15} />, count: segmentCounts.webinar, selected: webinarView, onSelect: () => { setWebinarView(true); setOfflineEventView(false); setCourseInterestFilter('all') } },
+                { label: 'Offline Events', icon: <MdStar size={15} />, count: segmentCounts.offlineEvent, selected: offlineEventView, onSelect: () => { setOfflineEventView(true); setWebinarView(false); setCourseInterestFilter('all') } },
               ] as const).map((t) => (
                 <button
                   key={t.label}
                   role="tab"
                   aria-selected={t.selected}
                   onClick={t.onSelect}
-                  className="px-2 py-1 text-xs font-semibold transition-colors whitespace-nowrap"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap"
                   style={{
-                    backgroundColor: t.selected ? 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' : 'var(--bg-primary)',
+                    backgroundColor: t.selected ? 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' : 'var(--bg-primary)',
                     color: t.selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                    borderRight: '1px solid var(--border-primary)',
-                    borderBottom: t.selected ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                    borderColor: t.selected ? 'color-mix(in srgb, var(--accent-primary) 45%, transparent)' : 'var(--border-primary)',
                   }}
                 >
+                  {t.icon}
                   {t.label}
+                  {/* The count is the point of the pill - it answers "how many
+                      are in there" without a click. */}
+                  <span
+                    className="ml-0.5 rounded-md px-1.5 py-px text-[10px] font-bold tabular-nums"
+                    style={{
+                      backgroundColor: t.selected ? 'color-mix(in srgb, var(--accent-primary) 22%, transparent)' : 'var(--bg-secondary)',
+                      color: t.selected ? 'var(--accent-primary)' : 'var(--text-muted)',
+                    }}
+                  >
+                    {t.count >= 1000 ? `${(t.count / 1000).toFixed(1)}K` : t.count}
+                  </span>
                 </button>
               ))}
             </div>
@@ -950,19 +1259,19 @@ export default function LeadsTable({
               </select>
 
               {!initialSourceFilter && (
-                <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)} className={filterClass} style={filterStyle}>
+                <select
+                  value={sourceCardFilter}
+                  onChange={(e) => setSourceCardFilter(e.target.value)}
+                  className={filterClass}
+                  style={filterStyle}
+                  title="Marketing source, first touch"
+                >
                   <option value="all">All sources</option>
-                  <option value="web">Web</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="voice">Voice</option>
-                  <option value="social">Social</option>
-                  {brandId === 'pop' && (
-                    <>
-                      <option value="d2d">D2D (door-to-door)</option>
-                      <option value="event">Event</option>
-                      <option value="landing">Landing page</option>
-                    </>
-                  )}
+                  {sourceCards.allLabels.map((sLabel) => (
+                    <option key={sLabel.label} value={sLabel.label}>
+                      {sLabel.label} ({sLabel.count})
+                    </option>
+                  ))}
                 </select>
               )}
               {/* D2D coverage count - how many People arrived via the field campaign */}
@@ -1071,6 +1380,70 @@ export default function LeadsTable({
         </div>
       </div>
 
+      {/* Source breakdown - one card per channel, click to filter.
+          Built from what the data actually holds rather than a fixed list, so
+          a brand that never sees Instagram is not shown an empty Instagram
+          card. Desktop only: on a phone this would push the table off screen,
+          and the source dropdown already covers it. */}
+      {showSources && sourceCards.total > 0 && (
+        <div className="hidden md:flex items-stretch gap-2 px-4 pb-3 overflow-x-auto scrollbar-hide">
+          {([{ key: 'all', label: 'All Sources', count: sourceCards.total }, ...sourceCards.cards] as const).map((c: any) => {
+            const selected = sourceCardFilter === c.key
+            return (
+              <button
+                key={c.key}
+                onClick={() => setSourceCardFilter(c.key === sourceCardFilter ? 'all' : c.key)}
+                aria-pressed={selected}
+                className="flex shrink-0 items-center gap-2.5 rounded-xl border px-3 py-2.5 min-w-[136px] transition-colors"
+                style={{
+                  backgroundColor: selected ? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' : 'var(--bg-primary)',
+                  borderColor: selected ? 'color-mix(in srgb, var(--accent-primary) 45%, transparent)' : 'var(--border-primary)',
+                }}
+              >
+                <span
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                  style={{
+                    backgroundColor: selected ? 'color-mix(in srgb, var(--accent-primary) 20%, transparent)' : 'var(--bg-secondary)',
+                    color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  }}
+                  aria-hidden
+                >
+                  {SOURCE_ICON[c.label] || <FaGlobe size={15} />}
+                </span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span
+                    className="text-[11px] font-medium whitespace-nowrap"
+                    style={{ color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                  >
+                    {c.label}
+                  </span>
+                  <span
+                    className="text-[16px] font-bold tabular-nums"
+                    style={{ color: selected ? 'var(--accent-primary)' : 'var(--text-primary)' }}
+                  >
+                    {c.count}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+          {sourceCards.othersCount > 0 && (
+            <div
+              className="flex shrink-0 items-center gap-2.5 rounded-xl border px-3 py-2.5 min-w-[110px]"
+              style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
+              title="Channels outside the top six"
+            >
+              <span className="flex flex-col items-start leading-tight">
+                <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>Others</span>
+                <span className="text-[16px] font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                  {sourceCards.othersCount}
+                </span>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table - min-h-0 lets this flex child shrink so it scrolls INTERNALLY
           (instead of the page scrolling), which is what makes the sticky <thead>
           actually stay put. Without min-h-0 the child grows to content height,
@@ -1084,7 +1457,7 @@ export default function LeadsTable({
               {loading ? 'Loading...' : 'No leads found'}
             </div>
           ) : (
-            displayRows.map((row) => {
+            pagedRows.map((row) => {
               if (row.kind === 'group') {
                 return (
                   <div
@@ -1265,7 +1638,7 @@ export default function LeadsTable({
                 </td>
               </tr>
             ) : (
-              displayRows.map((row) => {
+              pagedRows.map((row) => {
                 if (row.kind === 'group') {
                   return (
                     <tr
@@ -2428,6 +2801,72 @@ export default function LeadsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pager. The list is no longer capped, so on 2,800 leads an endless
+          scroll is unusable - this bounds what is on screen without hiding
+          anything from the filters, which still run over the whole set. */}
+      {!offlineEventView && !webinarView && filteredLeads.length > pageSize && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-2.5 flex-shrink-0"
+          style={{ borderColor: 'var(--border-primary)' }}
+        >
+          <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+            Showing {pageStart + 1} to {Math.min(pageStart + pageSize, filteredLeads.length)} of {filteredLeads.length} {brandId === 'pop' ? 'people' : 'leads'}
+          </span>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              aria-label="Previous page"
+              className="rounded-md border px-2 py-1 text-xs disabled:opacity-35"
+              style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+            >
+              &lsaquo;
+            </button>
+            {pageNumbers.map((n, i) =>
+              n === -1 ? (
+                <span key={`gap-${i}`} className="px-1 text-xs" style={{ color: 'var(--text-muted)' }}>...</span>
+              ) : (
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  aria-current={n === page ? 'page' : undefined}
+                  className="min-w-[26px] rounded-md border px-2 py-1 text-xs font-semibold tabular-nums"
+                  style={{
+                    borderColor: n === page ? 'color-mix(in srgb, var(--accent-primary) 45%, transparent)' : 'var(--border-primary)',
+                    backgroundColor: n === page ? 'color-mix(in srgb, var(--accent-primary) 16%, transparent)' : 'transparent',
+                    color: n === page ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                  }}
+                >
+                  {n + 1}
+                </button>
+              ),
+            )}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              aria-label="Next page"
+              className="rounded-md border px-2 py-1 text-xs disabled:opacity-35"
+              style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
+            >
+              &rsaquo;
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Rows per page</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
+              className={filterClass}
+              style={filterStyle}
+            >
+              {[10, 25, 50, 100, 200].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Lead Details Modal */}
       <LeadDetailsModal
