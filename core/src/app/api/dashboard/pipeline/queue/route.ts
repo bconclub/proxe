@@ -1,29 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
-import { BRAND_ID, getBrandConfig } from '@/configs'
+import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/dashboard/pipeline/queue?owner=me|all|<userId>
  *
- * The work queue behind the pipeline page. Not a report - a list of things
- * waiting on a human, newest obligation first:
+ * The human pipeline. Not a funnel report - a single list of things waiting on
+ * a person, most-owed first.
  *
- *   needsAnswer  booking date has passed and nobody has said whether it
- *                happened. 149 of these on windchasers today, which is why
- *                Demo Done and No Show read 0.
- *   today        booked for today, with the time
- *   upcoming     booked in the next 7 days
- *   rnr          rang, no reply and untouched for 2+ days
- *   unassigned   past bookings with NO owner - nobody to ask, so they sit in
- *                a shared pool anyone can claim
+ * The work is of two kinds and they belong in ONE list, because a salesperson
+ * does not think in buckets, they think "what do I do next":
  *
- * Bookings live in unified_context, NOT in a column: this brand's all_leads
- * has no booking_date at all, and web_sessions carries zero. They are spread
- * across whatsapp.booking_date (96), voice.booking_date (67) and
- * web.booking.date (30), so all three shapes are read.
+ *   followup     a call-back this person promised, from
+ *                activities.next_followup_date. Overdue ones lead the list -
+ *                a promise you have already broken outranks everything.
+ *   ask          a booking whose date has passed with nobody saying whether it
+ *                happened. The system refuses to guess: a date passing is not
+ *                evidence anyone turned up, which is why Demo Done reads zero
+ *                until someone answers.
+ *   booking      booked today or within the week.
+ *   rnr          rang, no reply, untouched for 2+ days and with no follow-up
+ *                already promised.
+ *
+ * Bookings live in unified_context, NOT in a column - this brand's all_leads
+ * has no booking_date at all, and they are spread across whatsapp, voice and
+ * web shapes, so all are read via JSON-path projection rather than hauling the
+ * whole context object across the wire for every lead.
  */
 
 const RNR_STALE_DAYS = 2
@@ -35,15 +40,53 @@ function istDay(d: Date): string {
   return new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10)
 }
 
-/** Booking date+time from any of the shapes leads actually use. */
-function readBooking(lead: any): { date: string | null; time: string | null } {
-  const uc = lead?.unified_context || {}
-  for (const ch of ['web', 'whatsapp', 'voice', 'social']) {
-    const blk = uc?.[ch] || {}
-    const nested = blk.booking || {}
-    const date = blk.booking_date || nested.date || nested.booking_date || null
-    const time = blk.booking_time || nested.time || nested.booking_time || null
-    if (date) return { date: String(date).slice(0, 10), time: time ? String(time) : null }
+export type QueueKind = 'followup' | 'ask' | 'booking' | 'rnr'
+
+export interface QueueCard {
+  id: string
+  name: string
+  phone: string | null
+  stage: string
+  owner_id: string | null
+  created_at: string | null
+  booking_date: string | null
+  booking_time: string | null
+  followup_at: string | null
+  followup_note: string | null
+  followup_activity_id: string | null
+  kind: QueueKind
+  /** Which counter this row feeds, and which filter chip shows it. */
+  bucket: string
+  /** Lower sorts first. Band first, then how long it has been waiting. */
+  urgency: number
+}
+
+// Bands. The gap between them is wide enough that nothing inside a band can
+// ever outrank the band above it.
+const BAND = {
+  followupOverdue: 0,
+  ask: 1,
+  followupToday: 2,
+  bookingToday: 3,
+  followupUpcoming: 4,
+  bookingUpcoming: 5,
+  rnr: 6,
+} as const
+
+const band = (b: number, tiebreak: number) => b * 1e12 + tiebreak
+
+/** Booking date+time out of the projected JSON paths. */
+function readBooking(row: any): { date: string | null; time: string | null } {
+  const webB = row.web_b || {}
+  const candidates: Array<[any, any]> = [
+    [row.web_d, row.web_t],
+    [webB.date || webB.booking_date, webB.time || webB.booking_time],
+    [row.wa_d, row.wa_t],
+    [row.vo_d, row.vo_t],
+    [row.so_d, row.so_t],
+  ]
+  for (const [d, t] of candidates) {
+    if (d) return { date: String(d).slice(0, 10), time: t ? String(t) : null }
   }
   return { date: null, time: null }
 }
@@ -59,27 +102,107 @@ export async function GET(request: NextRequest) {
 
     const supabase: any = getServiceClient() || authClient
 
-    // owner_id exists only on brands running features.leadAccess (Windchasers
-    // via migration 036, Lokazen via 005). Selecting it unconditionally made
-    // this route 500 with "column all_leads.owner_id does not exist" on BCON,
-    // taking the whole Pipeline page down - the same way the Leads page died.
-    // Off means the brand has no ownership model at all, so every lead is
-    // yours: see `mine` below.
-    const leadAccessOn = !!getBrandConfig().features?.leadAccess
+    const now = new Date()
+    const today = istDay(now)
+    const horizon = istDay(new Date(now.getTime() + UPCOMING_DAYS * 86_400_000))
+    const staleBefore = new Date(now.getTime() - RNR_STALE_DAYS * 86_400_000).toISOString()
+    const nowMs = now.getTime()
 
-    // Keyset-paged, narrow select. unified_context has to come along because
-    // the booking lives inside it - there is no column to read instead.
+    // ── 1. Follow-ups. One indexed read (partial index covers exactly this
+    //       predicate), then one keyed fetch of the leads behind them. No scan.
+    const { data: fRows } = await supabase
+      .from('activities')
+      .select('id, lead_id, note, next_followup_date')
+      .not('next_followup_date', 'is', null)
+      .order('next_followup_date', { ascending: true })
+      .limit(500)
+
+    const followupRows: any[] = fRows || []
+    const followupLeadIds = Array.from(new Set(followupRows.map((r) => r.lead_id).filter(Boolean)))
+    const leadsById = new Map<string, any>()
+    if (followupLeadIds.length) {
+      const { data: fLeads } = await supabase
+        .from('all_leads')
+        .select('id, customer_name, phone, lead_stage, owner_id, created_at')
+        .in('id', followupLeadIds)
+      for (const l of fLeads || []) leadsById.set(l.id, l)
+    }
+
+    const attention: QueueCard[] = []
+    const counts = {
+      followupsOverdue: 0,
+      followupsToday: 0,
+      followupsUpcoming: 0,
+      needsAnswer: 0,
+      today: 0,
+      upcoming: 0,
+      rnr: 0,
+      unassigned: 0,
+    }
+    // Leads that already have a promised call-back never appear as RNR too -
+    // the promise IS the answer to "what about this one".
+    const hasOpenFollowup = new Set<string>()
+
+    for (const row of followupRows) {
+      const lead = leadsById.get(row.lead_id)
+      if (!lead) continue
+      hasOpenFollowup.add(lead.id)
+      // Unowned follow-ups stay visible to everyone - nobody to filter them to.
+      const mine = ownerId === null || lead.owner_id === ownerId || !lead.owner_id
+      if (!mine) continue
+
+      const dueMs = Date.parse(row.next_followup_date)
+      const dueDay = isFinite(dueMs) ? istDay(new Date(dueMs)) : null
+      const overdue = isFinite(dueMs) && dueMs < nowMs
+      const isToday = dueDay === today
+
+      let b: number
+      let bucket: string
+      if (overdue && !isToday) { b = BAND.followupOverdue; bucket = 'followupsOverdue'; counts.followupsOverdue++ }
+      else if (isToday) { b = BAND.followupToday; bucket = 'followupsToday'; counts.followupsToday++ }
+      else { b = BAND.followupUpcoming; bucket = 'followupsUpcoming'; counts.followupsUpcoming++ }
+
+      attention.push({
+        id: lead.id,
+        name: lead.customer_name || 'Unknown',
+        phone: lead.phone || null,
+        stage: lead.lead_stage || 'New',
+        owner_id: lead.owner_id || null,
+        created_at: lead.created_at || null,
+        booking_date: null,
+        booking_time: null,
+        followup_at: row.next_followup_date,
+        followup_note: row.note || null,
+        followup_activity_id: row.id,
+        kind: 'followup',
+        bucket,
+        // Soonest-promised first inside every band, so the oldest broken
+        // promise is the very first row on the page.
+        urgency: band(b, isFinite(dueMs) ? dueMs : nowMs),
+      })
+    }
+
+    // ── 2. Bookings + RNR. Still a scan, but projected down to scalars: the
+    //       old version shipped every lead's entire unified_context.
+    const brandOutcome = `outcome:unified_context->${BRAND_ID}->booking_outcome`
+    const SELECT = [
+      'id', 'customer_name', 'phone', 'lead_stage', 'owner_id', 'created_at', 'last_interaction_at',
+      'wa_d:unified_context->whatsapp->>booking_date',
+      'wa_t:unified_context->whatsapp->>booking_time',
+      'vo_d:unified_context->voice->>booking_date',
+      'vo_t:unified_context->voice->>booking_time',
+      'web_d:unified_context->web->>booking_date',
+      'web_t:unified_context->web->>booking_time',
+      'web_b:unified_context->web->booking',
+      'so_d:unified_context->social->>booking_date',
+      'so_t:unified_context->social->>booking_time',
+      brandOutcome,
+    ].join(', ')
+
     const rows: any[] = []
     let cursor: string | null = null
     for (let i = 0; i < 20; i++) {
-      let q = supabase
-        .from('all_leads')
-        .select(
-          'id, customer_name, phone, lead_stage, last_interaction_at, unified_context' +
-          (leadAccessOn ? ', owner_id' : '')
-        )
-        .order('id', { ascending: true })
-        .limit(1000)
+      let q = supabase.from('all_leads').select(SELECT).order('id', { ascending: true }).limit(1000)
       if (cursor) q = q.gt('id', cursor)
       const { data, error } = await q
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -89,76 +212,92 @@ export async function GET(request: NextRequest) {
       if (data.length < 1000 || !cursor) break
     }
 
-    const now = new Date()
-    const today = istDay(now)
-    const horizon = istDay(new Date(now.getTime() + UPCOMING_DAYS * 86_400_000))
-    const staleBefore = new Date(now.getTime() - RNR_STALE_DAYS * 86_400_000).toISOString()
-
-    const needsAnswer: any[] = []
-    const todayList: any[] = []
-    const upcoming: any[] = []
-    const rnr: any[] = []
-    const unassigned: any[] = []
-
     for (const lead of rows) {
-      const wc = lead.unified_context?.[BRAND_ID] || {}
-      // No ownership model on this brand -> every lead is yours, otherwise the
-      // default owner=me scope would filter the pipeline down to nothing.
-      const mine = !leadAccessOn || ownerId === null || lead.owner_id === ownerId
+      const mine = ownerId === null || lead.owner_id === ownerId
       const { date, time } = readBooking(lead)
-      const answered = wc.booking_outcome
-      // An answer only settles the booking it was given for - book again and
+      const answered = lead.outcome
+      // An answer settles only the booking it was given for - book again and
       // the question comes back.
-      const settled =
-        answered && (!answered.for_booking_date || answered.for_booking_date === date)
+      const settled = answered && (!answered.for_booking_date || answered.for_booking_date === date)
 
-      const card = {
+      const base = {
         id: lead.id,
         name: lead.customer_name || 'Unknown',
         phone: lead.phone || null,
         stage: lead.lead_stage || 'New',
         owner_id: lead.owner_id || null,
+        created_at: lead.created_at || null,
         booking_date: date,
         booking_time: time,
+        followup_at: null,
+        followup_note: null,
+        followup_activity_id: null,
       }
 
       if (date && !settled && date < today) {
-        if (!lead.owner_id) unassigned.push(card)
-        else if (mine) needsAnswer.push(card)
+        const unowned = !lead.owner_id
+        if (!unowned && !mine) continue
+        if (unowned) counts.unassigned++
+        else counts.needsAnswer++
+        attention.push({
+          ...base,
+          kind: 'ask',
+          bucket: unowned ? 'unassigned' : 'needsAnswer',
+          // Oldest unanswered booking first: the longest anyone has been left
+          // wondering.
+          urgency: band(BAND.ask, Date.parse(`${date}T00:00:00Z`) || 0),
+        })
         continue
       }
       if (!mine) continue
-      if (date === today) { todayList.push(card); continue }
-      if (date && date > today && date <= horizon) { upcoming.push(card); continue }
+
+      if (date === today) {
+        counts.today++
+        attention.push({
+          ...base,
+          kind: 'booking',
+          bucket: 'today',
+          urgency: band(BAND.bookingToday, Date.parse(`${date}T${(time || '00:00').slice(0, 5)}:00Z`) || 0),
+        })
+        continue
+      }
+      if (date && date > today && date <= horizon) {
+        counts.upcoming++
+        attention.push({
+          ...base,
+          kind: 'booking',
+          bucket: 'upcoming',
+          urgency: band(BAND.bookingUpcoming, Date.parse(`${date}T00:00:00Z`) || 0),
+        })
+        continue
+      }
+      // RNR: the orchestrator parks these as 'In Sequence' rather than 'R&R',
+      // so matching only 'R&R' found nothing. Both, minus anyone who already
+      // has a call-back promised.
       if (
-        lead.lead_stage === 'R&R' &&
+        (lead.lead_stage === 'R&R' || lead.lead_stage === 'In Sequence') &&
+        !hasOpenFollowup.has(lead.id) &&
         (!lead.last_interaction_at || lead.last_interaction_at < staleBefore)
       ) {
-        rnr.push(card)
+        counts.rnr++
+        attention.push({
+          ...base,
+          kind: 'rnr',
+          bucket: 'rnr',
+          urgency: band(BAND.rnr, Date.parse(lead.last_interaction_at || lead.created_at || '') || 0),
+        })
       }
     }
 
-    // Oldest obligation first - the thing you have kept someone waiting on
-    // longest is the thing to do next.
-    needsAnswer.sort((a, b) => String(a.booking_date).localeCompare(String(b.booking_date)))
-    unassigned.sort((a, b) => String(a.booking_date).localeCompare(String(b.booking_date)))
-    todayList.sort((a, b) => String(a.booking_time || '').localeCompare(String(b.booking_time || '')))
-    upcoming.sort((a, b) => String(a.booking_date).localeCompare(String(b.booking_date)))
+    attention.sort((a, b) => a.urgency - b.urgency)
 
     return NextResponse.json({
       owner: ownerParam,
-      counts: {
-        needsAnswer: needsAnswer.length,
-        today: todayList.length,
-        upcoming: upcoming.length,
-        rnr: rnr.length,
-        unassigned: unassigned.length,
-      },
-      needsAnswer: needsAnswer.slice(0, 100),
-      today: todayList.slice(0, 50),
-      upcoming: upcoming.slice(0, 50),
-      rnr: rnr.slice(0, 50),
-      unassigned: unassigned.slice(0, 50),
+      counts,
+      total: attention.length,
+      // Capped: past a couple of hundred rows this stops being a queue and
+      // starts being a backlog report. The counts stay exact.
+      attention: attention.slice(0, 200),
     })
   } catch (err: any) {
     console.error('[pipeline/queue] failed:', err?.message || err)

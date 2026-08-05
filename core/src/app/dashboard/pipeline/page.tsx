@@ -6,11 +6,14 @@ import {
   MdRefresh, MdEdit, MdCheck, MdClose as MdX,
   MdPersonOutline, MdChatBubbleOutline, MdVerifiedUser, MdStar,
   MdCheckCircle, MdDescription, MdEmojiEvents,
-  MdEventBusy, MdPause, MdClose, MdOutlineInfo,
+  MdEventBusy, MdPause, MdClose, MdOutlineInfo, MdExpandMore,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { BRAND_ID, brandConfig } from '@/configs'
 import { PIPELINE_STAGE_GROUPS } from '@/configs/lead-stages'
+import PipelineQueue, { type QueueCard } from '@/components/dashboard/PipelineQueue'
+import PipelineStats from '@/components/dashboard/PipelineStats'
+import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
 // Stage groups → the DB lead_stage values they roll up ('High Intent' folds
 // into Qualified, 'In Sequence' → New…). Canonical map lives in
@@ -161,11 +164,23 @@ const LEAD_ACCESS_ON = !!brandConfig.features?.leadAccess
 
 const DEFAULT_KEY_EVENT = brandConfig.pipeline?.keyEventLabel || 'Demo Booked'
 
+const FUNNEL_KEY = 'proxe_pipeline_funnel_open'
+
 const SPARK_KEYS = ['new', 'engaged', 'qualified', 'keyEvent'] as const
 type SparkKey = typeof SPARK_KEYS[number]
 
 export default function PipelinePage() {
   const router = useRouter()
+
+  // The funnel report is now secondary - collapsed unless asked for, and the
+  // choice is remembered so an admin who lives in it isn't re-clicking daily.
+  const [showFunnel, setShowFunnel] = useState(false)
+  useEffect(() => {
+    try { setShowFunnel(localStorage.getItem(FUNNEL_KEY) === '1') } catch { /* private mode */ }
+  }, [])
+
+  // The lead opened from a queue row, shown over this page.
+  const [selectedLead, setSelectedLead] = useState<any | null>(null)
 
   // Funnel data (exact head counts, owner-scoped)
   const [counts, setCounts] = useState<Counts | null>(null)
@@ -327,6 +342,24 @@ export default function PipelinePage() {
     router.push(`/dashboard/leads?stage=${encodeURIComponent(GROUPS[key][0])}&stageLabel=${encodeURIComponent(label)}`)
   }
 
+  // A queue card carries enough to open the modal; the modal re-fetches the
+  // rest itself, so there is no round trip before it appears.
+  const openLeadFromQueue = (card: QueueCard) => {
+    setSelectedLead({
+      id: card.id,
+      name: card.name,
+      email: null,
+      phone: card.phone,
+      source: null,
+      timestamp: card.created_at || new Date().toISOString(),
+      status: null,
+      lead_stage: card.stage,
+      booking_date: card.booking_date,
+      booking_time: card.booking_time,
+      created_at: card.created_at,
+    })
+  }
+
   const brandMark = brandConfig.markPath || brandConfig.iconPath || '/logo.png'
 
   if (!counts && reloadKey === 0) return <Skeleton />
@@ -394,6 +427,47 @@ export default function PipelinePage() {
           </button>
         </div>
 
+        {/* THE PIPELINE ITSELF - the work on the right, how the calling is
+            going on the left. Stacked on mobile with the work first: the
+            queue is what someone opens this page to do. */}
+        {(!LEAD_ACCESS_ON || viewOwner) && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-start">
+            <div className="lg:col-span-5 order-2 lg:order-1">
+              <PipelineStats
+                owner={LEAD_ACCESS_ON ? (viewOwner as string) : 'all'}
+                tiles={{ hot: c.qualified, booked: c.keyEvent, demoDone: c.demoDone, won: c.won }}
+                bookedLabel={keyEventLabel}
+                reloadKey={reloadKey}
+                onOpenStage={(k) => goStage(k === 'hot' ? 'qualified' : k === 'booked' ? 'keyEvent' : k)}
+              />
+            </div>
+            <div className="lg:col-span-7 order-1 lg:order-2">
+              <PipelineQueue
+                owner={LEAD_ACCESS_ON ? (viewOwner as string) : 'all'}
+                reloadKey={reloadKey}
+                onOpenLead={openLeadFromQueue}
+                onResolved={() => setReloadKey((k) => k + 1)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* THE FUNNEL REPORT - kept, but no longer the page. It answers "how is
+            the whole book doing", which is an occasional question, not the
+            daily one. Collapsed by default; the choice sticks. */}
+        <button
+          type="button"
+          onClick={() => setShowFunnel((v) => { try { localStorage.setItem(FUNNEL_KEY, v ? '0' : '1') } catch { /* private mode */ } return !v })}
+          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] mt-1 self-start"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <MdExpandMore size={15} style={{ transform: showFunnel ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          Funnel report
+          <span className="font-medium normal-case tracking-normal">({c.total} leads)</span>
+        </button>
+
+        {!showFunnel ? null : (
+        <>
         {/* Top row - New / Engaged / Qualified / key event, each with sparkline */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <StageCard icon={<MdPersonOutline size={19} />} label="New" value={c.new} color={BLUE} onClick={() => goStage('new')} right={<Sparkline points={sparks.new} color={BLUE} />} />
@@ -548,7 +622,18 @@ export default function PipelinePage() {
             })}
           </div>
         </div>
+        </>
+        )}
       </div>
+
+      {/* Opened from a queue row. It stays on this page: answering "did this
+          happen" should never cost you the list you were working. */}
+      <LeadDetailsModal
+        lead={selectedLead}
+        isOpen={!!selectedLead}
+        onClose={() => { setSelectedLead(null); setReloadKey((k) => k + 1) }}
+        onStatusUpdate={async () => { setReloadKey((k) => k + 1) }}
+      />
 
       <style>{`
         .chevron-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

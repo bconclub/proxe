@@ -107,6 +107,12 @@ export interface BrandConfig {
   // 'pipeline_config'), and the stored value wins over this default.
   pipeline?: {
     keyEventLabel?: string;
+    // Approved WhatsApp template sent when a call is logged as not-connected
+    // and the caller kept the "send callback message" tick. Must carry
+    // {{callback_date}} and {{callback_time}} so the lead is told WHEN we
+    // will ring back. A brand without one sends nothing - core never names a
+    // template of its own.
+    rnrCallbackTemplate?: string;
   };
   // Campaigns workspace CONTENT. Shared core must never hardcode a brand's
   // audience taxonomy (pilot/cabin-crew…), so the smart-suggestion chips and

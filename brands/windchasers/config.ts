@@ -29,6 +29,13 @@ export const windchasersConfig: BrandConfig = {
     campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
     logCallChat: true, // chat with PROXe after logging a call
   },
+  // A call nobody picked up leaves the lead in silence unless we say
+  // something. This template carries the call-back slot the caller just set,
+  // so the lead learns WHEN we are ringing back, not merely that we rang.
+  // Meta-approved; body lives in configs/whatsapp-template-bodies.ts.
+  pipeline: {
+    rnrCallbackTemplate: 'windchasers_postcall_callback_v1',
+  },
   // Campaigns workspace content in Windchasers' aviation language (shared core
   // ships neutral defaults; this keeps the pilot/cabin-crew audience prompts on
   // Windchasers only — no bleed to other brands).
