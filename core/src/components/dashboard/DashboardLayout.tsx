@@ -151,7 +151,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
   const { setTheme } = useTheme()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(true)
+  // Sidebar starts EXPANDED (founder call 2026-08-05): the labels make the
+  // dashboard quicker to move through, and Notifications/Report Issue at the
+  // foot of the rail are only readable when the labels are showing. An explicit
+  // choice still wins - the localStorage read below overrides this default, so
+  // anyone who collapsed it deliberately keeps it collapsed.
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [hoveredNavItem, setHoveredNavItem] = useState<string | null>(null)
   // Hover state on the sidebar itself - used to expand the collapsed rail on hover
   const [isHovered, setIsHovered] = useState(false)
@@ -335,11 +340,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         }
       }
 
+      // Only an EXPLICIT past choice overrides the expanded default above.
+      // Nothing writes this key except the toggle and the logo click, so a user
+      // who has never touched it gets the expanded rail.
       const savedState = localStorage.getItem('sidebar-collapsed')
       if (savedState !== null) {
         setIsCollapsed(savedState === 'true')
       }
-      // Note: Don't set default collapsed state here - let auto-hide handle it after initial render
     } catch (error) {
       console.error('Error loading preferences:', error)
       // Fallback to dark mode
