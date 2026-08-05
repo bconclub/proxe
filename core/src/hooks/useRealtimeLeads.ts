@@ -57,104 +57,138 @@ export function useRealtimeLeads() {
 
   useEffect(() => {
     const supabase = createClient()
+    const brand = getCurrentBrandId()
+    const isPop = brand === 'pop'
 
-    const isPop = getCurrentBrandId() === 'pop'
+    // booking_date / booking_time do NOT exist on every brand's all_leads -
+    // windchasers has neither. Selecting a missing column makes PostgREST
+    // return "column ... does not exist", whose message contains "does not
+    // exist", which used to trip the table-missing fallback below and silently
+    // send the whole dashboard to `unified_leads`. That view has no owner_id,
+    // no created_at and no updated_at, so ownership vanished from the leads
+    // list and incremental sync was impossible. Ask only for what exists.
+    // Same story for `status`: present on other brands' all_leads, absent on
+    // windchasers. It is only echoed into the CSV export - statusFilter runs
+    // off lead_stage - so omitting it costs nothing here.
+    const hasLegacyCols = brand !== 'windchasers'
+    const BASE_COLUMNS =
+      'id, customer_name, email, phone, created_at, updated_at, last_interaction_at, ' +
+      'lead_score, lead_stage, sub_stage, stage_override, unified_context, ' +
+      'first_touchpoint, last_touchpoint, brand, metadata, owner_id, needs_human_followup' +
+      (hasLegacyCols ? ', status, booking_date, booking_time' : '') +
+      (isPop ? POP_COLUMNS : '')
 
-    const fetchLeads = async () => {
-      try {
-        // Try all_leads first (has enriched columns like lead_score, lead_stage),
-        // fallback to unified_leads if it doesn't exist
-        const { data: allLeadsData, error: allLeadsError } = await supabase
-          .from('all_leads')
-          .select('id, customer_name, email, phone, created_at, last_interaction_at, booking_date, booking_time, lead_score, lead_stage, sub_stage, stage_override, unified_context, first_touchpoint, last_touchpoint, status, brand, metadata' + (isPop ? POP_COLUMNS : ''))
-          .order('last_interaction_at', { ascending: false })
-          .limit(1000)
+    const mapLead = (lead: any): Lead => ({
+      id: lead.id,
+      name: lead.customer_name || lead.name || null,
+      email: lead.email || null,
+      phone: lead.phone || null,
+      source: lead.first_touchpoint || lead.last_touchpoint || lead.source || 'web',
+      first_touchpoint: lead.first_touchpoint || null,
+      last_touchpoint: lead.last_touchpoint || null,
+      brand: lead.brand || null,
+      timestamp: lead.created_at || lead.timestamp || new Date().toISOString(),
+      last_interaction_at: lead.last_interaction_at || null,
+      booking_date: lead.booking_date || null,
+      booking_time: lead.booking_time || null,
+      status: lead.status || null,
+      metadata: lead.metadata || null,
+      unified_context: lead.unified_context || null,
+      lead_score: lead.lead_score ?? null,
+      lead_stage: lead.lead_stage || null,
+      sub_stage: lead.sub_stage || null,
+      stage_override: lead.stage_override ?? null,
+      last_scored_at: lead.last_scored_at || null,
+      is_active_chat: lead.is_active_chat ?? null,
+      ...(isPop ? {
+        constituency: lead.constituency ?? null,
+        district: lead.district ?? null,
+        booth: lead.booth ?? null,
+        language: lead.language ?? null,
+        lean: lead.lean ?? null,
+        magnet: lead.magnet ?? null,
+        grievance_category: lead.grievance_category ?? null,
+        grievance_text: lead.grievance_text ?? null,
+        salience: lead.salience ?? null,
+        action_intent: lead.action_intent ?? null,
+        loop_status: lead.loop_status ?? null,
+        engagement_type: lead.engagement_type ?? null,
+        intensity: lead.intensity ?? null,
+      } : {}),
+    } as Lead)
 
-        let data: any[] | null = null
-        let queryError: any = null
+    let cancelled = false
+    // High-water mark for the incremental poll. Set from the first full load.
+    let lastSync: string | null = null
 
-        if (allLeadsError && (allLeadsError.message.includes('does not exist') || allLeadsError.code === '42P01' || allLeadsError.message.includes('permission denied') || allLeadsError.code === '42501')) {
-          // Fallback to unified_leads
-          const { data: unifiedData, error: unifiedError } = await supabase
-            .from('unified_leads')
-            .select('*')
-            .order('timestamp', { ascending: false })
-            .limit(1000)
-
-          data = unifiedData
-          queryError = unifiedError
-        } else if (allLeadsError) {
-          queryError = allLeadsError
-        } else {
-          data = allLeadsData
+    /**
+     * Full load, once, on mount. Keyset paged on id so it is O(N) - offset
+     * paging re-walks every skipped row, which is why this was capped at 1000
+     * and why webinar registrations older than the cutoff were invisible.
+     *
+     * Renders progressively: each page is appended as it lands, so the table
+     * paints on the first batch instead of waiting for the whole table.
+     */
+    const loadAll = async () => {
+      const PAGE = 1000
+      let cursor: string | null = null
+      const acc: Lead[] = []
+      for (let i = 0; i < 60; i++) {
+        let q = supabase.from('all_leads').select(BASE_COLUMNS).order('id', { ascending: true }).limit(PAGE)
+        if (cursor) q = q.gt('id', cursor)
+        const { data, error: pageErr } = await q
+        if (pageErr) {
+          if (acc.length === 0) { setError(pageErr.message || 'Failed to fetch leads'); setLoading(false) }
+          return
         }
-
-        if (queryError) {
-          console.error('Supabase error:', queryError)
-          if (queryError.message.includes('Failed to fetch') || queryError.message.includes('NetworkError')) {
-            throw new Error('Unable to connect to Supabase. Please check your internet connection and Supabase project status.')
-          }
-          throw new Error(queryError.message || 'Failed to fetch leads')
-        }
-
-        const mappedLeads = (data || []).map((lead: any) => ({
-          id: lead.id,
-          name: lead.customer_name || lead.name || null,
-          email: lead.email || null,
-          phone: lead.phone || null,
-          source: lead.first_touchpoint || lead.last_touchpoint || lead.source || 'web',
-          first_touchpoint: lead.first_touchpoint || null,
-          last_touchpoint: lead.last_touchpoint || null,
-          brand: lead.brand || null,
-          timestamp: lead.created_at || lead.timestamp || new Date().toISOString(),
-          last_interaction_at: lead.last_interaction_at || null,
-          booking_date: lead.booking_date || null,
-          booking_time: lead.booking_time || null,
-          status: lead.status || null,
-          metadata: lead.metadata || null,
-          unified_context: lead.unified_context || null,
-          lead_score: lead.lead_score ?? null,
-          lead_stage: lead.lead_stage || null,
-          sub_stage: lead.sub_stage || null,
-          stage_override: lead.stage_override ?? null,
-          last_scored_at: lead.last_scored_at || null,
-          is_active_chat: lead.is_active_chat ?? null,
-          // POP constituent fields - only attached for the pop brand (undefined
-          // and harmless for everyone else).
-          ...(isPop ? {
-            constituency: lead.constituency ?? null,
-            district: lead.district ?? null,
-            booth: lead.booth ?? null,
-            language: lead.language ?? null,
-            lean: lead.lean ?? null,
-            magnet: lead.magnet ?? null,
-            grievance_category: lead.grievance_category ?? null,
-            grievance_text: lead.grievance_text ?? null,
-            salience: lead.salience ?? null,
-            action_intent: lead.action_intent ?? null,
-            loop_status: lead.loop_status ?? null,
-            engagement_type: lead.engagement_type ?? null,
-            intensity: lead.intensity ?? null,
-          } : {}),
-        }))
-
-        setLeads(mappedLeads)
+        if (cancelled) return
+        if (!data || data.length === 0) break
+        acc.push(...data.map(mapLead))
+        cursor = (data[data.length - 1] as any)?.id ?? null
+        // Newest first for display; the query order is an implementation detail.
+        setLeads([...acc].sort((a, b) =>
+          String(b.last_interaction_at || b.timestamp).localeCompare(String(a.last_interaction_at || a.timestamp))))
         setLoading(false)
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch leads'
-        console.error('Error fetching leads:', err)
-        setError(errorMessage)
-        setLoading(false)
+        if (data.length < PAGE || !cursor) break
       }
+      lastSync = new Date().toISOString()
+      setLoading(false)
     }
 
-    fetchLeads()
+    /**
+     * Incremental sync. Pulls only rows changed since the last pass and merges
+     * them in by id.
+     *
+     * The old poll refetched everything and replaced the array wholesale every
+     * 30s, which rebuilt every row underneath whoever was using the page. Now
+     * an untouched row keeps its identity, so the table stops reshuffling while
+     * someone is reading or typing.
+     */
+    const syncChanges = async () => {
+      if (!lastSync) return
+      const since = lastSync
+      lastSync = new Date().toISOString()
+      const { data, error: syncErr } = await supabase
+        .from('all_leads')
+        .select(BASE_COLUMNS)
+        .gte('updated_at', since)
+        .limit(500)
+      if (syncErr || !data || data.length === 0 || cancelled) return
+      setLeads((prev) => {
+        const byId = new Map(prev.map((l) => [l.id, l]))
+        for (const row of data) byId.set((row as any).id, mapLead(row))
+        return [...byId.values()].sort((a, b) =>
+          String(b.last_interaction_at || b.timestamp).localeCompare(String(a.last_interaction_at || a.timestamp)))
+      })
+    }
 
-    // Poll every 30s - Realtime postgres_changes on all_leads caused 19s lock
-    // contention that made the entire DB unresponsive (ShareLock death spiral)
-    const interval = setInterval(fetchLeads, 30_000)
+    loadAll()
+    // Realtime postgres_changes on all_leads caused 19s lock contention that
+    // made the whole DB unresponsive, so this stays a poll - just a cheap one.
+    const interval = setInterval(syncChanges, 30_000)
 
     return () => {
+      cancelled = true
       clearInterval(interval)
     }
   }, [])
