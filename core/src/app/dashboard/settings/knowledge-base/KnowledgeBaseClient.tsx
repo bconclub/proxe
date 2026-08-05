@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { FileUploader, UrlInput, TextInput, KnowledgeList, KnowledgeGraphSection } from '@/components/dashboard/KnowledgeBase'
 import { MdCloudUpload, MdLink, MdTextSnippet } from 'react-icons/md'
 import type { KnowledgeBaseItem } from '@/types'
@@ -62,8 +61,11 @@ export default function KnowledgeBaseClient() {
   const pendingCount = items.filter((i) => i.embeddings_status === 'pending' || i.embeddings_status === 'processing').length
   const errorCount = items.filter((i) => i.embeddings_status === 'error').length
 
+  // No <DashboardLayout> here: app/dashboard/layout.tsx already wraps every
+  // page under /dashboard in one. Nesting a second shell mounted a second
+  // sidebar, a second alerts poller and a second load chime.
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-5xl">
         {/* Header */}
         <div className="mb-8">
@@ -157,6 +159,6 @@ export default function KnowledgeBaseClient() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

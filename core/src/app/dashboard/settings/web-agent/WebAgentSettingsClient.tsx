@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import {
   MdCode,
   MdRefresh,
@@ -93,8 +92,11 @@ export default function WebAgentSettingsClient() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
   const embedCode = `<script src="${appUrl}/api/widget/embed.js"></script>`
 
+  // No <DashboardLayout> here: app/dashboard/layout.tsx already wraps every
+  // page under /dashboard in one. Nesting a second shell mounted a second
+  // sidebar, a second alerts poller and a second load chime.
   return (
-    <DashboardLayout>
+    <>
       <div style={{
         width: 'calc(100% + 64px)',
         height: 'calc(100vh - 48px)',
@@ -524,6 +526,6 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   )
 }

@@ -15,7 +15,7 @@ import { useTheme } from './ThemeProvider'
 import { applyAccentColor, type ThemeMode } from '@/lib/accent-theme'
 import { fetchGlobalPrefs, applySoundsToLocal } from '@/lib/dashboard-prefs'
 import { useLiveAlerts } from '@/lib/useLiveAlerts'
-import { playSound } from '@/lib/sound-prefs'
+import { maybePlayReadyCue } from '@/lib/ready-cue'
 import NotificationCenter from '@/components/dashboard/NotificationCenter'
 import {
   MdInbox,
@@ -174,7 +174,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   // different number inches from the bell's. See the note in useLiveAlerts.
   const [unreadCount] = useState(0) // TODO: needs server-side read state
   // One "dashboard loaded" chime per mount (see the prefs effect below).
-  const readyChimedRef = React.useRef(false)
+  // The "dashboard loaded" cue needs BOTH the sound prefs (so a muted team is
+  // respected) and the running version (so it can tell an update from a plain
+  // reload). Whichever lands second fires the attempt; ready-cue.ts owns the
+  // decision, and is deliberately quiet on an ordinary page load.
+  const prefsSettledRef = React.useRef(false)
+  const versionSettledRef = React.useRef(false)
+  const versionRef = React.useRef<string | null>(null)
+  const tryReadyCue = React.useCallback(() => {
+    if (!prefsSettledRef.current || !versionSettledRef.current) return
+    maybePlayReadyCue(versionRef.current)
+  }, [])
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
@@ -204,6 +214,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       .then(res => res.json())
       .then(data => {
         setBuildVersion(data.version || '0.0.1')
+        versionRef.current = data.version || null
+        versionSettledRef.current = true
+        tryReadyCue()
         // Use buildDate from API if available, otherwise fallback to getBuildDate()
         if (data.buildDate) {
           setBuildDate(data.buildDate)
@@ -212,6 +225,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         }
       })
       .catch(() => {
+        // No version to compare, but the "been away a while" rule still holds.
+        versionRef.current = null
+        versionSettledRef.current = true
+        tryReadyCue()
         // Fallback to existing method if API fails
         setBuildDate(getBuildDate())
       })
@@ -272,18 +289,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         const effMode = mode || (localStorage.getItem('proxe-theme') as ThemeMode) || 'bw-dark'
         applyAccentColor(accent, effMode)
       }
-      // "Dashboard loaded" cue. It waits for the prefs round-trip on purpose:
-      // firing before applySoundsToLocal would chime once at the default-on
-      // setting even for a team that has globally muted sounds. This layout
-      // mounts once per FULL page load (client-side nav keeps it alive), so
-      // this is a reload cue, not a per-page-click cue.
-      if (!readyChimedRef.current) {
-        readyChimedRef.current = true
-        playSound('ready')
-      }
+      // Prefs are in (so a globally muted team is respected). Hand off to the
+      // ready-cue rules, which stay silent unless something shipped or you
+      // have been away a while.
+      prefsSettledRef.current = true
+      tryReadyCue()
     })()
     return () => { cancelled = true }
-  }, [setTheme])
+  }, [setTheme, tryReadyCue])
 
   // AUTHENTICATION DISABLED - Client-side auth check commented out
   // useEffect(() => {
