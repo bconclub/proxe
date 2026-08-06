@@ -1,6 +1,20 @@
+-- SUPERSEDED - DO NOT RUN. Kept for history only.
+--
+-- This targeted BCON's ORIGINAL project (yvkauaiyranysldubnqv), on the plan
+-- where PROXe leads moved INTO it. The consolidation went the other way: BCON
+-- moved to ocduyhevwgfexqaxqdsz, which already allowed 'billing' because it was
+-- built from the proxe bootstrap pack. Nothing here is needed on the live
+-- database, and the original project is being decommissioned.
+--
+-- The equivalent live fixes are in
+-- brands/proxe/supabase/bootstrap/28_live_fixes.sql.
+--
+-- ---------------------------------------------------------------------------
+-- Original note follows.
+--
 -- Allow 'billing' as a touchpoint on all_leads.
 --
--- WHY: PROXe product leads are moving into this (Beacon's) Supabase alongside
+-- WHY: PROXe product leads are moving into this (BCON's) Supabase alongside
 -- BCON's service leads, segmented by the `brand` column. The goproxe.com landing
 -- site records Dodo Payments events by writing first_touchpoint/last_touchpoint
 -- = 'billing' (app/lib/leadsSupabase.ts -> recordBillingEvent), which is the only
