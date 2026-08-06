@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { sendTelegramMessage, telegramConfigured, tgEscape, tgLink } from '@/lib/services/telegram'
-import { BRAND_ID } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -9,48 +8,51 @@ export const maxDuration = 60
 /**
  * GET /api/cron/telegram-feed
  *
- * The group's running commentary: things worth the team seeing as they happen,
- * posted one at a time.
+ * The group hears about a lead when a HUMAN IS NEEDED. Nothing else.
  *
- * Split of duties, deliberately:
- *   GROUP    - what happened (a lead arrived, a seat was booked, someone
- *              finished a scholarship application). Shared awareness.
- *   PERSONAL - what YOU owe (see cron/followup-reminder). A nudge is only
- *              useful to the person who made the promise; in a group it is
- *              noise to everyone else and easy to assume someone else has it.
+ * It used to post every arrival, every booking, every win. Forty leads a day
+ * is forty pings, and a group that pings forty times gets muted - after which
+ * the one message that actually needed somebody is unread too. Volume belongs
+ * in the brief (counts, twice a day); the dashboard has the list.
  *
- * Written as a poller rather than Telegram calls sprinkled through the intake
- * routes: a lead landing must never wait on, or fail because of, a message to
- * a chat app.
+ * needs_human_followup is set by intake when the agent cannot proceed: a
+ * WhatsApp send failed, a conversation log failed, the agent handed off. Those
+ * are the moments where nothing happens next unless a person acts.
  *
- * The watermark lives in dashboard_settings so a redeploy doesn't replay the
- * day. On the very first run it starts from NOW - nobody wants the backlog
- * posted one by one.
+ * Dedupe is by lead id, kept in the same settings row as the watermark. A flag
+ * that stays true must not re-alert every ten minutes forever, and it cannot
+ * key off the flag clearing - being told is not the same as being handled.
  */
 
-const WATERMARK_KEY = 'telegram_feed_watermark'
-/** Ceiling per run: a burst (ad spike, bulk import) posts a summary instead. */
-const MAX_ITEMS = 12
+const STATE_KEY = 'telegram_feed_watermark'
+/** Ceiling per run. More than this and something systemic is wrong. */
+const MAX_ITEMS = 8
+/** How many alerted ids to remember. Comfortably more than a busy week. */
+const MEMORY = 500
 
-async function readWatermark(supabase: any): Promise<string | null> {
+interface FeedState {
+  since?: string
+  alerted?: string[]
+}
+
+async function readState(supabase: any): Promise<FeedState | null> {
   const { data } = await supabase
     .from('dashboard_settings')
     .select('value')
-    .eq('key', WATERMARK_KEY)
+    .eq('key', STATE_KEY)
     .maybeSingle()
-  return (data?.value as any)?.since || null
+  return (data?.value as FeedState) || null
 }
 
-async function writeWatermark(supabase: any, since: string) {
+async function writeState(supabase: any, state: FeedState) {
   await supabase.from('dashboard_settings').upsert(
-    { key: WATERMARK_KEY, value: { since }, description: 'Telegram group feed - last posted timestamp' },
+    { key: STATE_KEY, value: state, description: 'Telegram group feed - watermark + already-alerted leads' },
     { onConflict: 'key' },
   )
 }
 
 export async function GET(_request: NextRequest) {
   try {
-    // The group feed genuinely needs a group, so this one keeps the full gate.
     if (!telegramConfigured()) {
       return NextResponse.json({ ok: true, skipped: 'TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set' })
     }
@@ -58,118 +60,78 @@ export async function GET(_request: NextRequest) {
     if (!supabase) return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 })
 
     const now = new Date().toISOString()
-    const since = await readWatermark(supabase)
-    if (!since) {
-      await writeWatermark(supabase, now)
-      return NextResponse.json({ ok: true, started: true, note: 'watermark set, feed starts from now' })
+    const state = await readState(supabase)
+    if (!state?.since) {
+      // First run: start from now. Nobody wants the existing backlog of
+      // stuck leads arriving one at a time as if they just happened.
+      await writeState(supabase, { since: now, alerted: [] })
+      return NextResponse.json({ ok: true, started: true, note: 'watching from now' })
     }
 
+    const alerted = new Set(state.alerted || [])
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
-    const leadLink = (id: string, label: string) =>
-      appUrl ? tgLink(label, `${appUrl}/dashboard/leads?leadId=${id}`) : `<b>${tgEscape(label)}</b>`
 
-    type Item = { at: string; html: string }
-    const items: Item[] = []
-
-    // 1. New leads.
-    const { data: leads } = await supabase
+    const { data: stuck, error } = await supabase
       .from('all_leads')
-      .select('id, customer_name, phone, first_touchpoint, created_at, wc:unified_context->windchasers')
-      .gt('created_at', since)
-      .order('created_at', { ascending: true })
-      .limit(MAX_ITEMS * 2)
+      .select('id, customer_name, phone, lead_stage, last_interaction_at, first_touchpoint')
+      .eq('needs_human_followup', true)
+      .order('last_interaction_at', { ascending: false })
+      .limit(50)
 
-    for (const l of leads || []) {
-      const wc: any = l.wc || {}
-      const name = l.customer_name || 'Someone'
-      const src = l.first_touchpoint ? ` · ${tgEscape(l.first_touchpoint)}` : ''
-      // A scholarship tick at registration is the thing worth saying out loud.
-      const tag =
-        wc.offline_event_intent === 'scholarship'
-          ? ' 🎓 <i>also applying for the scholarship</i>'
-          : wc.offline_event_key
-            ? ` · <i>${tgEscape(String(wc.offline_event_name || wc.offline_event_key))}</i>`
-            : ''
-      items.push({
-        at: l.created_at,
-        html: `🆕 ${leadLink(l.id, name)}${src}${tag}`,
-      })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    const fresh = (stuck || []).filter((l: any) => !alerted.has(l.id))
+    if (!fresh.length) {
+      await writeState(supabase, { since: now, alerted: Array.from(alerted).slice(-MEMORY) })
+      return NextResponse.json({ ok: true, waiting: (stuck || []).length, posted: 0 })
     }
 
-    // 2. Stage changes that mean something: a booking, a demo taken, a win.
-    const NOTABLE: Record<string, string> = {
-      'Booking Made': '📅 booked',
-      'Demo Taken': '✅ demo taken',
-      'Closed Won': '🏆 won',
-      'Converted': '🏆 converted',
-      'Won': '🏆 won',
-    }
-    const { data: changes } = await supabase
-      .from('lead_stage_changes')
-      .select('lead_id, new_stage, changed_by, created_at')
-      .gt('created_at', since)
-      .in('new_stage', Object.keys(NOTABLE))
-      .order('created_at', { ascending: true })
-      .limit(MAX_ITEMS * 2)
+    const batch = fresh.slice(0, MAX_ITEMS)
 
-    const changeLeadIds = Array.from(new Set((changes || []).map((c: any) => c.lead_id).filter(Boolean)))
-    const nameById = new Map<string, string>()
-    if (changeLeadIds.length) {
-      const { data: cl } = await supabase.from('all_leads').select('id, customer_name').in('id', changeLeadIds)
-      for (const l of cl || []) nameById.set(l.id, l.customer_name || 'Someone')
-    }
-    for (const c of changes || []) {
-      items.push({
-        at: c.created_at,
-        html: `${NOTABLE[c.new_stage]} — ${leadLink(c.lead_id, nameById.get(c.lead_id) || 'Someone')}`,
-      })
-    }
-
-    // 3. Completed scholarship applications - the milestone the team cares
-    //    about most right now, and invisible in a stage change.
-    const { data: applied } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, applied_at:unified_context->windchasers->>scholarship_applied_at, track:unified_context->windchasers->>scholarship_track')
-      .not('unified_context->windchasers->>scholarship_applied_at', 'is', null)
-      .gt('unified_context->windchasers->>scholarship_applied_at', since)
-      .limit(MAX_ITEMS)
-
-    for (const a of applied || []) {
-      const track = a.track ? ` · ${tgEscape(String(a.track).replace(/_/g, ' '))}` : ''
-      items.push({
-        at: a.applied_at,
-        html: `🎓 <b>Scholarship application submitted</b> — ${leadLink(a.id, a.customer_name || 'Someone')}${track}`,
-      })
-    }
-
-    if (!items.length) {
-      await writeWatermark(supabase, now)
-      return NextResponse.json({ ok: true, posted: 0 })
-    }
-
-    items.sort((a, b) => a.at.localeCompare(b.at))
-
-    // A quiet stretch posts each item. A flood posts one line - a group that
-    // pings forty times gets muted, and then nothing is seen at all.
-    if (items.length > MAX_ITEMS) {
-      await sendTelegramMessage(
-        `📈 <b>${items.length} updates</b> in the last few minutes.\n${appUrl ? tgLink('Open the dashboard', `${appUrl}/dashboard`) : ''}`,
-        { disablePreview: true },
-      )
-      await writeWatermark(supabase, now)
-      return NextResponse.json({ ok: true, posted: 1, summarised: items.length })
+    // The last thing they said. Without it the alert says somebody is stuck
+    // but not on what, and whoever picks it up has to open the lead to find
+    // out whether it is urgent.
+    const lastMsg = new Map<string, string>()
+    const { data: msgs } = await supabase
+      .from('conversations')
+      .select('lead_id, content, created_at')
+      .eq('sender', 'customer')
+      .in('lead_id', batch.map((l: any) => l.id))
+      .order('created_at', { ascending: false })
+      .limit(200)
+    for (const m of msgs || []) {
+      if (m.lead_id && !lastMsg.has(m.lead_id)) {
+        lastMsg.set(m.lead_id, String(m.content || '').replace(/\s+/g, ' ').slice(0, 140))
+      }
     }
 
     let posted = 0
-    for (const it of items) {
-      const res = await sendTelegramMessage(it.html, { disablePreview: true })
-      if (res.success) posted++
-      // Telegram's own limit is ~20 messages/minute to one chat.
+    for (const l of batch) {
+      const name = tgEscape(l.customer_name || 'Unknown')
+      const said = lastMsg.get(l.id)
+      const lines = [
+        `🙋 <b>Someone needs you</b>`,
+        `${appUrl ? tgLink(name, `${appUrl}/dashboard/leads?leadId=${l.id}`) : `<b>${name}</b>`}${l.phone ? ` · ${tgEscape(l.phone)}` : ''}`,
+      ]
+      if (l.lead_stage) lines.push(`<i>${tgEscape(l.lead_stage)}</i>`)
+      if (said) lines.push(`\n"${tgEscape(said)}"`)
+      if (l.phone) {
+        lines.push(`\n${tgLink('Reply on WhatsApp', `https://wa.me/${String(l.phone).replace(/\D/g, '')}`)}`)
+      }
+
+      const res = await sendTelegramMessage(lines.join('\n'), { disablePreview: true })
+      if (res.success) { posted++; alerted.add(l.id) }
       await new Promise((r) => setTimeout(r, 400))
     }
 
-    await writeWatermark(supabase, now)
-    return NextResponse.json({ ok: true, posted, found: items.length })
+    await writeState(supabase, { since: now, alerted: Array.from(alerted).slice(-MEMORY) })
+
+    return NextResponse.json({
+      ok: true,
+      waiting: (stuck || []).length,
+      posted,
+      remaining: fresh.length - batch.length,
+    })
   } catch (error: any) {
     console.error('[telegram-feed] failed:', error?.message || error)
     return NextResponse.json({ error: error?.message || 'unknown' }, { status: 500 })
