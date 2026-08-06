@@ -873,14 +873,14 @@
 .message.user .messageAvatar {
   background: var(--bubble-user-bg);
   border-color: var(--bubble-user-border);
-  box-shadow: var(--bubble-user-shadow);
+  box-shadow: none;
 }
 
 /* AI avatar styling - left side */
 .message.ai .messageAvatar {
   background: var(--bubble-ai-bg);
   border-color: var(--bubble-ai-border);
-  box-shadow: var(--bubble-ai-shadow);
+  box-shadow: none;
 }
 
 /* Accent variations for avatars using brand colors */
@@ -893,7 +893,7 @@
 .message.user.accent-6 .messageAvatar {
   background: var(--bubble-user-bg);
   border-color: var(--bubble-user-border);
-  box-shadow: var(--bubble-user-shadow);
+  box-shadow: none;
 }
 
 .message.ai.accent-0 .messageAvatar,
@@ -905,7 +905,7 @@
 .message.ai.accent-6 .messageAvatar {
   background: var(--bubble-ai-bg);
   border-color: var(--bubble-ai-border);
-  box-shadow: var(--bubble-ai-shadow);
+  box-shadow: none;
 }
 
 .bubble {
@@ -1002,8 +1002,11 @@
   backdrop-filter: blur(35px) saturate(100%);
   -webkit-backdrop-filter: blur(35px) saturate(100%);
   color: var(--text-primary);
-  border: 2px solid var(--bubble-user-border);
-  box-shadow: var(--bubble-user-shadow);
+  /* 1px, not 2px, and no drop shadow. Every bubble was ringed in a heavy
+     border with a shadow behind it, so one short line of text read as a boxed
+     card instead of something a person said. */
+  border: 1px solid color-mix(in srgb, var(--bubble-user-border) 55%, transparent);
+  box-shadow: none;
   width: 70%;
   max-width: 70%;
   margin-left: auto; /* Align to the right */
@@ -1019,7 +1022,7 @@
 .message.user.accent-6 .bubble {
   background: var(--bubble-user-bg);
   border-color: var(--bubble-user-border);
-  box-shadow: var(--bubble-user-shadow);
+  box-shadow: none;
 }
 
 .message.ai .bubble {
@@ -1028,8 +1031,8 @@
   backdrop-filter: blur(35px) saturate(100%);
   -webkit-backdrop-filter: blur(35px) saturate(100%);
   color: var(--text-primary);
-  border: 2px solid var(--bubble-ai-border);
-  box-shadow: var(--bubble-ai-shadow);
+  border: 1px solid color-mix(in srgb, var(--bubble-ai-border) 45%, transparent);
+  box-shadow: none;
 }
 
 /* Accent variations for AI bubbles - all use consistent AI bubble colors */
@@ -1042,7 +1045,7 @@
 .message.ai.accent-6 .bubble {
   background: var(--bubble-ai-bg);
   border-color: var(--bubble-ai-border);
-  box-shadow: var(--bubble-ai-shadow);
+  box-shadow: none;
 }
 
 .infinityLoaderWrapper {

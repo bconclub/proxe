@@ -1,41 +1,28 @@
 'use client'
 
-import React, { useEffect, useState } from 'react';
-import Lottie from 'lottie-react';
+import React from 'react';
 import styles from './InfinityLoader.module.css';
 
+/**
+ * "PROXe is thinking" indicator.
+ *
+ * Was a Lottie animation fetched from /assets/icons/Typing in chat.json, with a
+ * static "..." as the fallback while it loaded. That file does not exist in
+ * this brand pack, or anywhere in the repo, so the fetch 404'd every time, the
+ * .catch() swallowed it, and the fallback WAS the indicator: three full stops
+ * that never moved. The agent looked frozen on every single reply.
+ *
+ * Three CSS-animated dots instead. Nothing to fetch, so nothing to 404, and
+ * lottie-react comes off the widget's critical path.
+ */
 export function InfinityLoader() {
-  const [animationData, setAnimationData] = useState<any>(null);
-
-  useEffect(() => {
-    // Load the Lottie JSON file
-    fetch('/assets/icons/Typing in chat.json')
-      .then((response) => response.json())
-      .then((data) => {
-        setAnimationData(data);
-      })
-      .catch(() => {
-        // Silently fail and use fallback
-      });
-  }, []);
-
-  if (!animationData) {
-    // Fallback while loading
-    return (
-      <div className={styles.loadingContainer}>
-        <div className={styles.typingAnimation}>...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.loadingContainer}>
-      <Lottie
-        animationData={animationData}
-        className={styles.typingAnimation}
-        loop={true}
-        autoplay={true}
-      />
+    <div className={styles.loadingContainer} role="status" aria-label="PROXe is typing">
+      <span className={styles.dot} />
+      <span className={styles.dot} />
+      <span className={styles.dot} />
     </div>
   );
 }
+
+export default InfinityLoader;
