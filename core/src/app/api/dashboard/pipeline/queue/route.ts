@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, getBrandConfig } from '@/configs'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +59,14 @@ export async function GET(request: NextRequest) {
 
     const supabase: any = getServiceClient() || authClient
 
+    // owner_id exists only on brands running features.leadAccess (Windchasers
+    // via migration 036, Lokazen via 005). Selecting it unconditionally made
+    // this route 500 with "column all_leads.owner_id does not exist" on BCON,
+    // taking the whole Pipeline page down - the same way the Leads page died.
+    // Off means the brand has no ownership model at all, so every lead is
+    // yours: see `mine` below.
+    const leadAccessOn = !!getBrandConfig().features?.leadAccess
+
     // Keyset-paged, narrow select. unified_context has to come along because
     // the booking lives inside it - there is no column to read instead.
     const rows: any[] = []
@@ -66,7 +74,10 @@ export async function GET(request: NextRequest) {
     for (let i = 0; i < 20; i++) {
       let q = supabase
         .from('all_leads')
-        .select('id, customer_name, phone, lead_stage, owner_id, last_interaction_at, unified_context')
+        .select(
+          'id, customer_name, phone, lead_stage, last_interaction_at, unified_context' +
+          (leadAccessOn ? ', owner_id' : '')
+        )
         .order('id', { ascending: true })
         .limit(1000)
       if (cursor) q = q.gt('id', cursor)
@@ -91,7 +102,9 @@ export async function GET(request: NextRequest) {
 
     for (const lead of rows) {
       const wc = lead.unified_context?.[BRAND_ID] || {}
-      const mine = ownerId === null || lead.owner_id === ownerId
+      // No ownership model on this brand -> every lead is yours, otherwise the
+      // default owner=me scope would filter the pipeline down to nothing.
+      const mine = !leadAccessOn || ownerId === null || lead.owner_id === ownerId
       const { date, time } = readBooking(lead)
       const answered = wc.booking_outcome
       // An answer only settles the booking it was given for - book again and

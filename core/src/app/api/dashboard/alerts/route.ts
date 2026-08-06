@@ -19,9 +19,10 @@ export const dynamic = 'force-dynamic'
  * question only - "what is new since <since>" - so the client can ping a sound
  * and bump an unread badge without re-diffing a 30-item history every poll.
  *
- * `since` is required-ish: with no `since` the route returns an empty list plus
- * the server clock, so a fresh tab establishes its baseline without a burst of
- * alerts for everything that happened while nobody was looking.
+ * With no `since` a fresh tab gets the last BACKFILL_HOURS of activity plus the
+ * server clock, marked `backfill: true`. The client fills the drawer from it but
+ * plays NO sound - so opening a tab shows you what you missed without pinging
+ * for everything that happened while nobody was looking.
  *
  * Auth: logged-in session. Reads use service-role (consistent with the other
  * dashboard reads that join across tables), then results are filtered through
@@ -43,6 +44,8 @@ export type DashboardAlert = {
 // Hard cap per poll. A quiet tab sees 0-2; a burst (bulk import, ad spike) is
 // truncated rather than firing dozens of sounds and a giant payload.
 const MAX_PER_KIND = 15
+// How much history a freshly-opened tab shows in the drawer (silently).
+const BACKFILL_HOURS = 24
 
 function labelChannel(raw: string | null | undefined): string {
   const c = (raw || '').toLowerCase()
@@ -63,8 +66,18 @@ export async function GET(request: NextRequest) {
     const sinceRaw = request.nextUrl.searchParams.get('since')
     const since = sinceRaw && !Number.isNaN(Date.parse(sinceRaw)) ? new Date(sinceRaw).toISOString() : null
 
-    // First poll of a tab: hand back the clock, no backlog.
-    if (!since) return NextResponse.json({ alerts: [], now })
+    // First poll of a tab used to return NOTHING - just the clock - so the
+    // drawer read "Nothing yet" until something happened while you watched.
+    // On a brand doing a handful of leads a day that is an empty panel more or
+    // less permanently, which is what it looked like on Lokazen.
+    //
+    // The no-backlog rule was really about SOUND: opening a tab must not ping
+    // for everything that arrived overnight. So keep that promise and drop the
+    // rest - hand back the last day of activity, flagged as a backfill, and let
+    // the client fill the list silently. Unread still comes from the client's
+    // own "last opened the bell" mark, so this does not invent a badge either.
+    const isBackfill = !since
+    const effectiveSince = since ?? new Date(Date.now() - BACKFILL_HOURS * 3600_000).toISOString()
 
     // `any` on purpose: the generated Database types make the service client a
     // union whose .from() overloads don't unify (same reason founder-metrics and
@@ -79,7 +92,7 @@ export async function GET(request: NextRequest) {
       const { data: leads } = await supabase
         .from('all_leads')
         .select('id, customer_name, first_touchpoint, last_touchpoint, created_at, unified_context')
-        .gt('created_at', since)
+        .gt('created_at', effectiveSince)
         .order('created_at', { ascending: false })
         .limit(MAX_PER_KIND)
 
@@ -107,7 +120,7 @@ export async function GET(request: NextRequest) {
         .from('conversations')
         .select('id, lead_id, channel, content, created_at')
         .eq('sender', 'customer')
-        .gt('created_at', since)
+        .gt('created_at', effectiveSince)
         .order('created_at', { ascending: false })
         .limit(MAX_PER_KIND)
 
@@ -145,7 +158,7 @@ export async function GET(request: NextRequest) {
 
     alerts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-    return NextResponse.json({ alerts, now })
+    return NextResponse.json({ alerts, now, backfill: isBackfill })
   } catch (error: any) {
     console.error('[alerts] Error:', error?.message || error)
     // Soft-fail: a broken poll must never break the dashboard shell.
