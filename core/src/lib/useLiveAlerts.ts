@@ -10,9 +10,10 @@
  * the Chats nav badge.
  *
  * Behaviour worth knowing:
- *   - The FIRST call has no `since`, so the server just hands back its clock.
- *     That baseline is deliberate: opening a tab must not replay (and ping for)
- *     everything that arrived overnight.
+ *   - The FIRST call has no `since`, so the server hands back its clock plus the
+ *     last 24h of activity flagged `backfill`. That fills the drawer silently:
+ *     opening a tab shows what you missed, but must never PING for everything
+ *     that arrived overnight.
  *   - The cursor lives in a ref, NOT localStorage. Two open tabs each keep
  *     their own cursor, so both get alerted instead of one silently eating the
  *     other's window.
@@ -101,13 +102,19 @@ export function useLiveAlerts(): LiveAlerts {
 
       if (fresh.length === 0) return
 
+      // The first poll of a tab comes back flagged as a backfill: the last day
+      // of activity, so the drawer has something in it instead of "Nothing yet".
+      // It fills the list but must stay SILENT - you should not be pinged for
+      // things that happened before you sat down.
+      const isBackfill = data?.backfill === true
+
       setAlerts((prev) => {
         // Dedupe by id: a row can straddle two polls if clocks drift slightly.
         const known = new Set(prev.map((a) => a.id))
         const added = fresh.filter((a) => !known.has(a.id))
         if (added.length === 0) return prev
         // One sound per batch. A lead landing outranks a message.
-        playSound(added.some((a) => a.kind === 'lead') ? 'new' : 'message')
+        if (!isBackfill) playSound(added.some((a) => a.kind === 'lead') ? 'new' : 'message')
         const next = [...added, ...prev].slice(0, FEED_CAP)
         try { localStorage.setItem(FEED_KEY, JSON.stringify(next)) } catch { /* private mode */ }
         return next
@@ -120,7 +127,7 @@ export function useLiveAlerts(): LiveAlerts {
   }, [])
 
   useEffect(() => {
-    void poll() // baseline call - establishes the cursor, returns nothing
+    void poll() // baseline call - establishes the cursor + silent 24h backfill
     const id = setInterval(() => { void poll() }, POLL_MS)
     const onVis = () => { if (document.visibilityState === 'visible') void poll() }
     document.addEventListener('visibilitychange', onVis)

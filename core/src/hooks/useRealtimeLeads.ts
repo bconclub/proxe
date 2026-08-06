@@ -77,17 +77,60 @@ export function useRealtimeLeads() {
     // "Error: column all_leads.needs_human_followup does not exist" and the
     // Activity feed stayed empty. Keep it OPTIONAL: try with it, and if the
     // column is missing, retry once without it instead of breaking the page.
-    const OPTIONAL_COLUMNS = ', needs_human_followup'
-    const CORE_COLUMNS =
+    const WISHLIST =
       'id, customer_name, email, phone, created_at, updated_at, last_interaction_at, ' +
       'lead_score, lead_stage, sub_stage, stage_override, unified_context, ' +
-      'first_touchpoint, last_touchpoint, brand, metadata, owner_id' +
+      'first_touchpoint, last_touchpoint, brand, metadata, needs_human_followup, owner_id' +
       (hasLegacyCols ? ', status, booking_date, booking_time' : '') +
       (isPop ? POP_COLUMNS : '')
-    let BASE_COLUMNS = CORE_COLUMNS + OPTIONAL_COLUMNS
-    /** True when the error is Postgres "undefined column" (42703). */
-    const isMissingColumn = (err: any) =>
-      err?.code === '42703' || /column .* does not exist/i.test(String(err?.message || ''))
+
+    // The five brand DBs have drifted apart: owner_id is Windchasers-only
+    // (migration 036), needs_human_followup reached Lokazen only in 006,
+    // windchasers lacks status/booking_*, and so on. Hand-maintaining "which
+    // brand has which column" is what broke this page twice - Lokazen died on
+    // needs_human_followup, then BCON died on owner_id, each showing nothing but
+    // a bare "column ... does not exist" where the table should be.
+    //
+    // So stop guessing. Ask for everything, and when Postgres says a column is
+    // missing (42703) it also NAMES it - drop that one and retry. Any brand
+    // loads with whatever subset it actually has, and the next divergence is
+    // handled without a code change. mapLead already defaults every field, so a
+    // dropped column reads as null rather than breaking a row.
+    let columns = WISHLIST.split(',').map((c) => c.trim()).filter(Boolean)
+    const selectList = () => columns.join(', ')
+
+    // Columns we cannot run without: `id` is the paging cursor, and the other
+    // two drive incremental sync and the display sort. If one of THESE is
+    // missing the brand is genuinely misconfigured and the error should show.
+    const ESSENTIAL = new Set(['id', 'updated_at', 'last_interaction_at'])
+
+    /** Name of the column in a Postgres "undefined column" (42703) error, if any. */
+    const missingColumn = (err: any): string | null => {
+      if (!err) return null
+      const message = String(err?.message || '')
+      if (err?.code !== '42703' && !/column .* does not exist/i.test(message)) return null
+      // e.g. `column all_leads.owner_id does not exist`
+      const m = /column\s+(?:[\w".]+\.)?"?([a-zA-Z0-9_]+)"?\s+does not exist/i.exec(message)
+      return m?.[1] ?? null
+    }
+
+    /**
+     * Run a query, shedding optional columns this brand's table lacks.
+     * `any` in/out on purpose: callers hand back a PostgrestFilterBuilder, which
+     * is thenable rather than a real Promise, so a generic signature does not
+     * unify (same reason the rest of this file's Supabase reads use `any`).
+     */
+    const withColumnFallback = async (run: () => any): Promise<any> => {
+      // Bounded: one pass per droppable column, never an unbounded retry loop.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const res: any = await run()
+        const col = missingColumn(res?.error)
+        if (!col || ESSENTIAL.has(col) || !columns.includes(col)) return res
+        console.warn(`[useRealtimeLeads] all_leads has no "${col}" on this brand - retrying without it`)
+        columns = columns.filter((c) => c !== col)
+      }
+      return run()
+    }
 
     const mapLead = (lead: any): Lead => ({
       id: lead.id,
@@ -146,18 +189,11 @@ export function useRealtimeLeads() {
       const acc: Lead[] = []
       for (let i = 0; i < 60; i++) {
         const runPage = async () => {
-          let q = supabase.from('all_leads').select(BASE_COLUMNS).order('id', { ascending: true }).limit(PAGE)
+          let q = supabase.from('all_leads').select(selectList()).order('id', { ascending: true }).limit(PAGE)
           if (cursor) q = q.gt('id', cursor)
           return q
         }
-        let { data, error: pageErr } = await runPage()
-        // Brand's all_leads lacks an optional column - drop it and retry once so
-        // the dashboard still loads instead of showing a bare error string.
-        if (pageErr && isMissingColumn(pageErr) && BASE_COLUMNS !== CORE_COLUMNS) {
-          console.warn('[useRealtimeLeads] optional column missing on this brand, retrying without it:', pageErr.message)
-          BASE_COLUMNS = CORE_COLUMNS
-          ;({ data, error: pageErr } = await runPage())
-        }
+        const { data, error: pageErr } = await withColumnFallback(runPage)
         if (pageErr) {
           if (acc.length === 0) { setError(pageErr.message || 'Failed to fetch leads'); setLoading(false) }
           return
@@ -189,11 +225,13 @@ export function useRealtimeLeads() {
       if (!lastSync) return
       const since = lastSync
       lastSync = new Date().toISOString()
-      const { data, error: syncErr } = await supabase
-        .from('all_leads')
-        .select(BASE_COLUMNS)
-        .gte('updated_at', since)
-        .limit(500)
+      const { data, error: syncErr } = await withColumnFallback(() =>
+        supabase
+          .from('all_leads')
+          .select(selectList())
+          .gte('updated_at', since)
+          .limit(500)
+      )
       if (syncErr || !data || data.length === 0 || cancelled) return
       setLeads((prev) => {
         const byId = new Map(prev.map((l) => [l.id, l]))
