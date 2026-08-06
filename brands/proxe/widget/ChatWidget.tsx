@@ -1707,6 +1707,21 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const hasUserSpoken = messages.some((message) => message.type === 'user');
   const showWelcomeQuickActions = isOpen && hasQuickButtons && !hasUserSpoken;
 
+  // Everything the visitor has already asked, normalised for comparison.
+  // Follow-up chips come back from the model, which does not reliably remember
+  // which of its own suggestions were already taken, so it re-offers them: you
+  // tap "PROXe Pricing", read the pricing answer, and are handed "PROXe
+  // Pricing" again. That reads as the agent not following its own conversation.
+  const askedAlready = useMemo(
+    () =>
+      new Set(
+        messages
+          .filter((m) => m.type === 'user')
+          .map((m) => (m.text || '').trim().toLowerCase())
+      ),
+    [messages]
+  );
+
   const isResponding = useMemo(
     () =>
       isLoading ||
@@ -2887,7 +2902,9 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
                       {/* Follow-up buttons inside the bubble for AI messages */}
                       {message.type === 'ai' && message.followUps && message.followUps.length > 0 && !message.isStreaming && message.hasStreamed === true && !showCalendly && !showDeployForm && (
                         <div className={styles.followUpButtons}>
-                          {message.followUps.map((followUp, followUpIndex) => {
+                          {message.followUps
+                            .filter((f) => !askedAlready.has((f || '').trim().toLowerCase()))
+                            .map((followUp, followUpIndex) => {
                             // Rotate through accent colors for follow-up buttons
                             const buttonAccentIndex = (accentIndex + followUpIndex) % 7;
                             const buttonAccentClass = `accent-${buttonAccentIndex}`;
