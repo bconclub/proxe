@@ -132,6 +132,18 @@ export interface BrandConfig {
   // Artifact surfaces built on the engine (see ArtifactDef above). Presence of
   // this array turns the sidebar brand header into an artifact switcher.
   artifacts?: ArtifactDef[];
+  // Lead brands visible in THIS deployment's dashboard.
+  //
+  // Every deployment used to own a Supabase project outright, so "which rows are
+  // mine" was answered by the connection string and nothing needed to say it.
+  // Beacon's project now also holds PROXe's product leads (segmented by the
+  // `brand` column) so one login covers both, which means a deployment has to
+  // declare what it should show.
+  //
+  // Absent (every brand except bcon/proxe today) = unchanged behaviour: no
+  // filtering, no tabs. With more than one entry the leads table gains brand
+  // tabs; the first entry is the default/primary brand.
+  leadBrands?: Array<{ id: string; label: string }>;
   apiUrl?: string;
   supabase?: {
     url?: string;

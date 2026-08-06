@@ -12,6 +12,37 @@ export const bconConfig: BrandConfig = {
       { text: "HI i am PROXe, BCON's AI Marketing Strategist\n\nHow can I help with your marketing today?", delay: 0 },
     ],
   },
+  // This deployment's Supabase now holds PROXe's product leads too, so BCON's
+  // dashboard is the single place both are worked and there is no second login.
+  // Two entries → the leads table gains All / BCON / PROXe tabs. BCON's own
+  // service leads stay first, which makes them the default view.
+  leadBrands: [
+    { id: 'bcon', label: 'BCON' },
+    { id: 'proxe', label: 'PROXe' },
+  ],
+  // Sidebar workspace switcher (same mechanism POP uses to reach Pulse Punjab).
+  // PROXe is a separate deployment because it needs its own agent prompts and
+  // its own WhatsApp number, but it reads the same database with the same
+  // login, so switching is a jump between two views of one system.
+  artifacts: [
+    {
+      id: 'bcon-os',
+      name: 'BCON',
+      description: 'Service leads, campaigns and the marketing agent',
+      status: 'live',
+      href: '/dashboard',
+      icon: 'grid',
+    },
+    {
+      id: 'proxe-os',
+      name: 'PROXe',
+      description: 'Product leads from goproxe.com, checkout and billing',
+      status: 'live',
+      href: 'https://proxe.goproxe.com/dashboard',
+      external: true,
+      icon: 'pulse',
+    },
+  ],
   // BCON runs the Vapi voice/calls stack and the dashboard extras.
   features: {
     voice: true,

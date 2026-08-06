@@ -35,10 +35,28 @@ export async function GET(request: NextRequest) {
     const leadAccessOn = !!getBrandConfig().features?.leadAccess
     const access = await getLeadAccess(supabase, user.id)
 
+    // Brand scope. Beacon's Supabase now holds PROXe product leads alongside
+    // BCON service leads so one login covers both; a deployment declares what it
+    // should see via config.leadBrands. Brands without it (pop, lokazen,
+    // windchasers) skip this entirely and behave exactly as before.
+    const leadBrands = getBrandConfig().leadBrands
+    const brandParam = searchParams.get('brand')
+
     let query = supabase
       .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    if (leadBrands?.length) {
+      const allowed = leadBrands.map((b) => b.id)
+      // A tab selection narrows to one brand, but only to a brand this
+      // deployment already declares - never trust the query string to widen
+      // visibility beyond the configured set.
+      query =
+        brandParam && allowed.includes(brandParam)
+          ? query.eq('brand', brandParam)
+          : query.in('brand', allowed)
+    }
 
     if (search && search.length >= 2) {
       // Postgres ILIKE pattern, OR across name/phone/email.

@@ -24,6 +24,30 @@ export const proxeConfig: BrandConfig = {
       { text: 'What would you like to do today?', delay: 1600 },
     ],
   },
+  // This deployment shares Beacon's Supabase, so it must say which rows are
+  // its own - without this it would list BCON's service leads too. One entry
+  // means no tabs render; it is purely a scope.
+  leadBrands: [{ id: 'proxe', label: 'PROXe' }],
+  // Mirror of BCON's switcher so the jump works both ways.
+  artifacts: [
+    {
+      id: 'proxe-os',
+      name: 'PROXe',
+      description: 'Product leads from goproxe.com, checkout and billing',
+      status: 'live',
+      href: '/dashboard',
+      icon: 'pulse',
+    },
+    {
+      id: 'bcon-os',
+      name: 'BCON',
+      description: 'Service leads, campaigns and the marketing agent',
+      status: 'live',
+      href: 'https://proxe.bconclub.com/dashboard',
+      external: true,
+      icon: 'grid',
+    },
+  ],
   features: {
     voice: false,
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added
