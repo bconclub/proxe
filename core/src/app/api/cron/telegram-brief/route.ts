@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { sendTelegramMessage, telegramConfigured, tgEscape, tgLink } from '@/lib/services/telegram'
 import { BRAND_ID, getBrandConfig } from '@/configs'
+import { getOfflineEvent } from '@/configs/offline-events'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -228,34 +229,50 @@ export async function GET(request: NextRequest) {
     // prints raw, underscores and all.
     const sourceOf = (l: any) => {
       const raw = String(l.first_touchpoint || l.last_touchpoint || '').toLowerCase()
+      const last = String(l.last_touchpoint || '').toLowerCase()
       if (!raw) return 'Unknown'
       if (/meta|facebook|instagram|fb_|\big\b/.test(raw)) return 'Meta'
       if (/whatsapp|\bwa\b/.test(raw)) return 'WhatsApp'
       if (/form|web|site|landing/.test(raw)) return 'Website'
       if (/voice|call/.test(raw)) return 'Call'
-      if (/manual|admin|import/.test(raw)) return 'Added by hand'
+      // 'manual' does NOT mean somebody typed it in. Every one of these has a
+      // WhatsApp last-touch: they messaged the number directly, with no prior
+      // web or ad touch, and intake stamps 'manual' for want of a better word.
+      // Counting them as hand-entered under-reports WhatsApp badly - it was a
+      // fifth of a day's leads.
+      if (/manual|admin|import/.test(raw)) {
+        return /whatsapp|\bwa\b/.test(last) ? 'WhatsApp' : 'Added by hand'
+      }
       if (/referr/.test(raw)) return 'Referral'
       const clean = raw.replace(/_/g, ' ')
       return clean.charAt(0).toUpperCase() + clean.slice(1)
     }
 
-    // What they came for. The event/webinar segments are their own answer;
-    // everything else falls back to the course they asked about.
+    // WHAT they came for is the line worth reading. "39 leads" is a number;
+    // "12 Wings of Freedom, 9 pilot, 4 cabin crew" is something you can staff
+    // and follow up against.
+    //
+    // An event lead is named by its EVENT, not the generic word - two events
+    // running at once are different work, and "Event 12" hides which.
     const wantOf = (l: any) => {
       const type = String(l.wc_type || '').toLowerCase()
       if (type === 'webinar') return 'Webinar'
-      if (type === 'offline_event') {
-        return l.wc_intent === 'scholarship' ? 'Event + scholarship' : 'Event'
+      if (type === 'offline_event' || l.wc_event) {
+        const ev = getOfflineEvent(String(l.wc_event || ''))
+        const label = ev?.name || 'Offline event'
+        return l.wc_intent === 'scholarship' ? `${label} + scholarship` : label
       }
       const course = String(l.wc_course || '').trim()
-      return course || 'Not stated yet'
+      if (course) return course
+      return 'Not said yet'
     }
 
     lines.push(`New leads: <b>${newLeads.length}</b>`)
     if (newLeads.length) {
-      lines.push(`  ${tally(newLeads, sourceOf)}`)
-      const want = tally(newLeads, wantOf)
-      if (want) lines.push(`  ${want}`)
+      lines.push(`  <i>from</i> ${tally(newLeads, sourceOf)}`)
+      // Labelled, because a bare second row of numbers reads as more sources.
+      const want = tally(newLeads, wantOf, 6)
+      if (want) lines.push(`  <i>for</i> ${want}`)
     }
 
     lines.push(`Calls logged: <b>${calls.length}</b>`)
