@@ -429,6 +429,8 @@ export default function LeadsTable({
   const [scoreFilter, setScoreFilter] = useState<string>('all')
   const [webinarView, setWebinarView] = useState(false)
   const [offlineEventView, setOfflineEventView] = useState(false)
+  /** Per-event: show only the registrants who also want the scholarship. */
+  const [scholarshipOnly, setScholarshipOnly] = useState<Record<string, boolean>>({})
   // Which offline-event groups the user has collapsed. Absent = use the
   // default (newest event open, older ones closed).
   const [collapsedEvents, setCollapsedEvents] = useState<Record<string, boolean>>({})
@@ -700,11 +702,20 @@ export default function LeadsTable({
         scholarship,
         collapsed,
       }
+      // "Show me only the ones going for the scholarship" - answered INSIDE the
+      // event, because that is where those people are. They aren't a separate
+      // audience to be listed elsewhere; they're this event's registrants who
+      // also ticked the box.
+      const shown = scholarshipOnly[g.key]
+        ? g.groupLeads.filter(
+            (l) => l.unified_context?.[brandId]?.offline_event_intent === 'scholarship',
+          )
+        : g.groupLeads
       return collapsed
         ? [header]
-        : [header, ...g.groupLeads.map((lead) => ({ kind: 'lead' as const, lead }))]
+        : [header, ...shown.map((lead) => ({ kind: 'lead' as const, lead }))]
     })
-  }, [filteredLeads, offlineEventView, collapsedEvents, brandId])
+  }, [filteredLeads, offlineEventView, collapsedEvents, scholarshipOnly, brandId])
 
   /** Column count for full-width rows (empty state, group headers). */
   const columnCount = (showAviationColumns ? 12 : scoutView ? 11 : 9) + ((webinarView || offlineEventView) ? 1 : 0)
@@ -1454,9 +1465,25 @@ export default function LeadsTable({
                       ▼
                     </span>
                     <span className="text-[12px] font-semibold" style={{ color: 'var(--accent-primary)' }}>{row.label}</span>
-                    <span className="ml-auto text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
-                      {row.registered}/{row.total}
-                      {row.scholarship > 0 ? ` · ★${row.scholarship}` : ''}
+                    <span className="ml-auto flex items-center gap-1.5 text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
+                      <span>{row.registered}/{row.total}</span>
+                      {row.scholarship > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setScholarshipOnly((prev) => ({ ...prev, [row.key]: !prev[row.key] }))
+                            setCollapsedEvents((prev) => ({ ...prev, [row.key]: false }))
+                          }}
+                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold touch-44"
+                          style={{
+                            background: scholarshipOnly[row.key] ? 'var(--accent-primary)' : 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+                            color: scholarshipOnly[row.key] ? '#fff' : 'var(--accent-primary)',
+                          }}
+                        >
+                          ★{row.scholarship}{scholarshipOnly[row.key] ? ' ×' : ''}
+                        </button>
+                      )}
                     </span>
                   </div>
                 )
@@ -1644,18 +1671,30 @@ export default function LeadsTable({
                           ) : null}
                           <span className="ml-auto flex items-center gap-2 text-[10.5px]" style={{ color: 'var(--text-secondary)' }}>
                             <span>{row.registered} registered · {row.total - row.registered} interested</span>
-                            {row.scholarship > 0 && (
-                              <span
-                                className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                                style={{
-                                  background: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
-                                  color: 'var(--accent-primary)',
-                                  border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
-                                }}
-                              >
-                                {row.scholarship} scholarship
-                              </span>
-                            )}
+                            {row.scholarship > 0 && (() => {
+                              const on = !!scholarshipOnly[row.key]
+                              return (
+                                <button
+                                  type="button"
+                                  // Stop the row's collapse handler - this tap
+                                  // filters the group, it doesn't close it.
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setScholarshipOnly((prev) => ({ ...prev, [row.key]: !prev[row.key] }))
+                                    setCollapsedEvents((prev) => ({ ...prev, [row.key]: false }))
+                                  }}
+                                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors"
+                                  style={{
+                                    background: on ? 'var(--accent-primary)' : 'color-mix(in srgb, var(--accent-primary) 18%, transparent)',
+                                    color: on ? '#fff' : 'var(--accent-primary)',
+                                    border: '1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent)',
+                                  }}
+                                  title={on ? 'Showing only scholarship applicants - tap to show everyone' : 'Show only the scholarship applicants'}
+                                >
+                                  {on ? `${row.scholarship} scholarship only ×` : `${row.scholarship} scholarship`}
+                                </button>
+                              )
+                            })()}
                           </span>
                         </div>
                       </td>
