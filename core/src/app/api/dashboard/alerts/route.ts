@@ -118,7 +118,10 @@ export async function GET(request: NextRequest) {
     try {
       const { data: msgs } = await supabase
         .from('conversations')
-        .select('id, lead_id, channel, content, created_at')
+        // session_id groups an anonymous web chat: until the visitor gives a
+        // name there is no lead_id, so it is the only thing tying their turns
+        // together.
+        .select('id, lead_id, channel, content, created_at, session_id:metadata->>session_id')
         .eq('sender', 'customer')
         .gt('created_at', effectiveSince)
         .order('created_at', { ascending: false })
@@ -136,18 +139,41 @@ export async function GET(request: NextRequest) {
         for (const l of leads || []) nameMap.set(l.id, l)
       }
 
+      // ONE row per conversation, not per message.
+      //
+      // Somebody answering a seven-question chat flow is one person arriving,
+      // not seven things to look at - and unnamed web visitors all render as
+      // "Website visitor", so ungrouped they read as a crowd that isn't there.
+      // Group by lead, falling back to the web session for anonymous chats;
+      // `rows` is newest-first, so the first hit per key is the latest thing
+      // they said and the rest only add to the count.
+      const threads = new Map<string, { m: any; lead: any; count: number }>()
       for (const m of rows) {
         const lead = m.lead_id ? nameMap.get(m.lead_id) : null
         // A message on a lead this user cannot see must not ping them either.
         if (lead && !canSeeLead(access, lead)) continue
+        // No lead and no session = nothing to group on; keep it standalone
+        // rather than merging strangers into one row.
+        const key = m.lead_id || (m.session_id ? `sess:${m.session_id}` : `msg:${m.id}`)
+        const seen = threads.get(key)
+        if (seen) seen.count++
+        else threads.set(key, { m, lead, count: 1 })
+      }
+
+      for (const [key, { m, lead, count }] of threads) {
         const name = lead?.customer_name || 'Website visitor'
         const body = String(m.content || '').replace(/\s+/g, ' ').trim()
+        const more = count > 1 ? ` · ${count} messages` : ''
         alerts.push({
-          id: `msg-${m.id}`,
+          // Keyed by thread: the row stays the same row as it grows, instead
+          // of the feed treating every new turn as a brand-new alert.
+          id: `msg-${key}`,
           kind: 'message',
           leadId: m.lead_id || null,
           leadName: name,
-          content: body ? `${name}: ${body.slice(0, 90)}${body.length > 90 ? '...' : ''}` : `${name} sent a message`,
+          content: body
+            ? `${name}: ${body.slice(0, 90)}${body.length > 90 ? '...' : ''}${more}`
+            : `${name} sent a message${more}`,
           channel: labelChannel(m.channel),
           timestamp: m.created_at,
         })
