@@ -1,11 +1,18 @@
 /**
- * Campaigns store - GET list / POST save / PATCH update-status / DELETE.
+ * Campaigns store - GET list / POST save / PATCH update / DELETE.
  *
- * Campaigns live as ONE JSON document in dashboard_settings (key
- * 'campaigns_v1') in the brand's own Supabase - same zero-migration pattern as
- * dashboard prefs. Volume is small (a team plans campaigns by hand); cap 100,
- * newest first. Sending is NOT here - a campaign saves as 'ready' and the send
- * wiring stays an explicit, separate step.
+ * One ROW per campaign in the brand's own Supabase (migration 041), not one
+ * shared JSON document. The document version lost every campaign it held: a
+ * read that returned nothing looked exactly like "no campaigns", and the next
+ * save wrote that emptiness back over the lot. Rows cannot do that - a failed
+ * read surfaces as an error, and a save touches only its own row.
+ *
+ * Falls back to the legacy dashboard_settings blob for READS only, so a
+ * deployment that has not run 041 yet still shows what it has. Writes always
+ * go to the table; there is no path back into the blob.
+ *
+ * Sending is NOT here - a campaign saves as 'ready' and the send wiring stays
+ * an explicit, separate step.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -14,8 +21,8 @@ import { getServiceClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
-const KEY = 'campaigns_v1'
-const MAX_CAMPAIGNS = 100
+const LEGACY_KEY = 'campaigns_v1'
+const MAX_CAMPAIGNS = 200
 
 export interface CampaignAudience {
   description: string
@@ -36,45 +43,36 @@ export interface CampaignTemplate {
 export interface Campaign {
   id: string
   name: string
-  status: 'draft' | 'ready' | 'sent' | 'archived'
+  status: 'draft' | 'ready' | 'sending' | 'sent' | 'archived'
   audience: CampaignAudience
   template: CampaignTemplate | null
   channel?: string
   scheduled_at?: string | null
+  sent_at?: string | null
+  sent_count?: number
+  failed_count?: number
   created_by: string
   created_at: string
   updated_at: string
 }
 
-async function readAll(service: any): Promise<Campaign[]> {
-  const { data } = await service
-    .from('dashboard_settings')
-    .select('value')
-    .eq('key', KEY)
-    .maybeSingle()
-  const list = (data?.value as any)?.campaigns
-  return Array.isArray(list) ? list : []
-}
-
-async function writeAll(service: any, campaigns: Campaign[], userId: string) {
-  const { error } = await service
-    .from('dashboard_settings')
-    .upsert(
-      {
-        key: KEY,
-        value: { campaigns: campaigns.slice(0, MAX_CAMPAIGNS) },
-        description: 'Campaign builder - saved campaigns (audience + template + status)',
-        updated_by: userId,
-      },
-      { onConflict: 'key' },
-    )
-  if (error) throw new Error(error.message)
-}
+const STATUSES = ['draft', 'ready', 'sending', 'sent', 'archived']
 
 async function requireUser() {
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   return user
+}
+
+/** Legacy blob, read-only. Used only when the campaigns table isn't there. */
+async function readLegacy(service: any): Promise<Campaign[]> {
+  const { data } = await service
+    .from('dashboard_settings')
+    .select('value')
+    .eq('key', LEGACY_KEY)
+    .maybeSingle()
+  const list = (data?.value as any)?.campaigns
+  return Array.isArray(list) ? list : []
 }
 
 export async function GET() {
@@ -83,7 +81,20 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const service: any = getServiceClient()
     if (!service) return NextResponse.json({ error: 'Service client unavailable' }, { status: 500 })
-    return NextResponse.json({ campaigns: await readAll(service) })
+
+    const { data, error } = await service
+      .from('campaigns')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(MAX_CAMPAIGNS)
+
+    if (error) {
+      // Table missing = 041 hasn't been run. Show the legacy blob rather than
+      // an empty list, so nothing LOOKS deleted while the migration is pending.
+      console.error('[campaigns] table read failed, falling back to legacy blob:', error.message)
+      return NextResponse.json({ campaigns: await readLegacy(service), legacy: true })
+    }
+    return NextResponse.json({ campaigns: data || [] })
   } catch (error) {
     console.error('[campaigns] GET failed:', error)
     return NextResponse.json({ error: 'Failed to load campaigns' }, { status: 500 })
@@ -105,10 +116,11 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString()
-    const campaign: Campaign = {
+    const row = {
       id: `CMP-${now.slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8)}`,
       name,
       status: body.template ? 'ready' : 'draft',
+      channel: body.channel === 'whatsapp' || !body.channel ? 'whatsapp' : String(body.channel).slice(0, 20),
       audience: {
         description: String(audience.description || '').slice(0, 300),
         filters: audience.filters || {},
@@ -119,13 +131,12 @@ export async function POST(request: NextRequest) {
         ? {
             name: String(body.template.name || '').slice(0, 100),
             body: String(body.template.body || '').slice(0, 2000),
-            footer: body.template.footer ? String(body.template.footer).slice(0, 120) : undefined,
-            buttons: Array.isArray(body.template.buttons) ? body.template.buttons.slice(0, 3) : undefined,
+            footer: body.template.footer ? String(body.template.footer).slice(0, 120) : null,
+            buttons: Array.isArray(body.template.buttons) ? body.template.buttons.slice(0, 3) : null,
             status: body.template.status === 'approved' ? 'approved' : 'draft',
-            variables: Array.isArray(body.template.variables) ? body.template.variables : undefined,
+            variables: Array.isArray(body.template.variables) ? body.template.variables : null,
           }
         : null,
-      channel: body.channel === 'whatsapp' || !body.channel ? 'whatsapp' : String(body.channel).slice(0, 20),
       scheduled_at: body.scheduled_at && !isNaN(new Date(body.scheduled_at).getTime())
         ? new Date(body.scheduled_at).toISOString()
         : null,
@@ -134,9 +145,14 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     }
 
-    const all = await readAll(service)
-    await writeAll(service, [campaign, ...all], user.id)
-    return NextResponse.json({ success: true, campaign })
+    const { data, error } = await service.from('campaigns').insert(row).select().single()
+    // A save that fails must SAY so. The old version could report success
+    // while the write went nowhere.
+    if (error) {
+      console.error('[campaigns] insert failed:', error.message)
+      return NextResponse.json({ error: `Could not save: ${error.message}` }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, campaign: data })
   } catch (error) {
     console.error('[campaigns] POST failed:', error)
     return NextResponse.json({ error: 'Failed to save campaign' }, { status: 500 })
@@ -152,16 +168,31 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const id = String(body.id || '')
-    const status = String(body.status || '')
-    if (!id || !['draft', 'ready', 'sent', 'archived'].includes(status)) {
-      return NextResponse.json({ error: 'id and a valid status are required' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+
+    const patch: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (body.status !== undefined) {
+      if (!STATUSES.includes(String(body.status))) {
+        return NextResponse.json({ error: 'invalid status' }, { status: 400 })
+      }
+      patch.status = String(body.status)
+      if (body.status === 'sent') patch.sent_at = new Date().toISOString()
     }
-    const all = await readAll(service)
-    const idx = all.findIndex((c) => c.id === id)
-    if (idx === -1) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
-    all[idx] = { ...all[idx], status: status as Campaign['status'], updated_at: new Date().toISOString() }
-    await writeAll(service, all, user.id)
-    return NextResponse.json({ success: true, campaign: all[idx] })
+    if (body.name !== undefined) patch.name = String(body.name).trim().slice(0, 80)
+    if (body.template !== undefined) patch.template = body.template
+    if (body.scheduled_at !== undefined) {
+      patch.scheduled_at = body.scheduled_at && !isNaN(new Date(body.scheduled_at).getTime())
+        ? new Date(body.scheduled_at).toISOString()
+        : null
+    }
+
+    const { data, error } = await service.from('campaigns').update(patch).eq('id', id).select().single()
+    if (error) {
+      console.error('[campaigns] update failed:', error.message)
+      return NextResponse.json({ error: `Could not update: ${error.message}` }, { status: 500 })
+    }
+    if (!data) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+    return NextResponse.json({ success: true, campaign: data })
   } catch (error) {
     console.error('[campaigns] PATCH failed:', error)
     return NextResponse.json({ error: 'Failed to update campaign' }, { status: 500 })
@@ -177,11 +208,23 @@ export async function DELETE(request: NextRequest) {
 
     const id = new URL(request.url).searchParams.get('id') || ''
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-    const all = await readAll(service)
-    await writeAll(service, all.filter((c) => c.id !== id), user.id)
-    return NextResponse.json({ success: true })
+
+    // Archive, don't destroy. A campaign carries who was messaged and when;
+    // deleting the row would take the send log with it (ON DELETE CASCADE),
+    // and that record is the only proof of what went out.
+    const { data, error } = await service
+      .from('campaigns')
+      .update({ status: 'archived', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) {
+      console.error('[campaigns] archive failed:', error.message)
+      return NextResponse.json({ error: `Could not archive: ${error.message}` }, { status: 500 })
+    }
+    return NextResponse.json({ success: true, campaign: data, archived: true })
   } catch (error) {
     console.error('[campaigns] DELETE failed:', error)
-    return NextResponse.json({ error: 'Failed to delete campaign' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to archive campaign' }, { status: 500 })
   }
 }
