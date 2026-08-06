@@ -11,7 +11,6 @@
     { "path": "/api/cron/telegram-brief?kind=pulse", "schedule": "30 8 * * *" },
     { "path": "/api/cron/telegram-brief?kind=evening", "schedule": "30 11 * * *" },
     { "path": "/api/cron/campaign-send", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/followup-reminder", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/telegram-feed", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/followup-reminder", "schedule": "*/10 * * * *" }
   ]
 }
