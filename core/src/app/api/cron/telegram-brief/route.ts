@@ -67,25 +67,10 @@ function sourceLabel(lead: any): string {
   return String(lead.first_touchpoint || lead.last_touchpoint || 'direct').replace(/_/g, ' ')
 }
 
-function leadLine(lead: any): string {
-  const name = tgEscape(lead.customer_name || 'Unknown')
-  const src = tgEscape(sourceLabel(lead))
-  const label = APP_URL ? tgLink(name, `${APP_URL}/dashboard/inbox?lead=${lead.id}`) : `<b>${name}</b>`
-  return `• ${label} <i>${src}</i>`
-}
-
-/** Group a set of leads by source, biggest first: "meta forms 12, web 3". */
-function sourceBreakdown(leads: any[]): string {
-  const counts = new Map<string, number>()
-  for (const l of leads) {
-    const k = sourceLabel(l)
-    counts.set(k, (counts.get(k) || 0) + 1)
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => `${tgEscape(k)} ${n}`)
-    .join(', ')
-}
+// leadLine() and sourceBreakdown() lived here to print a lead per row. The
+// brief now reports shape rather than a roster - forty names on a phone is
+// unreadable and says nothing you can act on - so both are gone. Individual
+// arrivals go to the group feed (cron/telegram-feed), one message each.
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -147,7 +132,14 @@ export async function GET(request: NextRequest) {
     const [newLeadsRes, touchedRes, callsRes, attentionRes] = await Promise.all([
       supabase
         .from('all_leads')
-        .select('id, customer_name, phone, first_touchpoint, last_touchpoint, created_at')
+        // What KIND of lead matters as much as how many - "40 leads" tells you
+        // nothing you can act on, "28 pilot, 9 cabin crew" does. Read as JSON
+        // paths so this stays a handful of scalars per row.
+        .select(`id, customer_name, phone, first_touchpoint, last_touchpoint, created_at,
+                 wc_type:unified_context->${BRAND_ID}->>lead_type,
+                 wc_course:unified_context->${BRAND_ID}->>course_interest,
+                 wc_event:unified_context->${BRAND_ID}->>offline_event_key,
+                 wc_intent:unified_context->${BRAND_ID}->>offline_event_intent`)
         .gte('created_at', windowStart.toISOString())
         .lt('created_at', windowEnd.toISOString())
         .order('created_at', { ascending: false }),
@@ -158,7 +150,9 @@ export async function GET(request: NextRequest) {
         .lt('last_interaction_at', windowEnd.toISOString()),
       supabase
         .from('activities')
-        .select('id, lead_id, created_at')
+        // created_by so the brief can say WHO made the calls, not just how
+        // many were made.
+        .select('id, lead_id, created_by, created_at')
         .eq('activity_type', 'call')
         .gte('created_at', windowStart.toISOString())
         .lt('created_at', windowEnd.toISOString()),
@@ -207,45 +201,89 @@ export async function GET(request: NextRequest) {
     lines.push(`<i>${tgEscape(brand)}</i>`)
     lines.push('')
 
-    const windowWord = kind === 'morning' ? 'Yesterday' : kind === 'evening' ? 'Today' : 'This hour'
+    // A brief is a SHAPE, not a roster. Naming forty leads is unreadable on a
+    // phone and tells you nothing you can act on; "40 in, 28 pilot, mostly
+    // Meta, Richard made 18 calls" is the same information you can act on.
+    // Individual leads have their own feed, and the dashboard has the list.
+    const windowWord = kind === 'morning' ? 'Overnight' : kind === 'evening' ? 'Today' : 'This hour'
     lines.push(`<b>${windowWord}</b>`)
-    lines.push(`New leads: <b>${newLeads.length}</b>${newLeads.length ? ` — ${sourceBreakdown(newLeads)}` : ''}`)
-    lines.push(`Touched: <b>${touched.length}</b>`)
-    lines.push(`Calls logged: <b>${calls.length}</b>`)
 
+    /** "Meta 32 · Web 14 · WhatsApp 9" - biggest first, nothing with a zero. */
+    const tally = (items: any[], pick: (x: any) => string | null | undefined, max = 5) => {
+      const m = new Map<string, number>()
+      for (const it of items) {
+        const k = (pick(it) || '').trim()
+        if (!k) continue
+        m.set(k, (m.get(k) || 0) + 1)
+      }
+      return Array.from(m.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, max)
+        .map(([k, n]) => `${tgEscape(k)} <b>${n}</b>`)
+        .join(' · ')
+    }
+
+    const SOURCE_LABEL: Record<string, string> = {
+      facebook: 'Meta', instagram: 'Meta', meta: 'Meta', social: 'Meta',
+      web: 'Website', website: 'Website', whatsapp: 'WhatsApp',
+      voice: 'Call', manual: 'Added by hand', referral: 'Referral',
+    }
+    const sourceOf = (l: any) => {
+      const raw = String(l.first_touchpoint || l.last_touchpoint || '').toLowerCase()
+      return SOURCE_LABEL[raw] || (raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Unknown')
+    }
+
+    // What they came for. The event/webinar segments are their own answer;
+    // everything else falls back to the course they asked about.
+    const wantOf = (l: any) => {
+      const type = String(l.wc_type || '').toLowerCase()
+      if (type === 'webinar') return 'Webinar'
+      if (type === 'offline_event') {
+        return l.wc_intent === 'scholarship' ? 'Event + scholarship' : 'Event'
+      }
+      const course = String(l.wc_course || '').trim()
+      return course || 'Not stated yet'
+    }
+
+    lines.push(`New leads: <b>${newLeads.length}</b>`)
     if (newLeads.length) {
-      lines.push('')
-      lines.push(`<b>Who came in</b>`)
-      // Cap the roster: a brief is a prompt to act, not a data dump, and
-      // Telegram hard-fails past 4096 chars.
-      for (const l of newLeads.slice(0, 12)) lines.push(leadLine(l))
-      if (newLeads.length > 12) lines.push(`<i>+ ${newLeads.length - 12} more</i>`)
+      lines.push(`  ${tally(newLeads, sourceOf)}`)
+      const want = tally(newLeads, wantOf)
+      if (want) lines.push(`  ${want}`)
     }
 
-    if (kind === 'morning' || kind === 'evening') {
-      lines.push('')
-      lines.push(`<b>Calls booked today</b>`)
-      if (!bookings.length) {
-        lines.push('<i>Nothing on the calendar.</i>')
-      } else {
-        for (const b of bookings.slice(0, 12)) {
-          const nm = tgEscape(bookingNames.get(b.lead_id) || 'Unknown')
-          const who = APP_URL && b.lead_id ? tgLink(nm, `${APP_URL}/dashboard/inbox?lead=${b.lead_id}`) : `<b>${nm}</b>`
-          const status = b.booking_status ? ` <i>${tgEscape(b.booking_status)}</i>` : ''
-          lines.push(`• ${tgEscape(b.booking_time || '')} ${who}${status}`.trim())
+    lines.push(`Calls logged: <b>${calls.length}</b>`)
+    if (calls.length) {
+      // Who did the calling. created_by is a user id on this schema, so it has
+      // to be resolved to a name or the line reads as a row of UUIDs.
+      const byUser = new Map<string, number>()
+      for (const c of calls) {
+        const k = String((c as any).created_by || '')
+        if (k) byUser.set(k, (byUser.get(k) || 0) + 1)
+      }
+      const ids = Array.from(byUser.keys())
+      const nameById = new Map<string, string>()
+      if (ids.length) {
+        const { data: us } = await supabase
+          .from('dashboard_users')
+          .select('id, full_name, email')
+          .in('id', ids)
+        for (const u of us || []) {
+          nameById.set(u.id, u.full_name || (u.email || '').split('@')[0] || 'Someone')
         }
-        if (bookings.length > 12) lines.push(`<i>+ ${bookings.length - 12} more</i>`)
       }
+      const who = Array.from(byUser.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([id, n]) => `${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`)
+        .join(' · ')
+      if (who) lines.push(`  ${who}`)
     }
 
-    if (attention.length) {
-      lines.push('')
-      lines.push(`<b>Needs a human (${attention.length})</b>`)
-      for (const l of attention.slice(0, 8)) {
-        const nm = tgEscape(l.customer_name || 'Unknown')
-        const who = APP_URL ? tgLink(nm, `${APP_URL}/dashboard/inbox?lead=${l.id}`) : `<b>${nm}</b>`
-        lines.push(`• ${who} ${tgEscape(l.phone || '')}`.trim())
-      }
+    lines.push(`Touched: <b>${touched.length}</b>`)
+    if (attention.length) lines.push(`Waiting on a human: <b>${attention.length}</b>`)
+    if (kind === 'morning' || kind === 'evening') {
+      lines.push(`Booked today: <b>${bookings.length}</b>`)
     }
 
     if (APP_URL) {
