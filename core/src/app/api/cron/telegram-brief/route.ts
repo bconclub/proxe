@@ -223,14 +223,20 @@ export async function GET(request: NextRequest) {
         .join(' · ')
     }
 
-    const SOURCE_LABEL: Record<string, string> = {
-      facebook: 'Meta', instagram: 'Meta', meta: 'Meta', social: 'Meta',
-      web: 'Website', website: 'Website', whatsapp: 'WhatsApp',
-      voice: 'Call', manual: 'Added by hand', referral: 'Referral',
-    }
+    // Matched on substrings, not exact keys: the real values are things like
+    // 'meta_forms' and 'fb_lead_form', which an exact map misses and then
+    // prints raw, underscores and all.
     const sourceOf = (l: any) => {
       const raw = String(l.first_touchpoint || l.last_touchpoint || '').toLowerCase()
-      return SOURCE_LABEL[raw] || (raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Unknown')
+      if (!raw) return 'Unknown'
+      if (/meta|facebook|instagram|fb_|\big\b/.test(raw)) return 'Meta'
+      if (/whatsapp|\bwa\b/.test(raw)) return 'WhatsApp'
+      if (/form|web|site|landing/.test(raw)) return 'Website'
+      if (/voice|call/.test(raw)) return 'Call'
+      if (/manual|admin|import/.test(raw)) return 'Added by hand'
+      if (/referr/.test(raw)) return 'Referral'
+      const clean = raw.replace(/_/g, ' ')
+      return clean.charAt(0).toUpperCase() + clean.slice(1)
     }
 
     // What they came for. The event/webinar segments are their own answer;
