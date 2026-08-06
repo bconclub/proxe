@@ -2074,12 +2074,13 @@ export async function GET(request: NextRequest) {
       const d7 = now.getTime() - 7 * 86400000
       const d14 = now.getTime() - 14 * 86400000
       const byChannel: Record<string, { count: number; last7: number; prior7: number }> = {}
-      // windchasers: group touchpoints by the LEAD's marketing source
-      // (attribution.source — Instagram / Google Ads / Meta Ads / Direct …)
-      // instead of the conversation channel. Nearly all conversations happen on
-      // WhatsApp, so channel grouping collapsed the card to "WhatsApp 100%" and
-      // hid where leads actually came from. Other brands keep channel grouping.
-      const groupBySource = BRAND_ID === 'windchasers'
+      // Group touchpoints by the LEAD's marketing source (attribution.source -
+      // Instagram / Google Ads / Meta Ads / Direct …) instead of the conversation
+      // channel. Nearly all conversations happen on WhatsApp, so channel grouping
+      // collapsed the card to "WhatsApp 100%" and hid where leads actually came
+      // from - Lokazen showed exactly that while its Leads table listed Meta Ads,
+      // Instagram, Facebook, Organic, Referral and Direct.
+      const groupBySource = BRAND_ID === 'windchasers' || BRAND_ID === 'lokazen'
       const canonSource = (raw: string): string => {
         const s = raw.toLowerCase().trim()
         if (!s) return 'direct'
