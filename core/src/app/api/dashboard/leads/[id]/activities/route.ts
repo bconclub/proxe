@@ -213,7 +213,7 @@ export async function POST(
         activity_type: activity_type || 'note',
         note: note.trim(),
         duration_minutes: duration_minutes || null,
-        next_followup_date: next_followup_date || next_followup || null,
+        next_follow_up_date: next_followup_date || next_followup || null,
         created_by: createdBy,
       })
       .select()

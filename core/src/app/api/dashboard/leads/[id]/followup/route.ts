@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // be resolvable through this lead's access check.
     const { error, data } = await supabase
       .from('activities')
-      .update({ next_followup_date: nextAt })
+      .update({ next_follow_up_date: nextAt })
       .eq('id', activity_id)
       .eq('lead_id', leadId)
       .select('id')

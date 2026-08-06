@@ -110,7 +110,7 @@ export async function POST(
         activity_type,
         note: activityNote,
         duration_minutes: duration_minutes || null,
-        next_followup_date: roundedFollowupDate,
+        next_follow_up_date: roundedFollowupDate,
         created_by: user.id,
       })
       .select()
