@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
  * does not think in buckets, they think "what do I do next":
  *
  *   followup     a call-back this person promised, from
- *                activities.next_followup_date. Overdue ones lead the list -
+ *                activities.next_follow_up_date. Overdue ones lead the list -
  *                a promise you have already broken outranks everything.
  *   ask          a booking whose date has passed with nobody saying whether it
  *                happened. The system refuses to guess: a date passing is not
@@ -112,9 +112,9 @@ export async function GET(request: NextRequest) {
     //       predicate), then one keyed fetch of the leads behind them. No scan.
     const { data: fRows } = await supabase
       .from('activities')
-      .select('id, lead_id, note, next_followup_date')
-      .not('next_followup_date', 'is', null)
-      .order('next_followup_date', { ascending: true })
+      .select('id, lead_id, note, next_follow_up_date')
+      .not('next_follow_up_date', 'is', null)
+      .order('next_follow_up_date', { ascending: true })
       .limit(500)
 
     const followupRows: any[] = fRows || []
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
       const mine = ownerId === null || lead.owner_id === ownerId || !lead.owner_id
       if (!mine) continue
 
-      const dueMs = Date.parse(row.next_followup_date)
+      const dueMs = Date.parse(row.next_follow_up_date)
       const dueDay = isFinite(dueMs) ? istDay(new Date(dueMs)) : null
       const overdue = isFinite(dueMs) && dueMs < nowMs
       const isToday = dueDay === today
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
         created_at: lead.created_at || null,
         booking_date: null,
         booking_time: null,
-        followup_at: row.next_followup_date,
+        followup_at: row.next_follow_up_date,
         followup_note: row.note || null,
         followup_activity_id: row.id,
         kind: 'followup',

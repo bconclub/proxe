@@ -1,7 +1,7 @@
 -- 040: let the pipeline resolve a follow-up
 --
 -- Follow-ups (the "call them back tomorrow at 11" promise a caller makes when
--- nobody picks up) live in activities.next_followup_date. Migration 033 added
+-- nobody picks up) live in activities.next_follow_up_date. Migration 033 added
 -- that column and an index for it, but no UPDATE policy - it was only ever
 -- written, never changed. The pipeline queue now marks them done and snoozes
 -- them, which is an UPDATE, and without a policy those calls quietly fail
@@ -26,8 +26,8 @@ CREATE POLICY "Authenticated users can update activities"
 -- partial index alone does not order. Cheap, and it keeps the queue's first
 -- query off a sort of the whole table.
 CREATE INDEX IF NOT EXISTS idx_activities_followup_due
-  ON public.activities (next_followup_date)
-  WHERE next_followup_date IS NOT NULL;
+  ON public.activities (next_follow_up_date)
+  WHERE next_follow_up_date IS NOT NULL;
 
 COMMIT;
 

@@ -214,9 +214,9 @@ export async function POST(
     // promise sits in the queue forever, ageing.
     await supabase
       .from('activities')
-      .update({ next_followup_date: null })
+      .update({ next_follow_up_date: null })
       .eq('lead_id', leadId)
-      .not('next_followup_date', 'is', null)
+      .not('next_follow_up_date', 'is', null)
       .then(undefined, (e: any) => console.error('[log-call] clearing old follow-ups failed:', e?.message))
 
     if (followupIn?.date) {
@@ -227,7 +227,7 @@ export async function POST(
           // Its own type so it never counts as a call in the stats.
           activity_type: 'followup',
           note: (followupIn.note || '').trim() || `Call back ${leadRow.customer_name || 'this lead'}`,
-          next_followup_date: followupAt.toISOString(),
+          next_follow_up_date: followupAt.toISOString(),
           created_by: activityCreatedBy,
         })
         if (fErr) console.error('[log-call] follow-up insert failed:', fErr.message)
@@ -416,7 +416,7 @@ export async function POST(
             lead_id: leadId,
             activity_type: 'followup',
             note: detail.note || `Follow up with ${leadName}`,
-            next_followup_date: dueAt.toISOString(),
+            next_follow_up_date: dueAt.toISOString(),
             created_by: activityCreatedBy,
           })
           if (tErr) console.error('[log-call] chat follow-up insert failed:', tErr.message)
