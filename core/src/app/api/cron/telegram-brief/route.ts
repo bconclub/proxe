@@ -111,8 +111,11 @@ export async function GET(request: NextRequest) {
   let windowStart: Date
   let windowEnd: Date
   if (kind === 'morning') {
-    windowStart = yesterdayStart
-    windowEnd = todayStart
+    // Since last night's brief, not "all of yesterday". The evening report
+    // already covered the working day; what the morning has to answer is what
+    // arrived while nobody was watching.
+    windowStart = new Date(yesterdayStart.getTime() + 19 * 3_600_000)
+    windowEnd = now
   } else if (kind === 'evening') {
     windowStart = todayStart
     windowEnd = now
@@ -123,7 +126,10 @@ export async function GET(request: NextRequest) {
       new Date(now.getTime() + IST_OFFSET_MS).getUTCDate(),
       new Date(now.getTime() + IST_OFFSET_MS).getUTCHours(), 0, 0,
     ) - IST_OFFSET_MS)
-    windowStart = new Date(windowEnd.getTime() - 3_600_000)
+    // The midday report is "today so far", not "the last hour". Someone
+    // reading at 1pm wants the day's shape, and an hour-slice of a quiet
+    // afternoon reads as if nothing is happening.
+    windowStart = todayStart
   }
 
   try {
@@ -194,34 +200,46 @@ export async function GET(request: NextRequest) {
     const lines: string[] = []
     const heading =
       kind === 'morning'
-        ? `☀️ <b>Morning brief</b> · ${tgEscape(istDateLabel(now))}`
+        ? `☀️ <b>MORNING</b> · ${tgEscape(istDateLabel(now))}`
         : kind === 'evening'
-          ? `🌆 <b>Day so far</b> · ${tgEscape(istDateLabel(now))}`
-          : `📊 <b>${tgEscape(istTimeLabel(windowStart))} to ${tgEscape(istTimeLabel(windowEnd))}</b>`
+          ? `🌆 <b>EVENING</b> · ${tgEscape(istDateLabel(now))}`
+          : `🕛 <b>MIDDAY</b> · ${tgEscape(istDateLabel(now))}`
+    // Say which stretch of time this covers. Without it every report is just
+    // "some leads came in" and two of them look identical.
+    const windowNote =
+      kind === 'morning'
+        ? `Since ${tgEscape(istTimeLabel(windowStart))} yesterday`
+        : 'Today so far'
     lines.push(heading)
-    lines.push(`<i>${tgEscape(brand)}</i>`)
+    lines.push(`<i>${windowNote} · ${tgEscape(brand)}</i>`)
     lines.push('')
 
     // A brief is a SHAPE, not a roster. Naming forty leads is unreadable on a
     // phone and tells you nothing you can act on; "40 in, 28 pilot, mostly
     // Meta, Richard made 18 calls" is the same information you can act on.
     // Individual leads have their own feed, and the dashboard has the list.
-    const windowWord = kind === 'morning' ? 'Overnight' : kind === 'evening' ? 'Today' : 'This hour'
-    lines.push(`<b>${windowWord}</b>`)
-
-    /** "Meta 32 · Web 14 · WhatsApp 9" - biggest first, nothing with a zero. */
-    const tally = (items: any[], pick: (x: any) => string | null | undefined, max = 5) => {
+    /**
+     * Counts as an aligned block. Telegram renders <pre> in a monospace font,
+     * which is the only way numbers line up in a column - and a column is what
+     * makes this scannable at a glance instead of a sentence you have to read.
+     */
+    const block = (
+      items: any[],
+      pick: (x: any) => string | null | undefined,
+      max = 6,
+    ): string | null => {
       const m = new Map<string, number>()
       for (const it of items) {
         const k = (pick(it) || '').trim()
         if (!k) continue
         m.set(k, (m.get(k) || 0) + 1)
       }
-      return Array.from(m.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, max)
-        .map(([k, n]) => `${tgEscape(k)} <b>${n}</b>`)
-        .join(' · ')
+      const rows = Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, max)
+      if (!rows.length) return null
+      const w = Math.max(...rows.map(([k]) => k.length))
+      return `<pre>${rows
+        .map(([k, n]) => `${tgEscape(k.padEnd(w))}  ${String(n).padStart(3)}`)
+        .join('\n')}</pre>`
     }
 
     // Matched on substrings, not exact keys: the real values are things like
@@ -267,15 +285,24 @@ export async function GET(request: NextRequest) {
       return 'Not said yet'
     }
 
-    lines.push(`New leads: <b>${newLeads.length}</b>`)
+    lines.push(`<b>${newLeads.length} new lead${newLeads.length === 1 ? '' : 's'}</b>`)
     if (newLeads.length) {
-      lines.push(`  <i>from</i> ${tally(newLeads, sourceOf)}`)
-      // Labelled, because a bare second row of numbers reads as more sources.
-      const want = tally(newLeads, wantOf, 6)
-      if (want) lines.push(`  <i>for</i> ${want}`)
+      const src = block(newLeads, sourceOf, 5)
+      if (src) { lines.push(''); lines.push(src) }
+      const want = block(newLeads, wantOf, 6)
+      if (want) { lines.push(''); lines.push(want) }
     }
 
-    lines.push(`Calls logged: <b>${calls.length}</b>`)
+    // Morning deliberately omits this. Overnight nobody was working, so a
+    // "touched" count at 9am measures the agent, not the team, and reads as
+    // activity that did not happen. From midday on it is the day's progress.
+    if (kind !== 'morning') {
+      lines.push('')
+      lines.push(`${touched.length} touched`)
+    }
+
+    lines.push('')
+    lines.push(`<b>${calls.length} call${calls.length === 1 ? '' : 's'}</b>`)
     if (calls.length) {
       // Who did the calling. created_by is a user id on this schema, so it has
       // to be resolved to a name or the line reads as a row of UUIDs.
@@ -295,18 +322,34 @@ export async function GET(request: NextRequest) {
           nameById.set(u.id, u.full_name || (u.email || '').split('@')[0] || 'Someone')
         }
       }
-      const who = Array.from(byUser.entries())
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([id, n]) => `${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`)
-        .join(' · ')
-      if (who) lines.push(`  ${who}`)
+      const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
+      if (rows.length) {
+        const w = Math.max(...rows.map(([id]) => (nameById.get(id) || 'Someone').length))
+        lines.push(
+          `<pre>${rows
+            .map(([id, n]) => `${tgEscape((nameById.get(id) || 'Someone').padEnd(w))}  ${String(n).padStart(3)}`)
+            .join('\n')}</pre>`,
+        )
+      }
     }
 
-    lines.push(`Touched: <b>${touched.length}</b>`)
-    if (attention.length) lines.push(`Waiting on a human: <b>${attention.length}</b>`)
     if (kind === 'morning' || kind === 'evening') {
-      lines.push(`Booked today: <b>${bookings.length}</b>`)
+      lines.push('')
+      lines.push(`${bookings.length} booked today`)
+    }
+
+    // The one line that asks for an action. Overdue call-backs are promises
+    // already broken, which is why they sit at the bottom where the eye stops
+    // rather than among the counts.
+    const { count: overdue } = await supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .not('next_follow_up_date', 'is', null)
+      .lt('next_follow_up_date', new Date().toISOString())
+
+    if (overdue && overdue > 0) {
+      lines.push('')
+      lines.push(`⚠️ <b>${overdue} call-back${overdue === 1 ? '' : 's'} overdue</b>`)
     }
 
     if (APP_URL) {
