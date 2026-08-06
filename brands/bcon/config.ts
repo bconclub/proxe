@@ -1,5 +1,28 @@
 import type { BrandConfig } from '@/configs/types';
 
+/**
+ * BCON now runs on the SHARED Supabase project `ocduyhevwgfexqaxqdsz`
+ * ("BCON PROXe"), not its original `yvkauaiyranysldubnqv`. All 992 rows were
+ * migrated across, and goproxe.com writes PROXe product leads into the same
+ * tables, tagged brand='proxe'. One database, one login, both lead streams -
+ * which is what `leadBrands` below splits back apart in the UI.
+ *
+ * Two things that will bite whoever touches the env next:
+ *
+ * 1. NEXT_PUBLIC_* vars are inlined at BUILD time. Marking them "Sensitive" in
+ *    Vercel withholds them from the build, so a Sensitive NEXT_PUBLIC_ var is
+ *    permanently undefined. The Supabase URL and anon key must NOT be
+ *    Sensitive; the service-role key must be, and must never carry the
+ *    NEXT_PUBLIC_ prefix (that would publish full DB access to every browser).
+ *
+ * 2. next.config.js resolves NEXT_PUBLIC_SUPABASE_URL first and only then falls
+ *    back to NEXT_PUBLIC_BCON_SUPABASE_URL. A stale brand-prefixed var is a
+ *    silent trapdoor back to the old, abandoned project - delete it rather than
+ *    leave it pointing somewhere real.
+ *
+ * Auth lives per project, so the old accounts did not come across. Login is
+ * proxe@goproxe.com.
+ */
 export const bconConfig: BrandConfig = {
   name: 'BCON',
   brand: 'bcon',
