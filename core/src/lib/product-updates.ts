@@ -1,198 +1,93 @@
-// Curated "what we shipped" updates surfaced in the NotificationCenter.
+// What's new - the RELEASE notes surfaced in the NotificationCenter.
 //
-// Add the NEWEST entry at the TOP. Each shows once per viewer (dismiss = seen,
-// tracked in localStorage), pinned above lead activity. Keep titles short and
-// human. This is product comms, not a version number.
+// This is product comms for the people paying for PROXe. It is not a changelog,
+// and it is not a list of things we got wrong.
 //
-//   brands omitted or ['*']  → common: every brand sees it
+// THE RULES (founder call, 2026-08-05, after the first pass got this wrong):
+//
+//   1. One entry per RELEASE, not per change. A release lands every couple of
+//      days and carries several highlights. Nobody wants a notification every
+//      time we push.
+//   2. Say what they can now DO. Never confess a defect. "Overview numbers were
+//      wrong above 2000 leads" is our problem; "your totals stay accurate
+//      however long your list gets" is their capability. Same fix, and only one
+//      of them belongs in front of a client.
+//   3. Work out what the release was actually solving and lead with that. The
+//      title carries the theme, the highlights carry the specifics.
+//   4. The version is the release marker (0.1, 0.2, 0.3 ...). The running build
+//      number in the drawer footer is a separate, faster-moving thing - do not
+//      try to keep the two in step.
+//
+// Brand gating lives on the HIGHLIGHT, not the release, so one release can
+// carry a line only Windchasers sees and a line only Lokazen sees. A release
+// whose every highlight is gated away is hidden entirely for that brand.
+//
+//   brands omitted or ['*']  → every brand sees this line
 //   brands: ['lokazen']      → only that brand's dashboard sees it
-//
-// The drawer renders this array IN ORDER - it does not sort. Keep it strictly
-// newest-first, across brands, or entries surface out of sequence.
-//
-// Rule of thumb for what belongs here: if a person using the dashboard would
-// notice the difference, it goes in. That includes fixes, not just features -
-// "the numbers were wrong above 2000 leads" matters more to them than any new
-// button. Groundwork that ships inert (no UI wired yet) does NOT go in.
-export type ProductUpdate = {
-  id: string          // stable unique id, e.g. '2026-07-05-scrollbars'
-  title: string       // short headline
-  detail?: string     // optional one-liner
-  date: string        // ISO date, e.g. '2026-07-05'
-  version?: string    // release it shipped in, e.g. '0.2', shown as a chip
-  brands?: string[]   // omit / ['*'] = all brands; else specific slugs
+
+export type ReleaseHighlight = {
+  text: string
+  /** omit / ['*'] = all brands; else specific brand slugs */
+  brands?: string[]
 }
 
-// Newest first. Only the newest UNSEEN entry visible to the current brand shows.
-//
-// Versioning starts fresh at 0.1 with the mobile release (2026-07-10). Every
-// commit that writes core/ auto-bumps the patch (pre-commit hook →
-// scripts/bump-version.js): 0.1.1, 0.1.2, … carry at 100 → 0.2.0. Entries
-// older than 0.1 predate the scheme and carry no version chip.
-export const PRODUCT_UPDATES: ProductUpdate[] = [
+export type Release = {
+  id: string           // stable unique id, e.g. 'r-0-3'
+  version: string      // release marker shown as a chip, e.g. '0.3'
+  title: string        // the theme - what this release is for
+  detail?: string      // one line of framing under the title
+  date: string         // ISO date, e.g. '2026-08-05'
+  highlights: ReleaseHighlight[]
+}
+
+// Newest release first - the drawer renders this array in order, it does not
+// sort. Only the newest UNSEEN release visible to the brand raises the badge.
+export const RELEASES: Release[] = [
   {
-    id: '2026-08-05-leads-uncapped',
-    title: 'The leads page shows every lead now, not the newest 1000',
-    detail: 'Older leads were invisible - the Webinar tab read "none yet" while holding 191 registrations, and OWNER came up empty. The full list now loads, tabs no longer overlap, and the counts add up to the table total.',
+    id: 'r-0-3',
+    version: '0.3',
+    title: 'Your whole book, and the moment it moves',
+    detail: 'Every lead you have in one list, accurate at any size, and a live feed that tells you the moment something needs a human.',
     date: '2026-08-05',
-    version: '0.3',
+    highlights: [
+      { text: 'The leads page holds every lead you have, however many that is, with tab counts that add up to the table.' },
+      { text: 'Overview totals stay accurate however long your list gets.' },
+      { text: 'A live feed in the sidebar: new leads and incoming messages as they land, stacked by person, with a sound you can switch off.' },
+      { text: 'Jump straight back to the latest message in any chat.' },
+      { text: 'Scholarship applications arrive on the lead they belong to, with the track they picked.', brands: ['windchasers'] },
+      { text: 'A daily brief in Telegram: what came in and from where, what was touched, and who is still waiting on a human.', brands: ['windchasers'] },
+      { text: 'See which ad a lead came from, down to the headline, so you can tell what is working.', brands: ['windchasers'] },
+    ],
   },
   {
-    id: '2026-08-04-live-notifications',
-    title: 'You now hear it when a lead or a message lands',
-    detail: 'The bell moved to the sidebar, so it is there on every page, with a live Activity feed. New leads and incoming messages ping a sound while your tab is open. Turn any of it off in Configure → Notifications & Sounds.',
-    date: '2026-08-04',
-    version: '0.3',
-  },
-  {
-    id: '2026-08-04-jump-to-latest',
-    title: 'Jump back to the latest message',
-    detail: 'Scrolled up in a long chat? A button now drops you straight to the bottom, in every chat across the dashboard and the widget.',
-    date: '2026-08-04',
-    version: '0.3',
-  },
-  {
-    id: '2026-08-04-scholarships',
-    title: 'Scholarship applications land on the lead',
-    detail: 'Applications from the site used to have nowhere to go. Each one now attaches to the lead you are already working, matched on phone, with the track they picked filled in.',
-    date: '2026-08-04',
-    version: '0.3',
-    brands: ['windchasers'],
-  },
-  {
-    id: '2026-08-04-telegram-briefs',
-    title: 'A daily brief in Telegram',
-    detail: 'New leads and where they came from, how many were touched, calls logged and booked today, and who needs a human - each name a link straight into the inbox.',
-    date: '2026-08-04',
-    version: '0.3',
-    brands: ['windchasers'],
-  },
-  {
-    id: '2026-08-01-metrics-truncation',
-    title: 'Overview numbers were wrong above 2000 leads',
-    detail: 'Total Leads sat pinned at 2000, and everything computed from it - engaged, warm, follow-up due, booked, the funnel, channel splits - was wrong with it. All of it now reads your real total.',
-    date: '2026-08-01',
-    version: '0.3',
-  },
-  {
-    id: '2026-07-30-ad-attribution',
-    title: 'See which ad a lead came from',
-    detail: 'WhatsApp leads from click-to-WhatsApp ads used to look organic. The ad, its headline and the campaign now show on the lead, so you can tell what is actually working.',
-    date: '2026-07-30',
-    version: '0.3',
-    brands: ['windchasers'],
-  },
-  {
-    id: '2026-07-29-human-takeover',
-    title: 'The agent stays quiet for 24h once you reply by hand',
-    detail: 'It used to talk over you: a teammate answered, the customer said "Ok", and the bot cut in with something unrelated. Once a human replies in a thread, the agent holds off for a day.',
+    id: 'r-0-2',
+    version: '0.2',
+    title: 'The agent hands over like a teammate',
+    detail: 'It knows when to step back, remembers what it was told, and books time you can actually take.',
     date: '2026-07-29',
-    version: '0.2',
+    highlights: [
+      { text: 'Reply by hand and the agent stays out of that conversation for a day.' },
+      { text: 'Callbacks are offered in real slots, inside the hours you actually work.' },
+      { text: 'The agent carries the whole conversation, so it stops asking for what you already gave it.' },
+      { text: 'Campaigns, built in a chat: it pulls the audience, matches a WhatsApp template, and drafts it with you.' },
+      { text: 'Log a call and PROXe lays out the next move to confirm in one tap.' },
+      { text: 'Report an issue from the sidebar, screenshot and all.' },
+      { text: 'Run several offline events at once, with leads grouped by the one they registered for.', brands: ['windchasers'] },
+      { text: 'The agent knows who has paid, so it can answer when they ask.', brands: ['lokazen'] },
+      { text: 'It offers a call when there is a reason to, and lets it go after a no.', brands: ['lokazen'] },
+      { text: 'A shared map pin resolves to a real place instead of another question.', brands: ['lokazen'] },
+    ],
   },
   {
-    id: '2026-07-29-real-booking-slots',
-    title: 'Bookings offer real slots, in the real window',
-    detail: 'The agent used to invent times like "11:48 AM" and only ever offered 3, 4 and 5 PM. Callbacks now run 11 AM to 6 PM, always at least 90 minutes out, and every time offered is one you can actually take.',
-    date: '2026-07-29',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-29-offline-events',
-    title: 'Offline events, grouped and on schedule',
-    detail: 'More than one event can run at a time, leads are grouped by the event they registered for, newest first, and reminders go out with directions instead of silently skipping.',
-    date: '2026-07-29',
-    version: '0.2',
-    brands: ['windchasers'],
-  },
-  {
-    id: '2026-07-29-payments-visible',
-    title: 'The agent knows who has paid',
-    detail: 'Someone would pay on the website, ask about it, and be told "I do not have visibility into payment status". Payments now reach the agent, so it can answer.',
-    date: '2026-07-29',
-    version: '0.2',
-    brands: ['lokazen'],
-  },
-  {
-    id: '2026-07-29-no-call-pushing',
-    title: 'The agent stops pushing for a call',
-    detail: 'It was turning every exchange into a booking attempt, three messages running. It now offers a call only when someone asks, and never re-offers after a no.',
-    date: '2026-07-29',
-    version: '0.2',
-    brands: ['lokazen'],
-  },
-  {
-    id: '2026-07-28-agent-memory',
-    title: 'The agent stops asking what you already told it',
-    detail: 'On long chats it only ever saw the first 20 messages, so past 20 turns it re-asked budget, floor and size it had already been given. It now reads the recent conversation plus every detail captured on the lead.',
-    date: '2026-07-28',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-28-mobile-bubbles',
-    title: 'Chat bubbles no longer get cut off on your phone',
-    detail: 'Message bubbles were a fixed width wider than a phone screen, so text ran off both edges in the inbox. They now fit the screen they are on.',
-    date: '2026-07-28',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-28-maps-links',
-    title: 'Shared map pins are read properly',
-    detail: 'An owner would send a Google Maps link and the agent would keep asking where the property was. It now resolves the pin to a real place name and confirms it back.',
-    date: '2026-07-28',
-    version: '0.2',
-    brands: ['lokazen'],
-  },
-  {
-    id: '2026-07-22-accept-invite',
-    title: 'Team invites no longer hang on "Verifying invitation..."',
-    detail: 'New teammates could get stuck on a spinner forever, with no error to explain it. Accepting an invite works, and tells you when something is wrong.',
-    date: '2026-07-22',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-20-log-call-chat',
-    title: 'Log a call, then plan the next move with PROXe',
-    detail: 'After you log a call, PROXe reads your notes and lays out the next steps to confirm in one tap: the message to send, the follow-up, and your reminder.',
-    date: '2026-07-20',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-19-campaigns',
-    title: 'Campaigns, built in a chat',
-    detail: 'Tell PROXe who to reach and it pulls the audience, matches a WhatsApp template, and drafts the campaign with you. Find it in the sidebar.',
-    date: '2026-07-19',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-17-report-issue',
-    title: 'See something broken? Report it in one click',
-    detail: 'New Report Issue button in the sidebar. Paste a screenshot, tell us what went wrong, done. Every report reaches the team and fixes ship in updates.',
-    date: '2026-07-17',
-    version: '0.2',
-  },
-  {
-    id: '2026-07-10-mobile',
-    title: 'PROXe is live on mobile',
-    detail: 'The whole dashboard now works on your phone. WhatsApp-style chats, tap-friendly leads, pipeline, events. Open it on mobile and go.',
-    date: '2026-07-10',
+    id: 'r-0-1',
     version: '0.1',
-  },
-  {
-    id: '2026-07-10-brain-quick-actions',
-    title: 'Quick Action Brain on your desktop',
-    detail: 'The Brain now attaches actions to its answers: place a call, open a page, jump to a lead, straight from the reply.',
+    title: 'PROXe on your phone',
+    detail: 'The whole dashboard, built for the device you actually carry.',
     date: '2026-07-10',
-  },
-  {
-    id: '2026-07-09-the-brain',
-    title: 'The Brain',
-    detail: 'Tap the corner orb for a spoken catch-up and ask back by voice.',
-    date: '2026-07-09',
-  },
-  {
-    id: '2026-07-05-evals',
-    title: 'Evals are live for WhatsApp and call testing',
-    detail: 'Test conversations and calls against real journeys from the Eval bench.',
-    date: '2026-07-05',
+    highlights: [
+      { text: 'Every page works on mobile: WhatsApp-style chats, leads, pipeline and events.' },
+      { text: 'The Brain: tap the orb for a spoken catch-up, and ask back by voice.' },
+      { text: 'Evals for testing conversations and calls against real journeys.' },
+    ],
   },
 ]

@@ -9,8 +9,8 @@
  *      passed in from DashboardLayout. This is new: until now nothing in the
  *      product told a human "a lead just came in" while they sat on another
  *      page, and the bell itself only existed on the Overview.
- *   2. What's new - curated product updates with version numbers
- *      (@/lib/product-updates), unchanged from the 2026-07-10 founder call.
+ *   2. What's new - RELEASE notes (@/lib/product-updates): one entry per
+ *      release, written as capability rather than changelog. See that file.
  *
  * The trigger renders two ways:
  *   - variant="sidebar" (default) - a nav row in the left rail, so the bell is
@@ -25,7 +25,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { PRODUCT_UPDATES, type ProductUpdate } from '@/lib/product-updates'
+import { RELEASES, type Release } from '@/lib/product-updates'
 import { getCurrentBrandId } from '@/configs'
 import type { DashboardAlert } from '@/app/api/dashboard/alerts/route'
 import {
@@ -83,10 +83,18 @@ function channelGlyph(channel: string) {
   return hit || { Icon: MdChatBubble, color: '#7a8aa0' }
 }
 
-// Updates visible to THIS brand, newest first (source array is curated newest-first).
-function visibleUpdates(): ProductUpdate[] {
+/**
+ * Releases visible to THIS brand, newest first (source array is curated
+ * newest-first). Gating is per HIGHLIGHT, so a release keeps only the lines
+ * this brand should see - and a release left with no lines at all is dropped
+ * rather than rendered as an empty shell.
+ */
+function visibleUpdates(): Release[] {
   const brandId = getCurrentBrandId()
-  return PRODUCT_UPDATES.filter((x) => !x.brands || x.brands.includes('*') || x.brands.includes(brandId))
+  const forBrand = (b?: string[]) => !b || b.includes('*') || b.includes(brandId)
+  return RELEASES
+    .map((r) => ({ ...r, highlights: r.highlights.filter((h) => forBrand(h.brands)) }))
+    .filter((r) => r.highlights.length > 0)
 }
 
 /** One person's run of activity, collapsed into a single row. */
@@ -171,7 +179,7 @@ export default function NotificationCenter({
   useEffect(() => { setMounted(true) }, [])
   const [tab, setTab] = useState<'activity' | 'updates'>('activity')
   const [unreadUpdates, setUnreadUpdates] = useState(0)
-  const [updates, setUpdates] = useState<ProductUpdate[]>([])
+  const [updates, setUpdates] = useState<Release[]>([])
   const [appVersion, setAppVersion] = useState<string | null>(null)
 
   // Client-only: resolve the brand's updates + how many are unseen.
@@ -400,10 +408,10 @@ export default function NotificationCenter({
               ) : updates.length === 0 ? (
                 <p className="text-sm text-center py-12" style={{ color: 'var(--text-secondary)' }}>No updates yet</p>
               ) : (
-                updates.map((u) => (
+                updates.map((r) => (
                   <div
-                    key={u.id}
-                    className="flex items-start gap-3 px-4 py-3 border-b"
+                    key={r.id}
+                    className="flex items-start gap-3 px-4 py-4 border-b"
                     style={{ borderColor: 'var(--border-primary)' }}
                   >
                     <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F122', color: '#6366F1' }}>
@@ -411,15 +419,22 @@ export default function NotificationCenter({
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5 mb-1">
-                        {u.version && (
-                          <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: '#6366F122', color: '#6366F1' }}>
-                            v{u.version}
-                          </span>
-                        )}
-                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtDate(u.date)}</span>
+                        <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: '#6366F122', color: '#6366F1' }}>
+                          v{r.version}
+                        </span>
+                        <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtDate(r.date)}</span>
                       </span>
-                      <span className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{u.title}</span>
-                      {u.detail && <span className="block text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{u.detail}</span>}
+                      <span className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.title}</span>
+                      {r.detail && <span className="block text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{r.detail}</span>}
+                      {/* The specifics sit under the theme, one line each. */}
+                      <span className="block mt-2 space-y-1">
+                        {r.highlights.map((h, i) => (
+                          <span key={i} className="flex gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                            <span aria-hidden style={{ color: '#6366F1' }}>·</span>
+                            <span className="flex-1">{h.text}</span>
+                          </span>
+                        ))}
+                      </span>
                     </span>
                   </div>
                 ))
