@@ -1034,8 +1034,24 @@ function PreviousCampaigns() {
       name: c.name,
       webinar: null as string | null,
       target: `Target: ${c.audience?.description || `${c.audience?.count ?? 0} people`}${c.scheduled_at ? ` · ${new Date(c.scheduled_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}` : ''}`,
-      statusLabel: c.status === 'ready' ? 'Scheduled' : c.status === 'draft' ? 'Pending' : 'Completed',
-      statusColor: c.status === 'ready' ? AMBER : c.status === 'draft' ? ('var(--text-muted)' as string) : BLUE,
+      // A send now paces itself over an hour, so "Sending" has to be its own
+      // state carrying live numbers. Without it a campaign half way through
+      // 122 people reads as finished, and a stall looks like a success.
+      statusLabel:
+        c.status === 'sending'
+          ? `Sending ${((c as any).sent_count ?? 0) + ((c as any).failed_count ?? 0)}/${c.audience?.count ?? 0}`
+          : c.status === 'sent'
+            ? `Sent ${(c as any).sent_count ?? 0}${(c as any).failed_count ? ` · ${(c as any).failed_count} failed` : ''}`
+            : c.status === 'archived'
+              ? 'Archived'
+              : c.status === 'ready'
+                ? 'Scheduled'
+                : 'Pending',
+      statusColor:
+        c.status === 'sending' ? GREEN
+          : c.status === 'ready' ? AMBER
+            : c.status === 'draft' ? ('var(--text-muted)' as string)
+              : BLUE,
       since: `Since ${new Date(c.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`,
       deliveredPct: null as number | null,
       read: null as number | null,
