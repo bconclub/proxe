@@ -16,6 +16,7 @@ import {
 } from '@/lib/sound-prefs';
 import { saveGlobalPrefs } from '@/lib/dashboard-prefs';
 import { brandLabel } from '@/configs';
+import TelegramConnect from '@/components/dashboard/TelegramConnect';
 
 const SOUND_EVENTS: { ev: SoundEvent; hint: string }[] = [
   { ev: 'ready', hint: 'Cue when a dashboard page finishes loading' },
@@ -121,6 +122,9 @@ export default function NotificationsPage() {
               );
             })}
           </div>
+
+          {/* Reminders reach a person, not a room - so this lives per user. */}
+          <TelegramConnect />
         </div>
       </div>
     </>
