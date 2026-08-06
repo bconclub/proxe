@@ -179,21 +179,31 @@ export async function GET(request: NextRequest) {
     // Today's committed calls come from web_sessions, which is where this
     // brand's booking columns actually live - all_leads has no booking_date
     // here, and selecting one that doesn't exist 400s the whole query.
-    const { data: bookingRows } = await supabase
-      .from('web_sessions')
-      .select('lead_id, booking_date, booking_time, booking_status')
-      .gte('booking_date', new Date(todayStart.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10))
-      .lte('booking_date', new Date(tomorrowStart.getTime() + IST_OFFSET_MS - 1).toISOString().slice(0, 10))
+    // Bookings live in unified_context, NOT web_sessions. Reading the wrong
+    // table is why every report has said "0 booked today" while five calls
+    // were actually on the calendar - a zero that looked like a quiet day and
+    // was really an empty query.
+    const todayIst = new Date(todayStart.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10)
+    const { data: bookedLeads } = await supabase
+      .from('all_leads')
+      .select(`id, customer_name, phone,
+               wa_d:unified_context->whatsapp->>booking_date, wa_t:unified_context->whatsapp->>booking_time,
+               vo_d:unified_context->voice->>booking_date,    vo_t:unified_context->voice->>booking_time,
+               web_d:unified_context->web->>booking_date,     web_t:unified_context->web->>booking_time,
+               so_d:unified_context->social->>booking_date,   so_t:unified_context->social->>booking_time`)
+      .eq('lead_stage', 'Booking Made')
+      .limit(500)
 
-    const bookings = (bookingRows || []).filter((b: any) => b.booking_date)
-    const bookingNames = new Map<string, string>()
-    if (bookings.length) {
-      const { data: bl } = await supabase
-        .from('all_leads')
-        .select('id, customer_name')
-        .in('id', bookings.map((b: any) => b.lead_id).filter(Boolean))
-      for (const l of bl || []) bookingNames.set(l.id, l.customer_name || 'Unknown')
-    }
+    const bookings = (bookedLeads || [])
+      .map((l: any) => ({
+        lead_id: l.id,
+        name: l.customer_name || 'Unknown',
+        phone: l.phone,
+        booking_date: l.wa_d || l.vo_d || l.web_d || l.so_d || null,
+        booking_time: l.wa_t || l.vo_t || l.web_t || l.so_t || null,
+      }))
+      .filter((b: any) => b.booking_date === todayIst)
+      .sort((a: any, b: any) => String(a.booking_time || '').localeCompare(String(b.booking_time || '')))
 
     // ── Render ──────────────────────────────────────────────────────────────
     const brand = getBrandConfig().name
@@ -333,23 +343,31 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (kind === 'morning' || kind === 'evening') {
-      lines.push('')
-      lines.push(`${bookings.length} booked today`)
-    }
+    // The day's calendar, at the bottom where the eye stops. This is the part
+    // that changes what someone does next - a count of bookings tells you the
+    // day is busy, the times tell you when to be free.
+    //
+    // Only what is still ahead: a brief at 1pm listing an 11am call reads as
+    // work to do, when it has already happened or already been missed.
+    const nowHhmm = new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(11, 16)
+    const upcoming = bookings.filter(
+      (b: any) => kind === 'morning' || !b.booking_time || b.booking_time >= nowHhmm,
+    )
 
-    // The one line that asks for an action. Overdue call-backs are promises
-    // already broken, which is why they sit at the bottom where the eye stops
-    // rather than among the counts.
-    const { count: overdue } = await supabase
-      .from('activities')
-      .select('id', { count: 'exact', head: true })
-      .not('next_follow_up_date', 'is', null)
-      .lt('next_follow_up_date', new Date().toISOString())
-
-    if (overdue && overdue > 0) {
+    if (upcoming.length) {
       lines.push('')
-      lines.push(`⚠️ <b>${overdue} call-back${overdue === 1 ? '' : 's'} overdue</b>`)
+      lines.push(`<b>Booked today</b>`)
+      const w = Math.max(...upcoming.map((b: any) => String(b.booking_time || '--:--').length))
+      lines.push(
+        `<pre>${upcoming
+          .slice(0, 10)
+          .map((b: any) => `${String(b.booking_time || '--:--').padEnd(w)}  ${tgEscape(b.name)}`)
+          .join('\n')}</pre>`,
+      )
+      if (upcoming.length > 10) lines.push(`<i>+ ${upcoming.length - 10} more</i>`)
+    } else if (kind !== 'pulse') {
+      lines.push('')
+      lines.push('<i>Nothing booked today.</i>')
     }
 
     if (APP_URL) {
