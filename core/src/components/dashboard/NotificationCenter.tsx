@@ -419,9 +419,13 @@ export default function NotificationCenter({
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="flex items-center gap-1.5 mb-1">
-                        <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: '#6366F122', color: '#6366F1' }}>
-                          v{r.version}
-                        </span>
+                        {/* Releases before 2026-07-08 predate versioning and
+                            carry a date only. */}
+                        {r.version && (
+                          <span className="inline-block text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded" style={{ backgroundColor: '#6366F122', color: '#6366F1' }}>
+                            v{r.version}
+                          </span>
+                        )}
                         <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtDate(r.date)}</span>
                       </span>
                       <span className="block text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{r.title}</span>
