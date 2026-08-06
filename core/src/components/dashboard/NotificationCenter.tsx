@@ -89,6 +89,57 @@ function visibleUpdates(): ProductUpdate[] {
   return PRODUCT_UPDATES.filter((x) => !x.brands || x.brands.includes('*') || x.brands.includes(brandId))
 }
 
+/** One person's run of activity, collapsed into a single row. */
+type AlertGroup = {
+  key: string
+  /** most recent event in the group - drives the row's time, preview and click */
+  latest: DashboardAlert
+  count: number
+  /** the group contains a "new lead" event, not just messages */
+  hasLead: boolean
+}
+
+/**
+ * One row per PERSON, not per event.
+ *
+ * Six messages from two people used to render as six rows, each repeating the
+ * name, so the drawer read as a wall rather than a list of who needs you. Now
+ * a run from the same lead collapses to one row: their name, the latest thing
+ * they said, and how many there were. Opening it goes to the lead, which is
+ * where the rest of the thread lives anyway.
+ *
+ * Anonymous web chats (no leadId) are deliberately NOT grouped - they all share
+ * the name "Website visitor", so keying on it would pile unrelated strangers
+ * into one row.
+ */
+function groupAlerts(alerts: DashboardAlert[]): AlertGroup[] {
+  const byKey = new Map<string, AlertGroup>()
+  for (const a of alerts) {
+    const key = a.leadId ? `lead:${a.leadId}` : `solo:${a.id}`
+    const g = byKey.get(key)
+    if (!g) {
+      byKey.set(key, { key, latest: a, count: 1, hasLead: a.kind === 'lead' })
+      continue
+    }
+    g.count += 1
+    if (a.kind === 'lead') g.hasLead = true
+    if (Date.parse(a.timestamp) > Date.parse(g.latest.timestamp)) g.latest = a
+  }
+  return [...byKey.values()].sort(
+    (x, y) => Date.parse(y.latest.timestamp) - Date.parse(x.latest.timestamp)
+  )
+}
+
+/**
+ * Row body. The name is the row's heading, so strip the "Name: " the alerts
+ * route prefixes onto message content rather than saying it twice.
+ */
+function previewOf(a: DashboardAlert): string {
+  if (a.kind === 'lead') return 'came in'
+  const prefix = `${a.leadName}: `
+  return a.content.startsWith(prefix) ? a.content.slice(prefix.length) : a.content
+}
+
 export interface NotificationCenterProps {
   /** legacy alias for variant="topbar" */
   inline?: boolean
@@ -306,12 +357,12 @@ export default function NotificationCenter({
                     Nothing yet. New leads and incoming messages land here while this tab is open.
                   </p>
                 ) : (
-                  alerts.map((a) => {
-                    const isLead = a.kind === 'lead'
+                  groupAlerts(alerts).map((g) => {
+                    const a = g.latest
                     const { Icon, color: tint } = channelGlyph(a.channel)
                     return (
                       <button
-                        key={a.id}
+                        key={g.key}
                         onClick={() => openAlert(a)}
                         className="flex items-start gap-3 px-4 py-3 border-b w-full text-left transition-colors"
                         style={{ borderColor: 'var(--border-primary)' }}
@@ -322,17 +373,25 @@ export default function NotificationCenter({
                           <Icon size={16} />
                         </span>
                         <span className="flex-1 min-w-0">
-                          {/* Only the event TYPE needs words - the channel is the
-                              icon on the left. Messages carry no chip at all. */}
+                          {/* The person is the heading. Only the event TYPE needs
+                              words - the channel is the icon on the left. */}
                           <span className="flex items-center gap-1.5 mb-1">
-                            {isLead && (
-                              <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase" style={{ backgroundColor: '#10B98122', color: '#10B981' }}>
+                            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                              {a.leadName}
+                            </span>
+                            {g.hasLead && (
+                              <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded uppercase flex-shrink-0" style={{ backgroundColor: '#10B98122', color: '#10B981' }}>
                                 New lead
                               </span>
                             )}
-                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{fmtAgo(a.timestamp)}</span>
+                            <span className="text-[11px] ml-auto flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{fmtAgo(a.timestamp)}</span>
                           </span>
-                          <span className="block text-sm" style={{ color: 'var(--text-primary)' }}>{a.content}</span>
+                          <span className="block text-sm truncate" style={{ color: 'var(--text-secondary)' }}>{previewOf(a)}</span>
+                          {g.count > 1 && (
+                            <span className="block text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              {g.hasLead ? `${g.count} updates` : `${g.count} messages`}
+                            </span>
+                          )}
                         </span>
                       </button>
                     )
