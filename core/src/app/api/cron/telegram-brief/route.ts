@@ -164,8 +164,13 @@ export async function GET(request: NextRequest) {
         .from('activities')
         // created_by so the brief can say WHO made the calls, not just how
         // many were made.
-        .select('id, lead_id, created_by, created_at')
-        .eq('activity_type', 'call')
+        // 'note' counts as a call. One counsellor logs every call as a note -
+        // "number not connecting", "candidate is busy call later" - thirty of
+        // them in a fortnight, all plainly phone calls. Counting only
+        // activity_type='call' reported her as having done nothing while she
+        // owned more leads than anyone.
+        .select('id, lead_id, created_by, created_at, activity_type')
+        .in('activity_type', ['call', 'manual_call', 'note'])
         .gte('created_at', windowStart.toISOString())
         .lt('created_at', windowEnd.toISOString()),
       supabase
@@ -432,32 +437,31 @@ export async function GET(request: NextRequest) {
     }
 
     ops.push(`Calls logged - <b>${calls.length}</b>`)
-    // Hoisted: the image needs the same per-caller rows the text does.
+
+    // EVERY caller, including the ones who made none.
+    //
+    // Listing only people with calls made a quiet day invisible - the report
+    // read "Richard 61, Haseeb 33" and said nothing about the three others who
+    // logged nothing at all. A zero is the more useful number of the two.
     const callerRows: Array<[string, number]> = []
-    if (calls.length) {
-      // Who did the calling. created_by is a user id on this schema, so it has
-      // to be resolved to a name or the line reads as a row of UUIDs.
-      const byUser = new Map<string, number>()
-      for (const c of calls) {
-        const k = String((c as any).created_by || '')
-        if (k) byUser.set(k, (byUser.get(k) || 0) + 1)
-      }
-      const ids = Array.from(byUser.keys())
-      const nameById = new Map<string, string>()
-      if (ids.length) {
-        const { data: us } = await supabase
-          .from('dashboard_users')
-          .select('id, full_name, email')
-          .in('id', ids)
-        for (const u of us || []) {
-          nameById.set(u.id, u.full_name || (u.email || '').split('@')[0] || 'Someone')
-        }
-      }
-      const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
-      if (rows.length) {
-        ops.push(rows.map(([id, n]) => `   ${tgEscape(nameById.get(id) || 'Someone')} - <b>${n}</b>`).join('\n'))
-        for (const [id, n] of rows) callerRows.push([nameById.get(id) || 'Someone', n])
-      }
+    const byUser = new Map<string, number>()
+    for (const c of calls) {
+      const k = String((c as any).created_by || '')
+      if (k) byUser.set(k, (byUser.get(k) || 0) + 1)
+    }
+    const { data: teamUsers } = await supabase
+      .from('dashboard_users')
+      .select('id, full_name, email')
+      .eq('is_active', true)
+
+    for (const u of teamUsers || []) {
+      const name = u.full_name || (u.email || '').split('@')[0] || 'Someone'
+      callerRows.push([name, byUser.get(u.id) || 0])
+    }
+    // Busiest first, and anyone on zero drops to the bottom in name order.
+    callerRows.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    if (callerRows.length) {
+      ops.push(callerRows.map(([name, n]) => `   ${tgEscape(name)} - <b>${n}</b>`).join('\n'))
     }
 
     // The day's calendar, at the bottom where the eye stops. This is the part

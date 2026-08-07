@@ -109,26 +109,32 @@ export async function answerQuestion(raw: string): Promise<string | null> {
 
   // CALLS
   if (/\bcalls?\b|called|dial/.test(q) && !/booked|booking/.test(q)) {
+    // 'note' counts too: one counsellor records every call as a note, so
+    // counting only activity_type='call' reported her as idle while she owned
+    // more leads than anyone.
     const { data } = await supabase
       .from('activities')
       .select('id, created_by')
-      .eq('activity_type', 'call')
+      .in('activity_type', ['call', 'manual_call', 'note'])
       .gte('created_at', from)
       .lt('created_at', to)
     const rows = data || []
-    if (!rows.length) return `No calls logged ${period.label}.`
     const byUser = new Map<string, number>()
     for (const r of rows) if (r.created_by) byUser.set(r.created_by, (byUser.get(r.created_by) || 0) + 1)
-    const ids = Array.from(byUser.keys())
-    const names = new Map<string, string>()
-    if (ids.length) {
-      const { data: us } = await supabase.from('dashboard_users').select('id, full_name, email').in('id', ids)
-      for (const u of us || []) names.set(u.id, u.full_name || (u.email || '').split('@')[0] || 'Someone')
-    }
-    const who = Array.from(byUser.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, n]) => `${names.get(id) || 'Someone'} ${n}`)
-      .join(', ')
+
+    // Everyone active, zeros included - a zero says more than a missing name.
+    const { data: us } = await supabase
+      .from('dashboard_users')
+      .select('id, full_name, email')
+      .eq('is_active', true)
+    const who = (us || [])
+      .map((u: any) => ({
+        name: u.full_name || (u.email || '').split('@')[0] || 'Someone',
+        n: byUser.get(u.id) || 0,
+      }))
+      .sort((a: any, b: any) => b.n - a.n || a.name.localeCompare(b.name))
+      .map((r: any) => `${r.name} - <b>${r.n}</b>`)
+      .join('\n')
     return `<b>${rows.length}</b> calls logged ${period.label}.\n${who}`
   }
 
