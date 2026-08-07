@@ -242,10 +242,10 @@ export async function GET(request: NextRequest) {
      * 22 characters - wide enough to set the shape, short enough not to wrap
      * on a small phone.
      */
-    const RULE = '━'.repeat(22)
+    const RULE = ''
     lines.push(heading)
-    lines.push(`<i>${tgEscape(istDateLabel(now))} · ${tgEscape(istTimeLabel(now))} · ${windowNote}</i>`)
-    lines.push(RULE)
+    lines.push(`<i>${windowNote}</i>`)
+    lines.push('')
 
     // A brief is a SHAPE, not a roster. Naming forty leads is unreadable on a
     // phone and tells you nothing you can act on; "40 in, 28 pilot, mostly
@@ -495,7 +495,7 @@ export async function GET(request: NextRequest) {
     sections.push(opsMsg)
     // The dry run still returns ONE string so the whole report can be read at
     // a glance; the separator marks where each message breaks.
-    const html = sections.join('\n\n———\n\n')
+    const html = sections.join('\n\n')
 
     if (dryRun) {
       return NextResponse.json({
@@ -524,14 +524,12 @@ export async function GET(request: NextRequest) {
     // Telegram does not guarantee ordering for messages fired at once, and a
     // report whose SOURCES arrive above its headline is worse than the wall
     // this replaced.
-    let ok = true
-    let firstError = ''
-    for (const part of sections) {
-      const r = await sendTelegramMessage(part, { disablePreview: true })
-      if (!r.success) { ok = false; firstError = firstError || (r.error || 'send failed') }
-      await new Promise((res) => setTimeout(res, 350))
-    }
-    const sent = { success: ok, error: firstError || undefined }
+    // ONE message. Four bubbles read as scattered, and the rules and
+    // blockquotes that were meant to hold them together added a wrapping bar,
+    // a grey box and a stray quote glyph. Plain text, bold headings, blank
+    // lines between sections - nothing that can render differently on a phone
+    // than it does here.
+    const sent = await sendTelegramMessage(sections.join('\n\n'), { disablePreview: true })
     return NextResponse.json({
       success: sent.success,
       messages: sections.length,
