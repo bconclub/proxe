@@ -148,7 +148,9 @@ export async function GET(request: NextRequest) {
                  wc_intent:unified_context->${BRAND_ID}->>offline_event_intent,
                  wc_ev_reg:unified_context->${BRAND_ID}->>offline_event_registered_at,
                  wc_zoom:unified_context->${BRAND_ID}->>zoom_registered,
-                 wc_web_reg:unified_context->${BRAND_ID}->>webinar_registered_at`)
+                 wc_web_reg:unified_context->${BRAND_ID}->>webinar_registered_at,
+                 attr_label:unified_context->attribution->>source_label,
+                 attr_source:unified_context->attribution->>source`)
         .gte('created_at', windowStart.toISOString())
         .lt('created_at', windowEnd.toISOString())
         .order('created_at', { ascending: false }),
@@ -254,10 +256,27 @@ export async function GET(request: NextRequest) {
       return rows.map(([k, n]) => `  ${tgEscape(k)} <b>${n}</b>`).join('\n')
     }
 
-    // Matched on substrings, not exact keys: the real values are things like
-    // 'meta_forms' and 'fb_lead_form', which an exact map misses and then
-    // prints raw, underscores and all.
+    /**
+     * Where the lead really came from.
+     *
+     * first_touchpoint only says HOW they reached us - 'form', 'whatsapp' -
+     * and "Website 13" is the least useful answer in the report: nobody
+     * arrives on a landing page by accident, they arrive from an ad. The
+     * attribution block carries the actual origin (Instagram, Google Ads,
+     * Google Organic) and 58 of 59 leads have it, so it wins whenever present.
+     * The touchpoint mapping below is the fallback for the ones that don't.
+     */
     const sourceOf = (l: any) => {
+      const label = String(l.attr_label || '').trim()
+      if (label) return label
+      const attr = String(l.attr_source || '').toLowerCase().trim()
+      if (attr) {
+        if (/^ig$|instagram/.test(attr)) return 'Instagram'
+        if (/^fb$|facebook|meta/.test(attr)) return /ads?/.test(attr) ? 'Facebook Ads' : 'Facebook'
+        if (/google/.test(attr)) return /ads?/.test(attr) ? 'Google Ads' : 'Google'
+        if (/direct/.test(attr)) return 'Direct'
+        return attr.charAt(0).toUpperCase() + attr.slice(1)
+      }
       const raw = String(l.first_touchpoint || l.last_touchpoint || '').toLowerCase()
       const last = String(l.last_touchpoint || '').toLowerCase()
       if (!raw) return 'Unknown'
@@ -333,9 +352,9 @@ export async function GET(request: NextRequest) {
 
     lines.push(`<b>${newLeads.length} new lead${newLeads.length === 1 ? '' : 's'}</b>`)
     if (newLeads.length) {
-      const src = block(newLeads, sourceOf, 5)
-      if (src) { lines.push(''); lines.push(src) }
-
+      // WHAT they want comes first. It is the question anyone opening this
+      // actually has - what kind of work arrived. Where it came from matters
+      // to whoever buys the ads, and can wait a few lines.
       const want: string[] = []
       if (cat.pilot) want.push(`  Pilot / DGCA <b>${cat.pilot}</b>`)
       if (cat.cabin) want.push(`  Cabin Crew <b>${cat.cabin}</b>`)
@@ -351,10 +370,18 @@ export async function GET(request: NextRequest) {
         if (cat.onlineInterested) want.push(`     interested <b>${cat.onlineInterested}</b>`)
       }
       if (want.length) { lines.push(''); lines.push(want.join('\n')) }
+
+      const src = block(newLeads, sourceOf, 6)
+      if (src) { lines.push(''); lines.push(src) }
     }
 
-    lines.push('')
-    lines.push(`${touched.length} touched`)
+    // Morning has no touched count. The window is 8pm to 9am - nobody was
+    // working, so any number here is the agent's overnight replies, and
+    // reading it as team activity flatters a night when nothing happened.
+    if (kind !== 'morning') {
+      lines.push('')
+      lines.push(`${touched.length} touched today`)
+    }
 
     lines.push('')
     lines.push(`<b>${calls.length} call${calls.length === 1 ? '' : 's'}</b>`)
