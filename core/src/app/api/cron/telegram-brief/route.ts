@@ -149,6 +149,7 @@ export async function GET(request: NextRequest) {
                  wc_ev_reg:unified_context->${BRAND_ID}->>offline_event_registered_at,
                  wc_zoom:unified_context->${BRAND_ID}->>zoom_registered,
                  wc_web_reg:unified_context->${BRAND_ID}->>webinar_registered_at,
+                 wc_applied:unified_context->${BRAND_ID}->>scholarship_applied_at,
                  attr_label:unified_context->attribution->>source_label,
                  attr_source:unified_context->attribution->>source`)
         .gte('created_at', windowStart.toISOString())
@@ -359,15 +360,24 @@ export async function GET(request: NextRequest) {
 
       if (isOffline) {
         cat.offline++
+        // Interested is EVERYONE who came for the event - registered or not.
+        // It was the not-registered remainder, which made the two rows read
+        // as rivals ("7 registered, 2 interested") when registered people are
+        // obviously interested too.
+        cat.offlineInterested++
         if (l.wc_ev_reg) cat.offlineReg++
-        else cat.offlineInterested++
-        if (l.wc_intent === 'scholarship') cat.offlineScholarship++
+        // Scholarship means the full application form was submitted, not that
+        // a box was ticked while registering. 30 ticked the box; 6 finished
+        // the form. Counting the ticks made the pipeline look five times
+        // healthier than it is.
+        if (l.wc_applied) cat.offlineScholarship++
       } else if (isOnline) {
         cat.online++
-        // Registered means registered ON ZOOM. Filling our form is interest;
-        // the seat only exists once Zoom has them.
+        // Same rule as offline: interested is everyone. Registered means
+        // registered ON ZOOM - filling our form is interest, the seat only
+        // exists once Zoom has them.
+        cat.onlineInterested++
         if (String(l.wc_zoom || '').toLowerCase() === 'true') cat.onlineReg++
-        else cat.onlineInterested++
       }
 
       const c = courseOf(l)
@@ -388,16 +398,19 @@ export async function GET(request: NextRequest) {
       const want: string[] = []
       if (cat.pilot) want.push(`Pilot / DGCA - <b>${cat.pilot}</b>`)
       if (cat.cabin) want.push(`Cabin Crew - <b>${cat.cabin}</b>`)
+      // Interested first: it is the whole group, and the rows beneath it are
+      // subsets narrowing down. Registered before scholarship, because that is
+      // the order someone actually moves through.
       if (cat.offline) {
-        want.push(`Offline event - <b>${cat.offline}</b>`)
-        if (cat.offlineReg) want.push(`   registered - <b>${cat.offlineReg}</b>`)
-        if (cat.offlineInterested) want.push(`   interested - <b>${cat.offlineInterested}</b>`)
-        if (cat.offlineScholarship) want.push(`   scholarship - <b>${cat.offlineScholarship}</b>`)
+        want.push(`Offline event`)
+        want.push(`   interested - <b>${cat.offlineInterested}</b>`)
+        want.push(`   registered - <b>${cat.offlineReg}</b>`)
+        want.push(`   scholarship - <b>${cat.offlineScholarship}</b>`)
       }
       if (cat.online) {
-        want.push(`Online event - <b>${cat.online}</b>`)
-        if (cat.onlineReg) want.push(`   registered - <b>${cat.onlineReg}</b>`)
-        if (cat.onlineInterested) want.push(`   interested - <b>${cat.onlineInterested}</b>`)
+        want.push(`Online event`)
+        want.push(`   interested - <b>${cat.onlineInterested}</b>`)
+        want.push(`   registered - <b>${cat.onlineReg}</b>`)
       }
       // <blockquote> is the one real layout tool Telegram gives a bot: an
       // indented block with a coloured bar down the left, and unlike <pre> no
