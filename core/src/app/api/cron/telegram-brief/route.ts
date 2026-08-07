@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
-import { sendTelegramMessage, telegramConfigured, tgEscape, tgLink } from '@/lib/services/telegram'
+import { sendTelegramMessage, sendTelegramPhoto, telegramConfigured, tgEscape, tgLink } from '@/lib/services/telegram'
 import { BRAND_ID, getBrandConfig } from '@/configs'
 
 export const dynamic = 'force-dynamic'
@@ -432,6 +432,8 @@ export async function GET(request: NextRequest) {
     }
 
     ops.push(`Calls logged - <b>${calls.length}</b>`)
+    // Hoisted: the image needs the same per-caller rows the text does.
+    const callerRows: Array<[string, number]> = []
     if (calls.length) {
       // Who did the calling. created_by is a user id on this schema, so it has
       // to be resolved to a name or the line reads as a row of UUIDs.
@@ -454,6 +456,7 @@ export async function GET(request: NextRequest) {
       const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
       if (rows.length) {
         ops.push(rows.map(([id, n]) => `   ${tgEscape(nameById.get(id) || 'Someone')} - <b>${n}</b>`).join('\n'))
+        for (const [id, n] of rows) callerRows.push([nameById.get(id) || 'Someone', n])
       }
     }
 
@@ -461,20 +464,15 @@ export async function GET(request: NextRequest) {
     // that changes what someone does next - a count of bookings tells you the
     // day is busy, the times tell you when to be free.
     //
-    // Only what is still ahead: a brief at 1pm listing an 11am call reads as
-    // work to do, when it has already happened or already been missed.
-    const nowHhmm = new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(11, 16)
-    const upcoming = bookings.filter(
-      (b: any) => kind === 'morning' || !b.booking_time || b.booking_time >= nowHhmm,
-    )
-
-    // Just the number. Who and when is the dashboard's job - the report only
-    // has to tell you whether the day is busy.
-    // Named for WHO did it. A booking is the agent's work - it books the slot
-    // off its own conversation - and a demo taken is a person's. Calling both
-    // "today" side by side made them look like the same pipeline measured
-    // twice, when the gap between them is the whole point.
-    ops.push(`PROXe booked calls - <b>${upcoming.length}</b>`)
+    // EVERY booking for today, not just the ones still ahead. Dropping the
+    // passed ones made the number shrink through the day - 6 in the morning,
+    // 1 by evening - which read as bookings being lost rather than kept. What
+    // the day was worth does not go down as the day goes on.
+    //
+    // Named for WHO did it: a booking is the agent's work, off its own
+    // conversation, and a demo taken is a person's. Side by side the gap
+    // between them is the point.
+    ops.push(`PROXe booked calls - <b>${bookings.length}</b>`)
 
     // Demos actually TAKEN today. Booked is a plan; taken is the outcome, and
     // only a human answering "did it happen" moves a lead there - which is why
@@ -493,9 +491,63 @@ export async function GET(request: NextRequest) {
     }
 
     sections.push(opsMsg)
-    // The dry run still returns ONE string so the whole report can be read at
-    // a glance; the separator marks where each message breaks.
     const html = sections.join('\n\n')
+
+    // ── The same report as a PICTURE ────────────────────────────────────────
+    // Telegram gives a bot no tables and no alignment, so text was always
+    // going to be a list of lines however it was arranged. An image has none
+    // of those limits - columns line up, headings carry weight, and it renders
+    // the same on every phone rather than depending on font size and width.
+    //
+    // Numbers travel in the URL; the card route holds no logic and touches no
+    // database, so Telegram can fetch it directly and there is nothing to
+    // upload from here.
+    const cardRows: Array<{ label: string; value: number | string; sub?: boolean }> = []
+    if (cat.pilot) cardRows.push({ label: 'Pilot / DGCA', value: cat.pilot })
+    if (cat.cabin) cardRows.push({ label: 'Cabin Crew', value: cat.cabin })
+    if (cat.offline) {
+      cardRows.push({ label: 'Offline event', value: cat.offlineInterested })
+      cardRows.push({ label: 'registered', value: cat.offlineReg, sub: true })
+      cardRows.push({ label: 'scholarship', value: cat.offlineScholarship, sub: true })
+    }
+    if (cat.online) {
+      cardRows.push({ label: 'Online event', value: cat.onlineInterested })
+      cardRows.push({ label: 'registered', value: cat.onlineReg, sub: true })
+    }
+
+    const srcCounts = new Map<string, number>()
+    for (const l of newLeads as any[]) {
+      const k = sourceOf(l)
+      if (k) srcCounts.set(k, (srcCounts.get(k) || 0) + 1)
+    }
+
+    const opsRows: Array<{ label: string; value: number | string; sub?: boolean }> = []
+    if (kind !== 'morning') opsRows.push({ label: 'Leads touched', value: touched.length })
+    opsRows.push({ label: 'Calls logged', value: calls.length })
+    for (const [name, n] of callerRows) opsRows.push({ label: name, value: n, sub: true })
+    opsRows.push({ label: 'PROXe booked calls', value: bookings.length })
+    opsRows.push({ label: 'Actual demos taken', value: demosToday || 0 })
+
+    const cardData = {
+      title: kind === 'morning' ? 'MORNING REPORT' : kind === 'evening' ? 'EVENING REPORT' : 'MIDDAY REPORT',
+      window: kind === 'morning' ? 'Since 8pm yesterday' : 'Today so far',
+      headline: String(newLeads.length),
+      headlineLabel: newLeads.length === 1 ? 'new lead' : 'new leads',
+      sections: [
+        { heading: 'LEAD CATEGORIES', rows: cardRows },
+        {
+          heading: 'SOURCES',
+          rows: Array.from(srcCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 6)
+            .map(([label, value]) => ({ label, value })),
+        },
+        { heading: 'OPERATIONS', rows: opsRows },
+      ].filter((s) => s.rows.length),
+    }
+    const cardUrl = APP_URL
+      ? `${APP_URL}/api/reports/brief-card?d=${encodeURIComponent(Buffer.from(JSON.stringify(cardData)).toString('base64'))}`
+      : null
 
     if (dryRun) {
       return NextResponse.json({
@@ -529,7 +581,16 @@ export async function GET(request: NextRequest) {
     // a grey box and a stray quote glyph. Plain text, bold headings, blank
     // lines between sections - nothing that can render differently on a phone
     // than it does here.
-    const sent = await sendTelegramMessage(sections.join('\n\n'), { disablePreview: true })
+    // Picture first, words as the safety net. If the card fails to render or
+    // Telegram cannot fetch it, the report still has to arrive - a prettier
+    // format is not worth a silent day.
+    let sent = cardUrl
+      ? await sendTelegramPhoto(cardUrl, `${cardData.title} · ${cardData.window}`)
+      : { success: false, error: 'no APP_URL' }
+    if (!sent.success) {
+      console.error('[telegram-brief] card send failed, falling back to text:', sent.error)
+      sent = await sendTelegramMessage(sections.join('\n\n'), { disablePreview: true })
+    }
     return NextResponse.json({
       success: sent.success,
       messages: sections.length,

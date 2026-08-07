@@ -89,3 +89,48 @@ export async function sendTelegramMessage(
     return { success: false, error: err?.message || 'unknown' }
   }
 }
+
+/**
+ * Send a PHOTO by URL, with an optional HTML caption.
+ *
+ * Telegram fetches the URL itself, so nothing has to be uploaded from here -
+ * no multipart, no buffering an image through this process. The trade is that
+ * the URL must be publicly reachable, which is why the card route takes its
+ * numbers in the query string and touches no database.
+ *
+ * Captions are capped at 1024 characters by Telegram, well under the 4096 a
+ * message allows - a caption is a line or two, not the report.
+ */
+export async function sendTelegramPhoto(
+  photoUrl: string,
+  caption = '',
+  opts: { chatId?: string; silent?: boolean } = {},
+): Promise<TelegramResult> {
+  const chatId = opts.chatId || CHAT_ID
+  if (!BOT_TOKEN || !chatId) {
+    return { success: false, skipped: true, error: 'TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID not set' }
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption: caption.slice(0, 1024),
+        parse_mode: 'HTML',
+        disable_notification: opts.silent === true,
+      }),
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok || body?.ok === false) {
+      const description = body?.description || `HTTP ${res.status}`
+      console.error('[telegram] photo failed:', description)
+      return { success: false, error: description }
+    }
+    return { success: true, messageId: body?.result?.message_id }
+  } catch (err: any) {
+    console.error('[telegram] photo error:', err?.message || err)
+    return { success: false, error: err?.message || 'unknown' }
+  }
+}
