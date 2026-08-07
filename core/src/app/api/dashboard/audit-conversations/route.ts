@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -72,11 +73,13 @@ export async function GET(request: NextRequest) {
   const full = request.nextUrl.searchParams.get('full') === '1'
   const only = request.nextUrl.searchParams.get('lead')
 
-  const { data: leads, error } = await supabase
-    .from('all_leads')
-    .select('id, customer_name, phone, customer_phone_normalized, lead_stage, unified_context, last_interaction_at')
-    .order('last_interaction_at', { ascending: false })
-    .limit(500)
+  const { data: leads, error } = await scopedQuery(
+    supabase
+      .from('all_leads')
+      .select('id, customer_name, phone, customer_phone_normalized, lead_stage, unified_context, last_interaction_at')
+      .order('last_interaction_at', { ascending: false })
+      .limit(500)
+  )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const owners = (leads || []).filter((l: any) => {
@@ -86,12 +89,14 @@ export async function GET(request: NextRequest) {
 
   const report: any[] = []
   for (const lead of owners) {
-    const { data: msgs } = await supabase
-      .from('conversations')
-      .select('sender, content, created_at, metadata')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: true })
-      .limit(200)
+    const { data: msgs } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('sender, content, created_at, metadata')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: true })
+        .limit(200)
+    )
     const turns = (msgs || []).map((m: any) => ({
       role: m.sender === 'customer' ? 'customer' : (m.metadata?.human ? 'human' : 'agent'),
       text: String(m.content || ''),

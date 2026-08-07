@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,19 +54,23 @@ export async function GET(req: NextRequest) {
     const items: Item[] = []
 
     if (id === 'intake') {
-      const { data } = await supabase
-        .from('all_leads')
-        .select('customer_name, first_touchpoint, created_at')
-        .in('brand', brands)
-        .order('created_at', { ascending: false })
-        .limit(8)
+      const { data } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('customer_name, first_touchpoint, created_at')
+          .in('brand', brands)
+          .order('created_at', { ascending: false })
+          .limit(8)
+      )
       for (const l of data || []) items.push({ title: l.customer_name || 'Lead', sub: `via ${l.first_touchpoint || 'web'}`, at: l.created_at })
     } else if (id === 'conversation') {
-      const { data } = await supabase
-        .from('conversations')
-        .select('lead_id, sender, channel, content, created_at')
-        .order('created_at', { ascending: false })
-        .limit(30)
+      const { data } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('lead_id, sender, channel, content, created_at')
+          .order('created_at', { ascending: false })
+          .limit(30)
+      )
       const leadIds = Array.from(new Set((data || []).map((c: any) => c.lead_id).filter(Boolean)))
       const { data: leads } = leadIds.length
         ? await supabase.from('all_leads').select('id, customer_name').in('id', leadIds.slice(0, 20))
@@ -91,13 +96,15 @@ export async function GET(req: NextRequest) {
         items.push({ title: t.lead_name || 'Lead', sub: `${String(t.task_type || '').replace(/_/g, ' ')}${seq} (${t.status})`, at: t.scheduled_at })
       }
     } else if (id === 'scoring') {
-      const { data } = await supabase
-        .from('all_leads')
-        .select('customer_name, lead_score, lead_stage, last_interaction_at')
-        .in('brand', brands)
-        .not('lead_score', 'is', null)
-        .order('lead_score', { ascending: false })
-        .limit(8)
+      const { data } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('customer_name, lead_score, lead_stage, last_interaction_at')
+          .in('brand', brands)
+          .not('lead_score', 'is', null)
+          .order('lead_score', { ascending: false })
+          .limit(8)
+      )
       for (const l of data || []) items.push({ title: `${l.customer_name || 'Lead'} · ${l.lead_score}`, sub: l.lead_stage || 'New', at: l.last_interaction_at })
     } else if (id === 'memory') {
       const { data } = await supabase
@@ -108,11 +115,13 @@ export async function GET(req: NextRequest) {
         .limit(8)
       for (const k of data || []) items.push({ title: k.title || 'Untitled', sub: k.type || 'knowledge', at: k.created_at })
     } else if (id === 'timing') {
-      const { data } = await supabase
-        .from('all_leads')
-        .select('customer_name, unified_context')
-        .in('brand', brands)
-        .limit(2000)
+      const { data } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('customer_name, unified_context')
+          .in('brand', brands)
+          .limit(2000)
+      )
       const now = Date.now()
       const upcoming: Array<Item & { ms: number }> = []
       for (const l of data || []) {

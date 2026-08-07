@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,10 +51,12 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. Query all_leads table - group by lead_stage
-    const { data: leads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('lead_stage, id')
-      .not('lead_stage', 'is', null)
+    const { data: leads, error: leadsError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('lead_stage, id')
+        .not('lead_stage', 'is', null)
+    )
 
     if (leadsError) {
       console.error('[flows/stats] Failed to fetch leads:', leadsError)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,12 +105,14 @@ export async function GET(
         : 0
 
     // Average response time from conversations metadata
-    const { data: agentMessages } = await supabase
-      .from('conversations')
-      .select('metadata')
-      .eq('sender', 'agent')
-      .eq('channel', channel)
-      .not('metadata->input_to_output_gap_ms', 'is', null)
+    const { data: agentMessages } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('metadata')
+        .eq('sender', 'agent')
+        .eq('channel', channel)
+        .not('metadata->input_to_output_gap_ms', 'is', null)
+    )
 
     let avgResponseTime = 0
     if (agentMessages && agentMessages.length > 0) {

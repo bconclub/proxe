@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
 import { cleanDisplayName } from '@/lib/services/utils';
 import { BRAND_ID, brandConfig } from '@/configs';
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic';
 
@@ -155,9 +156,11 @@ export async function GET(request: Request) {
     // We use the leads we already loaded for "today's leads", AND additionally
     // pull leads where the PAT or booking timestamp falls inside the window
     // even if the lead itself was created earlier.
-    const { data: ctxEventLeads } = await supabase
-      .from('all_leads')
-      .select('id, unified_context, metadata, created_at');
+    const { data: ctxEventLeads } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, unified_context, metadata, created_at');
+    )
 
     const inWindow = (iso: string | null | undefined): boolean => {
       if (!iso) return false;
@@ -267,12 +270,14 @@ export async function GET(request: Request) {
     };
 
     // ── 4) Top 5 active leads (today's customer messages) ───────────────────
-    const { data: custMsgs } = await supabase
-      .from('conversations')
-      .select('lead_id, created_at')
-      .eq('sender', 'customer')
-      .gte('created_at', startIso)
-      .lte('created_at', endIso);
+    const { data: custMsgs } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('lead_id, created_at')
+        .eq('sender', 'customer')
+        .gte('created_at', startIso)
+        .lte('created_at', endIso);
+    )
 
     const msgCountByLead = new Map<string, number>();
     for (const m of (custMsgs || [])) {
@@ -286,10 +291,12 @@ export async function GET(request: Request) {
 
     let topActive: Array<{ id: string; name: string; phone: string | null; score: number | null; messageCount: number }> = [];
     if (topIds.length > 0) {
-      const { data: leadRows } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, phone, lead_score')
-        .in('id', topIds);
+      const { data: leadRows } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, phone, lead_score')
+          .in('id', topIds);
+      )
       const byId = new Map((leadRows || []).map((r: any) => [r.id, r]));
       topActive = topIds.map((id) => {
         const r: any = byId.get(id) || {};

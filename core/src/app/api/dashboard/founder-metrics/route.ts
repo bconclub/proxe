@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { cleanDisplayName } from '@/lib/services/utils'
 import { BRAND_ID, brandConfig } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 // Normalise a stored customer_name for display: strips emoji / fancy-Unicode /
 // decorative junk so the dashboard reads as a professional system. Falls back to
@@ -248,12 +249,14 @@ export async function GET(request: NextRequest) {
       const convCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString()
       const PAGE = 1000
       for (let page = 0; page < 20; page++) {
-        const { data: chunk, error: convErr } = await supabase
-          .from('conversations')
-          .select('lead_id, sender, created_at, metadata, channel')
-          .gte('created_at', convCutoff)
-          .order('created_at', { ascending: false })
-          .range(page * PAGE, page * PAGE + PAGE - 1)
+        const { data: chunk, error: convErr } = await scopedQuery(
+          supabase
+            .from('conversations')
+            .select('lead_id, sender, created_at, metadata, channel')
+            .gte('created_at', convCutoff)
+            .order('created_at', { ascending: false })
+            .range(page * PAGE, page * PAGE + PAGE - 1)
+        )
         if (convErr) { console.warn('Error fetching conversations page', page, convErr.message); break }
         if (!chunk || chunk.length === 0) break
         messages.push(...chunk)

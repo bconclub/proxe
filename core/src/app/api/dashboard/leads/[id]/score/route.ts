@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -49,21 +50,25 @@ export async function POST(
     // recompute it. Service role per dashboard-write policy; best-effort.
     if (clientScore != null) {
       const svc = getServiceClient() || supabase
-      const { error: persistError } = await svc
-        .from('all_leads')
-        .update({ lead_score: clientScore, last_scored_at: new Date().toISOString() })
-        .eq('id', leadId)
+      const { error: persistError } = await scopedQuery(
+        svc
+          .from('all_leads')
+          .update({ lead_score: clientScore, last_scored_at: new Date().toISOString() })
+          .eq('id', leadId)
+      )
       if (persistError) {
         console.error('Failed to persist client score:', persistError.message)
       }
     }
 
     // Fetch updated lead data
-    const { data: leadData, error: fetchError } = await supabase
-      .from('all_leads')
-      .select('id, lead_score, lead_stage, sub_stage, last_scored_at')
-      .eq('id', leadId)
-      .single()
+    const { data: leadData, error: fetchError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, lead_score, lead_stage, sub_stage, last_scored_at')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (fetchError) {
       console.error('Error fetching updated lead:', fetchError)

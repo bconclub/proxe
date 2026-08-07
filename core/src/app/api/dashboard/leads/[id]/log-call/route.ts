@@ -22,6 +22,7 @@ import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { validateSteps, type DecisionStep } from '@/lib/logcall/decisionPlan'
 import { BRAND_ID, getBrandConfig } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -150,11 +151,13 @@ export async function POST(
     })
     if (activityError) console.error('[log-call] activity insert failed (continuing — note is primary):', activityError.message)
 
-    const { data: leadRow, error: leadErr } = await supabase
-      .from('all_leads')
-      .select('unified_context, customer_name, customer_phone_normalized, phone')
-      .eq('id', leadId)
-      .single()
+    const { data: leadRow, error: leadErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context, customer_name, customer_phone_normalized, phone')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (leadErr || !leadRow) {
       throw leadErr || new Error('Lead not found')

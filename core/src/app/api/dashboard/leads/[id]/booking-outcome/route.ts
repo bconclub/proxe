@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,11 +59,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const leadId = params.id
     const now = new Date().toISOString()
 
-    const { data: lead, error: readErr } = await supabase
-      .from('all_leads')
-      .select('unified_context, lead_stage, owner_id')
-      .eq('id', leadId)
-      .maybeSingle()
+    const { data: lead, error: readErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context, lead_stage, owner_id')
+        .eq('id', leadId)
+        .maybeSingle()
+    )
     if (readErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
     const ctx: any = lead.unified_context || {}

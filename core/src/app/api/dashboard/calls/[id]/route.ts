@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,12 +63,14 @@ export async function GET(
     let convLeadId: string | null = null
     let convDuration: number | null = null
     {
-      const { data: convs } = await supabase
-        .from('conversations')
-        .select('lead_id, sender, content, metadata, created_at')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'eq', callId)
-        .order('created_at', { ascending: true })
+      const { data: convs } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('lead_id, sender, content, metadata, created_at')
+          .eq('channel', 'voice')
+          .filter('metadata->>call_id', 'eq', callId)
+          .order('created_at', { ascending: true })
+      )
       ;(convs || []).forEach((c: any) => {
         if (c.lead_id && !convLeadId) convLeadId = c.lead_id
         if (c?.metadata?.summary) {

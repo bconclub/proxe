@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getBrandConfig } from '@/configs'
 import { getLeadAccess, filterLeads } from '@/lib/services/leadAccess'
+import { resolveWorkspaceBrands, scopeToWorkspace } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,16 @@ export async function GET(request: NextRequest) {
       .from('all_leads')
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
+
+    // Workspace scope, plus an optional ?brand= tab that narrows WITHIN it.
+    // Both are checked against this deployment's own leadBrands, so neither the
+    // cookie nor the query string can widen visibility past what config allows.
+    const workspaceBrands = await resolveWorkspaceBrands()
+    const brandParam = searchParams.get('brand')
+    query = scopeToWorkspace(
+      query,
+      brandParam && workspaceBrands?.includes(brandParam) ? [brandParam] : workspaceBrands
+    )
 
     if (search && search.length >= 2) {
       // Postgres ILIKE pattern, OR across name/phone/email.
@@ -115,6 +126,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       leads,
+      // The tab strip renders from this, so the client never has to know which
+      // brands a deployment covers.
+      leadBrands: getBrandConfig().leadBrands ?? null,
       pagination: {
         page,
         limit,
@@ -153,7 +167,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    let query = supabase.from('all_leads').delete()
+    // Scoped too: seeing another workspace's rows is a leak, deleting them is
+    // worse.
+    let query = scopeToWorkspace(
+      supabase.from('all_leads').delete(),
+      await resolveWorkspaceBrands()
+    )
 
     if (id) {
       query = query.eq('id', id)

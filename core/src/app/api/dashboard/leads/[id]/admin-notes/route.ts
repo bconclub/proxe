@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { classifyAndAct, getServiceClient } from '@/lib/services'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,11 +52,13 @@ export async function POST(
     const trimmedNote = note.trim()
 
     // 1. Fetch current lead data for duplicate guard + existing notes
-    const { data: lead, error: leadError } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', leadId)
-      .single()
+    const { data: lead, error: leadError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (leadError || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -93,10 +96,12 @@ export async function POST(
       ...existingCtx,
       admin_notes: [...existingNotes, newNote],
     }
-    const { error: updateError } = await supabase
-      .from('all_leads')
-      .update({ unified_context: updatedCtx })
-      .eq('id', leadId)
+    const { error: updateError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update({ unified_context: updatedCtx })
+        .eq('id', leadId)
+    )
     if (updateError) throw updateError
 
     // 4. Insert into activities table. created_by is a UUID column — pass the
@@ -156,11 +161,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'note_id or note_text is required' }, { status: 400 })
     }
 
-    const { data: lead, error: leadError } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', leadId)
-      .single()
+    const { data: lead, error: leadError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (leadError || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -179,10 +186,12 @@ export async function DELETE(
       return NextResponse.json({ error: 'Note not found' }, { status: 404 })
     }
 
-    const { error: updateError } = await supabase
-      .from('all_leads')
-      .update({ unified_context: { ...ctx, admin_notes: filtered } })
-      .eq('id', leadId)
+    const { error: updateError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update({ unified_context: { ...ctx, admin_notes: filtered } })
+        .eq('id', leadId)
+    )
 
     if (updateError) throw updateError
 

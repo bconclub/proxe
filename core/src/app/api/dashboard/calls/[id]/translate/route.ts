@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getServiceClient } from '@/lib/services';
 import Anthropic from '@anthropic-ai/sdk';
 import { resolveModel } from '@/lib/agent-core';
+import { scopedQuery } from '@/lib/server/workspace'
 
 // Translate a call's transcript turns to English on demand. Grievance calls are
 // in Punjabi/Hindi; dashboard staff read English — listening (recording) and
@@ -20,11 +21,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const supabase = getServiceClient() || authClient;
 
   // The transcript turns for this call (channel voice, matched by call_id).
-  const { data: rows, error } = await supabase
-    .from('conversations')
-    .select('id, sender, content, metadata, created_at')
-    .eq('metadata->>call_id', callId)
-    .order('created_at', { ascending: true });
+  const { data: rows, error } = await scopedQuery(
+    supabase
+      .from('conversations')
+      .select('id, sender, content, metadata, created_at')
+      .eq('metadata->>call_id', callId)
+      .order('created_at', { ascending: true });
+  )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const turns = (rows || []).filter((r: any) => r.content && r.content !== '(call recording)' && !r.metadata?.summary);

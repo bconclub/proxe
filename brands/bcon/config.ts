@@ -13,6 +13,10 @@ export const bconConfig: BrandConfig = {
     ],
   },
   // BCON runs the Vapi voice/calls stack and the dashboard extras.
+  leadBrands: [
+    { id: 'bcon', label: 'BCON', icon: '/bcon-icon.png', color: '#22c55e' },
+    { id: 'proxe', label: 'PROXe', icon: '/proxe-icon.png', color: '#7c3aed' },
+  ],
   features: {
     voice: true,
     brain: true,

@@ -12,6 +12,7 @@
 
 import { NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,13 +40,15 @@ export async function GET() {
   // Every agent template row, newest first; keep only the campaign-tagged ones.
   // (Filtering the JSON tag in JS is more robust than a PostgREST json `not.is`
   // filter, which silently returned nothing here.)
-  const { data: sends } = await sb
-    .from('conversations')
-    .select('lead_id, metadata, created_at')
-    .eq('sender', 'agent')
-    .eq('message_type', 'template')
-    .order('created_at', { ascending: false })
-    .limit(8000)
+  const { data: sends } = await scopedQuery(
+    sb
+      .from('conversations')
+      .select('lead_id, metadata, created_at')
+      .eq('sender', 'agent')
+      .eq('message_type', 'template')
+      .order('created_at', { ascending: false })
+      .limit(8000)
+  )
 
   const rows = (sends || []).filter((r: any) => r.metadata && r.metadata.campaign)
   if (!rows.length) return NextResponse.json({ campaigns: [] })
@@ -68,11 +71,13 @@ export async function GET() {
   // bot's deterministic quick-reply replies (`quick_reply_trigger`) — the group
   // tap is answered before it lands as an inbound row, so (b) is its only record.
   const clickedByTpl: Record<string, Set<string>> = {}
-  const { data: engagement } = await sb
-    .from('conversations')
-    .select('lead_id, sender, metadata, created_at')
-    .order('created_at', { ascending: false })
-    .limit(12000)
+  const { data: engagement } = await scopedQuery(
+    sb
+      .from('conversations')
+      .select('lead_id, sender, metadata, created_at')
+      .order('created_at', { ascending: false })
+      .limit(12000)
+  )
   for (const e of engagement || []) {
     const m: any = e.metadata || {}
     const tapped = !!m.quick_reply_trigger || (e.sender === 'customer' && (m.trigger_kind === 'button' || m.trigger_kind === 'interactive_button'))
@@ -184,11 +189,13 @@ export async function GET() {
   // Upcoming (scheduled, not-yet-sent) day-of webinar sends. Registered leads get
   // "starting soon" ~30 min before + "live now" at start — surface what's queued.
   const upcoming: any[] = []
-  const { data: wleads } = await sb
-    .from('all_leads')
-    .select('unified_context')
-    .filter('unified_context->windchasers->>lead_type', 'eq', 'webinar')
-    .limit(2000)
+  const { data: wleads } = await scopedQuery(
+    sb
+      .from('all_leads')
+      .select('unified_context')
+      .filter('unified_context->windchasers->>lead_type', 'eq', 'webinar')
+      .limit(2000)
+  )
   if (wleads && wleads.length) {
     const parseDate = (raw: string): number => {
       const d = new Date(raw).getTime()

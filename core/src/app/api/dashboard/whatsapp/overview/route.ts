@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +30,14 @@ const TIER_INFO: Record<string, { label: string; cap: string }> = {
 
 async function countSent(service: any, sinceIso: string): Promise<number | null> {
   try {
-    const { count } = await service
-      .from('conversations')
-      .select('id', { count: 'exact', head: true })
-      .eq('sender', 'agent')
-      .in('message_type', ['template', 'text'])
-      .gte('created_at', sinceIso)
+    const { count } = await scopedQuery(
+      service
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender', 'agent')
+        .in('message_type', ['template', 'text'])
+        .gte('created_at', sinceIso)
+    )
     return count ?? 0
   } catch {
     return null

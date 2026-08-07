@@ -18,6 +18,10 @@ export const proxeConfig: BrandConfig = {
     ],
   },
   // All extras OFF for the bare PROXe template — flip on as features land.
+  leadBrands: [
+    { id: 'proxe', label: 'PROXe', icon: '/proxe-icon.png', color: '#7c3aed' },
+    { id: 'bcon', label: 'BCON', icon: '/bcon-icon.png', color: '#22c55e' },
+  ],
   features: {
     voice: false,
     brain: true, // Brain ships to every brand; content is generic until a brain{} block is added

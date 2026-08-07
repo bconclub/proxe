@@ -14,6 +14,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getBrandConfig } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,12 +45,14 @@ export async function GET() {
     const PAGE = 1000
     const ownedRows: Array<{ owner_id: string; lead_stage: string | null }> = []
     for (let from = 0; from < 20000; from += PAGE) {
-      const { data, error } = await supabase
-        .from('all_leads')
-        .select('owner_id, lead_stage')
-        .not('owner_id', 'is', null)
-        .order('id', { ascending: true })
-        .range(from, from + PAGE - 1)
+      const { data, error } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('owner_id, lead_stage')
+          .not('owner_id', 'is', null)
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+      )
       if (error) throw error
       ownedRows.push(...((data || []) as any))
       if (!data || data.length < PAGE) break

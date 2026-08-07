@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,11 +47,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const supabase = getServiceClient() || authClient
 
-    const { data: lead, error: readErr } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', leadId)
-      .single()
+    const { data: lead, error: readErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .single()
+    )
     if (readErr || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
@@ -100,10 +103,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       source: 'set_type',
     })
 
-    const { error: updateErr } = await supabase
-      .from('all_leads')
-      .update({ unified_context: { ...ctx, [brandKey]: nextBrandCtx, admin_notes: adminNotes } })
-      .eq('id', leadId)
+    const { error: updateErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update({ unified_context: { ...ctx, [brandKey]: nextBrandCtx, admin_notes: adminNotes } })
+        .eq('id', leadId)
+    )
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 })
     }
