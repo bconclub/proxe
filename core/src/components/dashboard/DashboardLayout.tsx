@@ -9,6 +9,7 @@ import HealthBarButton from '@/components/dashboard/HealthBarButton'
 import { getBuildDate } from '@/lib/buildInfo'
 import { getBrandConfig } from '@/configs'
 import ArtifactSwitcher from '@/components/dashboard/ArtifactSwitcher'
+import WorkspaceSwitcher from '@/components/dashboard/WorkspaceSwitcher'
 import DashboardBrain from '@/components/dashboard/DashboardBrain'
 import ReportIssueModal from '@/components/dashboard/ReportIssueModal'
 import { useTheme } from './ThemeProvider'
@@ -109,7 +110,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
   // Brand logo + name come from the brand config so this layout shell stays
   // byte-identical across brands - only the resolved values differ per brand.
-  const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors, artifacts: brandArtifacts } = getBrandConfig()
+  const { name: brandName, brand: brandId, chatStructure: brandChat, markPath, colors: brandColors, artifacts: brandArtifacts, leadBrands } = getBrandConfig()
+  // More than one workspace means this deployment can see both brands' data and
+  // should offer an in-app switch. One (or none) means there is nothing to
+  // switch to and the control is hidden entirely.
+  const workspaces = leadBrands && leadBrands.length > 1 ? leadBrands : null
   // Brands with `artifacts` in config (pop) get the artifact switcher dropdown
   // on the brand header instead of a plain title / hardcoded war-room link.
   const hasArtifacts = Boolean(brandArtifacts && brandArtifacts.length > 0)
@@ -638,6 +643,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
           )}
         </div>
+
+        {/* Workspace switcher — same domain, same session, different brand's
+            data. Only rendered when the sidebar is expanded; collapsed there is
+            no room for a labelled control and the icon alone would be a mystery. */}
+        {workspaces && showExpanded && (
+          <div style={{ padding: '0 8px 8px' }}>
+            <WorkspaceSwitcher workspaces={workspaces} />
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-visible flex flex-col" style={{ padding: '8px' }}>
