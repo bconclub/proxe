@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolveWorkspaceBrands, scopeToWorkspace } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,11 +15,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all web messages
-    const { data: messages, error: messagesError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('channel', 'web')
-      .order('created_at', { ascending: false })
+    const ws = await resolveWorkspaceBrands()
+    const { data: messages, error: messagesError } = await scopeToWorkspace(
+      supabase
+        .from('conversations')
+        .select('*')
+        .eq('channel', 'web')
+        .order('created_at', { ascending: false }),
+      ws
+    )
 
     if (messagesError) throw messagesError
 

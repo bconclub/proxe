@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { resolveWorkspaceBrands, scopeToWorkspace } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,12 +14,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get all WhatsApp messages where sender is 'agent'
-    const { data: messages, error: messagesError } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('channel', 'whatsapp')
-      .eq('sender', 'agent')
+    // Get all WhatsApp messages where sender is 'agent', scoped to the
+    // selected workspace. Without this the inbox showed every brand's messages
+    // on a shared database no matter which workspace was picked.
+    const ws = await resolveWorkspaceBrands()
+    const { data: messages, error: messagesError } = await scopeToWorkspace(
+      supabase
+        .from('conversations')
+        .select('*')
+        .eq('channel', 'whatsapp')
+        .eq('sender', 'agent'),
+      ws
+    )
 
     if (messagesError) throw messagesError
 

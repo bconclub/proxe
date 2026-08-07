@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getBrandConfig } from '@/configs'
 import { getLeadAccess, filterLeads } from '@/lib/services/leadAccess'
+import { resolveWorkspaceBrands, scopeToWorkspace } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,6 @@ export async function GET(request: NextRequest) {
     // BCON service leads so one login covers both; a deployment declares what it
     // should see via config.leadBrands. Brands without it (pop, lokazen,
     // windchasers) skip this entirely and behave exactly as before.
-    const leadBrands = getBrandConfig().leadBrands
     const brandParam = searchParams.get('brand')
 
     let query = supabase
@@ -47,16 +47,14 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .order('last_interaction_at', { ascending: false })
 
-    if (leadBrands?.length) {
-      const allowed = leadBrands.map((b) => b.id)
-      // A tab selection narrows to one brand, but only to a brand this
-      // deployment already declares - never trust the query string to widen
-      // visibility beyond the configured set.
-      query =
-        brandParam && allowed.includes(brandParam)
-          ? query.eq('brand', brandParam)
-          : query.in('brand', allowed)
-    }
+    // The workspace switcher's selection (cookie) is the default scope; an
+    // explicit ?brand= tab narrows further. Both are validated against the
+    // deployment's own allow-list inside resolveWorkspaceBrands / below, so
+    // neither can widen visibility beyond what config declares.
+    const workspaceBrands = await resolveWorkspaceBrands()
+    const scoped =
+      brandParam && workspaceBrands?.includes(brandParam) ? [brandParam] : workspaceBrands
+    query = scopeToWorkspace(query, scoped)
 
     if (search && search.length >= 2) {
       // Postgres ILIKE pattern, OR across name/phone/email.
@@ -133,6 +131,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       leads,
+      // The tab strip renders from this, so the client never has to know which
+      // brands a deployment covers.
+      leadBrands: getBrandConfig().leadBrands ?? null,
       pagination: {
         page,
         limit,
