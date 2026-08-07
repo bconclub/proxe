@@ -389,10 +389,13 @@ export async function GET(request: NextRequest) {
         if (cat.onlineReg) want.push(`   registered - <b>${cat.onlineReg}</b>`)
         if (cat.onlineInterested) want.push(`   interested - <b>${cat.onlineInterested}</b>`)
       }
-      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${want.join('\n')}`)
+      // <blockquote> is the one real layout tool Telegram gives a bot: an
+      // indented block with a coloured bar down the left, and unlike <pre> no
+      // grey panel and no Copy button making a report look like code.
+      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n<blockquote>${want.join('\n')}</blockquote>`)
 
       const src = block(newLeads, sourceOf, 6)
-      if (src) sections.push(`<b>SOURCES</b>\n${src}`)
+      if (src) sections.push(`<b>SOURCES</b>\n<blockquote>${src}</blockquote>`)
     }
 
     // Everything the team did, under its own heading.
@@ -427,7 +430,7 @@ export async function GET(request: NextRequest) {
       }
       const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
       if (rows.length) {
-        lines.push(rows.map(([id, n]) => `     ${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`).join('\n'))
+        ops.push(rows.map(([id, n]) => `   ${tgEscape(nameById.get(id) || 'Someone')} - <b>${n}</b>`).join('\n'))
       }
     }
 
@@ -457,12 +460,12 @@ export async function GET(request: NextRequest) {
 
     ops.push(`Demos taken today - <b>${demosToday || 0}</b>`)
 
+    let opsMsg = `<b>OPERATIONS</b>\n<blockquote>${ops.join('\n')}</blockquote>`
     if (APP_URL) {
-      lines.push('')
-      lines.push(tgLink('Open dashboard', `${APP_URL}/dashboard`))
+      opsMsg += `\n\n${tgLink('Open dashboard', `${APP_URL}/dashboard`)}`
     }
 
-    sections.push(lines.join('\n'))
+    sections.push(opsMsg)
     // The dry run still returns ONE string so the whole report can be read at
     // a glance; the separator marks where each message breaks.
     const html = sections.join('\n\n———\n\n')
