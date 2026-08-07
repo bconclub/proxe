@@ -447,7 +447,11 @@ export async function GET(request: NextRequest) {
 
     // Just the number. Who and when is the dashboard's job - the report only
     // has to tell you whether the day is busy.
-    ops.push(`Calls booked today - <b>${upcoming.length}</b>`)
+    // Named for WHO did it. A booking is the agent's work - it books the slot
+    // off its own conversation - and a demo taken is a person's. Calling both
+    // "today" side by side made them look like the same pipeline measured
+    // twice, when the gap between them is the whole point.
+    ops.push(`PROXe booked calls - <b>${upcoming.length}</b>`)
 
     // Demos actually TAKEN today. Booked is a plan; taken is the outcome, and
     // only a human answering "did it happen" moves a lead there - which is why
@@ -458,7 +462,7 @@ export async function GET(request: NextRequest) {
       .in('new_stage', ['Demo Taken', 'Demo Done', 'Call Done'])
       .gte('created_at', todayStart.toISOString())
 
-    ops.push(`Demos taken today - <b>${demosToday || 0}</b>`)
+    ops.push(`Actual demos taken - <b>${demosToday || 0}</b>`)
 
     let opsMsg = `<b>OPERATIONS</b>\n<blockquote>${ops.join('\n')}</blockquote>`
     if (APP_URL) {
