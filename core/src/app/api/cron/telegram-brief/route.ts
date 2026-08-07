@@ -261,7 +261,7 @@ export async function GET(request: NextRequest) {
       // Plain lines, NOT <pre>. Telegram dresses a pre block up as code, with
       // a grey panel and a Copy button - it reads like something to run rather
       // than something to know. Alignment is not worth that.
-      return rows.map(([k, n]) => `  ${tgEscape(k)} <b>${n}</b>`).join('\n')
+      return rows.map(([k, n]) => `${tgEscape(k)} - <b>${n}</b>`).join('\n')
     }
 
     /**
