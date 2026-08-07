@@ -232,9 +232,19 @@ export async function GET(request: NextRequest) {
     // - grey panel, Copy button, reads like something to run - so the
     // structure has to come from the messages themselves. One heading each.
     const sections: string[] = []
+    /**
+     * Width-setter.
+     *
+     * A Telegram bubble is as wide as its longest line, so four messages of
+     * different content come out four different widths and the report looks
+     * ragged. The same rule under every heading makes them all one width.
+     * 22 characters - wide enough to set the shape, short enough not to wrap
+     * on a small phone.
+     */
+    const RULE = '━'.repeat(22)
     lines.push(heading)
-    lines.push(`<i>${windowNote} · ${tgEscape(brand)}</i>`)
-    lines.push('')
+    lines.push(`<i>${tgEscape(istDateLabel(now))} · ${tgEscape(istTimeLabel(now))} · ${windowNote}</i>`)
+    lines.push(RULE)
 
     // A brief is a SHAPE, not a roster. Naming forty leads is unreadable on a
     // phone and tells you nothing you can act on; "40 in, 28 pilot, mostly
@@ -392,10 +402,10 @@ export async function GET(request: NextRequest) {
       // <blockquote> is the one real layout tool Telegram gives a bot: an
       // indented block with a coloured bar down the left, and unlike <pre> no
       // grey panel and no Copy button making a report look like code.
-      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n<blockquote>${want.join('\n')}</blockquote>`)
+      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${RULE}\n<blockquote>${want.join('\n')}</blockquote>`)
 
       const src = block(newLeads, sourceOf, 6)
-      if (src) sections.push(`<b>SOURCES</b>\n<blockquote>${src}</blockquote>`)
+      if (src) sections.push(`<b>SOURCES</b>\n${RULE}\n<blockquote>${src}</blockquote>`)
     }
 
     // Everything the team did, under its own heading.
@@ -464,7 +474,7 @@ export async function GET(request: NextRequest) {
 
     ops.push(`Actual demos taken - <b>${demosToday || 0}</b>`)
 
-    let opsMsg = `<b>OPERATIONS</b>\n<blockquote>${ops.join('\n')}</blockquote>`
+    let opsMsg = `<b>OPERATIONS</b>\n${RULE}\n<blockquote>${ops.join('\n')}</blockquote>`
     if (APP_URL) {
       opsMsg += `\n\n${tgLink('Open dashboard', `${APP_URL}/dashboard`)}`
     }
