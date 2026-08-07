@@ -45,12 +45,30 @@ export async function GET(req: NextRequest) {
     return new Response('bad payload', { status: 400 })
   }
 
+  // Height from content, not a guess. A fixed 1250 cut OPERATIONS off the
+  // bottom entirely - the rows below the fold simply did not exist in the
+  // picture, which is worse than an ugly report.
+  const ROW = 69
+  const SUB_ROW = 57
+  const HEADING = 45
+  const SECTION_GAP = 30
+  const height =
+    112 + // page padding
+    120 + // title + window
+    136 + // headline panel
+    card.sections.reduce(
+      (h, s) =>
+        h + HEADING + SECTION_GAP + s.rows.reduce((r, row) => r + (row.sub ? SUB_ROW : ROW), 0),
+      0,
+    ) +
+    24 // breathing room at the foot
+
   return new ImageResponse(
     (
       <div
         style={{
           width: '1000px',
-          height: '1250px',
+          height: `${height}px`,
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: INK,
@@ -139,6 +157,6 @@ export async function GET(req: NextRequest) {
         </div>
       </div>
     ),
-    { width: 1000, height: 1250 },
+    { width: 1000, height },
   )
 }
