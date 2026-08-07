@@ -229,9 +229,9 @@ export async function GET(request: NextRequest) {
     // Meta, Richard made 18 calls" is the same information you can act on.
     // Individual leads have their own feed, and the dashboard has the list.
     /**
-     * Counts as an aligned block. Telegram renders <pre> in a monospace font,
-     * which is the only way numbers line up in a column - and a column is what
-     * makes this scannable at a glance instead of a sentence you have to read.
+     * Counts as indented lines under their heading. Plain text, never a code
+     * block: Telegram renders those as a grey panel with a Copy button, which
+     * reads as something to run rather than something to know.
      */
     const block = (
       items: any[],
@@ -246,10 +246,10 @@ export async function GET(request: NextRequest) {
       }
       const rows = Array.from(m.entries()).sort((a, b) => b[1] - a[1]).slice(0, max)
       if (!rows.length) return null
-      const w = Math.max(...rows.map(([k]) => k.length))
-      return `<pre>${rows
-        .map(([k, n]) => `${tgEscape(k.padEnd(w))}  ${String(n).padStart(3)}`)
-        .join('\n')}</pre>`
+      // Plain lines, NOT <pre>. Telegram dresses a pre block up as code, with
+      // a grey panel and a Copy button - it reads like something to run rather
+      // than something to know. Alignment is not worth that.
+      return rows.map(([k, n]) => `  ${tgEscape(k)} <b>${n}</b>`).join('\n')
     }
 
     // Matched on substrings, not exact keys: the real values are things like
@@ -334,12 +334,7 @@ export async function GET(request: NextRequest) {
       }
       const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
       if (rows.length) {
-        const w = Math.max(...rows.map(([id]) => (nameById.get(id) || 'Someone').length))
-        lines.push(
-          `<pre>${rows
-            .map(([id, n]) => `${tgEscape((nameById.get(id) || 'Someone').padEnd(w))}  ${String(n).padStart(3)}`)
-            .join('\n')}</pre>`,
-        )
+        lines.push(rows.map(([id, n]) => `  ${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`).join('\n'))
       }
     }
 
@@ -354,21 +349,10 @@ export async function GET(request: NextRequest) {
       (b: any) => kind === 'morning' || !b.booking_time || b.booking_time >= nowHhmm,
     )
 
-    if (upcoming.length) {
-      lines.push('')
-      lines.push(`<b>Booked today</b>`)
-      const w = Math.max(...upcoming.map((b: any) => String(b.booking_time || '--:--').length))
-      lines.push(
-        `<pre>${upcoming
-          .slice(0, 10)
-          .map((b: any) => `${String(b.booking_time || '--:--').padEnd(w)}  ${tgEscape(b.name)}`)
-          .join('\n')}</pre>`,
-      )
-      if (upcoming.length > 10) lines.push(`<i>+ ${upcoming.length - 10} more</i>`)
-    } else if (kind !== 'pulse') {
-      lines.push('')
-      lines.push('<i>Nothing booked today.</i>')
-    }
+    // Just the number. Who and when is the dashboard's job - the report only
+    // has to tell you whether the day is busy.
+    lines.push('')
+    lines.push(`<b>${upcoming.length} call${upcoming.length === 1 ? '' : 's'} booked today</b>`)
 
     if (APP_URL) {
       lines.push('')
