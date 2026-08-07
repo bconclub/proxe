@@ -275,16 +275,23 @@ export async function GET(request: NextRequest) {
      * The touchpoint mapping below is the fallback for the ones that don't.
      */
     const sourceOf = (l: any) => {
+      // One bucket per PLATFORM. Facebook Ads and Facebook are the same place,
+      // as are Google Ads and Google Organic - splitting them made five thin
+      // rows out of three real ones, and the paid/organic split belongs in an
+      // ads report, not in a lead brief. Anything genuinely new still gets its
+      // own row through the fallback below.
+      const both = `${l.attr_label || ''} ${l.attr_source || ''}`.toLowerCase().trim()
+      if (both) {
+        if (/instagram|^ig\b|\big\b/.test(both)) return 'Instagram'
+        if (/facebook|^fb\b|\bfb\b|meta/.test(both)) return 'Facebook'
+        if (/google/.test(both)) return 'Google'
+        if (/whatsapp|\bwa\b/.test(both)) return 'WhatsApp'
+        if (/direct/.test(both)) return 'Direct'
+      }
       const label = String(l.attr_label || '').trim()
       if (label) return label
       const attr = String(l.attr_source || '').toLowerCase().trim()
-      if (attr) {
-        if (/^ig$|instagram/.test(attr)) return 'Instagram'
-        if (/^fb$|facebook|meta/.test(attr)) return /ads?/.test(attr) ? 'Facebook Ads' : 'Facebook'
-        if (/google/.test(attr)) return /ads?/.test(attr) ? 'Google Ads' : 'Google'
-        if (/direct/.test(attr)) return 'Direct'
-        return attr.charAt(0).toUpperCase() + attr.slice(1)
-      }
+      if (attr) return attr.charAt(0).toUpperCase() + attr.slice(1)
       const raw = String(l.first_touchpoint || l.last_touchpoint || '').toLowerCase()
       const last = String(l.last_touchpoint || '').toLowerCase()
       if (!raw) return 'Unknown'

@@ -193,6 +193,18 @@ export async function POST(
     // Done BEFORE the orchestrator so its fresh context re-read keeps the owner.
     await assignOwnerOnTouch(supabase, leadId, user)
 
+    // A phone call IS an interaction, and until now it did not count as one:
+    // last_interaction_at was only ever moved by the agent. Of fourteen leads
+    // called in a day, ten still read as untouched - which matters well beyond
+    // a report, because that column is what the leads list sorts by and what
+    // the pipeline queue uses to decide a lead has gone quiet. Someone phoned
+    // an hour ago looked ignored for days.
+    await supabase
+      .from('all_leads')
+      .update({ last_interaction_at: new Date().toISOString() })
+      .eq('id', leadId)
+      .then(undefined, (e: any) => console.error('[log-call] last_interaction_at update failed:', e?.message))
+
     // ── The follow-up: the actual pipeline ───────────────────────────────────
     // Most calls are nobody-picked-up, and what happens next is a promise to
     // ring back. That promise is the work queue, so it has to be stored as
