@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MdHelpOutline, MdEventAvailable, MdPhoneMissed, MdPhoneCallback,
   MdCheckCircleOutline, MdRefresh, MdInbox,
@@ -147,6 +147,7 @@ export default function PipelineQueue({
   const [data, setData] = useState<QueueData | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const listRef = useRef<HTMLDivElement | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -291,7 +292,12 @@ export default function PipelineQueue({
             return (
               <button
                 key={f.key}
-                onClick={() => setFilter(f.key)}
+                onClick={() => {
+                  setFilter(f.key)
+                  // Start the new filter at its own top. Keeping the old
+                  // offset lands you mid-list in a set you have not seen.
+                  if (listRef.current) listRef.current.scrollTop = 0
+                }}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border transition-colors"
                 style={{
                   borderColor: on ? `color-mix(in srgb, ${f.color} 55%, transparent)` : 'var(--border-primary)',
@@ -319,7 +325,13 @@ export default function PipelineQueue({
 
       {error && <div className="px-3.5 py-1.5 text-[11.5px]" style={{ color: '#ef4444' }}>{error}</div>}
 
-      <div className="overflow-y-auto" style={{ maxHeight: 560 }}>
+      {/* Fixed height, not a cap.
+          With maxHeight the box shrank to fit whatever the filter returned -
+          268 rows down to 3 - and everything below it jumped up the page. A
+          filter should change what is IN the list, never where the list is.
+          The scroll position resets too, so a new filter starts at its top
+          instead of halfway down where the last one was left. */}
+      <div ref={listRef} className="overflow-y-auto" style={{ height: 560 }}>
         {rows.length === 0 ? (
           <div className="px-3.5 py-6 flex flex-col items-center gap-1 text-center" style={{ borderTop: '1px solid var(--border-primary)' }}>
             <MdInbox size={20} style={{ color: 'var(--text-muted)' }} />
