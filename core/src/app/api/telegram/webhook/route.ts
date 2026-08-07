@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { sendTelegramMessage, tgEscape } from '@/lib/services/telegram'
-import { answerQuestion, HELP } from '@/lib/services/telegramAsk'
+import { answerQuestion } from '@/lib/services/telegramAsk'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,18 +37,9 @@ export function introMessage(names: string[] = []): string {
     '<b>What I post on my own</b>',
     'Three reports a day - 9am, 1pm and 8pm. New leads, where they came from, what they want, calls made, bookings and demos.',
     '',
-    '<b>What you can ask me</b>',
-    'Tag me and ask in plain words:',
-    '<code>@goproxe_bot how many leads today</code>',
-    '<code>@goproxe_bot leads from Instagram yesterday</code>',
-    '<code>@goproxe_bot cabin crew leads this week</code>',
-    '<code>@goproxe_bot how many calls today</code>',
-    '<code>@goproxe_bot how many booked today</code>',
-    '<code>@goproxe_bot demos taken</code>',
-    '',
-    '<b>Commands</b>',
-    '/report - post the current report now',
-    '/help - this list',
+    '<b>Ask me any time</b>',
+    '/report - the day so far, up to this second',
+    '/calls - calls logged today, and by whom',
     '',
     '<i>For your own call-back reminders, open the dashboard, Configure, Notifications, Connect Telegram. Those come to you privately, not here.</i>',
   ].join('\n')
@@ -87,38 +78,34 @@ export async function POST(request: NextRequest) {
 
     const start = text.match(/^\/start\s+([A-Z0-9]{6,16})$/i)
     if (!start) {
-      // Anything else addressed to the bot is a QUESTION. In a group, privacy
-      // mode means we only ever see commands and @mentions, so if it reached
-      // us it was meant for us - answering "I did not understand" is better
-      // than the silence that made people assume it was broken.
-      const botName = String(process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, '').toLowerCase()
-      const isGroup = msg?.chat?.type === 'group' || msg?.chat?.type === 'supergroup'
-      const mentioned = botName && text.toLowerCase().includes(`@${botName}`)
-      const isCommand = text.startsWith('/')
+      // TWO commands, and nothing else.
+      //
+      // Free-text questions were tried and dropped: @mentions did not reach
+      // the bot reliably under privacy mode, and a feature that answers
+      // sometimes is worse than one that is not offered. Commands always
+      // arrive, so commands are what exist. More can be added when one is
+      // actually wanted.
+      const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
 
-      if (!isGroup || mentioned || isCommand) {
-        // Strip the mention and any /command@bot wrapper before parsing.
-        const question = text
-          .replace(new RegExp(`@${botName}`, 'ig'), '')
-          .replace(/^\/(ask|report|leads|calls|today|help)(@\S+)?\s*/i, (m) => (/help/i.test(m) ? 'help ' : ''))
-          .trim()
-
-        if (/^\/?(report|today)\b/i.test(text)) {
-          await sendTelegramMessage(
-            'Pulling the report - it posts here in a moment.',
-            { chatId: String(chatId) },
-          )
-          // The brief route does the whole job, card and all.
-          const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
-          if (base) fetch(`${base}/api/cron/telegram-brief?kind=pulse`).catch(() => {})
-          return ok({ handled: 'report' })
-        }
-
-        const answer = await answerQuestion(question || 'help')
-        await sendTelegramMessage(answer || HELP, { chatId: String(chatId) })
-        return ok({ handled: 'answered' })
+      if (/^\/report(@\S+)?\b/i.test(text)) {
+        // Fire and forget - the brief route posts the card itself, and waiting
+        // on it here would risk Telegram retrying the whole update.
+        if (base) fetch(`${base}/api/cron/telegram-brief?kind=pulse`).catch(() => {})
+        return ok({ handled: 'report' })
       }
-      return ok({ handled: 'not for us' })
+
+      if (/^\/calls(@\S+)?\b/i.test(text)) {
+        const answer = await answerQuestion('how many calls today')
+        await sendTelegramMessage(answer || 'Could not read the calls just now.', { chatId: String(chatId) })
+        return ok({ handled: 'calls' })
+      }
+
+      if (/^\/(help|start)(@\S+)?\b/i.test(text)) {
+        await sendTelegramMessage(introMessage(), { chatId: String(chatId) })
+        return ok({ handled: 'help' })
+      }
+
+      return ok({ handled: 'not a command' })
     }
 
     const code = start[1].toUpperCase()
