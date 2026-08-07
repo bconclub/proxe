@@ -415,10 +415,10 @@ export async function GET(request: NextRequest) {
       // <blockquote> is the one real layout tool Telegram gives a bot: an
       // indented block with a coloured bar down the left, and unlike <pre> no
       // grey panel and no Copy button making a report look like code.
-      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${RULE}\n<blockquote>${want.join('\n')}</blockquote>`)
+      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${want.join('\n')}`)
 
       const src = block(newLeads, sourceOf, 6)
-      if (src) sections.push(`<b>SOURCES</b>\n${RULE}\n<blockquote>${src}</blockquote>`)
+      if (src) sections.push(`<b>SOURCES</b>\n${src}`)
     }
 
     // Everything the team did, under its own heading.
@@ -487,7 +487,7 @@ export async function GET(request: NextRequest) {
 
     ops.push(`Actual demos taken - <b>${demosToday || 0}</b>`)
 
-    let opsMsg = `<b>OPERATIONS</b>\n${RULE}\n<blockquote>${ops.join('\n')}</blockquote>`
+    let opsMsg = `<b>OPERATIONS</b>\n${ops.join('\n')}`
     if (APP_URL) {
       opsMsg += `\n\n${tgLink('Open dashboard', `${APP_URL}/dashboard`)}`
     }
