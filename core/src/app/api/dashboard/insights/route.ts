@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { subDays, format, parseISO } from 'date-fns'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,20 +22,24 @@ export async function GET(request: NextRequest) {
     const startDate = subDays(endDate, days)
 
     // Get all leads
-    const { data: leads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('*')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
+    const { data: leads, error: leadsError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('*')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+    )
 
     if (leadsError) throw leadsError
 
     // Get all messages for conversations
-    const { data: messages, error: messagesError } = await supabase
-      .from('conversations')
-      .select('created_at, lead_id, channel')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
+    const { data: messages, error: messagesError } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('created_at, lead_id, channel')
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+    )
 
     if (messagesError) throw messagesError
 
@@ -124,13 +129,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Average Response Time from real metadata.input_to_output_gap_ms
-    const { data: agentMsgs } = await supabase
-      .from('conversations')
-      .select('created_at, metadata')
-      .eq('sender', 'agent')
-      .not('metadata->input_to_output_gap_ms', 'is', null)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
+    const { data: agentMsgs } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('created_at, metadata')
+        .eq('sender', 'agent')
+        .not('metadata->input_to_output_gap_ms', 'is', null)
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
+    )
 
     const responseByDate = new Map<string, { total: number; count: number }>()
     agentMsgs?.forEach((msg) => {

@@ -51,6 +51,20 @@ export async function resolveWorkspaceBrands(): Promise<string[] | null> {
  * plain equality index on `brand`; `.in` with one element does not always plan
  * the same way.
  */
+/**
+ * scopeToWorkspace with the brand lookup folded in, so a query can be scoped by
+ * wrapping it and nothing else — no extra local, no reordering around the auth
+ * gate. That matters at the scale this is applied: ~50 routes, several query
+ * sites each, and every hand-placed `const ws = await …` is somewhere the
+ * declaration can end up in the wrong function (which is exactly the mistake
+ * that already happened once here).
+ *
+ * cookies() is a request-scoped read, so calling this per query is cheap.
+ */
+export async function scopedQuery<T>(query: T, column = 'brand'): Promise<T> {
+  return scopeToWorkspace(query, await resolveWorkspaceBrands(), column)
+}
+
 export function scopeToWorkspace<T>(query: T, brands: string[] | null, column = 'brand'): T {
   if (!brands?.length) return query
   // Unconstrained T plus an internal cast, deliberately. Constraining T to

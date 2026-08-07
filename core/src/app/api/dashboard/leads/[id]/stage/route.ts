@@ -3,6 +3,7 @@ import { LEAD_STAGE_VALUES } from '@/configs/lead-stages'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
+import { scopedQuery } from '@/lib/server/workspace'
 
 // Allowed lead stages
 // The canonical list lives in @/configs/lead-stages - the API accepts exactly
@@ -57,11 +58,13 @@ export async function PATCH(
     }
 
     // Get current lead state
-    const { data: currentLead, error: fetchError } = await supabase
-      .from('all_leads')
-      .select('lead_stage, sub_stage, lead_score, stage_override')
-      .eq('id', leadId)
-      .single()
+    const { data: currentLead, error: fetchError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('lead_stage, sub_stage, lead_score, stage_override')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (fetchError || !currentLead) {
       return NextResponse.json(
@@ -89,12 +92,14 @@ export async function PATCH(
       updateData.sub_stage = null
     }
 
-    const { data: updatedLead, error: updateError } = await supabase
-      .from('all_leads')
-      .update(updateData)
-      .eq('id', leadId)
-      .select()
-      .single()
+    const { data: updatedLead, error: updateError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update(updateData)
+        .eq('id', leadId)
+        .select()
+        .single()
+    )
 
     if (updateError) {
       console.error('Error updating lead stage:', updateError)

@@ -11,6 +11,7 @@ import {
 } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 import { renderWaTemplate } from '@/configs/whatsapp-template-bodies'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,12 +115,14 @@ export async function POST(request: NextRequest) {
     if (urgency) brandCtx.urgency = urgency
 
     // ── Dedup by (phone, brand) ───────────────────────────────────────────────
-    const { data: existing } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, email, unified_context')
-      .eq('customer_phone_normalized', normalizedPhone)
-      .eq('brand', brand)
-      .maybeSingle()
+    const { data: existing } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, email, unified_context')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .eq('brand', brand)
+        .maybeSingle()
+    )
 
     let leadId: string
     let isNew = false
@@ -186,12 +189,14 @@ export async function POST(request: NextRequest) {
       if (insErr || !created) {
         // Lost a race to a concurrent insert - fall back to the existing row.
         if (insErr?.code === '23505' || insErr?.message?.includes('duplicate')) {
-          const { data: dup } = await supabase
-            .from('all_leads')
-            .select('id')
-            .eq('customer_phone_normalized', normalizedPhone)
-            .eq('brand', brand)
-            .maybeSingle()
+          const { data: dup } = await scopedQuery(
+            supabase
+              .from('all_leads')
+              .select('id')
+              .eq('customer_phone_normalized', normalizedPhone)
+              .eq('brand', brand)
+              .maybeSingle()
+          )
           if (dup) {
             leadId = dup.id
           } else {

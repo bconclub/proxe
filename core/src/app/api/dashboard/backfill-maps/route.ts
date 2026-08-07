@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
 import { resolveMapsLink } from '@/lib/services/mapsResolver'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -26,11 +27,13 @@ export async function POST(request: NextRequest) {
   if (!supabase) return NextResponse.json({ error: 'No DB' }, { status: 500 })
   const dry = request.nextUrl.searchParams.get('dry') === '1'
 
-  const { data: leads, error } = await supabase
-    .from('all_leads')
-    .select('id, customer_name, unified_context')
-    .order('last_interaction_at', { ascending: false })
-    .limit(300)
+  const { data: leads, error } = await scopedQuery(
+    supabase
+      .from('all_leads')
+      .select('id, customer_name, unified_context')
+      .order('last_interaction_at', { ascending: false })
+      .limit(300)
+  )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const results: any[] = []

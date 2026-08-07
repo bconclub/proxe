@@ -4,6 +4,7 @@ import { getServiceClient } from '@/lib/services'
 import { generateResponse } from '@/lib/agent-core'
 import { BRAND_ID, getBrandConfig } from '@/configs'
 import { buildLeadIndex, id8, parseActionsTrailer, validateActions, actionsPromptSpec } from '@/lib/brain/actions'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -162,8 +163,10 @@ export async function POST(request: NextRequest) {
     const now = Date.now()
 
     // ── Gather leads (aggregate in-process) ──────────────────────────────────
-    const { data: leads } = await supabase
-      .from('all_leads')
+    const { data: leads } = await scopedQuery(
+      supabase
+        .from('all_leads')
+    )
       // POP campaign columns (022/026) exist only for pop - append conditionally
       // so other brands' schemas don't error on the select.
       .select('id, customer_name, phone, lead_score, lead_stage, first_touchpoint, last_touchpoint, created_at, last_interaction_at, unified_context'
@@ -250,10 +253,12 @@ export async function POST(request: NextRequest) {
     }))
 
     // ── Conversations today (count) ──────────────────────────────────────────
-    const { count: convToday } = await supabase
-      .from('conversations')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', new Date(istMidnight).toISOString())
+    const { count: convToday } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', new Date(istMidnight).toISOString())
+    )
 
     const intensity_ladder: Record<string, number> = {}
     TIER_LABELS.forEach((lbl, i) => { intensity_ladder[lbl] = tierCounts[i] })

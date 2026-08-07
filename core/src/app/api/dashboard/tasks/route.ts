@@ -4,6 +4,7 @@ import { getServiceClient, getClient } from '@/lib/services'
 import { TEMPLATE_BODIES, resolveTaskTemplate, fillTemplateWithChips, buildNudgePreview } from '@/configs/template-bodies'
 import { resolveLeadFacts } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,10 +172,12 @@ export async function GET(request: NextRequest) {
     const factIds = Array.from(new Set(allTasks.map((t: any) => t.lead_id).filter(Boolean))).slice(0, 200)
     const factsByLead = new Map<string, ReturnType<typeof resolveLeadFacts>>()
     if (factIds.length) {
-      const { data: factLeads } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, unified_context')
-        .in('id', factIds)
+      const { data: factLeads } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, unified_context')
+          .in('id', factIds)
+      )
       for (const l of factLeads || []) factsByLead.set((l as any).id, resolveLeadFacts(l as any))
     }
 

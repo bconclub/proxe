@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,12 +30,14 @@ export async function GET(
     const activities: any[] = []
 
     // 1. PROXe actions: messages sent, sequences triggered (from conversations table where sender='agent')
-    const { data: proxeMessages, error: proxeError } = await supabase
-      .from('conversations')
-      .select('id, content, created_at, channel, sender, metadata')
-      .eq('lead_id', leadId)
-      .eq('sender', 'agent')
-      .order('created_at', { ascending: false })
+    const { data: proxeMessages, error: proxeError } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('id, content, created_at, channel, sender, metadata')
+        .eq('lead_id', leadId)
+        .eq('sender', 'agent')
+        .order('created_at', { ascending: false })
+    )
 
     if (!proxeError && proxeMessages) {
       for (const msg of proxeMessages) {
@@ -53,11 +56,13 @@ export async function GET(
     }
 
     // Check for sequences triggered (from metadata or unified_context)
-    const { data: lead } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', leadId)
-      .single()
+    const { data: lead } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', leadId)
+        .single()
+    )
 
     if (lead?.unified_context?.sequence) {
       activities.push({
@@ -118,12 +123,14 @@ export async function GET(
     }
 
     // 3. Customer actions: replies, link clicks, bookings (from conversations where sender='customer')
-    const { data: customerMessages, error: customerError } = await supabase
-      .from('conversations')
-      .select('id, content, created_at, channel, sender, metadata')
-      .eq('lead_id', leadId)
-      .eq('sender', 'customer')
-      .order('created_at', { ascending: false })
+    const { data: customerMessages, error: customerError } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('id, content, created_at, channel, sender, metadata')
+        .eq('lead_id', leadId)
+        .eq('sender', 'customer')
+        .order('created_at', { ascending: false })
+    )
 
     if (!customerError && customerMessages) {
       for (const msg of customerMessages) {
@@ -142,12 +149,14 @@ export async function GET(
     }
 
     // Check for bookings
-    const { data: webSession } = await supabase
-      .from('web_sessions')
-      .select('booking_date, booking_time, booking_status, booking_created_at')
-      .eq('lead_id', leadId)
-      .not('booking_date', 'is', null)
-      .single()
+    const { data: webSession } = await scopedQuery(
+      supabase
+        .from('web_sessions')
+        .select('booking_date, booking_time, booking_status, booking_created_at')
+        .eq('lead_id', leadId)
+        .not('booking_date', 'is', null)
+        .single()
+    )
 
     if (webSession?.booking_date) {
       activities.push({

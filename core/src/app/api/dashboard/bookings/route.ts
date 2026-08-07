@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,9 +56,11 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
 
     // Fetch ALL leads (we need to check unified_context + session tables too)
-    const { data: allLeads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('*')
+    const { data: allLeads, error: leadsError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('*')
+    )
 
     if (leadsError) throw leadsError
 

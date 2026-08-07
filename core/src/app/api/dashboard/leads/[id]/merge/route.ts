@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,10 +70,12 @@ export async function POST(
     }
 
     // Fetch both leads
-    const { data: leads, error: fetchErr } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, email, phone, lead_score, created_at, unified_context')
-      .in('id', [leadAId, leadBId])
+    const { data: leads, error: fetchErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, email, phone, lead_score, created_at, unified_context')
+        .in('id', [leadAId, leadBId])
+    )
     if (fetchErr || !leads || leads.length !== 2) {
       return NextResponse.json(
         { error: 'Could not fetch both leads', detail: fetchErr?.message },
@@ -151,10 +154,12 @@ export async function POST(
     }
 
     // Update the winner's unified_context with the merged_from entry.
-    const { error: updateErr } = await supabase
-      .from('all_leads')
-      .update({ unified_context: mergedCtx })
-      .eq('id', winner.id)
+    const { error: updateErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update({ unified_context: mergedCtx })
+        .eq('id', winner.id)
+    )
     if (updateErr) {
       console.error('[merge] Failed updating winner context:', updateErr.message)
       // Soft-fail: data is already moved, just the audit trail couldn't write.
@@ -163,10 +168,12 @@ export async function POST(
     }
 
     // ── Delete the loser ───────────────────────────────────────────────
-    const { error: deleteErr } = await supabase
-      .from('all_leads')
-      .delete()
-      .eq('id', loser.id)
+    const { error: deleteErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .delete()
+        .eq('id', loser.id)
+    )
     if (deleteErr) {
       console.error('[merge] Failed deleting loser:', deleteErr.message)
       return NextResponse.json(

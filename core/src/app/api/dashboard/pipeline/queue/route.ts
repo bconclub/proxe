@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,10 +122,12 @@ export async function GET(request: NextRequest) {
     const followupLeadIds = Array.from(new Set(followupRows.map((r) => r.lead_id).filter(Boolean)))
     const leadsById = new Map<string, any>()
     if (followupLeadIds.length) {
-      const { data: fLeads } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, phone, lead_stage, owner_id, created_at')
-        .in('id', followupLeadIds)
+      const { data: fLeads } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, phone, lead_stage, owner_id, created_at')
+          .in('id', followupLeadIds)
+      )
       for (const l of fLeads || []) leadsById.set(l.id, l)
     }
 
