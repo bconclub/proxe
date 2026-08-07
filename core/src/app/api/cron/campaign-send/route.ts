@@ -27,11 +27,22 @@ export const maxDuration = 60
 
 const PER_MINUTE = 2
 const CRON_MINUTES = 10
-/** Ceiling per run, so one invocation can't drain the list if a cron misfires. */
+/** Ceiling per run. The CRON INTERVAL is what paces the campaign, not a sleep
+ *  inside the function: at 2/min over a 10-minute gap this is the whole budget. */
 const MAX_PER_RUN = PER_MINUTE * CRON_MINUTES
 
-/** Pace inside a run: the gap that makes PER_MINUTE true. */
-const GAP_MS = Math.floor(60_000 / PER_MINUTE)
+/**
+ * Gap between sends INSIDE one run. Deliberately small.
+ *
+ * This was 30s - 60s/PER_MINUTE - which made a full batch need ten minutes
+ * while the function is killed at sixty seconds. Each run managed two sends
+ * before dying, so 154 messages took twelve hours instead of one, and the
+ * counter update at the end of the loop was never reached.
+ *
+ * The rate is the cron's job. Twenty sends spaced a second apart finish in
+ * twenty seconds, and the next run is ten minutes later: still 2/minute.
+ */
+const GAP_MS = 1_000
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -153,21 +164,66 @@ export async function GET(request: NextRequest) {
 
       let ok = false
       let err = ''
+      let msgId: string | null = null
       try {
         const res = await sendWhatsAppTemplate(phone, tpl.name, componentsFor(lead.customer_name) as any)
         ok = res.success
         err = res.error || ''
+        msgId = (res as any).messageId || null
       } catch (e: any) {
         err = e?.message || 'send failed'
       }
 
       await supabase
         .from('campaign_sends')
-        .update({ status: ok ? 'sent' : 'failed', error: ok ? null : err.slice(0, 300) })
+        .update({
+          status: ok ? 'sent' : 'failed',
+          error: ok ? null : err.slice(0, 300),
+          message_id: msgId,
+        })
         .eq('campaign_id', campaign.id)
         .eq('lead_id', lead.id)
 
+      // Log it as a conversation too. Not bookkeeping for its own sake: the
+      // delivery webhook finds a message by metadata.wa_message_id and stamps
+      // delivered/read onto that row, and the campaigns report reads those
+      // stamps. Without this the send is invisible to both - which is why a
+      // campaign that reached 154 people showed "0 sent, 0 campaigns".
+      if (ok) {
+        await supabase.from('conversations').insert({
+          lead_id: lead.id,
+          channel: 'whatsapp',
+          sender: 'agent',
+          content: String(tpl.body || `Campaign: ${campaign.name}`).slice(0, 2000),
+          message_type: 'template',
+          metadata: {
+            template_name: tpl.name,
+            template_language: 'en',
+            wa_message_id: msgId,
+            delivery_status: 'sent',
+            auto_sent: true,
+            trigger: 'campaign',
+            campaign: campaign.id,
+            campaign_name: campaign.name,
+            sent_by: 'system (campaign)',
+          },
+        })
+      }
+
       if (ok) { sent++; consecutiveFailures = 0 } else { failed++; consecutiveFailures++ }
+
+      // Counters go up AS WE GO, not at the end. A run that dies partway
+      // through - a timeout, a cold-start kill - must still leave behind a
+      // truthful count, or the campaign reads "not sent yet" while a hundred
+      // people have the message.
+      await supabase
+        .from('campaigns')
+        .update({
+          sent_count: (campaign.sent_count || 0) + sent,
+          failed_count: (campaign.failed_count || 0) + failed,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campaign.id)
 
       // Something systemic is wrong - a dead token, a paused number, a template
       // pulled from under us. Stop and leave the rest of the list intact.
