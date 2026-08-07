@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { sendTelegramMessage, tgEscape } from '@/lib/services/telegram'
+import { answerQuestion, HELP } from '@/lib/services/telegramAsk'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,34 @@ function ok(body: Record<string, unknown> = {}) {
   return NextResponse.json({ ok: true, ...body })
 }
 
+/** What PROXe says when someone new arrives, or when asked what it does. */
+export function introMessage(names: string[] = []): string {
+  const hello = names.length ? `Welcome ${names.join(', ')}.` : 'Hello.'
+  return [
+    `👋 <b>${hello}</b>`,
+    '',
+    "I'm PROXe. I watch the leads for WindChasers and post here so nobody has to go looking.",
+    '',
+    '<b>What I post on my own</b>',
+    'Three reports a day - 9am, 1pm and 8pm. New leads, where they came from, what they want, calls made, bookings and demos.',
+    '',
+    '<b>What you can ask me</b>',
+    'Tag me and ask in plain words:',
+    '<code>@goproxe_bot how many leads today</code>',
+    '<code>@goproxe_bot leads from Instagram yesterday</code>',
+    '<code>@goproxe_bot cabin crew leads this week</code>',
+    '<code>@goproxe_bot how many calls today</code>',
+    '<code>@goproxe_bot how many booked today</code>',
+    '<code>@goproxe_bot demos taken</code>',
+    '',
+    '<b>Commands</b>',
+    '/report - post the current report now',
+    '/help - this list',
+    '',
+    '<i>For your own call-back reminders, open the dashboard, Configure, Notifications, Connect Telegram. Those come to you privately, not here.</i>',
+  ].join('\n')
+}
+
 export async function POST(request: NextRequest) {
   try {
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -36,21 +65,60 @@ export async function POST(request: NextRequest) {
     const update = await request.json().catch(() => null)
     const msg = update?.message || update?.edited_message
     const chatId = msg?.chat?.id
+    if (!chatId) return ok({ ignored: 'no chat' })
+
+    // Someone joined the group. Introduce yourself once, to the room - a bot
+    // that sits silent until spoken to is a bot nobody knows how to speak to.
+    if (Array.isArray(msg?.new_chat_members) && msg.new_chat_members.length) {
+      const joined = msg.new_chat_members
+        .filter((m: any) => !m.is_bot)
+        .map((m: any) => tgEscape(m.first_name || 'there'))
+      if (joined.length) {
+        await sendTelegramMessage(introMessage(joined), { chatId: String(chatId) })
+      }
+      return ok({ handled: 'welcome' })
+    }
+
     const text = String(msg?.text || '').trim()
-    if (!chatId || !text) return ok({ ignored: 'no message' })
+    if (!text) return ok({ ignored: 'no text' })
 
     const supabase: any = getServiceClient()
     if (!supabase) return ok({ ignored: 'no service client' })
 
     const start = text.match(/^\/start\s+([A-Z0-9]{6,16})$/i)
     if (!start) {
-      if (/^\/start\b/.test(text)) {
-        await sendTelegramMessage(
-          'Hi. To connect this chat to your PROXe account, open the dashboard, go to Configure and tap "Connect Telegram". That gives you a link to tap.',
-          { chatId: String(chatId) },
-        )
+      // Anything else addressed to the bot is a QUESTION. In a group, privacy
+      // mode means we only ever see commands and @mentions, so if it reached
+      // us it was meant for us - answering "I did not understand" is better
+      // than the silence that made people assume it was broken.
+      const botName = String(process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, '').toLowerCase()
+      const isGroup = msg?.chat?.type === 'group' || msg?.chat?.type === 'supergroup'
+      const mentioned = botName && text.toLowerCase().includes(`@${botName}`)
+      const isCommand = text.startsWith('/')
+
+      if (!isGroup || mentioned || isCommand) {
+        // Strip the mention and any /command@bot wrapper before parsing.
+        const question = text
+          .replace(new RegExp(`@${botName}`, 'ig'), '')
+          .replace(/^\/(ask|report|leads|calls|today|help)(@\S+)?\s*/i, (m) => (/help/i.test(m) ? 'help ' : ''))
+          .trim()
+
+        if (/^\/?(report|today)\b/i.test(text)) {
+          await sendTelegramMessage(
+            'Pulling the report - it posts here in a moment.',
+            { chatId: String(chatId) },
+          )
+          // The brief route does the whole job, card and all.
+          const base = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '')
+          if (base) fetch(`${base}/api/cron/telegram-brief?kind=pulse`).catch(() => {})
+          return ok({ handled: 'report' })
+        }
+
+        const answer = await answerQuestion(question || 'help')
+        await sendTelegramMessage(answer || HELP, { chatId: String(chatId) })
+        return ok({ handled: 'answered' })
       }
-      return ok({ handled: 'no code' })
+      return ok({ handled: 'not for us' })
     }
 
     const code = start[1].toUpperCase()
