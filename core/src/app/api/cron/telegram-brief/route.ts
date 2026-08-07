@@ -224,6 +224,14 @@ export async function GET(request: NextRequest) {
       kind === 'morning'
         ? `Since 8pm yesterday`
         : 'Today so far'
+    // FOUR messages, not one wall.
+    //
+    // Header, categories, sources and operations in a single message is
+    // unreadable on a phone: by the time you reach the calls you have lost the
+    // headline. Telegram has no tables, and its only monospace is a code block
+    // - grey panel, Copy button, reads like something to run - so the
+    // structure has to come from the messages themselves. One heading each.
+    const sections: string[] = []
     lines.push(heading)
     lines.push(`<i>${windowNote} · ${tgEscape(brand)}</i>`)
     lines.push('')
@@ -351,6 +359,11 @@ export async function GET(request: NextRequest) {
     }
 
     lines.push(`<b>${newLeads.length} new lead${newLeads.length === 1 ? '' : 's'}</b>`)
+    // Header + headline is message one, and stands alone: the number is the
+    // thing most people read and nothing else.
+    sections.push(lines.join('\n'))
+    lines.length = 0
+
     if (newLeads.length) {
       // WHAT they want comes first. It is the question anyone opening this
       // actually has - what kind of work arrived. Where it came from matters
@@ -369,22 +382,23 @@ export async function GET(request: NextRequest) {
         if (cat.onlineReg) want.push(`     registered <b>${cat.onlineReg}</b>`)
         if (cat.onlineInterested) want.push(`     interested <b>${cat.onlineInterested}</b>`)
       }
-      if (want.length) { lines.push(''); lines.push(want.join('\n')) }
+      if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${want.join('\n')}`)
 
       const src = block(newLeads, sourceOf, 6)
-      if (src) { lines.push(''); lines.push(src) }
+      if (src) sections.push(`<b>SOURCES</b>\n${src}`)
     }
+
+    // Everything the team did, under its own heading.
+    lines.push('<b>OPERATIONS</b>')
 
     // Morning has no touched count. The window is 8pm to 9am - nobody was
     // working, so any number here is the agent's overnight replies, and
     // reading it as team activity flatters a night when nothing happened.
     if (kind !== 'morning') {
-      lines.push('')
-      lines.push(`${touched.length} touched today`)
+      lines.push(`  Leads touched <b>${touched.length}</b>`)
     }
 
-    lines.push('')
-    lines.push(`<b>${calls.length} call${calls.length === 1 ? '' : 's'}</b>`)
+    lines.push(`  Calls logged <b>${calls.length}</b>`)
     if (calls.length) {
       // Who did the calling. created_by is a user id on this schema, so it has
       // to be resolved to a name or the line reads as a row of UUIDs.
@@ -406,7 +420,7 @@ export async function GET(request: NextRequest) {
       }
       const rows = Array.from(byUser.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6)
       if (rows.length) {
-        lines.push(rows.map(([id, n]) => `  ${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`).join('\n'))
+        lines.push(rows.map(([id, n]) => `     ${tgEscape(nameById.get(id) || 'Someone')} <b>${n}</b>`).join('\n'))
       }
     }
 
@@ -423,8 +437,7 @@ export async function GET(request: NextRequest) {
 
     // Just the number. Who and when is the dashboard's job - the report only
     // has to tell you whether the day is busy.
-    lines.push('')
-    lines.push(`<b>${upcoming.length} call${upcoming.length === 1 ? '' : 's'} booked today</b>`)
+    lines.push(`  Calls booked today <b>${upcoming.length}</b>`)
 
     // Demos actually TAKEN today. Booked is a plan; taken is the outcome, and
     // only a human answering "did it happen" moves a lead there - which is why
@@ -435,14 +448,17 @@ export async function GET(request: NextRequest) {
       .in('new_stage', ['Demo Taken', 'Demo Done', 'Call Done'])
       .gte('created_at', todayStart.toISOString())
 
-    lines.push(`<b>${demosToday || 0} demo${demosToday === 1 ? '' : 's'} taken today</b>`)
+    lines.push(`  Demos taken today <b>${demosToday || 0}</b>`)
 
     if (APP_URL) {
       lines.push('')
       lines.push(tgLink('Open dashboard', `${APP_URL}/dashboard`))
     }
 
-    const html = lines.join('\n')
+    sections.push(lines.join('\n'))
+    // The dry run still returns ONE string so the whole report can be read at
+    // a glance; the separator marks where each message breaks.
+    const html = sections.join('\n\n———\n\n')
 
     if (dryRun) {
       return NextResponse.json({
@@ -467,9 +483,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, skipped: 'quiet hour', kind })
     }
 
-    const sent = await sendTelegramMessage(html)
+    // One message per section, in order. A short gap keeps them in sequence -
+    // Telegram does not guarantee ordering for messages fired at once, and a
+    // report whose SOURCES arrive above its headline is worse than the wall
+    // this replaced.
+    let ok = true
+    let firstError = ''
+    for (const part of sections) {
+      const r = await sendTelegramMessage(part, { disablePreview: true })
+      if (!r.success) { ok = false; firstError = firstError || (r.error || 'send failed') }
+      await new Promise((res) => setTimeout(res, 350))
+    }
+    const sent = { success: ok, error: firstError || undefined }
     return NextResponse.json({
       success: sent.success,
+      messages: sections.length,
       kind,
       brand: BRAND_ID,
       counts: {
