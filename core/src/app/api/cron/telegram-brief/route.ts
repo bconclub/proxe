@@ -214,10 +214,10 @@ export async function GET(request: NextRequest) {
     const lines: string[] = []
     const heading =
       kind === 'morning'
-        ? `☀️ <b>MORNING</b> · ${tgEscape(istDateLabel(now))}`
+        ? `☀️ <b>MORNING REPORT</b>`
         : kind === 'evening'
-          ? `🌆 <b>EVENING</b> · ${tgEscape(istDateLabel(now))}`
-          : `🕛 <b>MIDDAY</b> · ${tgEscape(istDateLabel(now))}`
+          ? `🌆 <b>EVENING REPORT</b>`
+          : `🕛 <b>MIDDAY REPORT</b>`
     // Say which stretch of time this covers. Without it every report is just
     // "some leads came in" and two of them look identical.
     const windowNote =
@@ -376,18 +376,18 @@ export async function GET(request: NextRequest) {
       // actually has - what kind of work arrived. Where it came from matters
       // to whoever buys the ads, and can wait a few lines.
       const want: string[] = []
-      if (cat.pilot) want.push(`  Pilot / DGCA <b>${cat.pilot}</b>`)
-      if (cat.cabin) want.push(`  Cabin Crew <b>${cat.cabin}</b>`)
+      if (cat.pilot) want.push(`Pilot / DGCA - <b>${cat.pilot}</b>`)
+      if (cat.cabin) want.push(`Cabin Crew - <b>${cat.cabin}</b>`)
       if (cat.offline) {
-        want.push(`  Offline event <b>${cat.offline}</b>`)
-        if (cat.offlineReg) want.push(`     registered <b>${cat.offlineReg}</b>`)
-        if (cat.offlineInterested) want.push(`     interested <b>${cat.offlineInterested}</b>`)
-        if (cat.offlineScholarship) want.push(`     scholarship <b>${cat.offlineScholarship}</b>`)
+        want.push(`Offline event - <b>${cat.offline}</b>`)
+        if (cat.offlineReg) want.push(`   registered - <b>${cat.offlineReg}</b>`)
+        if (cat.offlineInterested) want.push(`   interested - <b>${cat.offlineInterested}</b>`)
+        if (cat.offlineScholarship) want.push(`   scholarship - <b>${cat.offlineScholarship}</b>`)
       }
       if (cat.online) {
-        want.push(`  Online event <b>${cat.online}</b>`)
-        if (cat.onlineReg) want.push(`     registered <b>${cat.onlineReg}</b>`)
-        if (cat.onlineInterested) want.push(`     interested <b>${cat.onlineInterested}</b>`)
+        want.push(`Online event - <b>${cat.online}</b>`)
+        if (cat.onlineReg) want.push(`   registered - <b>${cat.onlineReg}</b>`)
+        if (cat.onlineInterested) want.push(`   interested - <b>${cat.onlineInterested}</b>`)
       }
       if (want.length) sections.push(`<b>LEAD CATEGORIES</b>\n${want.join('\n')}`)
 
@@ -396,16 +396,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Everything the team did, under its own heading.
-    lines.push('<b>OPERATIONS</b>')
+    const ops: string[] = []
 
     // Morning has no touched count. The window is 8pm to 9am - nobody was
     // working, so any number here is the agent's overnight replies, and
     // reading it as team activity flatters a night when nothing happened.
     if (kind !== 'morning') {
-      lines.push(`  Leads touched <b>${touched.length}</b>`)
+      ops.push(`Leads touched - <b>${touched.length}</b>`)
     }
 
-    lines.push(`  Calls logged <b>${calls.length}</b>`)
+    ops.push(`Calls logged - <b>${calls.length}</b>`)
     if (calls.length) {
       // Who did the calling. created_by is a user id on this schema, so it has
       // to be resolved to a name or the line reads as a row of UUIDs.
@@ -444,7 +444,7 @@ export async function GET(request: NextRequest) {
 
     // Just the number. Who and when is the dashboard's job - the report only
     // has to tell you whether the day is busy.
-    lines.push(`  Calls booked today <b>${upcoming.length}</b>`)
+    ops.push(`Calls booked today - <b>${upcoming.length}</b>`)
 
     // Demos actually TAKEN today. Booked is a plan; taken is the outcome, and
     // only a human answering "did it happen" moves a lead there - which is why
@@ -455,7 +455,7 @@ export async function GET(request: NextRequest) {
       .in('new_stage', ['Demo Taken', 'Demo Done', 'Call Done'])
       .gte('created_at', todayStart.toISOString())
 
-    lines.push(`  Demos taken today <b>${demosToday || 0}</b>`)
+    ops.push(`Demos taken today - <b>${demosToday || 0}</b>`)
 
     if (APP_URL) {
       lines.push('')
