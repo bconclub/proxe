@@ -41,6 +41,14 @@ export function introMessage(names: string[] = []): string {
     '/report - the day so far, up to this second',
     '/calls - calls logged today, and by whom',
     '',
+    '<b>Or ask in your own words</b>',
+    'Use /ask, or just reply to any message of mine:',
+    '<code>/ask how many leads today</code>',
+    '<code>/ask leads from Instagram yesterday</code>',
+    '<code>/ask cabin crew leads this week</code>',
+    '<code>/ask how many booked today</code>',
+    '<code>/ask demos taken</code>',
+    '',
     '<i>For your own call-back reminders, open the dashboard, Configure, Notifications, Connect Telegram. Those come to you privately, not here.</i>',
   ].join('\n')
 }
@@ -103,6 +111,30 @@ export async function POST(request: NextRequest) {
       if (/^\/(help|start)(@\S+)?\b/i.test(text)) {
         await sendTelegramMessage(introMessage(), { chatId: String(chatId) })
         return ok({ handled: 'help' })
+      }
+
+      // Free-text questions, by every route that actually reaches a bot in a
+      // group under privacy mode:
+      //   /ask ...          a command, so it always arrives
+      //   a REPLY to PROXe  replies to the bot are always delivered
+      //   @mention          delivered on most clients, not all - hence the
+      //                     other two, which do not depend on it
+      const botName = String(process.env.TELEGRAM_BOT_USERNAME || '').replace(/^@/, '').toLowerCase()
+      const isAsk = /^\/ask(@\S+)?\b/i.test(text)
+      const isReplyToBot = msg?.reply_to_message?.from?.is_bot === true
+      const isMention = !!botName && text.toLowerCase().includes(`@${botName}`)
+      const isPrivate = msg?.chat?.type === 'private'
+
+      if (isAsk || isReplyToBot || isMention || isPrivate) {
+        const question = text
+          .replace(/^\/ask(@\S+)?\s*/i, '')
+          .replace(new RegExp(`@${botName}`, 'ig'), '')
+          .trim()
+        const answer = await answerQuestion(question || 'help')
+        await sendTelegramMessage(answer || 'Ask me about leads, calls, bookings or demos.', {
+          chatId: String(chatId),
+        })
+        return ok({ handled: 'asked' })
       }
 
       return ok({ handled: 'not a command' })
