@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient } from '@/lib/services'
 import { sendTelegramMessage, telegramConfigured, tgEscape, tgLink } from '@/lib/services/telegram'
 import { BRAND_ID, getBrandConfig } from '@/configs'
-import { getOfflineEvent } from '@/configs/offline-events'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -102,19 +101,19 @@ export async function GET(request: NextRequest) {
   const yesterdayStart = new Date(todayStart.getTime() - 86_400_000)
 
   // The window each brief reports on.
-  //   morning - all of yesterday
+  //   morning - since 8pm last night, the stretch nobody was watching
   //   evening - today so far
-  //   pulse   - since the top of the previous hour, which is where the previous
-  //             pulse fired. Fixed boundaries mean two pulses can never
-  //             double-count or leave a gap, which a "last 60 minutes from now"
-  //             window would do the moment a cron fires late.
+  //   pulse   - 1pm, today from midnight
+
+
+
   let windowStart: Date
   let windowEnd: Date
   if (kind === 'morning') {
     // Since last night's brief, not "all of yesterday". The evening report
     // already covered the working day; what the morning has to answer is what
     // arrived while nobody was watching.
-    windowStart = new Date(yesterdayStart.getTime() + 19 * 3_600_000)
+    windowStart = new Date(yesterdayStart.getTime() + 20 * 3_600_000)
     windowEnd = now
   } else if (kind === 'evening') {
     windowStart = todayStart
@@ -146,7 +145,10 @@ export async function GET(request: NextRequest) {
                  wc_type:unified_context->${BRAND_ID}->>lead_type,
                  wc_course:unified_context->${BRAND_ID}->>course_interest,
                  wc_event:unified_context->${BRAND_ID}->>offline_event_key,
-                 wc_intent:unified_context->${BRAND_ID}->>offline_event_intent`)
+                 wc_intent:unified_context->${BRAND_ID}->>offline_event_intent,
+                 wc_ev_reg:unified_context->${BRAND_ID}->>offline_event_registered_at,
+                 wc_zoom:unified_context->${BRAND_ID}->>zoom_registered,
+                 wc_web_reg:unified_context->${BRAND_ID}->>webinar_registered_at`)
         .gte('created_at', windowStart.toISOString())
         .lt('created_at', windowEnd.toISOString())
         .order('created_at', { ascending: false }),
@@ -218,7 +220,7 @@ export async function GET(request: NextRequest) {
     // "some leads came in" and two of them look identical.
     const windowNote =
       kind === 'morning'
-        ? `Since ${tgEscape(istTimeLabel(windowStart))} yesterday`
+        ? `Since 8pm yesterday`
         : 'Today so far'
     lines.push(heading)
     lines.push(`<i>${windowNote} · ${tgEscape(brand)}</i>`)
@@ -276,40 +278,83 @@ export async function GET(request: NextRequest) {
       return clean.charAt(0).toUpperCase() + clean.slice(1)
     }
 
-    // WHAT they came for is the line worth reading. "39 leads" is a number;
-    // "12 Wings of Freedom, 9 pilot, 4 cabin crew" is something you can staff
-    // and follow up against.
-    //
-    // An event lead is named by its EVENT, not the generic word - two events
-    // running at once are different work, and "Event 12" hides which.
-    const wantOf = (l: any) => {
+    /**
+     * What the leads came for, as CATEGORIES.
+     *
+     * Not event names: "Wings of Freedom" means nothing to read in six months
+     * and changes every campaign. "Offline event" is the shape of the work,
+     * and the registry still holds which one for anyone who opens the
+     * dashboard. A specific event only earns its name when it needs one.
+     *
+     * Unknowns are not their own line - they are already inside the total, and
+     * "18 didn't say" as the biggest row buries the rows that matter.
+     */
+    const courseOf = (l: any): 'pilot' | 'cabin' | null => {
+      const c = String(l.wc_course || '').toLowerCase()
+      if (!c) return null
+      if (/cabin|crew|air ?host/.test(c)) return 'cabin'
+      if (/pilot|dgca|cpl|ppl|flight|aviation/.test(c)) return 'pilot'
+      return null
+    }
+
+    const cat = {
+      pilot: 0,
+      cabin: 0,
+      offline: 0,
+      offlineReg: 0,
+      offlineInterested: 0,
+      offlineScholarship: 0,
+      online: 0,
+      onlineReg: 0,
+      onlineInterested: 0,
+    }
+    for (const l of newLeads as any[]) {
       const type = String(l.wc_type || '').toLowerCase()
-      if (type === 'webinar') return 'Webinar'
-      if (type === 'offline_event' || l.wc_event) {
-        const ev = getOfflineEvent(String(l.wc_event || ''))
-        const label = ev?.name || 'Offline event'
-        return l.wc_intent === 'scholarship' ? `${label} + scholarship` : label
+      const isOffline = type === 'offline_event' || !!l.wc_event
+      const isOnline = type === 'webinar' || !!l.wc_web_reg
+
+      if (isOffline) {
+        cat.offline++
+        if (l.wc_ev_reg) cat.offlineReg++
+        else cat.offlineInterested++
+        if (l.wc_intent === 'scholarship') cat.offlineScholarship++
+      } else if (isOnline) {
+        cat.online++
+        // Registered means registered ON ZOOM. Filling our form is interest;
+        // the seat only exists once Zoom has them.
+        if (String(l.wc_zoom || '').toLowerCase() === 'true') cat.onlineReg++
+        else cat.onlineInterested++
       }
-      const course = String(l.wc_course || '').trim()
-      if (course) return course
-      return 'Not said yet'
+
+      const c = courseOf(l)
+      if (c === 'pilot') cat.pilot++
+      else if (c === 'cabin') cat.cabin++
     }
 
     lines.push(`<b>${newLeads.length} new lead${newLeads.length === 1 ? '' : 's'}</b>`)
     if (newLeads.length) {
       const src = block(newLeads, sourceOf, 5)
       if (src) { lines.push(''); lines.push(src) }
-      const want = block(newLeads, wantOf, 6)
-      if (want) { lines.push(''); lines.push(want) }
+
+      const want: string[] = []
+      if (cat.pilot) want.push(`  Pilot / DGCA <b>${cat.pilot}</b>`)
+      if (cat.cabin) want.push(`  Cabin Crew <b>${cat.cabin}</b>`)
+      if (cat.offline) {
+        want.push(`  Offline event <b>${cat.offline}</b>`)
+        if (cat.offlineReg) want.push(`     registered <b>${cat.offlineReg}</b>`)
+        if (cat.offlineInterested) want.push(`     interested <b>${cat.offlineInterested}</b>`)
+        if (cat.offlineScholarship) want.push(`     scholarship <b>${cat.offlineScholarship}</b>`)
+      }
+      if (cat.online) {
+        want.push(`  Online event <b>${cat.online}</b>`)
+        if (cat.onlineReg) want.push(`     registered <b>${cat.onlineReg}</b>`)
+        if (cat.onlineInterested) want.push(`     interested <b>${cat.onlineInterested}</b>`)
+      }
+      if (want.length) { lines.push(''); lines.push(want.join('\n')) }
     }
 
-    // Morning deliberately omits this. Overnight nobody was working, so a
-    // "touched" count at 9am measures the agent, not the team, and reads as
-    // activity that did not happen. From midday on it is the day's progress.
-    if (kind !== 'morning') {
-      lines.push('')
-      lines.push(`${touched.length} touched`)
-    }
+    lines.push('')
+    lines.push(`${touched.length} touched`)
 
     lines.push('')
     lines.push(`<b>${calls.length} call${calls.length === 1 ? '' : 's'}</b>`)
@@ -353,6 +398,17 @@ export async function GET(request: NextRequest) {
     // has to tell you whether the day is busy.
     lines.push('')
     lines.push(`<b>${upcoming.length} call${upcoming.length === 1 ? '' : 's'} booked today</b>`)
+
+    // Demos actually TAKEN today. Booked is a plan; taken is the outcome, and
+    // only a human answering "did it happen" moves a lead there - which is why
+    // this can read zero on a day with five bookings.
+    const { count: demosToday } = await supabase
+      .from('lead_stage_changes')
+      .select('id', { count: 'exact', head: true })
+      .in('new_stage', ['Demo Taken', 'Demo Done', 'Call Done'])
+      .gte('created_at', todayStart.toISOString())
+
+    lines.push(`<b>${demosToday || 0} demo${demosToday === 1 ? '' : 's'} taken today</b>`)
 
     if (APP_URL) {
       lines.push('')
