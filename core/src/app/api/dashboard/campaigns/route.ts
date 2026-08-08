@@ -109,18 +109,39 @@ export async function GET() {
       // logging.
       const ids = campaigns.map((c: any) => c.id)
 
+      // campaign_sends is the SOURCE for per-message records - it has a row
+      // per recipient per send, with the template it carried. Deriving these
+      // from conversations only worked for sends logged there, which is why
+      // the first 154 appeared to have no message history at all. They did;
+      // it was in this table the whole time.
       const { data: sendRows } = await service
         .from('campaign_sends')
-        .select('campaign_id, status')
+        .select('campaign_id, status, template_name, message_id, created_at')
         .in('campaign_id', ids)
+        .limit(20000)
 
       const totals = new Map<string, { sent: number; failed: number; skipped: number }>()
+      const msgAgg = new Map<string, Map<string, any>>()
       for (const r of sendRows || []) {
         const t = totals.get(r.campaign_id) || { sent: 0, failed: 0, skipped: 0 }
         if (r.status === 'sent') t.sent++
         else if (r.status === 'failed') t.failed++
         else if (r.status === 'skipped') t.skipped++
         totals.set(r.campaign_id, t)
+
+        const tpl = r.template_name || 'message'
+        const byTpl = msgAgg.get(r.campaign_id) || new Map()
+        const row = byTpl.get(tpl) || {
+          template: tpl, sent: 0, failed: 0, delivered: 0, read: 0,
+          first: r.created_at, last: r.created_at, ids: [] as string[],
+        }
+        if (r.status === 'sent') row.sent++
+        if (r.status === 'failed') row.failed++
+        if (r.message_id) row.ids.push(r.message_id)
+        if (r.created_at && r.created_at < row.first) row.first = r.created_at
+        if (r.created_at && r.created_at > row.last) row.last = r.created_at
+        byTpl.set(tpl, row)
+        msgAgg.set(r.campaign_id, byTpl)
       }
 
       const { data: convRows } = await service
@@ -130,33 +151,46 @@ export async function GET() {
         .order('created_at', { ascending: false })
         .limit(4000)
 
-      // template -> counts, per campaign.
-      const perMessage = new Map<string, Map<string, any>>()
+      // Receipts. Two ways in, because sends were logged differently before
+      // and after the campaign sender started writing to conversations:
+      //   by metadata.campaign     - sends logged with their campaign id
+      //   by wa_message_id         - matched back to a campaign_sends row
+      // The second is what recovers delivered/read for anything the first
+      // does not cover.
+      const idByMessage = new Map<string, { cid: string; tpl: string }>()
+      for (const [cid, byTpl] of msgAgg) {
+        for (const [tpl, row] of byTpl) {
+          for (const mid of row.ids as string[]) idByMessage.set(mid, { cid, tpl })
+        }
+      }
+
       for (const m of convRows || []) {
         const meta: any = m.metadata || {}
-        const cid = meta.campaign
-        if (!cid || !ids.includes(cid)) continue
-        const tpl = String(meta.template_name || 'message')
-        const byTpl = perMessage.get(cid) || new Map()
-        const row = byTpl.get(tpl) || { template: tpl, sent: 0, delivered: 0, read: 0, first: m.created_at, last: m.created_at }
-        row.sent++
         const ds = String(meta.delivery_status || '')
+        if (ds !== 'read' && ds !== 'delivered') continue
+
+        let cid = meta.campaign as string | undefined
+        let tpl = String(meta.template_name || '')
+        if (!cid || !ids.includes(cid)) {
+          const hit = meta.wa_message_id ? idByMessage.get(String(meta.wa_message_id)) : null
+          if (!hit) continue
+          cid = hit.cid
+          tpl = hit.tpl
+        }
+        const byTpl = msgAgg.get(cid)
+        if (!byTpl) continue
+        const row = byTpl.get(tpl) || byTpl.get('message')
+        if (!row) continue
         if (ds === 'read') { row.read++; row.delivered++ }
-        else if (ds === 'delivered') row.delivered++
-        if (m.created_at < row.first) row.first = m.created_at
-        if (m.created_at > row.last) row.last = m.created_at
-        byTpl.set(tpl, row)
-        perMessage.set(cid, byTpl)
+        else row.delivered++
       }
 
       for (const c of campaigns) {
         const t = totals.get(c.id) || { sent: 0, failed: 0, skipped: 0 }
-        const msgs = Array.from((perMessage.get(c.id) || new Map()).values()).sort(
-          (a: any, b: any) => String(b.last).localeCompare(String(a.last)),
-        )
-        // Delivered and read are only knowable for sends that were logged to
-        // conversations. The first campaign predates that, so its rows show
-        // sent without receipts rather than a fabricated zero-percent.
+        const msgs = Array.from((msgAgg.get(c.id) || new Map()).values())
+          .map(({ ids: _ids, ...m }: any) => m) // drop the id list from the payload
+          .sort((a: any, b: any) => String(b.last).localeCompare(String(a.last)))
+
         const delivered = msgs.reduce((n: number, m: any) => n + m.delivered, 0)
         const read = msgs.reduce((n: number, m: any) => n + m.read, 0)
         c.metrics = {

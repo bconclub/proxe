@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
       if (!phone) {
         await supabase.from('campaign_sends').insert({
           campaign_id: campaign.id, lead_id: lead.id, phone: null,
-          status: 'skipped', error: 'no phone',
+          status: 'skipped', error: 'no phone', template_name: tpl.name,
         })
         continue
       }
@@ -159,6 +159,9 @@ export async function GET(request: NextRequest) {
       // the row already exists and nobody gets a second message.
       const { error: claimErr } = await supabase.from('campaign_sends').insert({
         campaign_id: campaign.id, lead_id: lead.id, phone, status: 'pending',
+        // WHICH message this was. A campaign sends several times over its
+        // life and without this every send collapses into one total.
+        template_name: tpl.name,
       })
       if (claimErr) continue // unique violation = another run has this one
 
