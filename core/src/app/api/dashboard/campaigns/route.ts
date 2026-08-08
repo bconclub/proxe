@@ -94,7 +94,83 @@ export async function GET() {
       console.error('[campaigns] table read failed, falling back to legacy blob:', error.message)
       return NextResponse.json({ campaigns: await readLegacy(service), legacy: true })
     }
-    return NextResponse.json({ campaigns: data || [] })
+
+    const campaigns = data || []
+    if (campaigns.length) {
+      // A campaign is a CONTAINER, not one message. Freedom to Fly will send
+      // several times as the date nears, and each of those sends has its own
+      // template and its own delivered/read - so the metrics have to be per
+      // MESSAGE, rolled up to the campaign.
+      //
+      // The per-message rows come from conversations, where every campaign
+      // send is logged with metadata.campaign and the delivery webhook stamps
+      // delivered/read by wa_message_id. campaign_sends supplies the totals,
+      // because it has a row per recipient even when the send predates that
+      // logging.
+      const ids = campaigns.map((c: any) => c.id)
+
+      const { data: sendRows } = await service
+        .from('campaign_sends')
+        .select('campaign_id, status')
+        .in('campaign_id', ids)
+
+      const totals = new Map<string, { sent: number; failed: number; skipped: number }>()
+      for (const r of sendRows || []) {
+        const t = totals.get(r.campaign_id) || { sent: 0, failed: 0, skipped: 0 }
+        if (r.status === 'sent') t.sent++
+        else if (r.status === 'failed') t.failed++
+        else if (r.status === 'skipped') t.skipped++
+        totals.set(r.campaign_id, t)
+      }
+
+      const { data: convRows } = await service
+        .from('conversations')
+        .select('created_at, metadata')
+        .eq('message_type', 'template')
+        .order('created_at', { ascending: false })
+        .limit(4000)
+
+      // template -> counts, per campaign.
+      const perMessage = new Map<string, Map<string, any>>()
+      for (const m of convRows || []) {
+        const meta: any = m.metadata || {}
+        const cid = meta.campaign
+        if (!cid || !ids.includes(cid)) continue
+        const tpl = String(meta.template_name || 'message')
+        const byTpl = perMessage.get(cid) || new Map()
+        const row = byTpl.get(tpl) || { template: tpl, sent: 0, delivered: 0, read: 0, first: m.created_at, last: m.created_at }
+        row.sent++
+        const ds = String(meta.delivery_status || '')
+        if (ds === 'read') { row.read++; row.delivered++ }
+        else if (ds === 'delivered') row.delivered++
+        if (m.created_at < row.first) row.first = m.created_at
+        if (m.created_at > row.last) row.last = m.created_at
+        byTpl.set(tpl, row)
+        perMessage.set(cid, byTpl)
+      }
+
+      for (const c of campaigns) {
+        const t = totals.get(c.id) || { sent: 0, failed: 0, skipped: 0 }
+        const msgs = Array.from((perMessage.get(c.id) || new Map()).values()).sort(
+          (a: any, b: any) => String(b.last).localeCompare(String(a.last)),
+        )
+        // Delivered and read are only knowable for sends that were logged to
+        // conversations. The first campaign predates that, so its rows show
+        // sent without receipts rather than a fabricated zero-percent.
+        const delivered = msgs.reduce((n: number, m: any) => n + m.delivered, 0)
+        const read = msgs.reduce((n: number, m: any) => n + m.read, 0)
+        c.metrics = {
+          sent: t.sent || c.sent_count || 0,
+          failed: t.failed || c.failed_count || 0,
+          skipped: t.skipped,
+          delivered,
+          read,
+          tracked: msgs.reduce((n: number, m: any) => n + m.sent, 0),
+        }
+        c.messages = msgs
+      }
+    }
+    return NextResponse.json({ campaigns })
   } catch (error) {
     console.error('[campaigns] GET failed:', error)
     return NextResponse.json({ error: 'Failed to load campaigns' }, { status: 500 })

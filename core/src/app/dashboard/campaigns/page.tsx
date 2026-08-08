@@ -61,6 +61,15 @@ interface SavedCampaign {
   created_by?: string
   created_at: string
   updated_at?: string
+  /** Rolled up from campaign_sends + the delivery receipts. */
+  metrics?: { sent: number; failed: number; skipped: number; delivered: number; read: number; tracked: number }
+  /**
+   * One row per MESSAGE sent under this campaign. A campaign runs for weeks -
+   * Freedom to Fly will send again as the date nears - and each send has its
+   * own template and its own receipts, so they list underneath rather than
+   * collapsing into a single number.
+   */
+  messages?: Array<{ template: string; sent: number; delivered: number; read: number; first: string; last: string }>
 }
 interface SentSend {
   label: string
@@ -1053,8 +1062,13 @@ function PreviousCampaigns() {
             : c.status === 'draft' ? ('var(--text-muted)' as string)
               : BLUE,
       since: `Since ${new Date(c.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`,
-      deliveredPct: null as number | null,
-      read: null as number | null,
+      // Real numbers, from campaign_sends and the delivery receipts. These
+      // were hardcoded null, which is why a campaign that reached 154 people
+      // still read "Not sent yet" beside its own send count.
+      deliveredPct: (c as any).metrics?.tracked
+        ? Math.round(((c as any).metrics.delivered / (c as any).metrics.tracked) * 100)
+        : null,
+      read: (c as any).metrics?.read ?? null,
       clicked: null as number | null,
       sentC: undefined as SentCampaign | undefined,
       savedC: c as SavedCampaign | undefined,
@@ -1173,7 +1187,9 @@ function PreviousCampaigns() {
               <div
                 className="grid grid-cols-1 md:grid-cols-[2.4fr_1.1fr_1.6fr_40px] gap-y-2 items-center px-4 py-3 campaign-row"
                 style={{ cursor: r.sentC ? 'pointer' : 'default', paddingLeft: r.webinar ? 28 : undefined }}
-                onClick={() => r.sentC && setExpanded(expanded === r.id ? null : r.id)}
+                // Saved campaigns expand too - that is where the per-message
+                // history lives, and without this the row was inert.
+                onClick={() => (r.sentC || r.savedC) && setExpanded(expanded === r.id ? null : r.id)}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0" style={{ background: `${r.kind === 'sent' ? PURPLE : BLUE}1c`, color: r.kind === 'sent' ? PURPLE : BLUE }}>
@@ -1211,14 +1227,42 @@ function PreviousCampaigns() {
                       <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Clicked</div>
                     </div>
                   </div>
+                ) : r.savedC?.metrics?.sent ? (
+                  // A campaign that has sent shows what it did, not "not sent
+                  // yet". Delivered and read only exist for sends logged to
+                  // conversations - the first one predates that, so it says so
+                  // rather than printing a false 0%.
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-[14px] font-bold tabular-nums" style={{ color: PURPLE }}>{r.savedC.metrics.sent}</div>
+                      <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Sent</div>
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-bold tabular-nums" style={{ color: BLUE }}>
+                        {r.savedC.metrics.tracked ? r.savedC.metrics.delivered : '–'}
+                      </div>
+                      <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Delivered</div>
+                    </div>
+                    <div>
+                      <div className="text-[14px] font-bold tabular-nums" style={{ color: GREEN }}>
+                        {r.savedC.metrics.tracked ? r.savedC.metrics.read : '–'}
+                      </div>
+                      <div className="text-[9.5px]" style={{ color: 'var(--text-muted)' }}>Read</div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Not sent yet{r.savedC?.template ? ` · ${r.savedC.template.name}` : ' · no template'}</div>
                 )}
                 <div className="flex justify-end">
                   {r.savedC ? (
-                    <button onClick={(e) => { e.stopPropagation(); removeSaved(r.id) }} className="p-1.5 rounded-md" title="Delete" style={{ color: 'var(--text-muted)' }}>
-                      <MdDeleteOutline size={16} />
-                    </button>
+                    <span className="flex items-center">
+                      <span className="p-1" style={{ color: 'var(--text-muted)' }}>
+                        {expanded === r.id ? <MdExpandLess size={16} /> : <MdMoreVert size={16} />}
+                      </span>
+                      <button onClick={(e) => { e.stopPropagation(); removeSaved(r.id) }} className="p-1.5 rounded-md" title="Archive" style={{ color: 'var(--text-muted)' }}>
+                        <MdDeleteOutline size={16} />
+                      </button>
+                    </span>
                   ) : (
                     <span className="p-1.5" style={{ color: 'var(--text-muted)' }}>
                       {expanded === r.id ? <MdExpandLess size={16} /> : <MdMoreVert size={16} />}
@@ -1226,6 +1270,31 @@ function PreviousCampaigns() {
                   )}
                 </div>
               </div>
+              {/* Every message this campaign has sent, newest first. The
+                  campaign is the container; Freedom to Fly will send again as
+                  the date nears and each send lands here with its own
+                  template and its own receipts. */}
+              {r.savedC && expanded === r.id && (
+                <div className="px-4 pb-3 space-y-1">
+                  {(r.savedC.messages || []).length === 0 ? (
+                    <div className="text-[11px] px-2.5 py-2" style={{ color: 'var(--text-muted)' }}>
+                      No per-message records yet. Sends before 7 Aug were not logged individually, so only the total is known.
+                    </div>
+                  ) : (
+                    (r.savedC.messages || []).map((m, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[11px] rounded-lg px-2.5 py-1.5" style={{ background: 'var(--bg-primary)' }}>
+                        <span className="font-mono text-[10px] truncate flex-1" style={{ color: 'var(--text-secondary)' }}>{m.template}</span>
+                        <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
+                          {new Date(m.last).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                        </span>
+                        <span className="shrink-0 font-semibold tabular-nums" style={{ color: PURPLE }}>{m.sent} sent</span>
+                        <span className="shrink-0 tabular-nums" style={{ color: BLUE }}>{m.delivered} delivered</span>
+                        <span className="shrink-0 tabular-nums" style={{ color: GREEN }}>{m.read} read</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
               {r.sentC && expanded === r.id && (
                 <div className="px-4 pb-3 space-y-1">
                   {r.sentC.sends.map((s, i) => (
