@@ -27,7 +27,7 @@ export const proxeConfig: BrandConfig = {
   // This deployment shares Beacon's Supabase, so it must say which rows are
   // its own - without this it would list BCON's service leads too. One entry
   // means no tabs render; it is purely a scope.
-  leadBrands: [{ id: 'proxe', label: 'PROXe' }],
+  leadBrands: [{ id: 'proxe', label: 'PROXe', icon: '/proxe-icon.png', color: '#7c3aed' }],
   // Mirror of BCON's switcher so the jump works both ways.
   artifacts: [
     {

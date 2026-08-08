@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,11 +27,14 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: lead } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', params.id)
-      .single() as { data: any }
+    const scoped = (await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', params.id)
+    )) as any
+    const { data: lead } = (await scoped.single()) as { data: any }
+    
 
     const lkz = lead?.unified_context?.lokazen || {}
     const brand = String(lkz.brand_name || '').trim()

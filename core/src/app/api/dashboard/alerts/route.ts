@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getLeadAccess, canSeeLead } from '@/lib/services/leadAccess'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,12 +90,14 @@ export async function GET(request: NextRequest) {
     // New leads. unified_context comes along because leadAccess needs it to
     // decide whether a restricted user may see this lead at all.
     try {
-      const { data: leads } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, first_touchpoint, last_touchpoint, created_at, unified_context')
-        .gt('created_at', effectiveSince)
-        .order('created_at', { ascending: false })
-        .limit(MAX_PER_KIND)
+      const { data: leads } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, first_touchpoint, last_touchpoint, created_at, unified_context')
+          .gt('created_at', effectiveSince)
+          .order('created_at', { ascending: false })
+          .limit(MAX_PER_KIND)
+      )
 
       for (const l of leads || []) {
         if (!canSeeLead(access, l)) continue
@@ -116,8 +119,10 @@ export async function GET(request: NextRequest) {
     // Inbound messages. sender='customer' is the inbound marker across every
     // channel (see the inbox thread renderer, which splits on the same value).
     try {
-      const { data: msgs } = await supabase
-        .from('conversations')
+      const { data: msgs } = await scopedQuery(
+        supabase
+          .from('conversations')
+      
         // session_id groups an anonymous web chat: until the visitor gives a
         // name there is no lead_id, so it is the only thing tying their turns
         // together.
@@ -125,17 +130,19 @@ export async function GET(request: NextRequest) {
         .eq('sender', 'customer')
         .gt('created_at', effectiveSince)
         .order('created_at', { ascending: false })
-        .limit(MAX_PER_KIND)
+        .limit(MAX_PER_KIND))
 
       const rows = msgs || []
       // Resolve sender names in one query; anonymous web chats have no lead yet.
       const leadIds = Array.from(new Set(rows.map((m: any) => m.lead_id).filter(Boolean)))
       const nameMap = new Map<string, any>()
       if (leadIds.length > 0) {
-        const { data: leads } = await supabase
-          .from('all_leads')
-          .select('id, customer_name, unified_context')
-          .in('id', leadIds)
+        const { data: leads } = await scopedQuery(
+          supabase
+            .from('all_leads')
+            .select('id, customer_name, unified_context')
+            .in('id', leadIds)
+        )
         for (const l of leads || []) nameMap.set(l.id, l)
       }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceClient, getClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -136,11 +137,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data: recentLeads } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, customer_phone_normalized, phone, last_interaction_at')
-      .gt('last_interaction_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
-      .limit(200)
+    const { data: recentLeads } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, customer_phone_normalized, phone, last_interaction_at')
+        .gt('last_interaction_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+        .limit(200)
+    )
 
     const activeConvoLeads = (recentLeads || []).filter((l: any) => !leadsWithPendingTasks.has(l.id))
 
@@ -150,13 +153,15 @@ export async function GET(request: NextRequest) {
 
     const respondedLeads = new Set<string>()
     if (allLeadIds.size > 0) {
-      const { data: responses } = await supabase
-        .from('conversations')
-        .select('lead_id, created_at')
-        .in('lead_id', Array.from(allLeadIds).slice(0, 200))
-        .eq('sender', 'customer')
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
+      const { data: responses } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('lead_id, created_at')
+          .in('lead_id', Array.from(allLeadIds).slice(0, 200))
+          .eq('sender', 'customer')
+          .gte('created_at', thirtyDaysAgo)
+          .order('created_at', { ascending: false })
+      )
 
       if (responses) {
         const latestResponse = new Map<string, string>()

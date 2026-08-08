@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getLeadAccess, canSeeLead } from '@/lib/services/leadAccess'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,11 +18,12 @@ export async function GET(
     }
     const { id } = params
 
-    const { data, error } = await supabase
-      .from('all_leads')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
+    const { data, error } = await (await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('*')
+        .eq('id', id)
+    )).maybeSingle()
 
     if (error) throw error
     if (!data) {
@@ -75,11 +77,12 @@ export async function PATCH(
     const leadId = params.id
     const body = await request.json()
 
-    const { data: lead, error: fetchErr } = await service
-      .from('all_leads')
-      .select('id, customer_name, email, unified_context, brand')
-      .eq('id', leadId)
-      .maybeSingle()
+    const { data: lead, error: fetchErr } = await (await scopedQuery(
+      service
+        .from('all_leads')
+        .select('id, customer_name, email, unified_context, brand')
+        .eq('id', leadId)
+    )).maybeSingle()
     if (fetchErr || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
@@ -175,10 +178,12 @@ export async function PATCH(
     // it made every edited lead jump to "now". The edit is recorded in
     // unified_context.last_actor + the activities audit instead.
 
-    const { error: upErr } = await service
-      .from('all_leads')
-      .update(updates)
-      .eq('id', leadId)
+    const { error: upErr } = await scopedQuery(
+      service
+        .from('all_leads')
+        .update(updates)
+        .eq('id', leadId)
+    )
     if (upErr) throw upErr
 
     if (auditChanges.length > 0) {
@@ -251,11 +256,13 @@ export async function DELETE(
     }
 
     console.log('[DELETE] Deleting lead from all_leads...')
-    const { data, error } = await supabase
-      .from('all_leads')
-      .delete()
-      .eq('id', id)
-      .select()
+    const { data, error } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .delete()
+        .eq('id', id)
+        .select()
+    )
 
     if (error) {
       console.error('[DELETE] Supabase error deleting lead:', error)

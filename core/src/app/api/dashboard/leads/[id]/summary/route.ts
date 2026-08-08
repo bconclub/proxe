@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { recordTokenUsage, usageFrom } from '@/lib/token-usage'
 import { BRAND_ID } from '@/configs'
 import { resolveModel } from '@/lib/agent-core'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,13 +119,15 @@ export async function GET(
     console.log('Generating summary for lead:', leadId, { forceRefresh })
 
     // Fetch lead data
-    const { data: lead, error: leadError } = await supabase
-      .from('all_leads')
+    const { data: lead, error: leadError } = await (await scopedQuery(
+      supabase
+        .from('all_leads')
+    
       // POP campaign columns (intensity ladder + grievance) appended only for pop.
       .select('id, customer_name, email, phone, created_at, last_interaction_at, lead_stage, sub_stage, unified_context'
         + (BRAND_ID === 'pop' ? ', intensity, grievance_category, lean' : ''))
       .eq('id', leadId)
-      .single() as { data: any; error: any }
+    )).single() as { data: any; error: any }
 
     if (leadError) {
       console.error('Error fetching lead:', leadError)
@@ -185,16 +188,20 @@ export async function GET(
     let guardInbound = 0
     let guardTotal = 0
     try {
-      const { count: inb } = await supabase
-        .from('conversations')
-        .select('id', { count: 'exact', head: true })
-        .eq('lead_id', leadId)
-        .eq('sender', 'customer')
+      const { count: inb } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('lead_id', leadId)
+          .eq('sender', 'customer')
+      )
       guardInbound = inb || 0
-      const { count: tot } = await supabase
-        .from('conversations')
-        .select('id', { count: 'exact', head: true })
-        .eq('lead_id', leadId)
+      const { count: tot } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('lead_id', leadId)
+      )
       guardTotal = tot || 0
     } catch (e) {
       console.error('Summary context-check failed, proceeding without guard:', e)
@@ -341,10 +348,12 @@ export async function GET(
       // Fetch messages for response rate calculation
       let responseRate = 0
       try {
-        const { data: messages } = await supabase
-          .from('conversations')
-          .select('sender')
-          .eq('lead_id', leadId)
+        const { data: messages } = await scopedQuery(
+          supabase
+            .from('conversations')
+            .select('sender')
+            .eq('lead_id', leadId)
+        )
 
         if (messages && messages.length > 0) {
           const customerMessages = messages.filter(m => m.sender === 'customer').length
@@ -418,10 +427,12 @@ export async function GET(
       // Fetch messages for response rate calculation
       let responseRate = 0
       try {
-        const { data: messages } = await supabase
-          .from('conversations')
-          .select('sender')
-          .eq('lead_id', leadId)
+        const { data: messages } = await scopedQuery(
+          supabase
+            .from('conversations')
+            .select('sender')
+            .eq('lead_id', leadId)
+        )
 
         if (messages && messages.length > 0) {
           const customerMessages = messages.filter(m => m.sender === 'customer').length
@@ -466,12 +477,14 @@ export async function GET(
       // Fetch full conversation history for richer summary
       let allConversationMessages: any[] = []
       try {
-        const { data: convData } = await supabase
-          .from('conversations')
-          .select('content, sender, created_at, channel')
-          .eq('lead_id', leadId)
-          .order('created_at', { ascending: true })
-          .limit(80)
+        const { data: convData } = await scopedQuery(
+          supabase
+            .from('conversations')
+            .select('content, sender, created_at, channel')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: true })
+            .limit(80)
+        )
 
         if (convData) allConversationMessages = convData
       } catch (err) {
@@ -599,10 +612,12 @@ export async function GET(
                   unified_summary: unifiedSummary,
                   unified_summary_generated_at: new Date().toISOString()
                 };
-                await supabase
-                  .from('all_leads')
-                  .update({ unified_context: newUnifiedContext })
-                  .eq('id', leadId);
+                await scopedQuery(
+                  supabase
+                    .from('all_leads')
+                    .update({ unified_context: newUnifiedContext })
+                    .eq('id', leadId)
+                );
               } catch (dbError) {
                 console.error('Error saving updated unified_summary:', dbError);
               }
@@ -707,11 +722,13 @@ export async function GET(
     let allMessages: any[] = []
 
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('content, sender, created_at, channel')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: true })
+      const { data, error } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('content, sender, created_at, channel')
+          .eq('lead_id', leadId)
+          .order('created_at', { ascending: true })
+      )
 
       if (!error && data) {
         allMessages = data
@@ -914,10 +931,12 @@ export async function GET(
                 unified_summary: aiSummary,
                 unified_summary_generated_at: new Date().toISOString()
               };
-              await supabase
-                .from('all_leads')
-                .update({ unified_context: newUnifiedContext })
-                .eq('id', leadId);
+              await scopedQuery(
+                supabase
+                  .from('all_leads')
+                  .update({ unified_context: newUnifiedContext })
+                  .eq('id', leadId)
+              );
             } catch (dbError) {
               console.error('Error saving regenerated unified_summary:', dbError);
             }

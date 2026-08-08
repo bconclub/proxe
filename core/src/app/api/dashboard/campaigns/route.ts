@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { resolveTemplateIds, fetchTemplateAnalytics } from '@/lib/services/templateAnalytics'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,12 +146,14 @@ export async function GET() {
         msgAgg.set(r.campaign_id, byTpl)
       }
 
-      const { data: convRows } = await service
-        .from('conversations')
-        .select('created_at, metadata')
-        .eq('message_type', 'template')
-        .order('created_at', { ascending: false })
-        .limit(4000)
+      const { data: convRows } = await scopedQuery(
+        service
+          .from('conversations')
+          .select('created_at, metadata')
+          .eq('message_type', 'template')
+          .order('created_at', { ascending: false })
+          .limit(4000)
+      )
 
       // Receipts. Two ways in, because sends were logged differently before
       // and after the campaign sender started writing to conversations:

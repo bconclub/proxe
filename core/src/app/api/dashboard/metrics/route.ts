@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,9 +15,11 @@ export async function GET() {
     }
 
     // Get all leads (use all_leads - every WhatsApp conversation = a lead)
-    const { data: leads, error: leadsError } = await supabase
-      .from('all_leads')
-      .select('*')
+    const { data: leads, error: leadsError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('*')
+    )
 
     if (leadsError) throw leadsError
 
@@ -46,11 +49,13 @@ export async function GET() {
         : 0
 
     // Average response time from conversations metadata
-    const { data: agentMessages } = await supabase
-      .from('conversations')
-      .select('metadata')
-      .eq('sender', 'agent')
-      .not('metadata->input_to_output_gap_ms', 'is', null)
+    const { data: agentMessages } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('metadata')
+        .eq('sender', 'agent')
+        .not('metadata->input_to_output_gap_ms', 'is', null)
+    )
 
     let avgResponseTime = 0
     if (agentMessages && agentMessages.length > 0) {
@@ -108,12 +113,14 @@ export async function GET() {
 
     // Response time trends from real data
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const { data: trendMessages } = await supabase
-      .from('conversations')
-      .select('created_at, metadata')
-      .eq('sender', 'agent')
-      .not('metadata->input_to_output_gap_ms', 'is', null)
-      .gte('created_at', last7Days.toISOString())
+    const { data: trendMessages } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('created_at, metadata')
+        .eq('sender', 'agent')
+        .not('metadata->input_to_output_gap_ms', 'is', null)
+        .gte('created_at', last7Days.toISOString())
+    )
 
     const trendByDate = new Map<string, { total: number; count: number }>()
     trendMessages?.forEach((msg) => {

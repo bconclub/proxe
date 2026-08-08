@@ -29,6 +29,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getWhatsAppCreds } from '@/lib/services/whatsappCreds';
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership';
 import { canAccessLeadId } from '@/lib/services/leadAccess';
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic';
 
@@ -211,11 +212,12 @@ export async function POST(request: NextRequest) {
 
     // Fetch lead info
     const authClient = await createClient();
-    const { data: lead, error: leadError } = await authClient
-      .from('all_leads')
-      .select('id, customer_name, email, phone')
-      .eq('id', leadId)
-      .single();
+    const { data: lead, error: leadError } = await (await scopedQuery(
+      authClient
+        .from('all_leads')
+        .select('id, customer_name, email, phone')
+        .eq('id', leadId)
+    )).single();
 
     if (leadError || !lead) {
       return NextResponse.json(

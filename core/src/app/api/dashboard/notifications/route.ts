@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,10 +141,12 @@ export async function GET(_request: NextRequest) {
 
     // Resolve lead names/channels in one query.
     const leadIds = Array.from(new Set(rows.map((r: any) => r.lead_id).filter(Boolean)))
-    const { data: leads } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, first_touchpoint, last_touchpoint')
-      .in('id', leadIds)
+    const { data: leads } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, first_touchpoint, last_touchpoint')
+        .in('id', leadIds)
+    )
 
     const leadMap = new Map<string, any>()
     for (const l of leads || []) leadMap.set(l.id, l)

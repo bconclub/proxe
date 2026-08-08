@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendMissedCallMessage } from '@/lib/services/whatsappSender'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,11 +86,12 @@ export async function POST(
     }
 
     // Get current lead stage
-    const { data: lead, error: leadError } = await supabase
-      .from('all_leads')
-      .select('lead_stage, lead_score')
-      .eq('id', leadId)
-      .single()
+    const { data: lead, error: leadError } = await (await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('lead_stage, lead_score')
+        .eq('id', leadId)
+    )).single()
 
     if (leadError || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
@@ -133,10 +135,12 @@ export async function POST(
       updatePayload.disqualification_reason = disqualification_reason
     }
 
-    const { error: updateError } = await supabase
-      .from('all_leads')
-      .update(updatePayload)
-      .eq('id', leadId)
+    const { error: updateError } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update(updatePayload)
+        .eq('id', leadId)
+    )
 
     if (updateError) {
       console.error('Error updating lead:', updateError)
@@ -191,11 +195,12 @@ export async function POST(
 
     // R&R: Auto-send "missed call" WhatsApp message (fire-and-forget)
     if (new_stage === 'R&R') {
-      const { data: leadDetails } = await supabase
-        .from('all_leads')
-        .select('customer_name, phone, booking_date, booking_time')
-        .eq('id', leadId)
-        .single()
+      const { data: leadDetails } = await (await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('customer_name, phone, booking_date, booking_time')
+          .eq('id', leadId)
+    )).single()
 
       if (leadDetails?.phone) {
         const name = leadDetails.customer_name || 'there'

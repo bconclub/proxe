@@ -19,6 +19,7 @@ import { getServiceClient } from '@/lib/services'
 import { storeBooking, isAllowedBookingTime } from '@/lib/services/bookingManager'
 import { notifySlackBooking, notifySlackLead } from '@/lib/services/slackNotifier'
 import { BRAND_ID, getBrandConfig } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,12 +69,14 @@ export async function POST(request: NextRequest) {
   const sinceISO = new Date(Date.now() - days * 86400000).toISOString()
 
   // Candidate leads: Lokazen, recently active, with NO booking on record.
-  const { data: leads, error } = await supabase
-    .from('all_leads')
-    .select('id, customer_name, phone, customer_phone_normalized, email, unified_context, last_interaction_at')
-    .gte('last_interaction_at', sinceISO)
-    .order('last_interaction_at', { ascending: false })
-    .limit(200)
+  const { data: leads, error } = await scopedQuery(
+    supabase
+      .from('all_leads')
+      .select('id, customer_name, phone, customer_phone_normalized, email, unified_context, last_interaction_at')
+      .gte('last_interaction_at', sinceISO)
+      .order('last_interaction_at', { ascending: false })
+      .limit(200)
+  )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const hasBooking = (uc: any) =>
@@ -91,12 +94,14 @@ export async function POST(request: NextRequest) {
     scanned++
 
     // Pull the lead's recent conversation.
-    const { data: convs } = await supabase
-      .from('conversations')
-      .select('content, sender, created_at')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: false })
-      .limit(20)
+    const { data: convs } = await scopedQuery(
+      supabase
+        .from('conversations')
+        .select('content, sender, created_at')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+    )
     if (!convs || !convs.length) continue
 
     const corpus = convs.map((c) => String(c.content || ''))

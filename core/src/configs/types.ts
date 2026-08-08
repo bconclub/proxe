@@ -154,7 +154,14 @@ export interface BrandConfig {
   // Absent (every brand except bcon/proxe today) = unchanged behaviour: no
   // filtering, no tabs. With more than one entry the leads table gains brand
   // tabs; the first entry is the default/primary brand.
-  leadBrands?: Array<{ id: string; label: string }>;
+  /**
+   * Workspaces this deployment can see and switch between in-app.
+   *
+   * More than one entry turns on the sidebar switcher. `icon` is a path in the
+   * deployment's OWN public/ — each brand stages only its own assets, so a
+   * sibling's logo has to be copied in rather than referenced across brands.
+   */
+  leadBrands?: Array<{ id: string; label: string; icon?: string; color?: string }>;
   apiUrl?: string;
   supabase?: {
     url?: string;

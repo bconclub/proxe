@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { BRAND_ID } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,11 +21,13 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const supabase = getServiceClient() || authClient
-    const { data: leads, error } = await supabase
-      .from('all_leads')
-      .select('id, customer_name, unified_context')
-      .in('brand', [BRAND_ID, 'default'])
-      .limit(2000)
+    const { data: leads, error } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('id, customer_name, unified_context')
+        .in('brand', [BRAND_ID, 'default'])
+        .limit(2000)
+    )
     if (error) throw error
 
     type Entry = {

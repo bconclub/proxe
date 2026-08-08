@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessLeadId } from '@/lib/services/leadAccess'
 import { assignOwnerOnTouch } from '@/lib/services/leadOwnership'
+import { scopedQuery } from '@/lib/server/workspace'
 
 /**
  * POST /api/dashboard/leads/[id]/convert
@@ -48,11 +49,12 @@ export async function POST(
     const currency = typeof body.currency === 'string' && body.currency.trim() ? body.currency.trim() : 'INR'
     const notes = typeof body.notes === 'string' ? body.notes.trim() : ''
 
-    const { data: lead, error: fetchErr } = await supabase
-      .from('all_leads')
-      .select('lead_stage, unified_context')
-      .eq('id', leadId)
-      .single()
+    const { data: lead, error: fetchErr } = await (await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('lead_stage, unified_context')
+        .eq('id', leadId)
+    )).single()
     if (fetchErr || !lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
     const oldStage = lead.lead_stage
@@ -82,10 +84,12 @@ export async function POST(
 
     // 2. converted_at column - separate soft-fail write (brands may not have run
     //    migration 037 yet; never block the conversion on a missing column).
-    const { error: colErr } = await supabase
-      .from('all_leads')
-      .update({ converted_at: convertedAt })
-      .eq('id', leadId)
+    const { error: colErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update({ converted_at: convertedAt })
+        .eq('id', leadId)
+    )
     if (colErr) console.warn(`[convert] converted_at column not written (run migration 037): ${colErr.message}`)
 
     // 3. Stop autonomous follow-ups - a won lead shouldn't get nudged.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getBrandConfig } from '@/configs'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +41,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       .maybeSingle()
     const isAdmin = me?.role === 'admin'
 
-    const { data: lead, error: readErr } = await supabase
-      .from('all_leads')
-      .select('unified_context')
-      .eq('id', params.id)
-      .maybeSingle()
+    const { data: lead, error: readErr } = await (await scopedQuery(
+      supabase
+        .from('all_leads')
+        .select('unified_context')
+        .eq('id', params.id)
+    )).maybeSingle()
     if (readErr || !lead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
@@ -75,10 +77,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     // elsewhere and would error the whole update.
     const update: Record<string, any> = { unified_context: newCtx }
     if (leadAccessOn) update.owner_id = nextOwner ? nextOwner.id : null
-    const { error: updErr } = await supabase
-      .from('all_leads')
-      .update(update)
-      .eq('id', params.id)
+    const { error: updErr } = await scopedQuery(
+      supabase
+        .from('all_leads')
+        .update(update)
+        .eq('id', params.id)
+    )
     if (updErr) {
       console.error('[leads/owner] update failed:', updErr.message)
       return NextResponse.json({ error: 'Failed to set owner' }, { status: 500 })

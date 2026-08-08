@@ -40,8 +40,8 @@ export const bconConfig: BrandConfig = {
   // Two entries → the leads table gains All / BCON / PROXe tabs. BCON's own
   // service leads stay first, which makes them the default view.
   leadBrands: [
-    { id: 'bcon', label: 'BCON' },
-    { id: 'proxe', label: 'PROXe' },
+    { id: 'bcon', label: 'BCON', icon: '/bcon-icon.png', color: '#22c55e' },
+    { id: 'proxe', label: 'PROXe', icon: '/proxe-icon.png', color: '#7c3aed' },
   ],
   // Sidebar workspace switcher (same mechanism POP uses to reach Pulse Punjab).
   // PROXe is a separate deployment because it needs its own agent prompts and

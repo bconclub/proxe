@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
 import { getBrandConfig } from '@/configs'
 import { getLeadAccess, filterLeads } from '@/lib/services/leadAccess'
+import { resolveWorkspaceBrands } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +49,11 @@ export async function GET(request: NextRequest) {
       .order('last_interaction_at', { ascending: false })
 
     if (leadBrands?.length) {
-      const allowed = leadBrands.map((b) => b.id)
+      // The sidebar switcher narrows this further via the `workspace` cookie.
+      // resolveWorkspaceBrands returns the configured set already filtered by
+      // that selection, so picking PROXe here shows PROXe rows only — and a
+      // forged cookie can still only ever narrow, never widen.
+      const allowed = (await resolveWorkspaceBrands()) ?? leadBrands.map((b) => b.id)
       // A tab selection narrows to one brand, but only to a brand this
       // deployment already declares - never trust the query string to widen
       // visibility beyond the configured set.

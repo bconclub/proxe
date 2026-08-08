@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { scopedQuery } from '@/lib/server/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,10 +67,12 @@ export async function GET(request: NextRequest) {
     // Lead names/scores for the rows on this page.
     const leadMap = new Map<string, any>()
     if (leadIds.length) {
-      const { data: leads } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, language')
-        .in('id', leadIds)
+      const { data: leads } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, email, phone, lead_score, lead_stage, language')
+          .in('id', leadIds)
+      )
       ;(leads || []).forEach((l: any) => leadMap.set(l.id, l))
     }
 
@@ -80,11 +83,13 @@ export async function GET(request: NextRequest) {
     type CallExtra = { recordingUrl: string | null; summary: string | null; endedReason: string | null; turnCount: number; leadId: string | null; durationSeconds: number | null }
     const extras = new Map<string, CallExtra>()
     if (callIds.length) {
-      const { data: convs } = await supabase
-        .from('conversations')
-        .select('lead_id, sender, content, metadata, created_at')
-        .eq('channel', 'voice')
-        .filter('metadata->>call_id', 'in', `(${callIds.join(',')})`)
+      const { data: convs } = await scopedQuery(
+        supabase
+          .from('conversations')
+          .select('lead_id, sender, content, metadata, created_at')
+          .eq('channel', 'voice')
+          .filter('metadata->>call_id', 'in', `(${callIds.join(',')})`)
+      )
       ;(convs || []).forEach((c: any) => {
         const cid = c?.metadata?.call_id
         if (!cid) return
@@ -114,10 +119,12 @@ export async function GET(request: NextRequest) {
       Array.from(extras.values()).map((e) => e.leadId).filter((id): id is string => !!id && !leadMap.has(id)),
     ))
     if (convLeadIds.length) {
-      const { data: moreLeads } = await supabase
-        .from('all_leads')
-        .select('id, customer_name, email, phone, lead_score, lead_stage, language')
-        .in('id', convLeadIds)
+      const { data: moreLeads } = await scopedQuery(
+        supabase
+          .from('all_leads')
+          .select('id, customer_name, email, phone, lead_score, lead_stage, language')
+          .in('id', convLeadIds)
+      )
       ;(moreLeads || []).forEach((l: any) => leadMap.set(l.id, l))
     }
 
