@@ -20,7 +20,8 @@ import { getBrandConfig } from '@/configs'
  * windchasers). Callers must treat null as "apply no filter at all", which is
  * what makes this change a no-op for every single-brand deployment.
  */
-export const WORKSPACE_COOKIE = 'workspace'
+export { WORKSPACE_COOKIE } from '@/lib/workspaceCookie'
+import { WORKSPACE_COOKIE } from '@/lib/workspaceCookie'
 
 export async function resolveWorkspaceBrands(): Promise<string[] | null> {
   const leadBrands = getBrandConfig().leadBrands

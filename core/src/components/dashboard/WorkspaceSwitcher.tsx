@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MdCheck, MdUnfoldMore } from 'react-icons/md'
-import { WORKSPACE_COOKIE } from '@/lib/server/workspace'
+import { WORKSPACE_COOKIE } from '@/lib/workspaceCookie'
 
 export interface WorkspaceDef {
   id: string
