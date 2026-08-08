@@ -68,6 +68,7 @@ export interface BrandConfig {
     warRoom?: boolean;          // /war-room constituency view (needs vw_war_room_* views in the brand's Supabase)
     scouts?: boolean;           // Scout segment: /dashboard/scouts, scout widget mode, scout KB scope (lokazen)
     leadAccess?: boolean;       // Per-user lead ownership + type access: sticky first-touch claim, allowed_lead_types filtering, per-user pipeline, Humans overview (needs migration 036 columns - windchasers)
+    staleConversationAlerts?: boolean; // /api/cron/stale-conversations: Slack ping when a customer's last message goes unanswered 2h+ (catches a human takeover that went cold)
     campaigns?: boolean;        // /dashboard/campaigns - chat-driven campaign builder (audience pull + template match/draft)
     logCallChat?: boolean;      // after logging a call, chat with PROXe (vs the static decision hub)
   };

@@ -36,6 +36,16 @@ const SLACK_MENTION = (process.env.SLACK_MENTION_USER_ID || '')
   })
   .join(' ');
 
+/**
+ * The resolved @-mention string for this deployment ("<@U0ABC123>", "<!channel>",
+ * or "" when SLACK_MENTION_USER_ID is unset). Exported so alerts built outside
+ * this module (e.g. the stale-conversation cron) ping the same people, without
+ * each caller re-implementing the token → mention mapping.
+ */
+export function slackMention(): string {
+  return SLACK_MENTION;
+}
+
 export interface SlackResult {
   success: boolean;
   skipped?: boolean;

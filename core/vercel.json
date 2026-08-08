@@ -18,6 +18,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "path": "/api/cron/stale-conversations",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/telegram-brief?kind=morning",
       "schedule": "30 3 * * *"
     },

@@ -1046,21 +1046,29 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // 1b-4. Parallelize: dedup checks + session creation + cross-channel context
     const dedupCutoff30s = new Date(Date.now() - 30_000).toISOString();
     const [
-      { data: recentAgentMsg },
+      { data: alreadyLoggedMsg },
       { data: recentDuplicateMsg },
       ,                          // ensureSession returns void
       customerContext,
     ] = await Promise.all([
-      // Dedup: has agent replied in last 10s?
-      supabase
-        .from('conversations')
-        .select('created_at')
-        .eq('lead_id', leadId)
-        .eq('channel', 'whatsapp')
-        .eq('sender', 'agent')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
+      // Dedup: has THIS EXACT WhatsApp message already been logged? Meta retries
+      // a webhook until it gets a 200, and our in-memory processedMessageIds set
+      // is per-serverless-instance, so a retry landing on a cold instance used to
+      // slip through. Keying on the wamid catches it exactly. (This replaces an
+      // "agent replied in the last 3s" timer that could not tell a duplicate
+      // delivery from a customer who simply answered fast - see the PRE-AI guard
+      // below for the same bug in its 5s form.)
+      whatsappMessageId
+        ? supabase
+            .from('conversations')
+            .select('id')
+            .eq('lead_id', leadId)
+            .eq('channel', 'whatsapp')
+            .eq('sender', 'customer')
+            .eq('metadata->>whatsapp_message_id', whatsappMessageId)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       // Dedup: identical customer message in last 30s?
       supabase
         .from('conversations')
@@ -1078,12 +1086,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       fetchCustomerContext(customerPhone, customerName, supabase),
     ]);
 
-    if (recentAgentMsg?.created_at) {
-      const agentMsgAge = Date.now() - new Date(recentAgentMsg.created_at).getTime();
-      if (agentMsgAge < 3_000) {
-        console.log(`[meta/webhook] DEDUP: Agent responded ${agentMsgAge}ms ago for lead ${leadId}, skipping`);
-        return;
-      }
+    if (alreadyLoggedMsg?.id) {
+      console.log(`[meta/webhook] WAMID-DEDUP: message ${whatsappMessageId} already logged for lead ${leadId}, skipping`);
+      return;
     }
 
     if (recentDuplicateMsg) {
@@ -1092,7 +1097,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     }
 
     // 2-6. Parallelize: log inputs + fetch history + fetch summary (session now guaranteed to exist)
-    const [, , conversationHistory, summaryResult] = await Promise.all([
+    const [, loggedCustomerRow, conversationHistory, summaryResult] = await Promise.all([
       addUserInput(
         sessionId,
         messageText,
@@ -1226,23 +1231,33 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
     // double-tap on a Quick Reply button), the parallel-Promise dedup above
     // can let both invocations through because neither has finished logging
     // when the other queried. By the time we get HERE we've finished writing
-    // our customer row, so re-query for any agent message logged in the last
-    // 5 seconds. If a sibling invocation already replied, skip ours.
+    // our customer row, so we can ask the precise question: has a sibling
+    // already replied TO THIS MESSAGE?
+    //
+    // This used to be "any agent message in the last 5 seconds", which cannot
+    // distinguish a duplicate invocation from a customer who simply replied
+    // fast. It silently swallowed real messages - a lead who answered 4.6s
+    // after our greeting ("Wanted to know about ACT plans", 07 Aug) never got
+    // a response, and neither did "It's not letting me submit anymore".
+    // Anchoring on our own customer row's timestamp keeps the race protection
+    // and drops nothing the customer actually sent.
     {
-      const fiveSecAgo = new Date(Date.now() - 5_000).toISOString();
-      const { data: siblingAgent } = await supabase
-        .from('conversations')
-        .select('id, created_at')
-        .eq('lead_id', leadId)
-        .eq('channel', 'whatsapp')
-        .eq('sender', 'agent')
-        .gte('created_at', fiveSecAgo)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (siblingAgent?.id) {
-        console.log(`[meta/webhook] PRE-AI DEDUP: sibling agent reply ${siblingAgent.id} written in last 5s for lead ${leadId}, skipping`);
-        return;
+      const ourRowAt = loggedCustomerRow?.created_at;
+      if (ourRowAt) {
+        const { data: siblingAgent } = await supabase
+          .from('conversations')
+          .select('id, created_at')
+          .eq('lead_id', leadId)
+          .eq('channel', 'whatsapp')
+          .eq('sender', 'agent')
+          .gte('created_at', ourRowAt)   // strictly AFTER our inbound message
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (siblingAgent?.id) {
+          console.log(`[meta/webhook] PRE-AI DEDUP: sibling already answered this message (agent row ${siblingAgent.id}) for lead ${leadId}, skipping`);
+          return;
+        }
       }
     }
 

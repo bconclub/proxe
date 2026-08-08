@@ -1391,12 +1391,51 @@ export async function POST(request: NextRequest) {
         const recentDuplicate = mapped
           ? await wasTemplateRecentlySent(supabase, leadId, mapped.template, dedupWindowMs)
           : false
+
+        // ATOMIC CLAIM. wasTemplateRecentlySent above is a read-then-write
+        // check, so concurrent deliveries of the same event all read "not
+        // sent" before any of them writes. Live on 06 Aug 2026 the website
+        // posted one payout event 7 times inside a single second and the
+        // scout got 7 identical messages. Claiming a row with a UNIQUE
+        // (lead_id, event_key) makes the winner unambiguous - the database
+        // decides, not a lookup that is already stale by the time we send.
+        // Bucketed key so genuinely repeatable events still fire later:
+        // one-time stages are keyed bare, submission by day, payout by 5 min.
+        let claimedEvent = true
+        if (mapped && !recentDuplicate) {
+          const BUCKET_MS: Record<string, number> = {
+            submission: SUBMISSION_DEDUP_MS,
+            payout: 5 * 60 * 1000,
+          }
+          const bucket = BUCKET_MS[canonicalEvent]
+          const eventKey = bucket
+            ? `${canonicalEvent}:${Math.floor(Date.now() / bucket)}`
+            : canonicalEvent
+          const { error: claimErr } = await supabase
+            .from('scout_event_sends')
+            .insert({ lead_id: leadId, event_key: eventKey, template: mapped.template })
+          if (claimErr) {
+            if (claimErr.code === '23505') {
+              claimedEvent = false
+              console.log(`[inbound] Lokazen scout event ALREADY CLAIMED (${eventKey}) lead=${leadId} - duplicate delivery, no send`)
+            } else if (claimErr.code === '42P01') {
+              // Migration 007 not applied yet. Fall through to the old
+              // time-window behaviour rather than blocking every scout send.
+              console.warn('[inbound] scout_event_sends table missing (run migration 007) - falling back to time-window dedup only')
+            } else {
+              console.error('[inbound] scout event claim failed:', claimErr.code, claimErr.message)
+            }
+          }
+        }
+
         if (!mapped) {
           console.log(`[inbound] Lokazen scout event has no template mapping: ${scoutEventToSend} (context persisted, no send)`)
         } else if (!activeTemplates.has(mapped.template)) {
           console.log(`[inbound] Lokazen scout template disabled via LOKAZEN_ACTIVE_SCOUT_TEMPLATES override: ${mapped.template} (context persisted, no send).`)
         } else if (recentDuplicate) {
           console.log(`[inbound] Lokazen scout template SKIPPED as duplicate (sent within last 5 min): ${mapped.template} lead=${leadId}`)
+        } else if (!claimedEvent) {
+          console.log(`[inbound] Lokazen scout template SKIPPED - concurrent duplicate lost the claim: ${mapped.template} lead=${leadId}`)
         } else {
           // Fully static templates (params.length === 0) get an empty components
           // array - Meta hard-fails on a BODY component whose parameter count

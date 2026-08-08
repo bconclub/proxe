@@ -28,6 +28,7 @@ export const lokazenConfig: BrandConfig = {
     leadAccess: true, // Per-user ownership + Owner/Brand/Scout access + Humans overview (needs migration 005)
     campaigns: true, // AI campaign workspace
     logCallChat: true, // chat with PROXe after logging a call
+    staleConversationAlerts: true, // Slack ping when a customer waits 2h+ with no reply (human took over then went quiet)
   },
   brain: {
     persona: ' — the intelligence behind Lokazen\'s commercial real-estate matching operation in Bangalore',
