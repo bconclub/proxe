@@ -116,6 +116,13 @@ export interface BrandConfig {
    * breakdown; leave it unset and every active user is listed.
    */
   callers?: string[];
+  /**
+   * When the team is on shift, IST 24h. Any call-back or reminder the AI
+   * proposes is pulled inside this window - it was booking 9am call-backs for
+   * a team that starts at 10, which is a promise to the lead nobody is there
+   * to keep.
+   */
+  workingHours?: { start: string; end: string };
   pipeline?: {
     keyEventLabel?: string;
     // Approved WhatsApp template sent when a call is logged as not-connected

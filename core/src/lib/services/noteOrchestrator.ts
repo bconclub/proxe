@@ -17,6 +17,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { recordTokenUsage, usageFrom } from '@/lib/token-usage';
 import { sendWhatsAppText } from './whatsappSender';
+import { getBrandConfig } from '@/configs';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -274,6 +275,24 @@ export function resolveBookingDate(dateStr: string, timeStr: string | null): Dat
       else if (ampm === 'pm' && hour !== 12) hour += 12;
       else if (!ampm && hour >= 1 && hour <= 8) hour += 12;
     }
+  }
+
+  // Keep it inside the team's shift.
+  //
+  // The planner reads "tomorrow morning" as 9am, and a counsellor who starts
+  // at 10 is handed a promise nobody can keep - the lead was told 9 and there
+  // is no one there. Same at the far end: an 8pm call-back is a call nobody
+  // makes. A time outside the window is pulled to its nearest edge instead of
+  // being booked as stated.
+  const wh = getBrandConfig().workingHours;
+  if (wh) {
+    const [sh, sm] = String(wh.start || '10:00').split(':').map((n) => parseInt(n, 10));
+    const [eh, em] = String(wh.end || '19:00').split(':').map((n) => parseInt(n, 10));
+    const startMin = (isNaN(sh) ? 10 : sh) * 60 + (isNaN(sm) ? 0 : sm);
+    const endMin = (isNaN(eh) ? 19 : eh) * 60 + (isNaN(em) ? 0 : em);
+    const asMinutes = hour * 60 + minutes;
+    if (asMinutes < startMin) { hour = Math.floor(startMin / 60); minutes = startMin % 60; }
+    else if (asMinutes > endMin) { hour = Math.floor(endMin / 60); minutes = endMin % 60; }
   }
 
   targetIST.setUTCHours(hour, minutes, 0, 0);

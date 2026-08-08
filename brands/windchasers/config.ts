@@ -38,6 +38,8 @@ export const windchasersConfig: BrandConfig = {
     'haseebcr90@gmail.com',
     'namrata.baraik@gmail.com',
   ],
+  // Counsellor shifts. Nothing gets booked or reminded outside these hours.
+  workingHours: { start: '10:00', end: '19:00' },
   // A call nobody picked up leaves the lead in silence unless we say
   // something. This template carries the call-back slot the caller just set,
   // so the lead learns WHEN we are ringing back, not merely that we rang.
