@@ -29,6 +29,15 @@ export const windchasersConfig: BrandConfig = {
     campaigns: true, // chat-driven campaign builder — audience pull + template match/draft
     logCallChat: true, // chat with PROXe after logging a call
   },
+  // The three people who call leads. Admin and analyst accounts are left out
+  // so the reports do not carry three permanent zeros nobody is meant to act
+  // on - Namrata is here because she logs her calls as notes, which the brief
+  // now counts.
+  callers: [
+    'bgomesrichard@gmail.com',
+    'haseebcr90@gmail.com',
+    'namrata.baraik@gmail.com',
+  ],
   // A call nobody picked up leaves the lead in silence unless we say
   // something. This template carries the call-back slot the caller just set,
   // so the lead learns WHEN we are ringing back, not merely that we rang.

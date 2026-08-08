@@ -105,6 +105,16 @@ export interface BrandConfig {
   // key milestone stage ("Demo Booked", "Site Visit Booked"…) - admins can
   // override it from the dashboard (stored in dashboard_settings key
   // 'pipeline_config'), and the stored value wins over this default.
+  /**
+   * Who actually calls leads, by email.
+   *
+   * The reports name everyone on the team including the zeros, which is the
+   * point - a zero is the number worth asking about. But an admin or an
+   * analyst who never calls sitting at "0" every day is noise that trains
+   * people to skip the line. Only these accounts appear in the calls
+   * breakdown; leave it unset and every active user is listed.
+   */
+  callers?: string[];
   pipeline?: {
     keyEventLabel?: string;
     // Approved WhatsApp template sent when a call is logged as not-connected

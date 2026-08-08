@@ -1,5 +1,5 @@
 import { getServiceClient } from '@/lib/services'
-import { BRAND_ID } from '@/configs'
+import { BRAND_ID, getBrandConfig } from '@/configs'
 
 /**
  * Answering questions asked in the group.
@@ -127,7 +127,10 @@ export async function answerQuestion(raw: string): Promise<string | null> {
       .from('dashboard_users')
       .select('id, full_name, email')
       .eq('is_active', true)
+    // Only the people whose job is calling - see brandConfig.callers.
+    const callerList = (getBrandConfig().callers || []).map((e: string) => e.toLowerCase())
     const who = (us || [])
+      .filter((u: any) => !callerList.length || callerList.includes(String(u.email || '').toLowerCase()))
       .map((u: any) => ({
         name: u.full_name || (u.email || '').split('@')[0] || 'Someone',
         n: byUser.get(u.id) || 0,

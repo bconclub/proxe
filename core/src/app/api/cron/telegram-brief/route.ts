@@ -454,7 +454,11 @@ export async function GET(request: NextRequest) {
       .select('id, full_name, email')
       .eq('is_active', true)
 
+    // Only the people whose job is calling. An admin parked at 0 every day is
+    // noise that teaches people to skip the whole line.
+    const callerList = (getBrandConfig().callers || []).map((e) => e.toLowerCase())
     for (const u of teamUsers || []) {
+      if (callerList.length && !callerList.includes(String(u.email || '').toLowerCase())) continue
       const name = u.full_name || (u.email || '').split('@')[0] || 'Someone'
       callerRows.push([name, byUser.get(u.id) || 0])
     }
