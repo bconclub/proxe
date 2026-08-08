@@ -69,7 +69,11 @@ interface SavedCampaign {
    * own template and its own receipts, so they list underneath rather than
    * collapsing into a single number.
    */
-  messages?: Array<{ template: string; sent: number; delivered: number; read: number; first: string; last: string }>
+  messages?: Array<{
+    template: string; sent: number; delivered: number; read: number; first: string; last: string
+    /** Per-day sent/delivered/read from Meta, when available. */
+    days?: Array<{ day: string; sent: number; delivered: number; read: number }>
+  }>
 }
 interface SentSend {
   label: string
@@ -1282,14 +1286,30 @@ function PreviousCampaigns() {
                     </div>
                   ) : (
                     (r.savedC.messages || []).map((m, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px] rounded-lg px-2.5 py-1.5" style={{ background: 'var(--bg-primary)' }}>
-                        <span className="font-mono text-[10px] truncate flex-1" style={{ color: 'var(--text-secondary)' }}>{m.template}</span>
-                        <span className="shrink-0" style={{ color: 'var(--text-muted)' }}>
-                          {new Date(m.last).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-                        </span>
-                        <span className="shrink-0 font-semibold tabular-nums" style={{ color: PURPLE }}>{m.sent} sent</span>
-                        <span className="shrink-0 tabular-nums" style={{ color: BLUE }}>{m.delivered} delivered</span>
-                        <span className="shrink-0 tabular-nums" style={{ color: GREEN }}>{m.read} read</span>
+                      <div key={i} className="rounded-lg px-2.5 py-2" style={{ background: 'var(--bg-primary)' }}>
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <span className="font-mono text-[10px] truncate flex-1" style={{ color: 'var(--text-secondary)' }}>{m.template}</span>
+                          <span className="shrink-0 font-semibold tabular-nums" style={{ color: PURPLE }}>{m.sent} sent</span>
+                          <span className="shrink-0 tabular-nums" style={{ color: BLUE }}>{m.delivered} delivered</span>
+                          <span className="shrink-0 tabular-nums" style={{ color: GREEN }}>{m.read} read</span>
+                        </div>
+                        {/* Day by day, from Meta. "How many went out and how
+                            many were read" is a daily question - a single
+                            total hides a send that landed overnight. */}
+                        {!!m.days?.length && (
+                          <div className="mt-1.5 pt-1.5 space-y-0.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                            {m.days.map((d) => (
+                              <div key={d.day} className="flex items-center gap-3 text-[10.5px]">
+                                <span className="w-[68px] shrink-0" style={{ color: 'var(--text-muted)' }}>
+                                  {new Date(`${d.day}T00:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' })}
+                                </span>
+                                <span className="tabular-nums" style={{ color: PURPLE }}>{d.sent} sent</span>
+                                <span className="tabular-nums" style={{ color: BLUE }}>{d.delivered} delivered</span>
+                                <span className="tabular-nums" style={{ color: GREEN }}>{d.read} read</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))
                   )}

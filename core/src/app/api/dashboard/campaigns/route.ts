@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/services'
+import { resolveTemplateIds, fetchTemplateAnalytics } from '@/lib/services/templateAnalytics'
 
 export const dynamic = 'force-dynamic'
 
@@ -185,10 +186,55 @@ export async function GET() {
         else row.delivered++
       }
 
+      // Meta's own per-template numbers. Our receipts only cover sends logged
+      // with a wa_message_id - the first 154 have none - but Meta kept the
+      // counts anyway, per template per day. Authoritative, and it fills the
+      // history we never wrote down.
+      const templateNames = Array.from(
+        new Set(
+          Array.from(msgAgg.values()).flatMap((byTpl) =>
+            Array.from(byTpl.keys()).filter((t) => t && t !== 'message'),
+          ),
+        ),
+      ) as string[]
+
+      let metaByTemplate = new Map<string, any>()
+      if (templateNames.length) {
+        try {
+          const idMap = await resolveTemplateIds(templateNames)
+          const ids2 = Array.from(idMap.values()).map((v) => v.id)
+          if (ids2.length) {
+            const oldest = Array.from(msgAgg.values())
+              .flatMap((m) => Array.from(m.values()))
+              .reduce((min: string | null, r: any) => (!min || r.first < min ? r.first : min), null)
+            const stats = await fetchTemplateAnalytics(
+              ids2,
+              new Date(oldest ? Date.parse(oldest) - 86_400_000 : Date.now() - 30 * 86_400_000),
+            )
+            for (const [name, { id }] of idMap) {
+              const s = stats.get(id)
+              if (s) metaByTemplate.set(name, s)
+            }
+          }
+        } catch (e: any) {
+          console.error('[campaigns] template analytics unavailable:', e?.message || e)
+        }
+      }
+
       for (const c of campaigns) {
         const t = totals.get(c.id) || { sent: 0, failed: 0, skipped: 0 }
         const msgs = Array.from((msgAgg.get(c.id) || new Map()).values())
-          .map(({ ids: _ids, ...m }: any) => m) // drop the id list from the payload
+          .map(({ ids: _ids, ...m }: any) => {
+            const meta = metaByTemplate.get(m.template)
+            if (meta) {
+              // Meta wins on receipts - it saw every one, including the ones
+              // that landed while nothing of ours was listening.
+              m.delivered = meta.total.delivered
+              m.read = meta.total.read
+              m.days = meta.days
+            }
+            return m
+          })
           .sort((a: any, b: any) => String(b.last).localeCompare(String(a.last)))
 
         const delivered = msgs.reduce((n: number, m: any) => n + m.delivered, 0)
@@ -199,7 +245,9 @@ export async function GET() {
           skipped: t.skipped,
           delivered,
           read,
-          tracked: msgs.reduce((n: number, m: any) => n + m.sent, 0),
+          // Meta reports on every send, so once its numbers are in the whole
+          // campaign is tracked - not just the part we logged ourselves.
+          tracked: msgs.some((m: any) => m.days) ? t.sent : msgs.reduce((n: number, m: any) => n + m.sent, 0),
         }
         c.messages = msgs
       }
