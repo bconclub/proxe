@@ -160,7 +160,12 @@ export async function GET() {
   }
 
   // ── 3. Voice grievance prompts (per language) ────────────────────────────
+  // POP ONLY. These are the Punjab grievance-call prompts (Punjabi / Hindi /
+  // English "Sab di sunenge" calls). They were emitted for every brand, so
+  // Lokazen's knowledge graph showed "Punjabi Call" / "Hindi Call" nodes that
+  // have nothing to do with commercial real estate - a brand bleed.
   try {
+    if (getCurrentBrandId() !== 'pop') throw new Error('__skip_voice_prompts__')
     const mod = await import('@/lib/server/voicePromptConfig')
     const editable = await mod.getEditableVoicePrompts()
     const langLabel: Record<string, string> = { pa: 'Punjabi', hi: 'Hindi', en: 'English' }
@@ -180,8 +185,9 @@ export async function GET() {
       // Voice prompts feed the Voice channel node if it exists.
       if (hubUsed.has('chan:voice')) link(id, 'chan:voice')
     }
-  } catch (e) {
-    console.error('[kb-graph] voice prompts failed (brand may have none)', e)
+  } catch (e: any) {
+    // The POP-only skip above is deliberate, not a failure - stay quiet for it.
+    if (e?.message !== '__skip_voice_prompts__') console.error('[kb-graph] voice prompts failed (brand may have none)', e)
   }
 
   // ── 4. Brain prompts (summary / reflection / vocabulary) ─────────────────
